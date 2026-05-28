@@ -1,46 +1,18 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+agent-platform = {workspace = true}
 
 [dependency-groups]
 dev = [
-  "pytest>=9.0.3,<10",
+  "agent-platform",
+  "pytest>=8.0,<9",
   # Used only by tests/integration/ — read HAI_API_KEY_TEST when running locally.
-  "python-dotenv>=1.2.2,<2",
+  "python-dotenv>=1.0,<2",
   # Must match the ruff pin in config.yaml's post_hooks so local `uv sync --group dev`
   # gets the same ruff that the SDK regen uses.
-  "ruff==0.15.15"
-]
-
-[project]
-name = "agent-platform"
-version = "0.0.0"
-description = "Python SDK for H Company's Agent Platform"
-requires-python = ">=3.10"
-readme = "README.md"
-authors = [{name = "H Company"}]
-license = {text = "MIT"}
-license-files = ["LICENSE"]
-dependencies = [
-  "httpx>=0.28.1,<0.29.0",
-  "pydantic>=2.13.4,<3",
-  "python-dateutil>=2.9.0.post0,<3",
-  "attrs>=26.1.0"
-]
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/agent_platform"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-# By default, integration tests are excluded — they hit a live API. Run them
-# explicitly with `pytest -m integration`. The nightly CI workflow uses
-# `-m "integration and not slow"` for the cheap tier and the full marker
-# for the slow tier.
-addopts = "-ra -q -m 'not integration'"
-markers = [
-  "integration: tests that hit a live Agent Platform backend (requires HAI_API_KEY_TEST)",
-  "slow: integration tests that consume significant tokens or wall-clock time"
+  "ruff==0.15.13"
 ]
 
 [tool.ruff]

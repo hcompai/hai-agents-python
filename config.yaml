@@ -9,7 +9,7 @@ use_path_prefixes_for_title_model_names: true
 field_prefix: "field_"
 post_hooks:
   # Strip the standalone-package skeleton that `--meta uv` writes alongside the
-  # generated package. We install + ship via the root pyproject.toml; these
+  # generated package. We install + ship via packages/sdk/pyproject.toml; these
   # would just be unused noise in every regen diff.
   - "rm -f pyproject.toml README.md .gitignore"
   # I    = isort (group/sort imports)

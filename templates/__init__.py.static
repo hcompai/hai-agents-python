@@ -2,10 +2,10 @@
 
 This module is the hand-written entry point. The rest of the package
 (``api/``, ``models/``, ``client.py``, etc.) is generated from
-``sdk/python/openapi.json`` by ``openapi-python-client==0.28.3``.
+``openapi.json`` by ``openapi-python-client==0.28.3``.
 
-Do NOT edit ``sdk/python/src/agent_platform/__init__.py`` directly — it
-is overwritten on every regen. Edit ``sdk/python/templates/__init__.py.static``
+Do NOT edit ``packages/sdk/src/agent_platform/__init__.py`` directly — it
+is overwritten on every regen. Edit ``templates/__init__.py.static``
 instead; the schema-sync workflow restores it after each regeneration.
 """
 

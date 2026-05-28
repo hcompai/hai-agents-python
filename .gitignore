@@ -1,7 +1,7 @@
-# src/agent_platform/ is generated but committed: that's how drift detection works.
-# Sync PRs from regen-on-dispatch.yaml commit the regenerated src/ so reviewers can
-# see what changed. test.yaml regenerates again from openapi.json on every PR and
-# tests the result.
+# packages/sdk/src/agent_platform/ is generated but committed: that's how drift
+# detection works. Sync PRs from regen-on-dispatch.yaml commit the regenerated src/
+# so reviewers can see what changed. test.yaml regenerates again from openapi.json on
+# every PR and tests the result.
 
 .openapi-generator-ignore
 .openapi-generator/
