@@ -19,10 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
 
       - name: Install openapi-python-client
         run: uv tool install openapi-python-client==0.28.3
@@ -65,10 +65,10 @@ jobs:
       HAI_API_KEY_TEST: ${{ secrets.HAI_API_KEY_TEST }}
       HAI_API_BASE_URL_TEST: "https://agp.hcompany.ai"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
 
       - name: Install openapi-python-client
         run: uv tool install openapi-python-client==0.28.3
