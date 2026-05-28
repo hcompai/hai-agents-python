@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-platform"
+version = "0.0.0"
+description = "Python SDK for H Company's Agent Platform"
+requires-python = ">=3.10"
+readme = "README.md"
+authors = [{name = "H Company"}]
+license = {text = "MIT"}
+license-files = ["LICENSE"]
+dependencies = [
+  "httpx>=0.23.0,<0.29.0",
+  "pydantic>=2.0,<3",
+  "python-dateutil>=2.8.0,<3",
+  "attrs>=22.2.0"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_platform"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# By default, integration tests are excluded — they hit a live API. Run them
+# explicitly with `pytest -m integration`. The nightly CI workflow uses
+# `-m "integration and not slow"` for the cheap tier and the full marker
+# for the slow tier.
+addopts = "-ra -q -m 'not integration'"
+markers = [
+  "integration: tests that hit a live Agent Platform backend (requires HAI_API_KEY_TEST)",
+  "slow: integration tests that consume significant tokens or wall-clock time"
+]

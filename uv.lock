@@ -2,22 +2,28 @@ version = 1
 revision = 3
 requires-python = ">=3.10"
 
+[manifest]
+members = [
+    "agent-platform",
+]
+
+[manifest.dependency-groups]
+dev = [
+    { name = "agent-platform", editable = "packages/sdk" },
+    { name = "pytest", specifier = ">=8.0,<9" },
+    { name = "python-dotenv", specifier = ">=1.0,<2" },
+    { name = "ruff", specifier = "==0.15.13" },
+]
+
 [[package]]
 name = "agent-platform"
-version = "0.1.0"
-source = { editable = "." }
+version = "0.0.0"
+source = { editable = "packages/sdk" }
 dependencies = [
     { name = "attrs" },
     { name = "httpx" },
     { name = "pydantic" },
     { name = "python-dateutil" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "python-dotenv" },
-    { name = "ruff" },
 ]
 
 [package.metadata]
@@ -26,13 +32,6 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.23.0,<0.29.0" },
     { name = "pydantic", specifier = ">=2.0,<3" },
     { name = "python-dateutil", specifier = ">=2.8.0,<3" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.0,<9" },
-    { name = "python-dotenv", specifier = ">=1.0,<2" },
-    { name = "ruff", specifier = "==0.15.13" },
 ]
 
 [[package]]

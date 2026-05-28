@@ -114,15 +114,15 @@ jobs:
         run: |
           uv run --no-project python scripts/prepare_openapi.py \
             /tmp/agp-schema/openapi.json /tmp/openapi.filtered.json
-          rm -rf src/agent_platform/
+          rm -rf packages/sdk/src/agent_platform/
           openapi-python-client generate \
             --path /tmp/openapi.filtered.json \
             --config config.yaml \
             --custom-template-path templates/ \
             --meta uv \
-            --output-path src/ \
+            --output-path packages/sdk/src/ \
             --overwrite
-          cp templates/__init__.py.static src/agent_platform/__init__.py
+          cp templates/__init__.py.static packages/sdk/src/agent_platform/__init__.py
           rm /tmp/openapi.filtered.json
 
       - name: Refresh committed openapi.json snapshot
@@ -131,10 +131,10 @@ jobs:
       - name: Verify SDK installs and unit tests pass
         run: |
           python3 -m venv /tmp/sdk-check
-          /tmp/sdk-check/bin/pip install --quiet -e . "pytest>=8,<9"
+          /tmp/sdk-check/bin/pip install --quiet -e packages/sdk "pytest>=8,<9"
           /tmp/sdk-check/bin/python -c "from agent_platform import Client; Client(api_key='hk-smoke', base_url='http://x'); print('SDK install + import OK')"
-          /tmp/sdk-check/bin/pytest tests/ -m "not integration" -q
-          /tmp/sdk-check/bin/pytest tests/integration --collect-only -m integration -q
+          /tmp/sdk-check/bin/pytest packages/sdk/tests -m "not integration" -q
+          /tmp/sdk-check/bin/pytest packages/sdk/tests/integration --collect-only -m integration -q
 
       - name: Detect if there's a diff to PR
         id: diff
@@ -159,7 +159,7 @@ jobs:
           NEW_VERSION=$(python3 - <<'PY'
           import os, re, pathlib
 
-          path = pathlib.Path("pyproject.toml")
+          path = pathlib.Path("packages/sdk/pyproject.toml")
           text = path.read_text()
           match = re.search(r'^version = "(\d+)\.(\d+)\.(\d+)"', text, re.MULTILINE)
           major, minor, patch = (int(g) for g in match.groups())
@@ -207,6 +207,6 @@ jobs:
 
             ## Reviewer checklist
 
-            - [ ] Diff in `src/` looks consistent with upstream changes
+            - [ ] Diff in `packages/sdk/src/` looks consistent with upstream changes
             - [ ] Version bump (`${{ steps.version.outputs.new_version }}`) matches the change's severity
             - [ ] Tests pass (CI)

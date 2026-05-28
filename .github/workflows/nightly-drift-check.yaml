@@ -69,15 +69,15 @@ jobs:
         run: |
           uv run --no-project python scripts/prepare_openapi.py \
             /tmp/agp-schema/openapi.json /tmp/openapi.filtered.json
-          rm -rf src/agent_platform/
+          rm -rf packages/sdk/src/agent_platform/
           openapi-python-client generate \
             --path /tmp/openapi.filtered.json \
             --config config.yaml \
             --custom-template-path templates/ \
             --meta uv \
-            --output-path src/ \
+            --output-path packages/sdk/src/ \
             --overwrite
-          cp templates/__init__.py.static src/agent_platform/__init__.py
+          cp templates/__init__.py.static packages/sdk/src/agent_platform/__init__.py
           rm /tmp/openapi.filtered.json
 
       - name: Refresh openapi.json snapshot
@@ -108,7 +108,7 @@ jobs:
           labels: auto-sync,drift
           body: |
             The nightly safety-net workflow detected drift between the committed
-            `src/` (+ `openapi.json` snapshot) and the latest OpenAPI schema
+            `packages/sdk/src/` (+ `openapi.json` snapshot) and the latest OpenAPI schema
             artifact published by `hcompai/agent_platform`'s `main` branch.
 
             This usually means the `repository_dispatch` from `hcompai/agent_platform`

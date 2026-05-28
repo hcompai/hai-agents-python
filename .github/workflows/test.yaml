@@ -31,30 +31,30 @@ jobs:
         run: |
           uv run --no-project python scripts/prepare_openapi.py \
             openapi.json /tmp/openapi.filtered.json
-          rm -rf src/agent_platform/
+          rm -rf packages/sdk/src/agent_platform/
           openapi-python-client generate \
             --path /tmp/openapi.filtered.json \
             --config config.yaml \
             --custom-template-path templates/ \
             --meta uv \
-            --output-path src/ \
+            --output-path packages/sdk/src/ \
             --overwrite
-          cp templates/__init__.py.static src/agent_platform/__init__.py
+          cp templates/__init__.py.static packages/sdk/src/agent_platform/__init__.py
           rm /tmp/openapi.filtered.json
 
       - name: Install SDK + dev deps
         run: |
           python3 -m venv /tmp/sdk-venv
-          /tmp/sdk-venv/bin/pip install --quiet -e . "pytest>=8,<9" "python-dotenv>=1,<2"
+          /tmp/sdk-venv/bin/pip install --quiet -e packages/sdk "pytest>=8,<9" "python-dotenv>=1,<2"
 
       - name: Smoke import
         run: /tmp/sdk-venv/bin/python -c "from agent_platform import Client, AsyncClient; Client(api_key='hk-smoke', base_url='http://x'); print('SDK install + import OK')"
 
       - name: Unit tests
-        run: /tmp/sdk-venv/bin/pytest tests/ -m "not integration" -v
+        run: /tmp/sdk-venv/bin/pytest packages/sdk/tests -m "not integration" -v
 
       - name: Collect integration tests
-        run: /tmp/sdk-venv/bin/pytest tests/integration --collect-only -m integration -q
+        run: /tmp/sdk-venv/bin/pytest packages/sdk/tests/integration --collect-only -m integration -q
 
   integration-live:
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
@@ -77,23 +77,23 @@ jobs:
         run: |
           uv run --no-project python scripts/prepare_openapi.py \
             openapi.json /tmp/openapi.filtered.json
-          rm -rf src/agent_platform/
+          rm -rf packages/sdk/src/agent_platform/
           openapi-python-client generate \
             --path /tmp/openapi.filtered.json \
             --config config.yaml \
             --custom-template-path templates/ \
             --meta uv \
-            --output-path src/ \
+            --output-path packages/sdk/src/ \
             --overwrite
-          cp templates/__init__.py.static src/agent_platform/__init__.py
+          cp templates/__init__.py.static packages/sdk/src/agent_platform/__init__.py
           rm /tmp/openapi.filtered.json
 
       - name: Install SDK
         run: |
           python3 -m venv /tmp/sdk-venv
           /tmp/sdk-venv/bin/pip install --quiet --index-url https://pypi.org/simple \
-            -e . "pytest>=8,<9" "python-dotenv>=1,<2"
+            -e packages/sdk "pytest>=8,<9" "python-dotenv>=1,<2"
 
       - name: Run fast integration tier
         if: env.HAI_API_KEY_TEST != ''
-        run: /tmp/sdk-venv/bin/pytest tests/integration -m "integration and not slow" -v --tb=short
+        run: /tmp/sdk-venv/bin/pytest packages/sdk/tests/integration -m "integration and not slow" -v --tb=short

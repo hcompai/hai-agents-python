@@ -14,18 +14,18 @@ regen-sdk:
 	echo "Regenerating SDK from $(SCHEMA)..."; \
 	uv run --no-project python scripts/prepare_openapi.py \
 		"$(SCHEMA)" /tmp/openapi.filtered.json; \
-	rm -rf src/agent_platform/; \
+	rm -rf packages/sdk/src/agent_platform/; \
 	openapi-python-client generate \
 		--path /tmp/openapi.filtered.json \
 		--config config.yaml \
 		--custom-template-path templates/ \
 		--meta uv \
-		--output-path src/ \
+		--output-path packages/sdk/src/ \
 		--overwrite; \
-	cp templates/__init__.py.static src/agent_platform/__init__.py; \
+	cp templates/__init__.py.static packages/sdk/src/agent_platform/__init__.py; \
 	if [ "$(SCHEMA)" != "openapi.json" ]; then cp "$(SCHEMA)" openapi.json; fi; \
 	rm /tmp/openapi.filtered.json; \
-	echo "Regenerated src/. Review and commit if changes look right."
+	echo "Regenerated packages/sdk/src/. Review and commit if changes look right."
 
 # Pull the latest schema artifact published by agent_platform's main branch and regen.
 # Requires `gh` CLI authenticated against hcompai/agent_platform (actions:read).
@@ -48,7 +48,7 @@ regen-sdk-from-main:
 test: test-unit
 
 test-unit:
-	uv run pytest tests/ -m "not integration"
+	uv run pytest packages/sdk/tests -m "not integration"
 
 test-integration:
-	uv run pytest tests/integration -m "integration and not slow"
+	uv run pytest packages/sdk/tests/integration -m "integration and not slow"
