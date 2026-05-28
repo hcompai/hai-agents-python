@@ -1,0 +1,183 @@
+name: Regen SDK on backend dispatch
+
+# Triggered by hcompai/agent_platform's schema-sync workflow whenever the
+# backend's public OpenAPI schema changes. Pulls the freshly-exported schema
+# from that workflow run, regenerates the SDK, and opens a sync PR.
+#
+# The dispatch event from agent_platform carries:
+#   - agp_sha            : the agent_platform commit SHA that produced this schema
+#   - agp_short_sha      : same SHA, abbreviated, for branch / PR titles
+#   - agp_actor          : who merged the upstream PR (for PR body attribution)
+#   - agp_run_id         : the agent_platform workflow run that uploaded the artifact
+#   - agp_artifact_name  : the artifact name containing openapi.json
+#   - agp_commit_message : top line of the agent_platform commit (for PR body context)
+#   - breaking           : "true" / "false" — oasdiff result on the upstream side
+#
+# Required secrets:
+#   AGP_ARTIFACT_TOKEN  - fine-grained PAT or GitHub App token with
+#                         `actions:read` + `contents:read` on hcompai/agent_platform
+
+on:
+  repository_dispatch:
+    types: [backend-updated]
+  workflow_dispatch:
+    inputs:
+      agp_sha:
+        description: "agent_platform commit SHA to regen against"
+        required: true
+        type: string
+      agp_run_id:
+        description: "agent_platform workflow run ID with the openapi.json artifact"
+        required: true
+        type: string
+      agp_artifact_name:
+        description: "Artifact name (default: openapi-schema)"
+        required: false
+        default: openapi-schema
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  # Serialize regen runs so two rapid upstream merges don't race on the
+  # `sync/...` branch / committed openapi.json.
+  group: regen-on-dispatch
+  cancel-in-progress: false
+
+jobs:
+  regen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Resolve inputs
+        id: inputs
+        env:
+          DISPATCH_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+        run: |
+          # Unify repository_dispatch and workflow_dispatch into one set of step outputs
+          # so subsequent steps don't have to branch on event type.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "agp_sha=${{ inputs.agp_sha }}" >> "$GITHUB_OUTPUT"
+            echo "agp_short_sha=$(echo "${{ inputs.agp_sha }}" | cut -c1-7)" >> "$GITHUB_OUTPUT"
+            echo "agp_actor=manual:${{ github.actor }}" >> "$GITHUB_OUTPUT"
+            echo "agp_run_id=${{ inputs.agp_run_id }}" >> "$GITHUB_OUTPUT"
+            echo "agp_artifact_name=${{ inputs.agp_artifact_name }}" >> "$GITHUB_OUTPUT"
+            echo "agp_commit_message=manual regen" >> "$GITHUB_OUTPUT"
+            echo "breaking=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "agp_sha=${{ github.event.client_payload.agp_sha }}" >> "$GITHUB_OUTPUT"
+            echo "agp_short_sha=${{ github.event.client_payload.agp_short_sha }}" >> "$GITHUB_OUTPUT"
+            echo "agp_actor=${{ github.event.client_payload.agp_actor }}" >> "$GITHUB_OUTPUT"
+            echo "agp_run_id=${{ github.event.client_payload.agp_run_id }}" >> "$GITHUB_OUTPUT"
+            echo "agp_artifact_name=${{ github.event.client_payload.agp_artifact_name }}" >> "$GITHUB_OUTPUT"
+            echo "agp_commit_message=${{ github.event.client_payload.agp_commit_message }}" >> "$GITHUB_OUTPUT"
+            echo "breaking=${{ github.event.client_payload.breaking }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install openapi-python-client
+        run: uv tool install openapi-python-client==0.28.3
+
+      - name: Fetch openapi.json from agent_platform workflow artifact
+        env:
+          GH_TOKEN: ${{ secrets.AGP_ARTIFACT_TOKEN }}
+        run: |
+          gh run download "${{ steps.inputs.outputs.agp_run_id }}" \
+            --repo hcompai/agent_platform \
+            --name "${{ steps.inputs.outputs.agp_artifact_name }}" \
+            --dir /tmp/agp-schema
+          # Sanity-check the artifact: must be valid OpenAPI 3.x with at least
+          # a handful of paths, otherwise refuse to overwrite the committed schema.
+          python3 - <<'PY'
+          import json, sys
+          with open("/tmp/agp-schema/openapi.json") as f:
+              schema = json.load(f)
+          assert schema.get("openapi", "").startswith("3."), f"Not OpenAPI 3.x: {schema.get('openapi')!r}"
+          paths = schema.get("paths", {})
+          assert len(paths) > 5, f"Suspiciously few paths in fetched schema: {len(paths)}"
+          print(f"Schema OK: openapi={schema['openapi']}, {len(paths)} paths")
+          PY
+
+      - name: Regenerate SDK
+        working-directory: python
+        run: |
+          uv run --no-project --with pyyaml python scripts/filter_openapi.py \
+            /tmp/agp-schema/openapi.json filter.yaml /tmp/openapi.filtered.json
+          rm -rf src/agent_platform/
+          openapi-python-client generate \
+            --path /tmp/openapi.filtered.json \
+            --config config.yaml \
+            --custom-template-path templates/ \
+            --meta uv \
+            --output-path src/ \
+            --overwrite
+          cp templates/__init__.py.static src/agent_platform/__init__.py
+          rm /tmp/openapi.filtered.json
+
+      - name: Refresh committed openapi.json snapshot
+        run: cp /tmp/agp-schema/openapi.json openapi.json
+
+      - name: Verify SDK installs and unit tests pass
+        run: |
+          python3 -m venv /tmp/sdk-check
+          /tmp/sdk-check/bin/pip install --quiet ./python "pytest>=8,<9"
+          /tmp/sdk-check/bin/python -c "from agent_platform import Client; Client(api_key='hk-smoke', base_url='http://x'); print('SDK install + import OK')"
+          cd python
+          /tmp/sdk-check/bin/pytest tests/ -m "not integration" -q
+          /tmp/sdk-check/bin/pytest tests/integration --collect-only -m integration -q
+
+      - name: Detect if there's a diff to PR
+        id: diff
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "has_diff=false" >> "$GITHUB_OUTPUT"
+            echo "No regeneration diff — SDK is already up to date with the upstream schema."
+          else
+            echo "has_diff=true" >> "$GITHUB_OUTPUT"
+            echo "## Regen diff stats" >> "$GITHUB_STEP_SUMMARY"
+            git diff --staged --stat | tail -20 >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Open sync PR
+        if: steps.diff.outputs.has_diff == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: sync/agent-platform-${{ steps.inputs.outputs.agp_short_sha }}
+          delete-branch: true
+          commit-message: |
+            chore(sdk): sync to agent_platform@${{ steps.inputs.outputs.agp_short_sha }}
+
+            Upstream commit: ${{ steps.inputs.outputs.agp_commit_message }}
+            By: ${{ steps.inputs.outputs.agp_actor }}
+          title: "chore(sdk): sync to agent_platform@${{ steps.inputs.outputs.agp_short_sha }}"
+          labels: |
+            auto-sync
+            ${{ steps.inputs.outputs.breaking == 'true' && 'breaking-change' || '' }}
+          body: |
+            Auto-generated by `regen-on-dispatch.yaml` in response to a backend schema change.
+
+            **Upstream:** [agent_platform@${{ steps.inputs.outputs.agp_short_sha }}](https://github.com/hcompai/agent_platform/commit/${{ steps.inputs.outputs.agp_sha }})
+            **Triggered by:** ${{ steps.inputs.outputs.agp_actor }}
+            **Breaking change:** `${{ steps.inputs.outputs.breaking }}`
+
+            > Upstream commit: ${{ steps.inputs.outputs.agp_commit_message }}
+
+            ## What changed
+
+            See the file diff for the regenerated SDK + updated `openapi.json` snapshot.
+
+            ## Reviewer checklist
+
+            - [ ] Diff in `python/src/` looks consistent with upstream changes
+            - [ ] If labelled `breaking-change`: SemVer major bump justified, downstream consumers notified
+            - [ ] Tests pass (CI)

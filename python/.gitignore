@@ -1,0 +1,12 @@
+# We intentionally commit the generated source under src/ — that's how drift detection works
+# (CI regenerates and checks git diff). DO NOT add `src/` to this file.
+
+# But DO ignore generator metadata sidecars:
+.openapi-generator-ignore
+.openapi-generator/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
