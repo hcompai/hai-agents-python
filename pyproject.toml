@@ -7,12 +7,12 @@ agent-platform = {workspace = true}
 [dependency-groups]
 dev = [
   "agent-platform",
-  "pytest>=8.0,<9",
+  "pytest>=9.0.3,<10",
   # Used only by tests/integration/ — read HAI_API_KEY_TEST when running locally.
-  "python-dotenv>=1.0,<2",
+  "python-dotenv>=1.2.2,<2",
   # Must match the ruff pin in config.yaml's post_hooks so local `uv sync --group dev`
   # gets the same ruff that the SDK regen uses.
-  "ruff==0.15.13"
+  "ruff==0.15.15"
 ]
 
 [tool.ruff]
