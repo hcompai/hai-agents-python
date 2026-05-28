@@ -1,0 +1,4187 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Agent API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000"
+    }
+  ],
+  "paths": {
+    "/api/v2/sessions": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Create Session",
+        "description": "Create an agentic session.\n\nPass ``Idempotency-Key`` for safe retries: identical requests within 24h\nreturn the original session; reuse with a different body returns 422.",
+        "operationId": "create_session_api_v2_sessions_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "List Sessions",
+        "description": "List sessions visible to ``user``.",
+        "operationId": "list_sessions_api_v2_sessions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "owner",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "me",
+                "me-in-organization",
+                "organization",
+                "me-or-organization"
+              ],
+              "type": "string",
+              "default": "me-in-organization",
+              "title": "Owner"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrajectoryStatus"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "agent",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "parent_session_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parent Session Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number (1-based)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number (1-based)"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Number of items per page",
+              "default": 10,
+              "title": "Size"
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort by field",
+              "enum": [
+                "created_at",
+                "-created_at"
+              ],
+              "default": [
+                "-created_at"
+              ],
+              "title": "Sort"
+            },
+            "description": "Sort by field"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SessionSummary_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/quota": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Get Session Quota",
+        "description": "Concurrent-session quota for the authenticated user.",
+        "operationId": "get_session_quota_api_v2_sessions_quota_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v2/sessions/{id}": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Get Session",
+        "description": "Get a session.",
+        "operationId": "get_session_api_v2_sessions__id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Cancel Session",
+        "description": "Cancel the session.",
+        "operationId": "cancel_session_api_v2_sessions__id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{id}/status": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Get Session Status",
+        "description": "Get a session's live status.",
+        "operationId": "get_session_status_api_v2_sessions__id__status_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{id}/messages": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Send Session Messages",
+        "description": "Send a user message (single or batch).",
+        "operationId": "send_session_messages_api_v2_sessions__id__messages_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/UserMessageEvent"
+                  },
+                  {
+                    "$ref": "#/components/schemas/UserMessageBatch"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "type",
+                  "mapping": {
+                    "user_message": "#/components/schemas/UserMessageEvent",
+                    "batch": "#/components/schemas/UserMessageBatch"
+                  }
+                },
+                "title": "Input"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{id}/pause": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Pause Session",
+        "description": "Pause the session.",
+        "operationId": "pause_session_api_v2_sessions__id__pause_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{id}/resume": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Resume Session",
+        "description": "Resume the session.",
+        "operationId": "resume_session_api_v2_sessions__id__resume_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{id}/force_answer": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Force Session Answer",
+        "description": "Ask the agent to emit a final answer on its next step.",
+        "operationId": "force_session_answer_api_v2_sessions__id__force_answer_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{id}/changes": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Get Session Changes",
+        "description": "Long-poll for new events since ``from_index``; 204 if none arrive within ``wait_for_seconds``.",
+        "operationId": "get_session_changes_api_v2_sessions__id__changes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "from_index",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "From Index"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "include_events",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Include Events"
+            }
+          },
+          {
+            "name": "wait_for_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 25,
+              "minimum": 0,
+              "default": 0,
+              "title": "Wait For Seconds"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrajectoryChanges"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No changes since the specified index"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{id}/events": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "List Session Events",
+        "description": "Paginated event history. Use ``/changes`` for live tailing.",
+        "operationId": "list_session_events_api_v2_sessions__id__events_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Size"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "timestamp",
+                      "-timestamp"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TrajectoryEvent_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{id}/feedback": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Submit Session Feedback",
+        "description": "Record semantic-success feedback on the whole session.",
+        "operationId": "submit_session_feedback_api_v2_sessions__id__feedback_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Feedback"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{id}/events/{event_index}/feedback": {
+      "put": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Submit Event Feedback",
+        "description": "Record feedback on a single event in the session's history.",
+        "operationId": "submit_event_feedback_api_v2_sessions__id__events__event_index__feedback_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "event_index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Index"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Feedback"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{id}/share": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Share Session",
+        "description": "Make the session publicly readable; returns the share URL path.",
+        "operationId": "share_session_api_v2_sessions__id__share_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareLink"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Unshare Session",
+        "description": "Revoke public access to the session.",
+        "operationId": "unshare_session_api_v2_sessions__id__share_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{id}/resources/{bucket}/{key}": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Get Session Resource",
+        "description": "Redirect to a presigned S3 URL for a session-owned resource.",
+        "operationId": "get_session_resource_api_v2_sessions__id__resources__bucket___key__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Bucket"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/memories": {
+      "post": {
+        "tags": [
+          "Memories"
+        ],
+        "summary": "Create Memory",
+        "description": "Upsert a memory by ``(org_id, namespace, key)``. 201 on create, 200 on update.",
+        "operationId": "create_memory_api_v2_memories_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMemory"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing memory updated (upsert).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryRecord"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "New memory created."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Memories"
+        ],
+        "summary": "List Memories",
+        "description": "List org memories; optional exact-namespace and key-prefix filters.",
+        "operationId": "list_memories_api_v2_memories_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "namespace",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact namespace filter.",
+              "title": "Namespace"
+            },
+            "description": "Exact namespace filter."
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Key prefix filter.",
+              "title": "Key"
+            },
+            "description": "Key prefix filter."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number (1-based)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number (1-based)"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Number of items per page",
+              "default": 10,
+              "title": "Size"
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort by field",
+              "enum": [
+                "updated_at",
+                "-updated_at"
+              ],
+              "default": [
+                "-updated_at"
+              ],
+              "title": "Sort"
+            },
+            "description": "Sort by field"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_MemoryRecord_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/memories/{id}": {
+      "get": {
+        "tags": [
+          "Memories"
+        ],
+        "summary": "Get Memory",
+        "description": "Get a memory by id.",
+        "operationId": "get_memory_api_v2_memories__id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Memories"
+        ],
+        "summary": "Update Memory",
+        "description": "Update a memory's value.",
+        "operationId": "update_memory_api_v2_memories__id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemory"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Memories"
+        ],
+        "summary": "Delete Memory",
+        "description": "Delete a memory.",
+        "operationId": "delete_memory_api_v2_memories__id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/skills": {
+      "post": {
+        "tags": [
+          "Skills"
+        ],
+        "summary": "Create Skill",
+        "description": "Create a skill.",
+        "operationId": "create_skill_api_v2_skills_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSkill"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Skills"
+        ],
+        "summary": "List Skills",
+        "description": "List skills for the current org, optionally filtered by name prefix.",
+        "operationId": "list_skills_api_v2_skills_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by name prefix.",
+              "title": "Name"
+            },
+            "description": "Filter by name prefix."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number (1-based)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number (1-based)"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Number of items per page",
+              "default": 10,
+              "title": "Size"
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort by field",
+              "enum": [
+                "created_at",
+                "-created_at",
+                "name",
+                "-name"
+              ],
+              "default": [
+                "-created_at"
+              ],
+              "title": "Sort"
+            },
+            "description": "Sort by field"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SkillRecord_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/skills/{id}": {
+      "get": {
+        "tags": [
+          "Skills"
+        ],
+        "summary": "Get Skill",
+        "description": "Get a skill by id.",
+        "operationId": "get_skill_api_v2_skills__id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Skills"
+        ],
+        "summary": "Update Skill",
+        "description": "Update a skill's content.",
+        "operationId": "update_skill_api_v2_skills__id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSkill"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Skills"
+        ],
+        "summary": "Delete Skill",
+        "description": "Delete a skill.",
+        "operationId": "delete_skill_api_v2_skills__id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/environments": {
+      "post": {
+        "tags": [
+          "Environments"
+        ],
+        "summary": "Create Environment",
+        "description": "Create an environment. ``reserved=True`` and the ``h/`` namespace require H-employee privileges.",
+        "operationId": "create_environment_api_v2_environments_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEnvironment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Environments"
+        ],
+        "summary": "List Environments",
+        "description": "List reserved + caller's org environments.",
+        "operationId": "list_environments_api_v2_environments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number (1-based)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number (1-based)"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Number of items per page",
+              "default": 10,
+              "title": "Size"
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort by field",
+              "enum": [
+                "created_at",
+                "-created_at",
+                "env_identifier",
+                "-env_identifier"
+              ],
+              "default": [
+                "-created_at"
+              ],
+              "title": "Sort"
+            },
+            "description": "Sort by field"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_EnvironmentRecord_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/environments/{env_identifier}": {
+      "get": {
+        "tags": [
+          "Environments"
+        ],
+        "summary": "Get Environment",
+        "description": "Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.",
+        "operationId": "get_environment_api_v2_environments__env_identifier__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "env_identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Env Identifier"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Environments"
+        ],
+        "summary": "Update Environment",
+        "description": "Replace ``spec`` + ``description``. ``spec.id`` must match the URL identifier; renames are not supported.",
+        "operationId": "update_environment_api_v2_environments__env_identifier__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "env_identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Env Identifier"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEnvironment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Environments"
+        ],
+        "summary": "Delete Environment",
+        "description": "Delete by identifier. Reserved rows: H employee only.",
+        "operationId": "delete_environment_api_v2_environments__env_identifier__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "env_identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Env Identifier"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/agents": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Create Agent",
+        "description": "Create an agent. ``reserved=True`` and the ``h/`` namespace require H-employee privileges.",
+        "operationId": "create_agent_api_v2_agents_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "List Agents",
+        "description": "List reserved + caller's org agents.",
+        "operationId": "list_agents_api_v2_agents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number (1-based)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number (1-based)"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Number of items per page",
+              "default": 10,
+              "title": "Size"
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort by field",
+              "enum": [
+                "created_at",
+                "-created_at",
+                "agent_identifier",
+                "-agent_identifier"
+              ],
+              "default": [
+                "-created_at"
+              ],
+              "title": "Sort"
+            },
+            "description": "Sort by field"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AgentRecord_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/agents/{agent_identifier}": {
+      "get": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Get Agent",
+        "description": "Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.",
+        "operationId": "get_agent_api_v2_agents__agent_identifier__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Identifier"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Update Agent",
+        "description": "Replace ``spec``. ``spec.name`` must match the URL identifier; renames are not supported.",
+        "operationId": "update_agent_api_v2_agents__agent_identifier__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Identifier"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Delete Agent",
+        "description": "Delete by identifier. Reserved rows: H employee only.",
+        "operationId": "delete_agent_api_v2_agents__agent_identifier__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Identifier"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Agent": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 127,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Unique catalog identifier for this agent. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment')."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Description",
+            "description": "Short summary advertised to parent agents that may delegate to this one."
+          },
+          "environments": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Browser"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CodeSandbox"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MCP"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Memory"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "code": "#/components/schemas/CodeSandbox",
+                      "mcp": "#/components/schemas/MCP",
+                      "memory": "#/components/schemas/Memory",
+                      "web": "#/components/schemas/Browser"
+                    }
+                  }
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Environments",
+            "description": "Environments the agent runs in. A string entry references a catalog id; an inline Environment defines an ad-hoc environment. At least one entry, at most one per kind."
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Model id; defaults to the platform-provided one if omitted."
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions",
+            "description": "Steering text appended to the system prompt."
+          },
+          "subagents": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Agent"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subagents",
+            "description": "Agents this one can spawn. A string entry references another catalog id; an inline Agent defines an ad-hoc sub-agent."
+          },
+          "skills": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Skill"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skills",
+            "description": "Skills available to this agent. A string entry references a catalog id; an inline Skill defines an ad-hoc skill."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "environments"
+        ],
+        "title": "Agent",
+        "description": "Declarative agent definition."
+      },
+      "AgentRecord": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/Agent",
+            "description": "Typed agent definition consumed by the runtime."
+          },
+          "reserved": {
+            "type": "boolean",
+            "title": "Reserved",
+            "description": "True for H-owned rows; world-readable, write-locked behind employee_only."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "spec",
+          "reserved",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AgentRecord",
+        "description": "Catalog row exposing an ``Agent`` spec payload plus AgP metadata.\n\nThe catalog handle is ``spec.name``; callers reference it directly\nvia ``record.spec.name`` rather than a duplicated top-level field."
+      },
+      "Browser": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id",
+            "description": "Catalog id."
+          },
+          "kind": {
+            "type": "string",
+            "const": "web",
+            "title": "Kind",
+            "default": "web"
+          },
+          "headless": {
+            "type": "boolean",
+            "title": "Headless",
+            "description": "Run without a visible window."
+          },
+          "width": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Width",
+            "description": "Viewport width in pixels."
+          },
+          "height": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Height",
+            "description": "Viewport height in pixels."
+          },
+          "start_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Url",
+            "description": "Initial URL."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "headless",
+          "width",
+          "height",
+          "start_url"
+        ],
+        "title": "Browser",
+        "description": "Browser environment."
+      },
+      "CodeSandbox": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id",
+            "description": "Catalog id."
+          },
+          "kind": {
+            "type": "string",
+            "const": "code",
+            "title": "Kind",
+            "default": "code"
+          },
+          "pip_packages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pip Packages",
+            "description": "Pip packages installed at provision time."
+          },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Env",
+            "description": "Environment variables."
+          },
+          "mcp_servers": {
+            "items": {
+              "$ref": "#/components/schemas/MCPServer"
+            },
+            "type": "array",
+            "title": "Mcp Servers",
+            "description": "MCP servers reachable from the sandbox."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "CodeSandbox",
+        "description": "Code sandbox environment."
+      },
+      "CreateAgent": {
+        "properties": {
+          "spec": {
+            "$ref": "#/components/schemas/Agent",
+            "description": "Typed agent definition consumed by the runtime."
+          },
+          "reserved": {
+            "type": "boolean",
+            "title": "Reserved",
+            "description": "H employees only; rejected with 403 otherwise.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "spec"
+        ],
+        "title": "CreateAgent",
+        "description": "``POST /api/v2/agents`` body."
+      },
+      "CreateEnvironment": {
+        "properties": {
+          "spec": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Browser"
+              },
+              {
+                "$ref": "#/components/schemas/CodeSandbox"
+              },
+              {
+                "$ref": "#/components/schemas/MCP"
+              },
+              {
+                "$ref": "#/components/schemas/Memory"
+              }
+            ],
+            "title": "Spec",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "code": "#/components/schemas/CodeSandbox",
+                "mcp": "#/components/schemas/MCP",
+                "memory": "#/components/schemas/Memory",
+                "web": "#/components/schemas/Browser"
+              }
+            }
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "reserved": {
+            "type": "boolean",
+            "title": "Reserved",
+            "description": "H employees only; rejected with 403 otherwise.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "spec"
+        ],
+        "title": "CreateEnvironment",
+        "description": "``POST /api/v2/environments`` body."
+      },
+      "CreateMemory": {
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Namespace"
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "namespace",
+          "key",
+          "value"
+        ],
+        "title": "CreateMemory",
+        "description": "Upsert a memory by ``(org_id, namespace, key)``."
+      },
+      "CreateSkill": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Kebab-case stable handle the agent uses to reference this skill."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Description",
+            "description": "One-line routing hint shown in the skill catalog."
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 262144,
+            "title": "Body",
+            "description": "Markdown prompt fragment. Required unless `uri` is set.",
+            "default": ""
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Provenance URL."
+          },
+          "url_pattern": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url Pattern",
+            "description": "Inject only when an observation URL matches this regex. Mutually exclusive with `uri`."
+          },
+          "uri": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uri",
+            "description": "Fetch body on demand from this location. Mutually exclusive with `url_pattern`."
+          },
+          "reserved": {
+            "type": "boolean",
+            "title": "Reserved",
+            "description": "H employees only; rejected with 403 otherwise. Reserved rows are world-readable.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "CreateSkill",
+        "description": "Request to create a skill."
+      },
+      "EnvironmentRecord": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "spec": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Browser"
+              },
+              {
+                "$ref": "#/components/schemas/CodeSandbox"
+              },
+              {
+                "$ref": "#/components/schemas/MCP"
+              },
+              {
+                "$ref": "#/components/schemas/Memory"
+              }
+            ],
+            "title": "Spec",
+            "description": "Discriminated by ``kind``.",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "code": "#/components/schemas/CodeSandbox",
+                "mcp": "#/components/schemas/MCP",
+                "memory": "#/components/schemas/Memory",
+                "web": "#/components/schemas/Browser"
+              }
+            }
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "reserved": {
+            "type": "boolean",
+            "title": "Reserved",
+            "description": "True for H-owned rows; world-readable, write-locked behind employee_only."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "spec",
+          "reserved",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "EnvironmentRecord",
+        "description": "Catalog row exposing an ``Environment`` spec plus AgP metadata.\n\nThe catalog handle is ``spec.id``; callers reference it directly via\n``record.spec.id`` rather than a duplicated top-level field."
+      },
+      "Feedback": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Feedback",
+        "description": "Feedback on the semantic success of the trajectory."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "MCP": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id",
+            "description": "Catalog id."
+          },
+          "kind": {
+            "type": "string",
+            "const": "mcp",
+            "title": "Kind",
+            "default": "mcp"
+          },
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/MCPServer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Servers",
+            "description": "At least one MCP server."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "servers"
+        ],
+        "title": "MCP",
+        "description": "MCP environment."
+      },
+      "MCPServer": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.-]+$",
+            "title": "Name",
+            "description": "Stable identifier."
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "stdio",
+              "streamable_http",
+              "sse"
+            ],
+            "title": "Transport",
+            "description": "MCP transport."
+          },
+          "command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command",
+            "description": "Subprocess executable (stdio)."
+          },
+          "args": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Args",
+            "description": "Subprocess argv tail (stdio)."
+          },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Env",
+            "description": "Subprocess env vars (stdio)."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Endpoint URL (HTTP)."
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Headers",
+            "description": "Request headers (HTTP)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "transport"
+        ],
+        "title": "MCPServer",
+        "description": "MCP server attached to an environment."
+      },
+      "Memory": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id",
+            "description": "Catalog id."
+          },
+          "kind": {
+            "type": "string",
+            "const": "memory",
+            "title": "Kind",
+            "default": "memory"
+          },
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Namespace",
+            "description": "Memory namespace; scope for keys across sessions."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "namespace"
+        ],
+        "title": "Memory",
+        "description": "Cross-session key-value memory backed by AgP."
+      },
+      "MemoryRecord": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "namespace": {
+            "type": "string",
+            "title": "Namespace"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "namespace",
+          "key",
+          "value",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "MemoryRecord",
+        "description": "Persistent KV entry scoped to ``(org_id, namespace, key)``."
+      },
+      "Metrics": {
+        "properties": {
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 0
+          },
+          "cost_per_model": {
+            "items": {
+              "$ref": "#/components/schemas/ModelCost"
+            },
+            "type": "array",
+            "title": "Cost Per Model"
+          },
+          "input_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Cost"
+          },
+          "output_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Cost"
+          },
+          "reasoning_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Cost"
+          },
+          "total_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost"
+          }
+        },
+        "type": "object",
+        "title": "Metrics",
+        "description": "Metrics for a trajectory."
+      },
+      "ModelCost": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "reasoning_tokens": {
+            "type": "integer",
+            "title": "Reasoning Tokens"
+          },
+          "input_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Cost"
+          },
+          "output_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Cost"
+          },
+          "reasoning_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Cost"
+          },
+          "total_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "input_tokens",
+          "output_tokens",
+          "reasoning_tokens"
+        ],
+        "title": "ModelCost",
+        "description": "Cost for a model."
+      },
+      "ModelUsage": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "reasoning_tokens": {
+            "type": "integer",
+            "title": "Reasoning Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "input_tokens",
+          "output_tokens",
+          "reasoning_tokens"
+        ],
+        "title": "ModelUsage",
+        "description": "Per-model token usage."
+      },
+      "Page_AgentRecord_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRecord"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "title": "Page[AgentRecord]"
+      },
+      "Page_EnvironmentRecord_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentRecord"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "title": "Page[EnvironmentRecord]"
+      },
+      "Page_MemoryRecord_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryRecord"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "title": "Page[MemoryRecord]"
+      },
+      "Page_SessionSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "title": "Page[SessionSummary]"
+      },
+      "Page_SkillRecord_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SkillRecord"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "title": "Page[SkillRecord]"
+      },
+      "Page_TrajectoryEvent_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrajectoryEvent"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "title": "Page[TrajectoryEvent]"
+      },
+      "QuotaStatus": {
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "user",
+              "org"
+            ],
+            "title": "Scope"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "active": {
+            "type": "integer",
+            "title": "Active"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scope",
+          "limit",
+          "active",
+          "available"
+        ],
+        "title": "QuotaStatus",
+        "description": "Quota status."
+      },
+      "Session": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "request": {
+            "$ref": "#/components/schemas/SessionRequest"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SessionStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "request",
+          "status",
+          "created_at"
+        ],
+        "title": "Session",
+        "description": "Full session envelope: original request + live status."
+      },
+      "SessionRequest": {
+        "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/Agent",
+                "description": "Typed agent definition consumed by the runtime."
+              }
+            ],
+            "title": "Agent",
+            "description": "Catalog id or inline Agent. Carries its own environments."
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/UserMessageEvent"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UserMessageEvent"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messages",
+            "description": "Queued before turn 1. Accepts a string, a single UserMessageEvent, or a list."
+          },
+          "max_steps": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Steps",
+            "description": "Cap on policy calls; runtime default if null."
+          },
+          "max_time_s": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Time S",
+            "description": "Cap on wall-clock seconds."
+          },
+          "idle_timeout_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idle Timeout S",
+            "description": "Idle window before auto-termination; null terminates on Answer."
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id",
+            "description": "Group id for cascading and listing."
+          },
+          "parent_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Session Id",
+            "description": "Parent session id."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent"
+        ],
+        "title": "SessionRequest",
+        "description": "``POST /api/v2/sessions`` body."
+      },
+      "SessionStatus": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/TrajectoryStatus"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 0
+          },
+          "usage_per_model": {
+            "items": {
+              "$ref": "#/components/schemas/ModelUsage"
+            },
+            "type": "array",
+            "title": "Usage Per Model"
+          },
+          "subagent_session_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Subagent Session Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SessionStatus",
+        "description": "``GET /api/v2/sessions/{id}/status`` response."
+      },
+      "SessionSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TrajectoryStatus"
+          },
+          "first_message": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserMessageEvent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "created_at"
+        ],
+        "title": "SessionSummary",
+        "description": "Flat projection for session listings."
+      },
+      "ShareLink": {
+        "properties": {
+          "share_url": {
+            "type": "string",
+            "title": "Share Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "share_url"
+        ],
+        "title": "ShareLink",
+        "description": "Public share URL for a session.\n\n``share_url`` is a path; clients prepend the AgP host. Today this points at the\nv1 share router (``/share/api/v1/trajectories/{id}``); will migrate to\n``/share/v1/sessions/{id}`` once the v2 share router lands."
+      },
+      "Skill": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name",
+            "description": "Catalog id. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment')."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Description",
+            "description": "One-line routing hint."
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Body",
+            "description": "Markdown content."
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Provenance URL."
+          },
+          "url_pattern": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url Pattern",
+            "description": "Informational regex hinting at URLs where this skill applies (not gated)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "body"
+        ],
+        "title": "Skill",
+        "description": "Named instruction content. Loaded by name via ``load_skill`` or rendered inline by toolboxes."
+      },
+      "SkillRecord": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "url_pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url Pattern"
+          },
+          "uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uri"
+          },
+          "reserved": {
+            "type": "boolean",
+            "title": "Reserved"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "body",
+          "source",
+          "url_pattern",
+          "uri",
+          "reserved",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SkillRecord",
+        "description": "Named prompt fragment loaded into an agent's system prompt."
+      },
+      "TrajectoryChanges": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/TrajectoryStatus"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "new_events": {
+            "items": {
+              "$ref": "#/components/schemas/TrajectoryEvent"
+            },
+            "type": "array",
+            "title": "New Events",
+            "default": []
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "TrajectoryChanges",
+        "description": "Changes to a trajectory.\n\nThis represents a batch of updates returned by the polling API\nwhen checking for new events and status changes on a trajectory.\n\nUsed to incrementally fetch new events without\nre-downloading the entire trajectory history.\n\nAttributes:\n    status: Current status of the trajectory\n    started_at: When the trajectory started execution (None if not yet started)\n    finished_at: When the trajectory finished (None if still running)\n    error: Error message if trajectory failed (None if no error)\n    new_events: List of new events since the last poll (empty if no new events)\n    answer: Answer to the trajectory (None if not available)"
+      },
+      "TrajectoryEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "data": {
+            "title": "Data"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "data",
+          "timestamp"
+        ],
+        "title": "TrajectoryEvent",
+        "description": "Event from a trajectory.\n\nUnified from agp_client and agent_platform.\nUses the richer agent_platform version with screenshot serialization.\n\nEvents represent individual actions, observations, or state changes during\ntrajectory execution. They form a chronological log of everything that happened.\n\nCommon event types:\n- AgentStartedEvent: Agent begins execution\n- AgentCompletionEvent: Agent finishes successfully\n- AgentErrorEvent: Agent encounters an error\n- AgentEvent: Generic wrapper for agent-emitted events (policy_event, tool_result, observation_event)\n- LiveViewUrlEvent: Live view URL becomes available\n- ChatMessageEvent: Agent sends a chat message\n\nAttributes:\n    type: The type/name of the event (e.g., \"AgentStartedEvent\", \"AgentEvent\")\n    data: Event-specific data payload (structure varies by event type)\n    timestamp: When the event occurred"
+      },
+      "TrajectoryStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "paused",
+          "idle",
+          "completed",
+          "failed",
+          "timed_out",
+          "interrupted"
+        ],
+        "title": "TrajectoryStatus",
+        "description": "State of a session/trajectory.\n\nLifecycle::\n\n    PENDING \u2192 RUNNING \u2192 {COMPLETED, FAILED, TIMED_OUT, INTERRUPTED}\n       |        \u2191  \u2191\n       |        |  \u2514\u2500\u2500\u2500\u2500\u2500\u2192 IDLE (interactive: agent waiting for next task)\n       |        \u2193\n       \u2514\u2500\u2500\u2500\u2500\u2500\u2192 PAUSED"
+      },
+      "UpdateAgent": {
+        "properties": {
+          "spec": {
+            "$ref": "#/components/schemas/Agent",
+            "description": "Typed agent definition consumed by the runtime."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "spec"
+        ],
+        "title": "UpdateAgent",
+        "description": "``PUT /api/v2/agents/{agent_identifier}`` body. Full replace; ``spec.name`` is immutable."
+      },
+      "UpdateEnvironment": {
+        "properties": {
+          "spec": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Browser"
+              },
+              {
+                "$ref": "#/components/schemas/CodeSandbox"
+              },
+              {
+                "$ref": "#/components/schemas/MCP"
+              },
+              {
+                "$ref": "#/components/schemas/Memory"
+              }
+            ],
+            "title": "Spec",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "code": "#/components/schemas/CodeSandbox",
+                "mcp": "#/components/schemas/MCP",
+                "memory": "#/components/schemas/Memory",
+                "web": "#/components/schemas/Browser"
+              }
+            }
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "spec"
+        ],
+        "title": "UpdateEnvironment",
+        "description": "``PUT /api/v2/environments/{env_identifier}`` body. Full replace; ``spec.id`` is immutable."
+      },
+      "UpdateMemory": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "UpdateMemory",
+        "description": "Update a memory's value in place."
+      },
+      "UpdateSkill": {
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Description"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 262144,
+            "title": "Body",
+            "default": ""
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "url_pattern": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url Pattern"
+          },
+          "uri": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uri"
+          }
+        },
+        "type": "object",
+        "required": [
+          "description"
+        ],
+        "title": "UpdateSkill",
+        "description": "Request to update a skill. Full replacement; `name` is immutable."
+      },
+      "UserMessageBatch": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "batch",
+            "title": "Type",
+            "default": "batch"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/UserMessageEvent"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Messages"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "messages"
+        ],
+        "title": "UserMessageBatch",
+        "description": "Batch of user messages."
+      },
+      "UserMessageEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "user_message",
+            "title": "Type",
+            "default": "user_message"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Images",
+            "default": []
+          },
+          "caller_id": {
+            "type": "string",
+            "title": "Caller Id",
+            "default": "user"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "UserMessageEvent",
+        "description": "The user is sending a message to an active agent."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

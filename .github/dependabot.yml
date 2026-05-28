@@ -1,0 +1,29 @@
+version: 2
+
+# Keep agent_platform pinning to date by also bumping the third-party deps
+# that ship with the generated SDK (httpx, pydantic, attrs, ...) plus dev
+# tooling. The SDK code itself is regenerated automatically on every upstream
+# schema change, so dependabot only covers what we hand-pin in pyproject.toml.
+
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      production-deps:
+        applies-to: version-updates
+        dependency-type: production
+      dev-deps:
+        applies-to: version-updates
+        dependency-type: development
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        applies-to: version-updates
+        patterns:
+          - "*"
