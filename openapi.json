@@ -211,6 +211,10 @@
                 {
                   "type": "array",
                   "items": {
+                    "enum": [
+                      "created_at",
+                      "-created_at"
+                    ],
                     "type": "string"
                   }
                 },
@@ -219,10 +223,6 @@
                 }
               ],
               "description": "Sort by field",
-              "enum": [
-                "created_at",
-                "-created_at"
-              ],
               "default": [
                 "-created_at"
               ],
@@ -1256,6 +1256,10 @@
                 {
                   "type": "array",
                   "items": {
+                    "enum": [
+                      "updated_at",
+                      "-updated_at"
+                    ],
                     "type": "string"
                   }
                 },
@@ -1264,10 +1268,6 @@
                 }
               ],
               "description": "Sort by field",
-              "enum": [
-                "updated_at",
-                "-updated_at"
-              ],
               "default": [
                 "-updated_at"
               ],
@@ -1559,6 +1559,12 @@
                 {
                   "type": "array",
                   "items": {
+                    "enum": [
+                      "created_at",
+                      "-created_at",
+                      "name",
+                      "-name"
+                    ],
                     "type": "string"
                   }
                 },
@@ -1567,12 +1573,6 @@
                 }
               ],
               "description": "Sort by field",
-              "enum": [
-                "created_at",
-                "-created_at",
-                "name",
-                "-name"
-              ],
               "default": [
                 "-created_at"
               ],
@@ -1846,6 +1846,12 @@
                 {
                   "type": "array",
                   "items": {
+                    "enum": [
+                      "created_at",
+                      "-created_at",
+                      "env_identifier",
+                      "-env_identifier"
+                    ],
                     "type": "string"
                   }
                 },
@@ -1854,12 +1860,6 @@
                 }
               ],
               "description": "Sort by field",
-              "enum": [
-                "created_at",
-                "-created_at",
-                "env_identifier",
-                "-env_identifier"
-              ],
               "default": [
                 "-created_at"
               ],
@@ -2130,6 +2130,12 @@
                 {
                   "type": "array",
                   "items": {
+                    "enum": [
+                      "created_at",
+                      "-created_at",
+                      "agent_identifier",
+                      "-agent_identifier"
+                    ],
                     "type": "string"
                   }
                 },
@@ -2138,12 +2144,6 @@
                 }
               ],
               "description": "Sort by field",
-              "enum": [
-                "created_at",
-                "-created_at",
-                "agent_identifier",
-                "-agent_identifier"
-              ],
               "default": [
                 "-created_at"
               ],
