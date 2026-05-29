@@ -23,7 +23,7 @@ behavior:
 ## Dev setup
 
 ```bash
-git clone https://github.com/hcompai/agent-api && cd agent-api
+git clone https://github.com/hcompai/hai-agents-python && cd hai-agents-python
 uv sync --group dev
 ```
 
