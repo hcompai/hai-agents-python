@@ -1,22 +1,15 @@
-"""Shared fixtures and helpers for SDK model roundtrip tests.
+"""Shared fixtures and helpers for SDK model round-trip tests.
 
-The test strategy (per 02-RESEARCH.md Pattern 6): for each backend public_api/ model,
-construct a canonical input dict matching the OpenAPI schema, parse it through the
-SDK's generated model via from_dict() (the SDK's public parsing entrypoint), serialize
-back to dict via to_dict(), and assert the result equals the input.
+For each model, construct a canonical input dict matching the API schema, parse it
+through the SDK model's from_dict() (the public parsing entrypoint), serialize back
+via to_dict(), and assert the result equals the input. from_dict()/to_dict() is the
+SDK's actual public round-trip contract and handles the UNSET sentinel and
+discriminated-union resolution that model_validate() bypasses.
 
-DEVIATION NOTE: The plan template references model_validate() as the parsing path.
-After reading the generated code, model_validate() does NOT correctly handle the
-SDK's discriminated-union fields (spec in Environment, agent in SessionRequest)
-because Pydantic's native coercion does not know the SDK's UNSET sentinel or its
-from_dict() union-resolution logic.  We use from_dict() + to_dict() instead — this
-is the SDK's actual public roundtrip contract and is a tighter test.
-
-Datetime fields are the most common roundtrip-mismatch source — Pydantic v2 emits
-ISO 8601 with `+00:00` offset, python-dateutil's isoparse (used in the generated
-from_dict() methods) re-emits via .isoformat() which also uses `+00:00`.  Both
-sides therefore agree on the `+00:00` form.  We still normalize in assert_json_equal()
-to guard against future format drift.
+Datetime fields are the most common mismatch source: Pydantic v2 emits ISO 8601 with
+a `+00:00` offset, and python-dateutil's isoparse (used in from_dict()) re-emits the
+same form via .isoformat(). assert_json_equal() still normalizes to guard against
+future format drift.
 """
 
 from __future__ import annotations
