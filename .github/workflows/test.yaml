@@ -21,27 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-
-      - name: Install openapi-python-client
-        run: uv tool install openapi-python-client==0.28.3
-
-      - name: Regenerate SDK from committed openapi.json
-        run: |
-          uv run --no-project python scripts/prepare_openapi.py \
-            openapi.json /tmp/openapi.filtered.json
-          rm -rf packages/sdk/src/agent_platform/
-          openapi-python-client generate \
-            --path /tmp/openapi.filtered.json \
-            --config config.yaml \
-            --custom-template-path templates/ \
-            --meta uv \
-            --output-path packages/sdk/src/ \
-            --overwrite
-          cp templates/__init__.py.static packages/sdk/src/agent_platform/__init__.py
-          rm /tmp/openapi.filtered.json
-
       - name: Install SDK + dev deps
         run: |
           python3 -m venv /tmp/sdk-venv
@@ -63,30 +42,9 @@ jobs:
     needs: unit
     env:
       HAI_API_KEY_TEST: ${{ secrets.HAI_API_KEY_TEST }}
-      HAI_API_BASE_URL_TEST: "https://agp.hcompany.ai"
+      HAI_API_BASE_URL_TEST: "https://agp.eu.hcompany.ai"
     steps:
       - uses: actions/checkout@v6
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-
-      - name: Install openapi-python-client
-        run: uv tool install openapi-python-client==0.28.3
-
-      - name: Regenerate SDK from committed openapi.json
-        run: |
-          uv run --no-project python scripts/prepare_openapi.py \
-            openapi.json /tmp/openapi.filtered.json
-          rm -rf packages/sdk/src/agent_platform/
-          openapi-python-client generate \
-            --path /tmp/openapi.filtered.json \
-            --config config.yaml \
-            --custom-template-path templates/ \
-            --meta uv \
-            --output-path packages/sdk/src/ \
-            --overwrite
-          cp templates/__init__.py.static packages/sdk/src/agent_platform/__init__.py
-          rm /tmp/openapi.filtered.json
 
       - name: Install SDK
         run: |

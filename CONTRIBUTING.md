@@ -1,24 +1,21 @@
 # Contributing
 
-Bug reports, feature ideas, and PRs are welcome. For anything non-trivial,
-open an issue first so we can sanity-check the direction before you sink time
-into it.
+This repository is an **output-only mirror**. The Python SDK under
+`packages/sdk/src/agent_platform/` is generated from
+[hcompai/agent_platform](https://github.com/hcompai/agent_platform)'s OpenAPI
+schema and synced here by an automated PR. The codegen toolchain (generator,
+templates, config, version policy) lives upstream in `agent_platform`.
 
-## The SDK is auto-generated
+**Do not hand-edit anything under `packages/sdk/src/`.** The next sync PR will
+overwrite it. To change the SDK:
 
-The Python source under `packages/sdk/src/agent_platform/` is regenerated from
-`openapi.json` (the schema published by [hcompai/agent_platform](https://github.com/hcompai/agent_platform))
-by [`openapi-python-client==0.28.3`](https://github.com/openapi-generators/openapi-python-client).
-
-**Do not hand-edit anything under `packages/sdk/src/`.** A sync PR will overwrite
-your changes the next time the upstream schema moves. If you need to change client
-behavior:
-
-| You want to change... | Edit... |
+| You want to change... | Where to make the change |
 | --- | --- |
-| The exposed entrypoint (`Client`, `AsyncClient`, top-level imports) | `templates/__init__.py.static` |
-| The codegen config (project name, model naming, post-hooks) | `config.yaml` |
-| Which endpoints the SDK exposes, or a model field/endpoint shape | Upstream: open a PR on `hcompai/agent_platform` |
+| A model field, an endpoint, or which endpoints the SDK exposes | The API in [`hcompai/agent_platform`](https://github.com/hcompai/agent_platform) |
+| The generator config, templates, or version policy | `sdk-codegen/` in [`hcompai/agent_platform`](https://github.com/hcompai/agent_platform) |
+
+Hand-written parts of this repo (tests, packaging, docs) are open to PRs. For
+anything non-trivial, open an issue first.
 
 ## Dev setup
 
@@ -27,31 +24,9 @@ git clone https://github.com/hcompai/hai-agents-python && cd hai-agents-python
 uv sync --group dev
 ```
 
-## Regenerate locally
-
-```bash
-make regen-sdk-from-main   # pulls the latest schema artifact from agent_platform CI
-# or
-make regen-sdk SCHEMA=/path/to/openapi.json
-```
-
-`packages/sdk/src/` is generated but committed: each automated sync PR commits
-the regenerated code so reviewers see the diff. The initial code lands via the
-first sync PR after this repo is bootstrapped. CI regenerates it from
-`openapi.json` on every PR, so the test job always exercises a fresh build.
-
 ## Run tests
 
 ```bash
-uv run pytest packages/sdk/tests                                  # unit (default; integration deselected)
-uv run pytest packages/sdk/tests/integration -m integration -v     # live API (needs HAI_API_KEY_TEST)
+uv run pytest packages/sdk/tests                                 # unit (integration deselected)
+uv run pytest packages/sdk/tests/integration -m integration -v    # live API (needs HAI_API_KEY_TEST)
 ```
-
-## Pull request checklist
-
-- [ ] If you changed `templates/` or `config.yaml`, re-run `make regen-sdk`
-      and confirm the resulting diff is what you intended.
-- [ ] `uv run pytest packages/sdk/tests -m "not integration"` passes locally.
-- [ ] No CodeArtifact URLs slipped into `uv.lock` (the
-      `Check uv.lock for private CodeArtifact references` CI guard will catch
-      this, but it's faster to notice locally).
