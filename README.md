@@ -23,4 +23,4 @@ uv sync           # install every package + dev tools into one venv
 uv run pytest packages/sdk/tests
 ```
 
-The SDK in `packages/sdk/src/` is generated from the platform's OpenAPI schema; see [CONTRIBUTING.md](CONTRIBUTING.md).
+The SDK in `packages/sdk/src/` is generated upstream in [`hcompai/agent_platform`](https://github.com/hcompai/agent_platform) and synced here by an automated PR; this repo is an output-only mirror. See [CONTRIBUTING.md](CONTRIBUTING.md).
