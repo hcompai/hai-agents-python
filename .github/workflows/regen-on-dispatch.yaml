@@ -16,6 +16,8 @@ name: Regen SDK on backend dispatch
 # Required secrets:
 #   AGP_ARTIFACT_TOKEN  - fine-grained PAT or GitHub App token with
 #                         `actions:read` + `contents:read` on hcompai/agent_platform
+#   SDK_PR_TOKEN        - fine-grained PAT with `contents:write` + `pull-requests:write`
+#                         on this repo
 
 on:
   repository_dispatch:
@@ -179,7 +181,7 @@ jobs:
         if: steps.diff.outputs.has_diff == 'true'
         uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SDK_PR_TOKEN }}
           branch: sync/agent-platform-${{ steps.inputs.outputs.agp_short_sha }}
           delete-branch: true
           commit-message: |

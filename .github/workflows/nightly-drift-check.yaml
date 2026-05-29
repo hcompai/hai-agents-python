@@ -100,7 +100,7 @@ jobs:
         if: steps.diff.outputs.drift == 'true'
         uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SDK_PR_TOKEN }}
           branch: drift/nightly-${{ github.run_id }}
           delete-branch: true
           commit-message: "chore(sdk): nightly drift sync against agent_platform main"
