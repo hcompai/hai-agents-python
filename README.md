@@ -4,7 +4,7 @@
 
 # hai-agents-python
 
-Python developer libraries and tools for [H Company's Agent Platform](https://hcompany.ai). The TypeScript counterpart lives in [`hai-agents-ts`](https://github.com/hcompai/hai-agents-ts).
+Python developer libraries and tools for [H Company's Agent Platform](https://hcompany.ai).
 
 ## Packages
 
@@ -12,15 +12,13 @@ Python developer libraries and tools for [H Company's Agent Platform](https://hc
 | --- | --- |
 | [`packages/sdk`](packages/sdk) | Python SDK — sync and async clients, fully typed with Pydantic v2. Published to PyPI as [`agent-platform`](https://pypi.org/project/agent-platform/). |
 
-CLI and MCP server packages will land here as additional workspace members.
-
 ## Development
 
 This repo is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/). From the root:
 
 ```bash
-uv sync           # install every package + dev tools into one venv
+uv sync
 uv run pytest packages/sdk/tests
 ```
 
-The SDK in `packages/sdk/src/` is generated upstream in [`hcompai/agent_platform`](https://github.com/hcompai/agent_platform) and synced here by an automated PR; this repo is an output-only mirror. See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md).

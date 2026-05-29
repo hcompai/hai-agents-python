@@ -1,9 +1,5 @@
 name: CodeQL
 
-# Static analysis for the hand-maintained parts of this repo (tests, packaging,
-# workflows). The generated SDK under packages/sdk/src/ is excluded — findings there
-# can only be fixed in the upstream agent_platform code generator.
-
 on:
   push:
     branches: [main]
