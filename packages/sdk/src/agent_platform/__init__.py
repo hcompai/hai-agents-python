@@ -75,14 +75,14 @@ class Client(_AuthenticatedClient):
 
     Example:
         >>> from agent_platform import Client
-        >>> client = Client(api_key="hk-...", base_url="https://agp.hcompany.ai")
+        >>> client = Client(api_key="hk-...", base_url="https://agp.eu.hcompany.ai")
     """
 
     def __init__(
         self,
         *,
         api_key: str,
-        base_url: str = "https://agp.hcompany.ai",
+        base_url: str = "https://agp.eu.hcompany.ai",
     ) -> None:
         super().__init__(base_url=base_url, token=api_key)
 
@@ -110,6 +110,6 @@ class AsyncClient(_AuthenticatedClient):
         self,
         *,
         api_key: str,
-        base_url: str = "https://agp.hcompany.ai",
+        base_url: str = "https://agp.eu.hcompany.ai",
     ) -> None:
         super().__init__(base_url=base_url, token=api_key)
