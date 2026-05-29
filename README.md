@@ -2,9 +2,9 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
 </p>
 
-# agent-api
+# hai-agents-python
 
-Developer-facing libraries and tools for [H Company's Agent Platform](https://hcompany.ai).
+Python developer libraries and tools for [H Company's Agent Platform](https://hcompany.ai). The TypeScript counterpart lives in [`hai-agents-ts`](https://github.com/hcompai/hai-agents-ts).
 
 ## Packages
 
