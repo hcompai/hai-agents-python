@@ -1,21 +1,10 @@
-"""SDK-05 verification: SDK Pydantic v2 models round-trip JSON byte-identically.
+"""SDK Pydantic v2 models round-trip JSON byte-identically.
 
-Each test parses a canonical payload through the SDK model's from_dict() method
-(the SDK's public parsing entrypoint) and asserts the serialized output from
-to_dict() matches the input (after documented normalization for ISO 8601 datetime
-format).
-
-DEVIATION from plan template:
-  The plan suggested model_validate() for parsing.  After reading the generated code,
-  model_validate() does not correctly handle the SDK's discriminated-union fields
-  (e.g., spec in Environment, agent in SessionRequest) because Pydantic's native
-  coercion bypasses the SDK's UNSET sentinel and union-resolution logic in from_dict().
-  We use from_dict() + to_dict() — the SDK's actual public round-trip contract.
-  This is a tighter test: it validates the same path users call in production.
-
-If any test fails, the SDK model and the OpenAPI schema have drifted.  Either:
-  (a) the schema changed — run make regen-schema and regenerate the SDK, or
-  (b) the model.py.jinja template is buggy — fix template and regenerate.
+Each test parses a canonical payload through the model's from_dict() (the SDK's
+public parsing entrypoint) and asserts to_dict() reproduces the input (after the
+documented ISO 8601 datetime normalization). from_dict()/to_dict() is the actual
+public round-trip contract — it exercises the same path users call, including the
+UNSET sentinel and discriminated-union resolution that model_validate() bypasses.
 """
 
 from __future__ import annotations
@@ -118,9 +107,8 @@ def test_agent_record_roundtrip(agent_record_payload: Dict[str, Any]) -> None:
 def test_no_attrs_in_generated_models() -> None:
     """Structural enforcement: no ``attrs`` imports in models/.
 
-    SDK-05 explicitly forbids ``attrs`` and ``dataclass`` in models — this test
-    fails loudly if the generation strategy regresses (e.g., template
-    misconfiguration or manual edit that introduces attrs).
+    Models must be Pydantic v2 only; ``attrs`` and ``dataclass`` are forbidden,
+    so this test fails loudly if they reappear.
 
     Note: client.py and types.py deliberately use attrs (for AuthenticatedClient
     and File/Response) — that is expected and out of scope here.  Only models/.
@@ -143,11 +131,11 @@ def test_no_attrs_in_generated_models() -> None:
             if pattern in text:
                 violations.append(f"{py_file.name}: contains forbidden pattern '{pattern}'")
 
-    assert not violations, "Generated models violate SDK-05 (no attrs/dataclass):\n" + "\n".join(violations)
+    assert not violations, "Models must not use attrs/dataclass:\n" + "\n".join(violations)
 
 
 def test_datetime_field_serializes_as_iso8601(skill_record_payload: Dict[str, Any]) -> None:
-    """Datetime fields must serialize as ISO 8601 strings (Pitfall 5 from 02-RESEARCH.md).
+    """Datetime fields must serialize as ISO 8601 strings.
 
     SkillRecord carries two required datetime fields (created_at, updated_at). We verify:
       1. The serialized value is a string (not a datetime object)
@@ -171,9 +159,8 @@ def test_model_validate_simple_fields(skill_record_payload: Dict[str, Any]) -> N
     """Verify model_validate() works for models without complex union/UNSET fields.
 
     SkillRecord has no UNSET-guarded fields (its optional strings are nullable,
-    not UNSET) and no discriminated unions — model_validate() should work
-    identically to from_dict() for it. This test proves the plan's
-    model_validate() path is valid for simple models.
+    not UNSET) and no discriminated unions, so model_validate() works identically
+    to from_dict() for it.
 
     For models with UNSET sentinel defaults or discriminated unions (SessionRequest,
     Agent), from_dict() is the correct parsing path.
