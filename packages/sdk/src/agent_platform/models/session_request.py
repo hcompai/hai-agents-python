@@ -9,6 +9,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.agent import Agent
+    from ..models.session_request_answer_format_type_0 import SessionRequestAnswerFormatType0
     from ..models.user_message_event import UserMessageEvent
 
 
@@ -27,6 +28,8 @@ class SessionRequest(BaseModel):
         idle_timeout_s (int | None | Unset): Idle window before auto-termination; null terminates on Answer.
         group_id (None | str | Unset): Group id for cascading and listing.
         parent_session_id (None | str | Unset): Parent session id.
+        answer_format (None | SessionRequestAnswerFormatType0 | Unset): JSON Schema the final answer must conform to.
+            Null returns free-form text.
     """
 
     model_config = ConfigDict(
@@ -42,9 +45,11 @@ class SessionRequest(BaseModel):
     idle_timeout_s: int | None | Unset = UNSET
     group_id: None | str | Unset = UNSET
     parent_session_id: None | str | Unset = UNSET
+    answer_format: None | SessionRequestAnswerFormatType0 | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.agent import Agent
+        from ..models.session_request_answer_format_type_0 import SessionRequestAnswerFormatType0
         from ..models.user_message_event import UserMessageEvent
 
         agent: dict[str, Any] | str
@@ -97,6 +102,14 @@ class SessionRequest(BaseModel):
         else:
             parent_session_id = self.parent_session_id
 
+        answer_format: dict[str, Any] | None | Unset
+        if isinstance(self.answer_format, Unset):
+            answer_format = UNSET
+        elif isinstance(self.answer_format, SessionRequestAnswerFormatType0):
+            answer_format = self.answer_format.to_dict()
+        else:
+            answer_format = self.answer_format
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -116,12 +129,15 @@ class SessionRequest(BaseModel):
             field_dict["group_id"] = group_id
         if parent_session_id is not UNSET:
             field_dict["parent_session_id"] = parent_session_id
+        if answer_format is not UNSET:
+            field_dict["answer_format"] = answer_format
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.agent import Agent
+        from ..models.session_request_answer_format_type_0 import SessionRequestAnswerFormatType0
         from ..models.user_message_event import UserMessageEvent
 
         d = dict(src_dict)
@@ -214,6 +230,23 @@ class SessionRequest(BaseModel):
 
         parent_session_id = _parse_parent_session_id(d.pop("parent_session_id", UNSET))
 
+        def _parse_answer_format(data: object) -> None | SessionRequestAnswerFormatType0 | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                answer_format_type_0 = SessionRequestAnswerFormatType0.from_dict(data)
+
+                return answer_format_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | SessionRequestAnswerFormatType0 | Unset, data)
+
+        answer_format = _parse_answer_format(d.pop("answer_format", UNSET))
+
         session_request = cls(
             agent=agent,
             messages=messages,
@@ -222,6 +255,7 @@ class SessionRequest(BaseModel):
             idle_timeout_s=idle_timeout_s,
             group_id=group_id,
             parent_session_id=parent_session_id,
+            answer_format=answer_format,
         )
 
         return session_request

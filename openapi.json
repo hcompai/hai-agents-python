@@ -3564,6 +3564,19 @@
             ],
             "title": "Parent Session Id",
             "description": "Parent session id."
+          },
+          "answer_format": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Format",
+            "description": "JSON Schema the final answer must conform to. Null returns free-form text."
           }
         },
         "additionalProperties": false,
