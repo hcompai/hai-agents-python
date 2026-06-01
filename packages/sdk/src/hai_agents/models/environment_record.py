@@ -21,7 +21,7 @@ class EnvironmentRecord(BaseModel):
 
         Attributes:
             id (UUID):
-            spec (Browser | CodeSandbox | MCP | Memory): Discriminated by ``kind``.
+            spec (Browser): Browser environment.
             reserved (bool): True for H-owned rows; world-readable, write-locked behind employee_only.
             created_at (datetime.datetime):
             updated_at (datetime.datetime):
@@ -36,7 +36,7 @@ class EnvironmentRecord(BaseModel):
     )
 
     id: UUID
-    spec: Browser | CodeSandbox | MCP | Memory
+    spec: Browser
     reserved: bool
     created_at: datetime.datetime
     updated_at: datetime.datetime
@@ -44,21 +44,10 @@ class EnvironmentRecord(BaseModel):
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.browser import Browser
-        from ..models.code_sandbox import CodeSandbox
-        from ..models.mcp import MCP
-        from ..models.memory import Memory
 
         id = str(self.id)
 
-        spec: dict[str, Any]
-        if isinstance(self.spec, Browser):
-            spec = self.spec.to_dict()
-        elif isinstance(self.spec, CodeSandbox):
-            spec = self.spec.to_dict()
-        elif isinstance(self.spec, MCP):
-            spec = self.spec.to_dict()
-        else:
-            spec = self.spec.to_dict()
+        spec = self.spec.to_dict()
 
         reserved = self.reserved
 
@@ -87,45 +76,11 @@ class EnvironmentRecord(BaseModel):
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.browser import Browser
-        from ..models.code_sandbox import CodeSandbox
-        from ..models.mcp import MCP
-        from ..models.memory import Memory
 
         d = dict(src_dict)
         id = UUID(d.pop("id"))
 
-        def _parse_spec(data: object) -> Browser | CodeSandbox | MCP | Memory:
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                spec_type_0 = Browser.from_dict(data)
-
-                return spec_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                spec_type_1 = CodeSandbox.from_dict(data)
-
-                return spec_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                spec_type_2 = MCP.from_dict(data)
-
-                return spec_type_2
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            if not isinstance(data, dict):
-                raise TypeError()
-            spec_type_3 = Memory.from_dict(data)
-
-            return spec_type_3
-
-        spec = _parse_spec(d.pop("spec"))
+        spec = Browser.from_dict(d.pop("spec"))
 
         reserved = d.pop("reserved")
 
@@ -148,6 +103,3 @@ class EnvironmentRecord(BaseModel):
 
 
 from ..models.browser import Browser
-from ..models.code_sandbox import CodeSandbox
-from ..models.mcp import MCP
-from ..models.memory import Memory

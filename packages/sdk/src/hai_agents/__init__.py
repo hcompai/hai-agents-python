@@ -4,34 +4,28 @@ This module is the hand-written entry point. The rest of the package
 (``api/``, ``models/``, ``client.py``, etc.) is generated from
 ``openapi.json`` by ``openapi-python-client==0.28.3``.
 
-Do NOT edit ``packages/sdk/src/agent_platform/__init__.py`` directly — it
+Do NOT edit ``packages/sdk/src/hai_agents/__init__.py`` directly — it
 is overwritten on every regen. Edit ``templates/__init__.py.static``
 instead; the schema-sync workflow restores it after each regeneration.
 """
 
 from __future__ import annotations
 
-from agent_platform.client import AuthenticatedClient as _AuthenticatedClient
-from agent_platform.models.agent import Agent
-from agent_platform.models.agent_record import AgentRecord
-from agent_platform.models.browser import Browser
-from agent_platform.models.code_sandbox import CodeSandbox
-from agent_platform.models.create_agent import CreateAgent
-from agent_platform.models.create_environment import CreateEnvironment
-from agent_platform.models.create_memory import CreateMemory
-from agent_platform.models.create_skill import CreateSkill
-from agent_platform.models.environment_record import EnvironmentRecord
-from agent_platform.models.mcp import MCP
-from agent_platform.models.memory import Memory
-from agent_platform.models.memory_record import MemoryRecord
-from agent_platform.models.session import Session
-from agent_platform.models.session_request import SessionRequest
-from agent_platform.models.session_summary import SessionSummary
-from agent_platform.models.skill import Skill
-from agent_platform.models.skill_record import SkillRecord
-from agent_platform.models.update_environment import UpdateEnvironment
-from agent_platform.models.update_memory import UpdateMemory
-from agent_platform.models.update_skill import UpdateSkill
+from hai_agents.client import AuthenticatedClient as _AuthenticatedClient
+from hai_agents.models.agent import Agent
+from hai_agents.models.agent_record import AgentRecord
+from hai_agents.models.browser import Browser
+from hai_agents.models.create_agent import CreateAgent
+from hai_agents.models.create_environment import CreateEnvironment
+from hai_agents.models.create_skill import CreateSkill
+from hai_agents.models.environment_record import EnvironmentRecord
+from hai_agents.models.session import Session
+from hai_agents.models.session_request import SessionRequest
+from hai_agents.models.session_summary import SessionSummary
+from hai_agents.models.skill import Skill
+from hai_agents.models.skill_record import SkillRecord
+from hai_agents.models.update_environment import UpdateEnvironment
+from hai_agents.models.update_skill import UpdateSkill
 
 __all__ = [
     "Client",
@@ -42,9 +36,6 @@ __all__ = [
     "CreateAgent",
     # Environment specs (discriminated union members)
     "Browser",
-    "CodeSandbox",
-    "MCP",
-    "Memory",
     # Environment catalog
     "EnvironmentRecord",
     "CreateEnvironment",
@@ -54,10 +45,6 @@ __all__ = [
     "SkillRecord",
     "CreateSkill",
     "UpdateSkill",
-    # Memory catalog
-    "MemoryRecord",
-    "CreateMemory",
-    "UpdateMemory",
     # Session
     "Session",
     "SessionRequest",
@@ -74,7 +61,7 @@ class Client(_AuthenticatedClient):
         base_url: AgP base URL. Defaults to production.
 
     Example:
-        >>> from agent_platform import Client
+        >>> from hai_agents import Client
         >>> client = Client(api_key="hk-...", base_url="https://agp.eu.hcompany.ai")
     """
 
@@ -91,17 +78,17 @@ class AsyncClient(_AuthenticatedClient):
     """Async Agent Platform SDK client.
 
     Same constructor as ``Client``. Use with ``asyncio``-flavoured endpoint
-    functions (``asyncio()`` / ``asyncio_detailed()`` in each ``agent_platform.api.*`` module).
+    functions (``asyncio()`` / ``asyncio_detailed()`` in each ``hai_agents.api.*`` module).
 
     Note: openapi-python-client 0.28.x does not generate separate sync/async
     *client* classes — it generates per-endpoint sync and async *functions* that
     both accept an ``AuthenticatedClient`` instance. ``Client`` and ``AsyncClient``
     here are the same underlying class, exposed under two names for ergonomic
-    discoverability (so users can write `from agent_platform import AsyncClient`).
+    discoverability (so users can write `from hai_agents import AsyncClient`).
 
     Example:
-        >>> from agent_platform import AsyncClient
-        >>> from agent_platform.api.sessions import list_session_events
+        >>> from hai_agents import AsyncClient
+        >>> from hai_agents.api.sessions import list_session_events
         >>> client = AsyncClient(api_key="hk-...")
         >>> events = await list_session_events.asyncio(client=client, id="…")
     """
