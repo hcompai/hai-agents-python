@@ -8,7 +8,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.http_validation_error import HTTPValidationError
 from ...models.list_skills_sort_type_0_item import ListSkillsSortType0Item
-from ...models.page_skill_record import PageSkillRecord
+from ...models.page_skill import PageSkill
 from ...types import UNSET, Response, Unset
 
 
@@ -59,9 +59,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> HTTPValidationError | PageSkillRecord | None:
+) -> HTTPValidationError | PageSkill | None:
     if response.status_code == 200:
-        response_200 = PageSkillRecord.from_dict(response.json())
+        response_200 = PageSkill.from_dict(response.json())
 
         return response_200
 
@@ -78,7 +78,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[HTTPValidationError | PageSkillRecord]:
+) -> Response[HTTPValidationError | PageSkill]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -94,10 +94,10 @@ def sync_detailed(
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSkillsSortType0Item] | None | Unset = UNSET,
-) -> Response[HTTPValidationError | PageSkillRecord]:
+) -> Response[HTTPValidationError | PageSkill]:
     """List Skills
 
-     List skills for the current org, optionally filtered by name prefix.
+     List reserved + caller's org skills, optionally filtered by name prefix.
 
     Args:
         name (None | str | Unset): Filter by name prefix.
@@ -110,7 +110,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[HTTPValidationError | PageSkillRecord]
+        Response[HTTPValidationError | PageSkill]
     """
 
     kwargs = _get_kwargs(
@@ -134,10 +134,10 @@ def sync(
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSkillsSortType0Item] | None | Unset = UNSET,
-) -> HTTPValidationError | PageSkillRecord | None:
+) -> HTTPValidationError | PageSkill | None:
     """List Skills
 
-     List skills for the current org, optionally filtered by name prefix.
+     List reserved + caller's org skills, optionally filtered by name prefix.
 
     Args:
         name (None | str | Unset): Filter by name prefix.
@@ -150,7 +150,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        HTTPValidationError | PageSkillRecord
+        HTTPValidationError | PageSkill
     """
 
     return sync_detailed(
@@ -169,10 +169,10 @@ async def asyncio_detailed(
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSkillsSortType0Item] | None | Unset = UNSET,
-) -> Response[HTTPValidationError | PageSkillRecord]:
+) -> Response[HTTPValidationError | PageSkill]:
     """List Skills
 
-     List skills for the current org, optionally filtered by name prefix.
+     List reserved + caller's org skills, optionally filtered by name prefix.
 
     Args:
         name (None | str | Unset): Filter by name prefix.
@@ -185,7 +185,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[HTTPValidationError | PageSkillRecord]
+        Response[HTTPValidationError | PageSkill]
     """
 
     kwargs = _get_kwargs(
@@ -207,10 +207,10 @@ async def asyncio(
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSkillsSortType0Item] | None | Unset = UNSET,
-) -> HTTPValidationError | PageSkillRecord | None:
+) -> HTTPValidationError | PageSkill | None:
     """List Skills
 
-     List skills for the current org, optionally filtered by name prefix.
+     List reserved + caller's org skills, optionally filtered by name prefix.
 
     Args:
         name (None | str | Unset): Filter by name prefix.
@@ -223,7 +223,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        HTTPValidationError | PageSkillRecord
+        HTTPValidationError | PageSkill
     """
 
     return (

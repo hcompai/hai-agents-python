@@ -6,19 +6,19 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.agent_record import AgentRecord
+from ...models.agent import Agent
 from ...models.http_validation_error import HTTPValidationError
 from ...types import UNSET, Response
 
 
 def _get_kwargs(
-    agent_identifier: str,
+    agent_name: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/v2/agents/{agent_identifier}".format(
-            agent_identifier=quote(str(agent_identifier), safe=""),
+        "url": "/api/v2/agents/{agent_name}".format(
+            agent_name=quote(str(agent_name), safe=""),
         ),
     }
 
@@ -27,9 +27,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> AgentRecord | HTTPValidationError | None:
+) -> Agent | HTTPValidationError | None:
     if response.status_code == 200:
-        response_200 = AgentRecord.from_dict(response.json())
+        response_200 = Agent.from_dict(response.json())
 
         return response_200
 
@@ -46,7 +46,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[AgentRecord | HTTPValidationError]:
+) -> Response[Agent | HTTPValidationError]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -56,27 +56,27 @@ def _build_response(
 
 
 def sync_detailed(
-    agent_identifier: str,
+    agent_name: str,
     *,
     client: AuthenticatedClient,
-) -> Response[AgentRecord | HTTPValidationError]:
+) -> Response[Agent | HTTPValidationError]:
     """Get Agent
 
      Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
 
     Args:
-        agent_identifier (str):
+        agent_name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[AgentRecord | HTTPValidationError]
+        Response[Agent | HTTPValidationError]
     """
 
     kwargs = _get_kwargs(
-        agent_identifier=agent_identifier,
+        agent_name=agent_name,
     )
 
     response = client.get_httpx_client().request(
@@ -87,53 +87,53 @@ def sync_detailed(
 
 
 def sync(
-    agent_identifier: str,
+    agent_name: str,
     *,
     client: AuthenticatedClient,
-) -> AgentRecord | HTTPValidationError | None:
+) -> Agent | HTTPValidationError | None:
     """Get Agent
 
      Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
 
     Args:
-        agent_identifier (str):
+        agent_name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        AgentRecord | HTTPValidationError
+        Agent | HTTPValidationError
     """
 
     return sync_detailed(
-        agent_identifier=agent_identifier,
+        agent_name=agent_name,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    agent_identifier: str,
+    agent_name: str,
     *,
     client: AuthenticatedClient,
-) -> Response[AgentRecord | HTTPValidationError]:
+) -> Response[Agent | HTTPValidationError]:
     """Get Agent
 
      Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
 
     Args:
-        agent_identifier (str):
+        agent_name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[AgentRecord | HTTPValidationError]
+        Response[Agent | HTTPValidationError]
     """
 
     kwargs = _get_kwargs(
-        agent_identifier=agent_identifier,
+        agent_name=agent_name,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -142,28 +142,28 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    agent_identifier: str,
+    agent_name: str,
     *,
     client: AuthenticatedClient,
-) -> AgentRecord | HTTPValidationError | None:
+) -> Agent | HTTPValidationError | None:
     """Get Agent
 
      Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
 
     Args:
-        agent_identifier (str):
+        agent_name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        AgentRecord | HTTPValidationError
+        Agent | HTTPValidationError
     """
 
     return (
         await asyncio_detailed(
-            agent_identifier=agent_identifier,
+            agent_name=agent_name,
             client=client,
         )
     ).parsed

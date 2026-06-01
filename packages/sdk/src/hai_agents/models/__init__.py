@@ -1,11 +1,8 @@
 """Contains all the data models used in inputs/outputs"""
 
 from .agent import Agent
-from .agent_record import AgentRecord
 from .browser import Browser
-from .create_agent import CreateAgent
 from .create_environment import CreateEnvironment
-from .create_skill import CreateSkill
 from .environment_record import EnvironmentRecord
 from .feedback import Feedback
 from .http_validation_error import HTTPValidationError
@@ -18,10 +15,10 @@ from .list_skills_sort_type_0_item import ListSkillsSortType0Item
 from .metrics import Metrics
 from .model_cost import ModelCost
 from .model_usage import ModelUsage
-from .page_agent_record import PageAgentRecord
+from .page_agent import PageAgent
 from .page_environment_record import PageEnvironmentRecord
 from .page_session_summary import PageSessionSummary
-from .page_skill_record import PageSkillRecord
+from .page_skill import PageSkill
 from .page_trajectory_event import PageTrajectoryEvent
 from .quota_status import QuotaStatus
 from .quota_status_scope import QuotaStatusScope
@@ -32,14 +29,11 @@ from .session_status import SessionStatus
 from .session_summary import SessionSummary
 from .share_link import ShareLink
 from .skill import Skill
-from .skill_record import SkillRecord
 from .trajectory_changes import TrajectoryChanges
 from .trajectory_changes_answer_type_1 import TrajectoryChangesAnswerType1
 from .trajectory_event import TrajectoryEvent
 from .trajectory_status import TrajectoryStatus
-from .update_agent import UpdateAgent
 from .update_environment import UpdateEnvironment
-from .update_skill import UpdateSkill
 from .user_message_batch import UserMessageBatch
 from .user_message_event import UserMessageEvent
 from .validation_error import ValidationError
@@ -47,11 +41,8 @@ from .validation_error_context import ValidationErrorContext
 
 __all__ = (
     "Agent",
-    "AgentRecord",
     "Browser",
-    "CreateAgent",
     "CreateEnvironment",
-    "CreateSkill",
     "EnvironmentRecord",
     "Feedback",
     "HTTPValidationError",
@@ -64,10 +55,10 @@ __all__ = (
     "Metrics",
     "ModelCost",
     "ModelUsage",
-    "PageAgentRecord",
+    "PageAgent",
     "PageEnvironmentRecord",
     "PageSessionSummary",
-    "PageSkillRecord",
+    "PageSkill",
     "PageTrajectoryEvent",
     "QuotaStatus",
     "QuotaStatusScope",
@@ -78,14 +69,11 @@ __all__ = (
     "SessionSummary",
     "ShareLink",
     "Skill",
-    "SkillRecord",
     "TrajectoryChanges",
     "TrajectoryChangesAnswerType1",
     "TrajectoryEvent",
     "TrajectoryStatus",
-    "UpdateAgent",
     "UpdateEnvironment",
-    "UpdateSkill",
     "UserMessageBatch",
     "UserMessageEvent",
     "ValidationError",
