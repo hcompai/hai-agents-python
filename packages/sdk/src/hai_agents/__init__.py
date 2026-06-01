@@ -13,39 +13,18 @@ from __future__ import annotations
 
 from hai_agents.client import AuthenticatedClient as _AuthenticatedClient
 from hai_agents.models.agent import Agent
-from hai_agents.models.agent_record import AgentRecord
 from hai_agents.models.browser import Browser
-from hai_agents.models.create_agent import CreateAgent
-from hai_agents.models.create_environment import CreateEnvironment
-from hai_agents.models.create_skill import CreateSkill
-from hai_agents.models.environment_record import EnvironmentRecord
 from hai_agents.models.session import Session
 from hai_agents.models.session_request import SessionRequest
 from hai_agents.models.session_summary import SessionSummary
 from hai_agents.models.skill import Skill
-from hai_agents.models.skill_record import SkillRecord
-from hai_agents.models.update_environment import UpdateEnvironment
-from hai_agents.models.update_skill import UpdateSkill
 
 __all__ = [
     "Client",
     "AsyncClient",
-    # Agent
     "Agent",
-    "AgentRecord",
-    "CreateAgent",
-    # Environment specs (discriminated union members)
     "Browser",
-    # Environment catalog
-    "EnvironmentRecord",
-    "CreateEnvironment",
-    "UpdateEnvironment",
-    # Skill
     "Skill",
-    "SkillRecord",
-    "CreateSkill",
-    "UpdateSkill",
-    # Session
     "Session",
     "SessionRequest",
     "SessionSummary",

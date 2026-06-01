@@ -79,23 +79,23 @@ def run_id() -> str:
 
 @pytest.fixture
 def created_skills(client: Client) -> Iterator[list]:
-    """Track skill ids created during a test and delete them on teardown.
+    """Track skill names created during a test and delete them on teardown.
 
-    Tests append the returned Skill (or its id) to this list; the fixture
-    will call DELETE on each, ignoring 404s. Cleanup failures log a warning
-    but never fail the test — a leaked skill in staging is not a test bug.
+    Tests append each created skill's name to this list; the fixture calls
+    DELETE on each, ignoring 404s. Cleanup failures log a warning but never
+    fail the test — a leaked skill in staging is not a test bug.
     """
     from hai_agents.api.skills import (
         delete_skill as delete_skill,
     )
 
-    ids: list = []
-    yield ids
-    for sid in ids:
+    names: list = []
+    yield names
+    for name in names:
         try:
-            delete_skill.sync_detailed(client=client, id=sid)
+            delete_skill.sync_detailed(client=client, name=name)
         except Exception as exc:  # noqa: BLE001
-            print(f"warning: cleanup failed for skill {sid}: {exc}")
+            print(f"warning: cleanup failed for skill {name}: {exc}")
 
 
 @pytest.fixture
