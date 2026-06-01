@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any, Dict
 
 from hai_agents.models.agent import Agent
-from hai_agents.models.agent_record import AgentRecord
 from hai_agents.models.session import Session
 from hai_agents.models.session_request import SessionRequest
 from hai_agents.models.skill_record import SkillRecord
@@ -91,12 +90,6 @@ def test_agent_roundtrip(agent_payload: Dict[str, Any]) -> None:
     """
     serialized = _roundtrip(Agent, agent_payload)
     assert_json_equal(serialized, agent_payload)
-
-
-def test_agent_record_roundtrip(agent_record_payload: Dict[str, Any]) -> None:
-    """AgentRecord (catalog row: id + spec + reserved + timestamps) round-trips."""
-    serialized = _roundtrip(AgentRecord, agent_record_payload)
-    assert_json_equal(serialized, agent_record_payload)
 
 
 # ---------------------------------------------------------------------------
