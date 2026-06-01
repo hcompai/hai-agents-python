@@ -1,18 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, BinaryIO, Generator, TextIO, TypeVar, cast
+from typing import Any, BinaryIO, Generator, TextIO, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict
 
 from ..types import UNSET, Unset
-
-if TYPE_CHECKING:
-    from ..models.browser import Browser
-    from ..models.code_sandbox import CodeSandbox
-    from ..models.mcp import MCP
-    from ..models.memory import Memory
-
 
 T = TypeVar("T", bound="CreateEnvironment")
 
@@ -30,6 +23,7 @@ class CreateEnvironment(BaseModel):
         populate_by_name=True,
         extra="ignore",
         arbitrary_types_allowed=True,
+        defer_build=True,
     )
 
     spec: Browser | CodeSandbox | MCP | Memory
@@ -123,3 +117,9 @@ class CreateEnvironment(BaseModel):
         )
 
         return create_environment
+
+
+from ..models.browser import Browser
+from ..models.code_sandbox import CodeSandbox
+from ..models.mcp import MCP
+from ..models.memory import Memory

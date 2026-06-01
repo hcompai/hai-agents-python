@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, BinaryIO, Generator, TextIO, TypeVar, cast
+from typing import Any, BinaryIO, Generator, TextIO, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict
 
 from ..types import UNSET, Unset
-
-if TYPE_CHECKING:
-    from ..models.memory_record import MemoryRecord
-
 
 T = TypeVar("T", bound="PageMemoryRecord")
 
@@ -26,6 +22,7 @@ class PageMemoryRecord(BaseModel):
         populate_by_name=True,
         extra="ignore",
         arbitrary_types_allowed=True,
+        defer_build=True,
     )
 
     items: list[MemoryRecord]
@@ -97,3 +94,6 @@ class PageMemoryRecord(BaseModel):
 
     def __contains__(self, key: str) -> bool:
         return key in self.additional_properties
+
+
+from ..models.memory_record import MemoryRecord

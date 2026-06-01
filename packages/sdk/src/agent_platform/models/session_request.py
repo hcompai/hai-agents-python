@@ -1,17 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, BinaryIO, Generator, TextIO, TypeVar, cast
+from typing import Any, BinaryIO, Generator, TextIO, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict
 
 from ..types import UNSET, Unset
-
-if TYPE_CHECKING:
-    from ..models.agent import Agent
-    from ..models.session_request_answer_format_type_0 import SessionRequestAnswerFormatType0
-    from ..models.user_message_event import UserMessageEvent
-
 
 T = TypeVar("T", bound="SessionRequest")
 
@@ -36,6 +30,7 @@ class SessionRequest(BaseModel):
         populate_by_name=True,
         extra="ignore",
         arbitrary_types_allowed=True,
+        defer_build=True,
     )
 
     agent: Agent | str
@@ -259,3 +254,8 @@ class SessionRequest(BaseModel):
         )
 
         return session_request
+
+
+from ..models.agent import Agent
+from ..models.session_request_answer_format_type_0 import SessionRequestAnswerFormatType0
+from ..models.user_message_event import UserMessageEvent

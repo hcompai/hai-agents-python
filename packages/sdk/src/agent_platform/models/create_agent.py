@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, BinaryIO, Generator, TextIO, TypeVar, cast
+from typing import Any, BinaryIO, Generator, TextIO, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict
 
 from ..types import UNSET, Unset
-
-if TYPE_CHECKING:
-    from ..models.agent import Agent
-
 
 T = TypeVar("T", bound="CreateAgent")
 
@@ -26,6 +22,7 @@ class CreateAgent(BaseModel):
         populate_by_name=True,
         extra="ignore",
         arbitrary_types_allowed=True,
+        defer_build=True,
     )
 
     spec: Agent
@@ -65,3 +62,6 @@ class CreateAgent(BaseModel):
         )
 
         return create_agent
+
+
+from ..models.agent import Agent
