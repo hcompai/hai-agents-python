@@ -28,8 +28,8 @@ except ImportError:
 # Loading the models package eagerly resolves the SDK's forward refs (mirrors
 # the workaround in sdk/python/tests/conftest.py — Pydantic 2 needs every
 # referenced class loaded before instantiation works).
-import agent_platform.models  # noqa: F401
-from agent_platform import Client
+import hai_agents.models  # noqa: F401
+from hai_agents import Client
 
 DEFAULT_BASE_URL = "https://agp.staging.sandboxh.ai"
 
@@ -85,7 +85,7 @@ def created_skills(client: Client) -> Iterator[list]:
     will call DELETE on each, ignoring 404s. Cleanup failures log a warning
     but never fail the test — a leaked skill in staging is not a test bug.
     """
-    from agent_platform.api.skills import (
+    from hai_agents.api.skills import (
         delete_skill as delete_skill,
     )
 
@@ -105,13 +105,13 @@ def created_sessions(client: Client) -> Iterator[list]:
     Sessions can't be hard-deleted; the best we can do is cancel running ones
     so they stop consuming quota. Terminal sessions stay in history.
     """
-    from agent_platform.api.sessions import (
+    from hai_agents.api.sessions import (
         cancel_session as cancel_session,
     )
-    from agent_platform.api.sessions import (
+    from hai_agents.api.sessions import (
         get_session_status as get_status,
     )
-    from agent_platform.models.trajectory_status import TrajectoryStatus
+    from hai_agents.models.trajectory_status import TrajectoryStatus
 
     TERMINAL = {
         TrajectoryStatus.COMPLETED,

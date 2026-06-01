@@ -13,17 +13,17 @@ from __future__ import annotations
 
 import pytest
 
-from agent_platform import Client, CreateSkill, UpdateSkill
-from agent_platform.api.skills import (
+from hai_agents import Client, CreateSkill, UpdateSkill
+from hai_agents.api.skills import (
     create_skill as create_skill,
 )
-from agent_platform.api.skills import (
+from hai_agents.api.skills import (
     delete_skill as delete_skill,
 )
-from agent_platform.api.skills import (
+from hai_agents.api.skills import (
     get_skill as get_skill,
 )
-from agent_platform.api.skills import (
+from hai_agents.api.skills import (
     update_skill as update_skill,
 )
 

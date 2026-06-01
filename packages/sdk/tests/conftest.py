@@ -19,48 +19,15 @@ from typing import Any, Dict
 
 import pytest
 
-# ---------------------------------------------------------------------------
-# Forward-reference resolution
-#
-# Several generated models use TYPE_CHECKING guards for circular/forward
-# imports (e.g., SessionRequest references Agent and the Environment union
-# variants only under TYPE_CHECKING so they are invisible to Pydantic at
-# class-definition time).  Importing the full models package triggers all
-# imports, then model_rebuild() lets Pydantic resolve the forward references.
-#
-# This must run before any model is instantiated.
-# ---------------------------------------------------------------------------
-import agent_platform.models  # noqa: F401 — side-effect: registers all model classes
-
-# Import the complete models package to register all classes in their module namespaces.
-# agent_platform.models.__init__ imports every model, ensuring all forward-reference
-# TYPE_CHECKING guards are satisfied before model_rebuild() resolves annotations.
-import agent_platform.models as _models_pkg
-
-# Build a types namespace from all exported model classes.  Pydantic's model_rebuild()
-# uses this namespace to resolve forward-reference strings in annotations.
-_TYPES_NS = {name: getattr(_models_pkg, name) for name in _models_pkg.__all__}
-
-# Rebuild every model that uses TYPE_CHECKING-guarded forward references.
-# We pass _types_namespace so Pydantic can resolve every annotation in one pass
-# rather than relying on the module's global scope (which misses TYPE_CHECKING imports).
-for _model_name in _models_pkg.__all__:
-    _cls = getattr(_models_pkg, _model_name)
-    if hasattr(_cls, "model_rebuild"):
-        try:
-            _cls.model_rebuild(_types_namespace=_TYPES_NS)
-        except Exception:
-            pass  # Enums and non-BaseModel classes don't need rebuild; ignore.
-
-from agent_platform.models.agent import Agent
-from agent_platform.models.agent_record import AgentRecord
-from agent_platform.models.session import Session
-from agent_platform.models.session_request import SessionRequest
-from agent_platform.models.session_status import SessionStatus
-from agent_platform.models.session_summary import SessionSummary
-from agent_platform.models.skill_record import SkillRecord
-from agent_platform.models.trajectory_status import TrajectoryStatus
-from agent_platform.models.user_message_event import UserMessageEvent
+from hai_agents.models.agent import Agent
+from hai_agents.models.agent_record import AgentRecord
+from hai_agents.models.session import Session
+from hai_agents.models.session_request import SessionRequest
+from hai_agents.models.session_status import SessionStatus
+from hai_agents.models.session_summary import SessionSummary
+from hai_agents.models.skill_record import SkillRecord
+from hai_agents.models.trajectory_status import TrajectoryStatus
+from hai_agents.models.user_message_event import UserMessageEvent
 
 
 def _normalize_datetimes(obj: Any) -> Any:

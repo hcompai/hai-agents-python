@@ -16,18 +16,18 @@ import time
 
 import pytest
 
-from agent_platform import Client
-from agent_platform.api.sessions import (
+from hai_agents import Client
+from hai_agents.api.sessions import (
     get_session_changes as get_changes,
 )
-from agent_platform.api.sessions import (
+from hai_agents.api.sessions import (
     get_session_status as get_status,
 )
-from agent_platform.api.sessions import (
+from hai_agents.api.sessions import (
     list_session_events as list_events,
 )
-from agent_platform.models.session_status import SessionStatus
-from agent_platform.models.trajectory_status import TrajectoryStatus
+from hai_agents.models.session_status import SessionStatus
+from hai_agents.models.trajectory_status import TrajectoryStatus
 
 pytestmark = pytest.mark.integration
 

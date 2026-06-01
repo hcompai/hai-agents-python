@@ -2,11 +2,11 @@
 members = ["packages/*"]
 
 [tool.uv.sources]
-agent-platform = {workspace = true}
+hai-agents = {workspace = true}
 
 [dependency-groups]
 dev = [
-  "agent-platform",
+  "hai-agents",
   "pytest>=9.0.3,<10",
   # Used only by tests/integration/ — read HAI_API_KEY_TEST when running locally.
   "python-dotenv>=1.2.2,<2",

@@ -18,9 +18,8 @@ class Agent(BaseModel):
             start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-
             environment').
         description (str): Short summary advertised to parent agents that may delegate to this one.
-        environments (list[Browser | CodeSandbox | MCP | Memory | str]): Environments the agent runs in. A string entry
-            references a catalog id; an inline Environment defines an ad-hoc environment. At least one entry, at most one
-            per kind.
+        environments (list[Browser | str]): Environments the agent runs in. A string entry references a catalog id; an
+            inline Environment defines an ad-hoc environment. At least one entry, at most one per kind.
         model (None | str | Unset): Model id; defaults to the platform-provided one if omitted.
         instructions (None | str | Unset): Steering text appended to the system prompt.
         subagents (list[Agent | str] | None | Unset): Agents this one can spawn. A string entry references another
@@ -38,7 +37,7 @@ class Agent(BaseModel):
 
     name: str
     description: str
-    environments: list[Browser | CodeSandbox | MCP | Memory | str]
+    environments: list[Browser | str]
     model: None | str | Unset = UNSET
     instructions: None | str | Unset = UNSET
     subagents: list[Agent | str] | None | Unset = UNSET
@@ -47,9 +46,6 @@ class Agent(BaseModel):
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.browser import Browser
-        from ..models.code_sandbox import CodeSandbox
-        from ..models.mcp import MCP
-        from ..models.memory import Memory
         from ..models.skill import Skill
 
         name = self.name
@@ -60,12 +56,6 @@ class Agent(BaseModel):
         for environments_item_data in self.environments:
             environments_item: dict[str, Any] | str
             if isinstance(environments_item_data, Browser):
-                environments_item = environments_item_data.to_dict()
-            elif isinstance(environments_item_data, CodeSandbox):
-                environments_item = environments_item_data.to_dict()
-            elif isinstance(environments_item_data, MCP):
-                environments_item = environments_item_data.to_dict()
-            elif isinstance(environments_item_data, Memory):
                 environments_item = environments_item_data.to_dict()
             else:
                 environments_item = environments_item_data
@@ -138,9 +128,6 @@ class Agent(BaseModel):
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.browser import Browser
-        from ..models.code_sandbox import CodeSandbox
-        from ..models.mcp import MCP
-        from ..models.memory import Memory
         from ..models.skill import Skill
 
         d = dict(src_dict)
@@ -152,40 +139,16 @@ class Agent(BaseModel):
         _environments = d.pop("environments")
         for environments_item_data in _environments:
 
-            def _parse_environments_item(data: object) -> Browser | CodeSandbox | MCP | Memory | str:
+            def _parse_environments_item(data: object) -> Browser | str:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    environments_item_type_1_type_0 = Browser.from_dict(data)
+                    environments_item_type_1 = Browser.from_dict(data)
 
-                    return environments_item_type_1_type_0
+                    return environments_item_type_1
                 except (TypeError, ValueError, AttributeError, KeyError):
                     pass
-                try:
-                    if not isinstance(data, dict):
-                        raise TypeError()
-                    environments_item_type_1_type_1 = CodeSandbox.from_dict(data)
-
-                    return environments_item_type_1_type_1
-                except (TypeError, ValueError, AttributeError, KeyError):
-                    pass
-                try:
-                    if not isinstance(data, dict):
-                        raise TypeError()
-                    environments_item_type_1_type_2 = MCP.from_dict(data)
-
-                    return environments_item_type_1_type_2
-                except (TypeError, ValueError, AttributeError, KeyError):
-                    pass
-                try:
-                    if not isinstance(data, dict):
-                        raise TypeError()
-                    environments_item_type_1_type_3 = Memory.from_dict(data)
-
-                    return environments_item_type_1_type_3
-                except (TypeError, ValueError, AttributeError, KeyError):
-                    pass
-                return cast(Browser | CodeSandbox | MCP | Memory | str, data)
+                return cast(Browser | str, data)
 
             environments_item = _parse_environments_item(environments_item_data)
 
@@ -308,7 +271,4 @@ class Agent(BaseModel):
 
 
 from ..models.browser import Browser
-from ..models.code_sandbox import CodeSandbox
-from ..models.mcp import MCP
-from ..models.memory import Memory
 from ..models.skill import Skill

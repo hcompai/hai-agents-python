@@ -1,1 +1,1 @@
-# Test package for the agent-platform Python SDK.
+# Test package for the hai-agents Python SDK.
