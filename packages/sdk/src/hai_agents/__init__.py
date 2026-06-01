@@ -13,7 +13,9 @@ from __future__ import annotations
 
 from hai_agents.client import AuthenticatedClient as _AuthenticatedClient
 from hai_agents.models.agent import Agent
+from hai_agents.models.agent_record import AgentRecord
 from hai_agents.models.browser import Browser
+from hai_agents.models.create_agent import CreateAgent
 from hai_agents.models.create_environment import CreateEnvironment
 from hai_agents.models.create_skill import CreateSkill
 from hai_agents.models.environment_record import EnvironmentRecord
@@ -30,6 +32,8 @@ __all__ = [
     "AsyncClient",
     # Agent
     "Agent",
+    "AgentRecord",
+    "CreateAgent",
     # Environment specs (discriminated union members)
     "Browser",
     # Environment catalog

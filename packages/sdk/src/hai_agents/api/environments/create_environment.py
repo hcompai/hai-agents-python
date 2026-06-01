@@ -6,15 +6,14 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.create_environment import CreateEnvironment
-from ...models.environment_record import EnvironmentRecord
+from ...models.browser import Browser
 from ...models.http_validation_error import HTTPValidationError
 from ...types import UNSET, Response
 
 
 def _get_kwargs(
     *,
-    body: CreateEnvironment,
+    body: Browser,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -33,9 +32,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> EnvironmentRecord | HTTPValidationError | None:
+) -> Browser | HTTPValidationError | None:
     if response.status_code == 201:
-        response_201 = EnvironmentRecord.from_dict(response.json())
+        response_201 = Browser.from_dict(response.json())
 
         return response_201
 
@@ -52,7 +51,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[EnvironmentRecord | HTTPValidationError]:
+) -> Response[Browser | HTTPValidationError]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -64,21 +63,21 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    body: CreateEnvironment,
-) -> Response[EnvironmentRecord | HTTPValidationError]:
+    body: Browser,
+) -> Response[Browser | HTTPValidationError]:
     """Create Environment
 
-     Create an environment. ``reserved=True`` and the ``h/`` namespace require H-employee privileges.
+     Create an environment.
 
     Args:
-        body (CreateEnvironment): ``POST /api/v2/environments`` body.
+        body (Browser): Browser environment.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[EnvironmentRecord | HTTPValidationError]
+        Response[Browser | HTTPValidationError]
     """
 
     kwargs = _get_kwargs(
@@ -95,21 +94,21 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    body: CreateEnvironment,
-) -> EnvironmentRecord | HTTPValidationError | None:
+    body: Browser,
+) -> Browser | HTTPValidationError | None:
     """Create Environment
 
-     Create an environment. ``reserved=True`` and the ``h/`` namespace require H-employee privileges.
+     Create an environment.
 
     Args:
-        body (CreateEnvironment): ``POST /api/v2/environments`` body.
+        body (Browser): Browser environment.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        EnvironmentRecord | HTTPValidationError
+        Browser | HTTPValidationError
     """
 
     return sync_detailed(
@@ -121,21 +120,21 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    body: CreateEnvironment,
-) -> Response[EnvironmentRecord | HTTPValidationError]:
+    body: Browser,
+) -> Response[Browser | HTTPValidationError]:
     """Create Environment
 
-     Create an environment. ``reserved=True`` and the ``h/`` namespace require H-employee privileges.
+     Create an environment.
 
     Args:
-        body (CreateEnvironment): ``POST /api/v2/environments`` body.
+        body (Browser): Browser environment.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[EnvironmentRecord | HTTPValidationError]
+        Response[Browser | HTTPValidationError]
     """
 
     kwargs = _get_kwargs(
@@ -150,21 +149,21 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    body: CreateEnvironment,
-) -> EnvironmentRecord | HTTPValidationError | None:
+    body: Browser,
+) -> Browser | HTTPValidationError | None:
     """Create Environment
 
-     Create an environment. ``reserved=True`` and the ``h/`` namespace require H-employee privileges.
+     Create an environment.
 
     Args:
-        body (CreateEnvironment): ``POST /api/v2/environments`` body.
+        body (Browser): Browser environment.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        EnvironmentRecord | HTTPValidationError
+        Browser | HTTPValidationError
     """
 
     return (

@@ -6,19 +6,19 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.environment_record import EnvironmentRecord
+from ...models.browser import Browser
 from ...models.http_validation_error import HTTPValidationError
 from ...types import UNSET, Response
 
 
 def _get_kwargs(
-    env_identifier: str,
+    id: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/v2/environments/{env_identifier}".format(
-            env_identifier=quote(str(env_identifier), safe=""),
+        "url": "/api/v2/environments/{id}".format(
+            id=quote(str(id), safe=""),
         ),
     }
 
@@ -27,9 +27,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> EnvironmentRecord | HTTPValidationError | None:
+) -> Browser | HTTPValidationError | None:
     if response.status_code == 200:
-        response_200 = EnvironmentRecord.from_dict(response.json())
+        response_200 = Browser.from_dict(response.json())
 
         return response_200
 
@@ -46,7 +46,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[EnvironmentRecord | HTTPValidationError]:
+) -> Response[Browser | HTTPValidationError]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -56,27 +56,27 @@ def _build_response(
 
 
 def sync_detailed(
-    env_identifier: str,
+    id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[EnvironmentRecord | HTTPValidationError]:
+) -> Response[Browser | HTTPValidationError]:
     """Get Environment
 
      Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
 
     Args:
-        env_identifier (str):
+        id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[EnvironmentRecord | HTTPValidationError]
+        Response[Browser | HTTPValidationError]
     """
 
     kwargs = _get_kwargs(
-        env_identifier=env_identifier,
+        id=id,
     )
 
     response = client.get_httpx_client().request(
@@ -87,53 +87,53 @@ def sync_detailed(
 
 
 def sync(
-    env_identifier: str,
+    id: str,
     *,
     client: AuthenticatedClient,
-) -> EnvironmentRecord | HTTPValidationError | None:
+) -> Browser | HTTPValidationError | None:
     """Get Environment
 
      Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
 
     Args:
-        env_identifier (str):
+        id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        EnvironmentRecord | HTTPValidationError
+        Browser | HTTPValidationError
     """
 
     return sync_detailed(
-        env_identifier=env_identifier,
+        id=id,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    env_identifier: str,
+    id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[EnvironmentRecord | HTTPValidationError]:
+) -> Response[Browser | HTTPValidationError]:
     """Get Environment
 
      Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
 
     Args:
-        env_identifier (str):
+        id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[EnvironmentRecord | HTTPValidationError]
+        Response[Browser | HTTPValidationError]
     """
 
     kwargs = _get_kwargs(
-        env_identifier=env_identifier,
+        id=id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -142,28 +142,28 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    env_identifier: str,
+    id: str,
     *,
     client: AuthenticatedClient,
-) -> EnvironmentRecord | HTTPValidationError | None:
+) -> Browser | HTTPValidationError | None:
     """Get Environment
 
      Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
 
     Args:
-        env_identifier (str):
+        id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        EnvironmentRecord | HTTPValidationError
+        Browser | HTTPValidationError
     """
 
     return (
         await asyncio_detailed(
-            env_identifier=env_identifier,
+            id=id,
             client=client,
         )
     ).parsed

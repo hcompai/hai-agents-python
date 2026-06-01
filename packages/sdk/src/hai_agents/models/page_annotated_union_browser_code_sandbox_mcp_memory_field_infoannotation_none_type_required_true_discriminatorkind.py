@@ -7,13 +7,15 @@ from pydantic import BaseModel, ConfigDict
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="PageEnvironmentRecord")
+T = TypeVar(
+    "T", bound="PageAnnotatedUnionBrowserCodeSandboxMCPMemoryFieldInfoannotationNoneTypeRequiredTrueDiscriminatorkind"
+)
 
 
-class PageEnvironmentRecord(BaseModel):
+class PageAnnotatedUnionBrowserCodeSandboxMCPMemoryFieldInfoannotationNoneTypeRequiredTrueDiscriminatorkind(BaseModel):
     """
     Attributes:
-        items (list[EnvironmentRecord]):
+        items (list[Browser]):
         total (int):
         page (int):
     """
@@ -25,13 +27,13 @@ class PageEnvironmentRecord(BaseModel):
         defer_build=True,
     )
 
-    items: list[EnvironmentRecord]
+    items: list[Browser]
     total: int
     page: int
     additional_properties: dict[str, Any] = {}
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.environment_record import EnvironmentRecord
+        from ..models.browser import Browser
 
         items = []
         for items_item_data in self.items:
@@ -56,13 +58,13 @@ class PageEnvironmentRecord(BaseModel):
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.environment_record import EnvironmentRecord
+        from ..models.browser import Browser
 
         d = dict(src_dict)
         items = []
         _items = d.pop("items")
         for items_item_data in _items:
-            items_item = EnvironmentRecord.from_dict(items_item_data)
+            items_item = Browser.from_dict(items_item_data)
 
             items.append(items_item)
 
@@ -70,14 +72,14 @@ class PageEnvironmentRecord(BaseModel):
 
         page = d.pop("page")
 
-        page_environment_record = cls(
+        page_annotated_union_browser_code_sandbox_mcp_memory_field_infoannotation_none_type_required_true_discriminatorkind = cls(
             items=items,
             total=total,
             page=page,
         )
 
-        page_environment_record.additional_properties = d
-        return page_environment_record
+        page_annotated_union_browser_code_sandbox_mcp_memory_field_infoannotation_none_type_required_true_discriminatorkind.additional_properties = d
+        return page_annotated_union_browser_code_sandbox_mcp_memory_field_infoannotation_none_type_required_true_discriminatorkind
 
     @property
     def additional_keys(self) -> list[str]:
@@ -96,4 +98,4 @@ class PageEnvironmentRecord(BaseModel):
         return key in self.additional_properties
 
 
-from ..models.environment_record import EnvironmentRecord
+from ..models.browser import Browser

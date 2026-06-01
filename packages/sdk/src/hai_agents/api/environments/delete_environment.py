@@ -11,13 +11,13 @@ from ...types import UNSET, Response
 
 
 def _get_kwargs(
-    env_identifier: str,
+    id: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/v2/environments/{env_identifier}".format(
-            env_identifier=quote(str(env_identifier), safe=""),
+        "url": "/api/v2/environments/{id}".format(
+            id=quote(str(id), safe=""),
         ),
     }
 
@@ -54,7 +54,7 @@ def _build_response(
 
 
 def sync_detailed(
-    env_identifier: str,
+    id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[Any | HTTPValidationError]:
@@ -63,7 +63,7 @@ def sync_detailed(
      Delete by identifier. Reserved rows: H employee only.
 
     Args:
-        env_identifier (str):
+        id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -74,7 +74,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        env_identifier=env_identifier,
+        id=id,
     )
 
     response = client.get_httpx_client().request(
@@ -85,7 +85,7 @@ def sync_detailed(
 
 
 def sync(
-    env_identifier: str,
+    id: str,
     *,
     client: AuthenticatedClient,
 ) -> Any | HTTPValidationError | None:
@@ -94,7 +94,7 @@ def sync(
      Delete by identifier. Reserved rows: H employee only.
 
     Args:
-        env_identifier (str):
+        id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -105,13 +105,13 @@ def sync(
     """
 
     return sync_detailed(
-        env_identifier=env_identifier,
+        id=id,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    env_identifier: str,
+    id: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[Any | HTTPValidationError]:
@@ -120,7 +120,7 @@ async def asyncio_detailed(
      Delete by identifier. Reserved rows: H employee only.
 
     Args:
-        env_identifier (str):
+        id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -131,7 +131,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        env_identifier=env_identifier,
+        id=id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -140,7 +140,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    env_identifier: str,
+    id: str,
     *,
     client: AuthenticatedClient,
 ) -> Any | HTTPValidationError | None:
@@ -149,7 +149,7 @@ async def asyncio(
      Delete by identifier. Reserved rows: H employee only.
 
     Args:
-        env_identifier (str):
+        id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -161,7 +161,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            env_identifier=env_identifier,
+            id=id,
             client=client,
         )
     ).parsed
