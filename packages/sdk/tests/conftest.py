@@ -20,7 +20,6 @@ from typing import Any, Dict
 import pytest
 
 from hai_agents.models.agent import Agent
-from hai_agents.models.agent_record import AgentRecord
 from hai_agents.models.session import Session
 from hai_agents.models.session_request import SessionRequest
 from hai_agents.models.session_status import SessionStatus
@@ -142,16 +141,4 @@ def agent_payload() -> Dict[str, Any]:
         "name": "test-agent",
         "description": "A test agent for roundtrip validation.",
         "environments": [],
-    }
-
-
-@pytest.fixture
-def agent_record_payload(agent_payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Canonical AgentRecord dict — catalog row (id + spec + reserved + timestamps)."""
-    return {
-        "id": "00000000-0000-0000-0000-000000000002",
-        "spec": agent_payload,
-        "reserved": False,
-        "created_at": "2024-01-01T00:00:00+00:00",
-        "updated_at": "2024-06-01T12:00:00+00:00",
     }
