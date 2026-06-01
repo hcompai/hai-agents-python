@@ -6,23 +6,22 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.environment_record import EnvironmentRecord
+from ...models.browser import Browser
 from ...models.http_validation_error import HTTPValidationError
-from ...models.update_environment import UpdateEnvironment
 from ...types import UNSET, Response
 
 
 def _get_kwargs(
-    env_identifier: str,
+    id: str,
     *,
-    body: UpdateEnvironment,
+    body: Browser,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": "/api/v2/environments/{env_identifier}".format(
-            env_identifier=quote(str(env_identifier), safe=""),
+        "url": "/api/v2/environments/{id}".format(
+            id=quote(str(id), safe=""),
         ),
     }
 
@@ -36,9 +35,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> EnvironmentRecord | HTTPValidationError | None:
+) -> Browser | HTTPValidationError | None:
     if response.status_code == 200:
-        response_200 = EnvironmentRecord.from_dict(response.json())
+        response_200 = Browser.from_dict(response.json())
 
         return response_200
 
@@ -55,7 +54,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[EnvironmentRecord | HTTPValidationError]:
+) -> Response[Browser | HTTPValidationError]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -65,31 +64,29 @@ def _build_response(
 
 
 def sync_detailed(
-    env_identifier: str,
+    id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateEnvironment,
-) -> Response[EnvironmentRecord | HTTPValidationError]:
+    body: Browser,
+) -> Response[Browser | HTTPValidationError]:
     """Update Environment
 
-     Replace ``spec`` + ``description``. ``spec.id`` must match the URL identifier; renames are not
-    supported.
+     Replace the environment spec.
 
     Args:
-        env_identifier (str):
-        body (UpdateEnvironment): ``PUT /api/v2/environments/{env_identifier}`` body. Full
-            replace; ``spec.id`` is immutable.
+        id (str):
+        body (Browser): Browser environment.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[EnvironmentRecord | HTTPValidationError]
+        Response[Browser | HTTPValidationError]
     """
 
     kwargs = _get_kwargs(
-        env_identifier=env_identifier,
+        id=id,
         body=body,
     )
 
@@ -101,62 +98,58 @@ def sync_detailed(
 
 
 def sync(
-    env_identifier: str,
+    id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateEnvironment,
-) -> EnvironmentRecord | HTTPValidationError | None:
+    body: Browser,
+) -> Browser | HTTPValidationError | None:
     """Update Environment
 
-     Replace ``spec`` + ``description``. ``spec.id`` must match the URL identifier; renames are not
-    supported.
+     Replace the environment spec.
 
     Args:
-        env_identifier (str):
-        body (UpdateEnvironment): ``PUT /api/v2/environments/{env_identifier}`` body. Full
-            replace; ``spec.id`` is immutable.
+        id (str):
+        body (Browser): Browser environment.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        EnvironmentRecord | HTTPValidationError
+        Browser | HTTPValidationError
     """
 
     return sync_detailed(
-        env_identifier=env_identifier,
+        id=id,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    env_identifier: str,
+    id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateEnvironment,
-) -> Response[EnvironmentRecord | HTTPValidationError]:
+    body: Browser,
+) -> Response[Browser | HTTPValidationError]:
     """Update Environment
 
-     Replace ``spec`` + ``description``. ``spec.id`` must match the URL identifier; renames are not
-    supported.
+     Replace the environment spec.
 
     Args:
-        env_identifier (str):
-        body (UpdateEnvironment): ``PUT /api/v2/environments/{env_identifier}`` body. Full
-            replace; ``spec.id`` is immutable.
+        id (str):
+        body (Browser): Browser environment.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[EnvironmentRecord | HTTPValidationError]
+        Response[Browser | HTTPValidationError]
     """
 
     kwargs = _get_kwargs(
-        env_identifier=env_identifier,
+        id=id,
         body=body,
     )
 
@@ -166,32 +159,30 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    env_identifier: str,
+    id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateEnvironment,
-) -> EnvironmentRecord | HTTPValidationError | None:
+    body: Browser,
+) -> Browser | HTTPValidationError | None:
     """Update Environment
 
-     Replace ``spec`` + ``description``. ``spec.id`` must match the URL identifier; renames are not
-    supported.
+     Replace the environment spec.
 
     Args:
-        env_identifier (str):
-        body (UpdateEnvironment): ``PUT /api/v2/environments/{env_identifier}`` body. Full
-            replace; ``spec.id`` is immutable.
+        id (str):
+        body (Browser): Browser environment.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        EnvironmentRecord | HTTPValidationError
+        Browser | HTTPValidationError
     """
 
     return (
         await asyncio_detailed(
-            env_identifier=env_identifier,
+            id=id,
             client=client,
             body=body,
         )

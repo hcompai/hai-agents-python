@@ -1430,7 +1430,7 @@
           "Environments"
         ],
         "summary": "Create Environment",
-        "description": "Create an environment. ``reserved=True`` and the ``h/`` namespace require H-employee privileges.",
+        "description": "Create an environment.",
         "operationId": "create_environment_api_v2_environments_post",
         "security": [
           {
@@ -1442,7 +1442,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateEnvironment"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Browser"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "kind",
+                  "mapping": {
+                    "web": "#/components/schemas/Browser"
+                  }
+                },
+                "title": "Create"
               }
             }
           }
@@ -1453,7 +1464,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnvironmentRecord"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Browser"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "web": "#/components/schemas/Browser"
+                    }
+                  },
+                  "title": "Response Create Environment Api V2 Environments Post"
                 }
               }
             }
@@ -1522,8 +1544,8 @@
                     "enum": [
                       "created_at",
                       "-created_at",
-                      "env_identifier",
-                      "-env_identifier"
+                      "id",
+                      "-id"
                     ],
                     "type": "string"
                   }
@@ -1547,7 +1569,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_EnvironmentRecord_"
+                  "$ref": "#/components/schemas/Page_Annotated_Union_Browser__CodeSandbox__MCP__Memory___FieldInfo_annotation_NoneType__required_True__discriminator__kind____"
                 }
               }
             }
@@ -1565,14 +1587,14 @@
         }
       }
     },
-    "/api/v2/environments/{env_identifier}": {
+    "/api/v2/environments/{id}": {
       "get": {
         "tags": [
           "Environments"
         ],
         "summary": "Get Environment",
         "description": "Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.",
-        "operationId": "get_environment_api_v2_environments__env_identifier__get",
+        "operationId": "get_environment_api_v2_environments__id__get",
         "security": [
           {
             "HTTPBearer": []
@@ -1580,12 +1602,12 @@
         ],
         "parameters": [
           {
-            "name": "env_identifier",
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Env Identifier"
+              "title": "Id"
             }
           }
         ],
@@ -1595,7 +1617,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnvironmentRecord"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Browser"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "web": "#/components/schemas/Browser"
+                    }
+                  },
+                  "title": "Response Get Environment Api V2 Environments  Id  Get"
                 }
               }
             }
@@ -1617,8 +1650,8 @@
           "Environments"
         ],
         "summary": "Update Environment",
-        "description": "Replace ``spec`` + ``description``. ``spec.id`` must match the URL identifier; renames are not supported.",
-        "operationId": "update_environment_api_v2_environments__env_identifier__put",
+        "description": "Replace the environment spec.",
+        "operationId": "update_environment_api_v2_environments__id__put",
         "security": [
           {
             "HTTPBearer": []
@@ -1626,12 +1659,12 @@
         ],
         "parameters": [
           {
-            "name": "env_identifier",
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Env Identifier"
+              "title": "Id"
             }
           }
         ],
@@ -1640,7 +1673,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateEnvironment"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Browser"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "kind",
+                  "mapping": {
+                    "web": "#/components/schemas/Browser"
+                  }
+                },
+                "title": "Update"
               }
             }
           }
@@ -1651,7 +1695,18 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnvironmentRecord"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Browser"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "web": "#/components/schemas/Browser"
+                    }
+                  },
+                  "title": "Response Update Environment Api V2 Environments  Id  Put"
                 }
               }
             }
@@ -1674,7 +1729,7 @@
         ],
         "summary": "Delete Environment",
         "description": "Delete by identifier. Reserved rows: H employee only.",
-        "operationId": "delete_environment_api_v2_environments__env_identifier__delete",
+        "operationId": "delete_environment_api_v2_environments__id__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -1682,12 +1737,12 @@
         ],
         "parameters": [
           {
-            "name": "env_identifier",
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Env Identifier"
+              "title": "Id"
             }
           }
         ],
@@ -2169,97 +2224,6 @@
         "title": "Browser",
         "description": "Browser environment."
       },
-      "CreateEnvironment": {
-        "properties": {
-          "spec": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Browser"
-              }
-            ],
-            "title": "Spec",
-            "discriminator": {
-              "propertyName": "kind",
-              "mapping": {
-                "web": "#/components/schemas/Browser"
-              }
-            }
-          },
-          "description": {
-            "type": "string",
-            "title": "Description",
-            "default": ""
-          },
-          "reserved": {
-            "type": "boolean",
-            "title": "Reserved",
-            "description": "H employees only; rejected with 403 otherwise.",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "spec"
-        ],
-        "title": "CreateEnvironment",
-        "description": "``POST /api/v2/environments`` body."
-      },
-      "EnvironmentRecord": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "spec": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Browser"
-              }
-            ],
-            "title": "Spec",
-            "description": "Discriminated by ``kind``.",
-            "discriminator": {
-              "propertyName": "kind",
-              "mapping": {
-                "web": "#/components/schemas/Browser"
-              }
-            }
-          },
-          "description": {
-            "type": "string",
-            "title": "Description",
-            "default": ""
-          },
-          "reserved": {
-            "type": "boolean",
-            "title": "Reserved",
-            "description": "True for H-owned rows; world-readable, write-locked behind employee_only."
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "id",
-          "spec",
-          "reserved",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "EnvironmentRecord",
-        "description": "Catalog row exposing an ``Environment`` spec plus AgP metadata.\n\nThe catalog handle is ``spec.id``; callers reference it directly via\n``record.spec.id`` rather than a duplicated top-level field."
-      },
       "Feedback": {
         "properties": {
           "success": {
@@ -2489,11 +2453,21 @@
         ],
         "title": "Page[Agent]"
       },
-      "Page_EnvironmentRecord_": {
+      "Page_Annotated_Union_Browser__CodeSandbox__MCP__Memory___FieldInfo_annotation_NoneType__required_True__discriminator__kind____": {
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/EnvironmentRecord"
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Browser"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "web": "#/components/schemas/Browser"
+                }
+              }
             },
             "type": "array",
             "title": "Items"
@@ -2513,7 +2487,7 @@
           "total",
           "page"
         ],
-        "title": "Page[EnvironmentRecord]"
+        "title": "Page[Annotated[Union[Browser, CodeSandbox, MCP, Memory], FieldInfo(annotation=NoneType, required=True, discriminator='kind')]]"
       },
       "Page_SessionSummary_": {
         "properties": {
@@ -3088,36 +3062,6 @@
         ],
         "title": "TrajectoryStatus",
         "description": "State of a session/trajectory.\n\nLifecycle::\n\n    PENDING \u2192 RUNNING \u2192 {COMPLETED, FAILED, TIMED_OUT, INTERRUPTED}\n       |        \u2191  \u2191\n       |        |  \u2514\u2500\u2500\u2500\u2500\u2500\u2192 IDLE (interactive: agent waiting for next task)\n       |        \u2193\n       \u2514\u2500\u2500\u2500\u2500\u2500\u2192 PAUSED"
-      },
-      "UpdateEnvironment": {
-        "properties": {
-          "spec": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Browser"
-              }
-            ],
-            "title": "Spec",
-            "discriminator": {
-              "propertyName": "kind",
-              "mapping": {
-                "web": "#/components/schemas/Browser"
-              }
-            }
-          },
-          "description": {
-            "type": "string",
-            "title": "Description",
-            "default": ""
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "spec"
-        ],
-        "title": "UpdateEnvironment",
-        "description": "``PUT /api/v2/environments/{env_identifier}`` body. Full replace; ``spec.id`` is immutable."
       },
       "UserMessageBatch": {
         "properties": {

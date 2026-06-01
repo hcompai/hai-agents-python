@@ -14,22 +14,16 @@ from __future__ import annotations
 from hai_agents.client import AuthenticatedClient as _AuthenticatedClient
 from hai_agents.models.agent import Agent
 from hai_agents.models.browser import Browser
-from hai_agents.models.create_environment import CreateEnvironment
-from hai_agents.models.environment_record import EnvironmentRecord
 from hai_agents.models.session import Session
 from hai_agents.models.session_request import SessionRequest
 from hai_agents.models.session_summary import SessionSummary
 from hai_agents.models.skill import Skill
-from hai_agents.models.update_environment import UpdateEnvironment
 
 __all__ = [
     "Client",
     "AsyncClient",
     "Agent",
     "Browser",
-    "EnvironmentRecord",
-    "CreateEnvironment",
-    "UpdateEnvironment",
     "Skill",
     "Session",
     "SessionRequest",
