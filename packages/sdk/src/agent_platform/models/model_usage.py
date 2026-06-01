@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, BinaryIO, Generator, TextIO, TypeVar
+from typing import Any, BinaryIO, Generator, TextIO, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -24,6 +24,7 @@ class ModelUsage(BaseModel):
         populate_by_name=True,
         extra="ignore",
         arbitrary_types_allowed=True,
+        defer_build=True,
     )
 
     name: str

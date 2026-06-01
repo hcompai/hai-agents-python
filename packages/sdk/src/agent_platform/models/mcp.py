@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, BinaryIO, Generator, Literal, TextIO, TypeVar, cast
+from typing import Any, BinaryIO, Generator, Literal, TextIO, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict
 
 from ..types import UNSET, Unset
-
-if TYPE_CHECKING:
-    from ..models.mcp_server import MCPServer
-
 
 T = TypeVar("T", bound="MCP")
 
@@ -27,6 +23,7 @@ class MCP(BaseModel):
         populate_by_name=True,
         extra="ignore",
         arbitrary_types_allowed=True,
+        defer_build=True,
     )
 
     id: str
@@ -83,3 +80,6 @@ class MCP(BaseModel):
         )
 
         return mcp
+
+
+from ..models.mcp_server import MCPServer

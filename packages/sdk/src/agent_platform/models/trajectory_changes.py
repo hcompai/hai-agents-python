@@ -2,19 +2,13 @@ from __future__ import annotations
 
 import datetime
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, BinaryIO, Generator, TextIO, TypeVar, cast
+from typing import Any, BinaryIO, Generator, TextIO, TypeVar, cast
 
 from dateutil.parser import isoparse
 from pydantic import BaseModel, ConfigDict
 
 from ..models.trajectory_status import TrajectoryStatus
 from ..types import UNSET, Unset
-
-if TYPE_CHECKING:
-    from ..models.metrics import Metrics
-    from ..models.trajectory_changes_answer_type_1 import TrajectoryChangesAnswerType1
-    from ..models.trajectory_event import TrajectoryEvent
-
 
 T = TypeVar("T", bound="TrajectoryChanges")
 
@@ -58,6 +52,7 @@ class TrajectoryChanges(BaseModel):
         populate_by_name=True,
         extra="ignore",
         arbitrary_types_allowed=True,
+        defer_build=True,
     )
 
     status: TrajectoryStatus
@@ -252,3 +247,8 @@ class TrajectoryChanges(BaseModel):
 
     def __contains__(self, key: str) -> bool:
         return key in self.additional_properties
+
+
+from ..models.metrics import Metrics
+from ..models.trajectory_changes_answer_type_1 import TrajectoryChangesAnswerType1
+from ..models.trajectory_event import TrajectoryEvent

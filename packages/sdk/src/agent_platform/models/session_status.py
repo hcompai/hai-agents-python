@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, BinaryIO, Generator, TextIO, TypeVar, cast
+from typing import Any, BinaryIO, Generator, TextIO, TypeVar, cast
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
 from ..models.trajectory_status import TrajectoryStatus
 from ..types import UNSET, Unset
-
-if TYPE_CHECKING:
-    from ..models.model_usage import ModelUsage
-
 
 T = TypeVar("T", bound="SessionStatus")
 
@@ -39,6 +35,7 @@ class SessionStatus(BaseModel):
         populate_by_name=True,
         extra="ignore",
         arbitrary_types_allowed=True,
+        defer_build=True,
     )
 
     status: TrajectoryStatus
@@ -155,3 +152,6 @@ class SessionStatus(BaseModel):
 
     def __contains__(self, key: str) -> bool:
         return key in self.additional_properties
+
+
+from ..models.model_usage import ModelUsage
