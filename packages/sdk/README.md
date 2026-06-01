@@ -29,6 +29,7 @@ session = create_session.sync(
             description="A demo agent.",
             instructions="Reply concisely.",
             environments=[Browser(id="browser", kind="web",
+                                  headless=True,
                                   width=1280, height=800,
                                   start_url="https://bing.com")],
         ),
