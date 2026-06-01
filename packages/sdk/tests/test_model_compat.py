@@ -16,7 +16,8 @@ from typing import Any, Dict
 from hai_agents.models.agent import Agent
 from hai_agents.models.session import Session
 from hai_agents.models.session_request import SessionRequest
-from hai_agents.models.skill_record import SkillRecord
+from hai_agents.models.session_summary import SessionSummary
+from hai_agents.models.skill import Skill
 
 from .conftest import assert_json_equal
 
@@ -66,15 +67,14 @@ def test_session_full_roundtrip(session_payload: Dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_skill_record_roundtrip(skill_record_payload: Dict[str, Any]) -> None:
-    """SkillRecord round-trips all 9 fields including nullable source/url_pattern/uri.
+def test_skill_roundtrip(skill_payload: Dict[str, Any]) -> None:
+    """Skill round-trips: required name/description/body plus nullable source/url_pattern.
 
-    Unlike UNSET-guarded fields, SkillRecord's nullable string fields (source,
-    url_pattern, uri) ARE included in to_dict() even when None — so the
-    fixture must supply them as None to achieve input == output.
+    source/url_pattern are emitted by to_dict() when set to None (they are only
+    omitted when UNSET), so the fixture supplies them to achieve input == output.
     """
-    serialized = _roundtrip(SkillRecord, skill_record_payload)
-    assert_json_equal(serialized, skill_record_payload)
+    serialized = _roundtrip(Skill, skill_payload)
+    assert_json_equal(serialized, skill_payload)
 
 
 # ---------------------------------------------------------------------------
@@ -127,10 +127,10 @@ def test_no_attrs_in_generated_models() -> None:
     assert not violations, "Models must not use attrs/dataclass:\n" + "\n".join(violations)
 
 
-def test_datetime_field_serializes_as_iso8601(skill_record_payload: Dict[str, Any]) -> None:
+def test_datetime_field_serializes_as_iso8601(session_summary_payload: Dict[str, Any]) -> None:
     """Datetime fields must serialize as ISO 8601 strings.
 
-    SkillRecord carries two required datetime fields (created_at, updated_at). We verify:
+    SessionSummary carries a required ``created_at`` datetime. We verify:
       1. The serialized value is a string (not a datetime object)
       2. It contains 'T' (ISO 8601 separator)
       3. It has a timezone offset ('Z' or '+00:00') — both are valid per ISO 8601
@@ -138,31 +138,28 @@ def test_datetime_field_serializes_as_iso8601(skill_record_payload: Dict[str, An
     The round-trip uses isoparse (dateutil) for parsing + .isoformat() for
     serialization — both sides produce '+00:00' form for UTC, so no 'Z' ambiguity.
     """
-    instance = SkillRecord.from_dict(skill_record_payload)
+    instance = SessionSummary.from_dict(session_summary_payload)
     serialized = instance.to_dict()
 
-    for field_name in ("created_at", "updated_at"):
-        value = serialized[field_name]
-        assert isinstance(value, str), f"{field_name} not serialized as string: {type(value)}"
-        assert "T" in value, f"{field_name} not ISO 8601: {value!r}"
-        assert value.endswith(("Z", "+00:00")), f"{field_name} missing UTC timezone: {value!r}"
+    value = serialized["created_at"]
+    assert isinstance(value, str), f"created_at not serialized as string: {type(value)}"
+    assert "T" in value, f"created_at not ISO 8601: {value!r}"
+    assert value.endswith(("Z", "+00:00")), f"created_at missing UTC timezone: {value!r}"
 
 
-def test_model_validate_simple_fields(skill_record_payload: Dict[str, Any]) -> None:
-    """Verify model_validate() works for models without complex union/UNSET fields.
+def test_model_validate_simple_fields(session_summary_payload: Dict[str, Any]) -> None:
+    """Verify model_validate() works for models without discriminated unions.
 
-    SkillRecord has no UNSET-guarded fields (its optional strings are nullable,
-    not UNSET) and no discriminated unions, so model_validate() works identically
-    to from_dict() for it.
+    SessionSummary's only non-scalar field (first_message) is UNSET here, so
+    model_validate() parses it identically to from_dict().
 
-    For models with UNSET sentinel defaults or discriminated unions (SessionRequest,
-    Agent), from_dict() is the correct parsing path.
+    For models with discriminated unions (SessionRequest, Agent), from_dict()
+    is the correct parsing path.
     """
-    via_validate = SkillRecord.model_validate(skill_record_payload)
+    via_validate = SessionSummary.model_validate(session_summary_payload)
     assert isinstance(via_validate.created_at, datetime.datetime)
-    assert str(via_validate.id) == skill_record_payload["id"]
+    assert str(via_validate.id) == session_summary_payload["id"]
 
-    via_from_dict = SkillRecord.from_dict(skill_record_payload)
+    via_from_dict = SessionSummary.from_dict(session_summary_payload)
     assert via_validate.id == via_from_dict.id
-    assert via_validate.name == via_from_dict.name
     assert via_validate.created_at == via_from_dict.created_at

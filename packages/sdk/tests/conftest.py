@@ -24,7 +24,7 @@ from hai_agents.models.session import Session
 from hai_agents.models.session_request import SessionRequest
 from hai_agents.models.session_status import SessionStatus
 from hai_agents.models.session_summary import SessionSummary
-from hai_agents.models.skill_record import SkillRecord
+from hai_agents.models.skill import Skill
 from hai_agents.models.trajectory_status import TrajectoryStatus
 from hai_agents.models.user_message_event import UserMessageEvent
 
@@ -104,29 +104,32 @@ def session_payload(session_request_payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @pytest.fixture
-def skill_record_payload() -> Dict[str, Any]:
-    """Canonical SkillRecord dict matching backend public_api/skill.py:SkillRecord.
+def skill_payload() -> Dict[str, Any]:
+    """Canonical Skill dict matching SDK Skill model.
 
-    Fields: id, name, description, body, source (None|str), url_pattern (None|str),
-            uri (None|str), reserved (bool), created_at, updated_at.
-
-    Note: source/url_pattern/uri are nullable (None), NOT UNSET — SkillRecord.to_dict()
-    includes them even when None (they are not UNSET-guarded in the template).
-    The fixture must include them as None so input == output. ``reserved`` is a
-    required bool (default False on the backend) and must be present here too,
-    otherwise from_dict()/model_validate() raise.
+    source/url_pattern are nullable and supplied as None so to_dict() emits them
+    (they are only omitted when UNSET), giving input == output.
     """
     return {
-        "id": "00000000-0000-0000-0000-000000000003",
         "name": "test-skill",
         "description": "A test skill for roundtrip validation.",
         "body": "## Instructions\nDo something useful.",
         "source": None,
         "url_pattern": None,
-        "uri": None,
-        "reserved": False,
+    }
+
+
+@pytest.fixture
+def session_summary_payload() -> Dict[str, Any]:
+    """Canonical SessionSummary dict (id + status enum + created_at).
+
+    Optional fields (first_message, started_at, finished_at) default to UNSET
+    and are omitted by to_dict(), so the fixture leaves them out.
+    """
+    return {
+        "id": "00000000-0000-0000-0000-000000000003",
+        "status": "running",
         "created_at": "2024-01-01T00:00:00+00:00",
-        "updated_at": "2024-06-01T12:00:00+00:00",
     }
 
 
