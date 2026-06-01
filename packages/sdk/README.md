@@ -13,6 +13,15 @@ Python SDK for [H Company's Agent Platform](https://hcompany.ai). Sync and async
 pip install agent-platform
 ```
 
+If the package is not available from your package index yet, install from a
+repository checkout:
+
+```bash
+git clone https://github.com/hcompai/hai-agents-python.git
+cd hai-agents-python
+pip install ./packages/sdk
+```
+
 ```python
 from agent_platform import Client, Agent, SessionRequest
 from agent_platform.api.sessions import create_session
