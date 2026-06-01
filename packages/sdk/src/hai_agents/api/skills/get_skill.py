@@ -1,25 +1,24 @@
 from http import HTTPStatus
 from typing import Any, cast
 from urllib.parse import quote
-from uuid import UUID
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.http_validation_error import HTTPValidationError
-from ...models.skill_record import SkillRecord
+from ...models.skill import Skill
 from ...types import UNSET, Response
 
 
 def _get_kwargs(
-    id: UUID,
+    name: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/v2/skills/{id}".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v2/skills/{name}".format(
+            name=quote(str(name), safe=""),
         ),
     }
 
@@ -28,9 +27,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> HTTPValidationError | SkillRecord | None:
+) -> HTTPValidationError | Skill | None:
     if response.status_code == 200:
-        response_200 = SkillRecord.from_dict(response.json())
+        response_200 = Skill.from_dict(response.json())
 
         return response_200
 
@@ -47,7 +46,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[HTTPValidationError | SkillRecord]:
+) -> Response[HTTPValidationError | Skill]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -57,27 +56,27 @@ def _build_response(
 
 
 def sync_detailed(
-    id: UUID,
+    name: str,
     *,
     client: AuthenticatedClient,
-) -> Response[HTTPValidationError | SkillRecord]:
+) -> Response[HTTPValidationError | Skill]:
     """Get Skill
 
-     Get a skill by id.
+     Fetch by name; 404 if not visible. ``:path`` so slash-containing names round-trip.
 
     Args:
-        id (UUID):
+        name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[HTTPValidationError | SkillRecord]
+        Response[HTTPValidationError | Skill]
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        name=name,
     )
 
     response = client.get_httpx_client().request(
@@ -88,53 +87,53 @@ def sync_detailed(
 
 
 def sync(
-    id: UUID,
+    name: str,
     *,
     client: AuthenticatedClient,
-) -> HTTPValidationError | SkillRecord | None:
+) -> HTTPValidationError | Skill | None:
     """Get Skill
 
-     Get a skill by id.
+     Fetch by name; 404 if not visible. ``:path`` so slash-containing names round-trip.
 
     Args:
-        id (UUID):
+        name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        HTTPValidationError | SkillRecord
+        HTTPValidationError | Skill
     """
 
     return sync_detailed(
-        id=id,
+        name=name,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: UUID,
+    name: str,
     *,
     client: AuthenticatedClient,
-) -> Response[HTTPValidationError | SkillRecord]:
+) -> Response[HTTPValidationError | Skill]:
     """Get Skill
 
-     Get a skill by id.
+     Fetch by name; 404 if not visible. ``:path`` so slash-containing names round-trip.
 
     Args:
-        id (UUID):
+        name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[HTTPValidationError | SkillRecord]
+        Response[HTTPValidationError | Skill]
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        name=name,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -143,28 +142,28 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: UUID,
+    name: str,
     *,
     client: AuthenticatedClient,
-) -> HTTPValidationError | SkillRecord | None:
+) -> HTTPValidationError | Skill | None:
     """Get Skill
 
-     Get a skill by id.
+     Fetch by name; 404 if not visible. ``:path`` so slash-containing names round-trip.
 
     Args:
-        id (UUID):
+        name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        HTTPValidationError | SkillRecord
+        HTTPValidationError | Skill
     """
 
     return (
         await asyncio_detailed(
-            id=id,
+            name=name,
             client=client,
         )
     ).parsed
