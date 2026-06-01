@@ -7,13 +7,13 @@ from pydantic import BaseModel, ConfigDict
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="PageSkillRecord")
+T = TypeVar("T", bound="PageSkill")
 
 
-class PageSkillRecord(BaseModel):
+class PageSkill(BaseModel):
     """
     Attributes:
-        items (list[SkillRecord]):
+        items (list[Skill]):
         total (int):
         page (int):
     """
@@ -25,13 +25,13 @@ class PageSkillRecord(BaseModel):
         defer_build=True,
     )
 
-    items: list[SkillRecord]
+    items: list[Skill]
     total: int
     page: int
     additional_properties: dict[str, Any] = {}
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.skill_record import SkillRecord
+        from ..models.skill import Skill
 
         items = []
         for items_item_data in self.items:
@@ -56,13 +56,13 @@ class PageSkillRecord(BaseModel):
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.skill_record import SkillRecord
+        from ..models.skill import Skill
 
         d = dict(src_dict)
         items = []
         _items = d.pop("items")
         for items_item_data in _items:
-            items_item = SkillRecord.from_dict(items_item_data)
+            items_item = Skill.from_dict(items_item_data)
 
             items.append(items_item)
 
@@ -70,14 +70,14 @@ class PageSkillRecord(BaseModel):
 
         page = d.pop("page")
 
-        page_skill_record = cls(
+        page_skill = cls(
             items=items,
             total=total,
             page=page,
         )
 
-        page_skill_record.additional_properties = d
-        return page_skill_record
+        page_skill.additional_properties = d
+        return page_skill
 
     @property
     def additional_keys(self) -> list[str]:
@@ -96,4 +96,4 @@ class PageSkillRecord(BaseModel):
         return key in self.additional_properties
 
 
-from ..models.skill_record import SkillRecord
+from ..models.skill import Skill

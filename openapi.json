@@ -1128,7 +1128,7 @@
           "Skills"
         ],
         "summary": "Create Skill",
-        "description": "Create a skill.",
+        "description": "Create a skill. The ``h/`` namespace is reserved for built-in skills.",
         "operationId": "create_skill_api_v2_skills_post",
         "security": [
           {
@@ -1140,7 +1140,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateSkill"
+                "$ref": "#/components/schemas/Skill"
               }
             }
           }
@@ -1151,7 +1151,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SkillRecord"
+                  "$ref": "#/components/schemas/Skill"
                 }
               }
             }
@@ -1173,7 +1173,7 @@
           "Skills"
         ],
         "summary": "List Skills",
-        "description": "List skills for the current org, optionally filtered by name prefix.",
+        "description": "List reserved + caller's org skills, optionally filtered by name prefix.",
         "operationId": "list_skills_api_v2_skills_get",
         "security": [
           {
@@ -1263,7 +1263,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_SkillRecord_"
+                  "$ref": "#/components/schemas/Page_Skill_"
                 }
               }
             }
@@ -1281,14 +1281,14 @@
         }
       }
     },
-    "/api/v2/skills/{id}": {
+    "/api/v2/skills/{name}": {
       "get": {
         "tags": [
           "Skills"
         ],
         "summary": "Get Skill",
-        "description": "Get a skill by id.",
-        "operationId": "get_skill_api_v2_skills__id__get",
+        "description": "Fetch by name; 404 if not visible. ``:path`` so slash-containing names round-trip.",
+        "operationId": "get_skill_api_v2_skills__name__get",
         "security": [
           {
             "HTTPBearer": []
@@ -1296,13 +1296,12 @@
         ],
         "parameters": [
           {
-            "name": "id",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "format": "uuid",
-              "title": "Id"
+              "title": "Name"
             }
           }
         ],
@@ -1312,7 +1311,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SkillRecord"
+                  "$ref": "#/components/schemas/Skill"
                 }
               }
             }
@@ -1334,8 +1333,8 @@
           "Skills"
         ],
         "summary": "Update Skill",
-        "description": "Update a skill's content.",
-        "operationId": "update_skill_api_v2_skills__id__put",
+        "description": "Replace a skill's content. ``name`` must match the URL identifier; renames are not supported.",
+        "operationId": "update_skill_api_v2_skills__name__put",
         "security": [
           {
             "HTTPBearer": []
@@ -1343,13 +1342,12 @@
         ],
         "parameters": [
           {
-            "name": "id",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "format": "uuid",
-              "title": "Id"
+              "title": "Name"
             }
           }
         ],
@@ -1358,7 +1356,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateSkill"
+                "$ref": "#/components/schemas/Skill"
               }
             }
           }
@@ -1369,7 +1367,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SkillRecord"
+                  "$ref": "#/components/schemas/Skill"
                 }
               }
             }
@@ -1391,8 +1389,8 @@
           "Skills"
         ],
         "summary": "Delete Skill",
-        "description": "Delete a skill.",
-        "operationId": "delete_skill_api_v2_skills__id__delete",
+        "description": "Delete by name. Reserved rows: H employee only.",
+        "operationId": "delete_skill_api_v2_skills__name__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -1400,13 +1398,12 @@
         ],
         "parameters": [
           {
-            "name": "id",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "format": "uuid",
-              "title": "Id"
+              "title": "Name"
             }
           }
         ],
@@ -2208,86 +2205,6 @@
         "title": "CreateEnvironment",
         "description": "``POST /api/v2/environments`` body."
       },
-      "CreateSkill": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name",
-            "description": "Kebab-case stable handle the agent uses to reference this skill."
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 1024,
-            "minLength": 1,
-            "title": "Description",
-            "description": "One-line routing hint shown in the skill catalog."
-          },
-          "body": {
-            "type": "string",
-            "maxLength": 262144,
-            "title": "Body",
-            "description": "Markdown prompt fragment. Required unless `uri` is set.",
-            "default": ""
-          },
-          "source": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2048,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source",
-            "description": "Provenance URL."
-          },
-          "url_pattern": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1024,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Url Pattern",
-            "description": "Inject only when an observation URL matches this regex. Mutually exclusive with `uri`."
-          },
-          "uri": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2048,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Uri",
-            "description": "Fetch body on demand from this location. Mutually exclusive with `url_pattern`."
-          },
-          "reserved": {
-            "type": "boolean",
-            "title": "Reserved",
-            "description": "H employees only; rejected with 403 otherwise. Reserved rows are world-readable.",
-            "default": false
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "description"
-        ],
-        "title": "CreateSkill",
-        "description": "Request to create a skill."
-      },
       "EnvironmentRecord": {
         "properties": {
           "id": {
@@ -2624,11 +2541,11 @@
         ],
         "title": "Page[SessionSummary]"
       },
-      "Page_SkillRecord_": {
+      "Page_Skill_": {
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/SkillRecord"
+              "$ref": "#/components/schemas/Skill"
             },
             "type": "array",
             "title": "Items"
@@ -2648,7 +2565,7 @@
           "total",
           "page"
         ],
-        "title": "Page[SkillRecord]"
+        "title": "Page[Skill]"
       },
       "Page_TrajectoryEvent_": {
         "properties": {
@@ -3059,89 +2976,6 @@
         "title": "Skill",
         "description": "Named instruction content. Loaded by name via ``load_skill`` or rendered inline by toolboxes."
       },
-      "SkillRecord": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description"
-          },
-          "body": {
-            "type": "string",
-            "title": "Body"
-          },
-          "source": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source"
-          },
-          "url_pattern": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Url Pattern"
-          },
-          "uri": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Uri"
-          },
-          "reserved": {
-            "type": "boolean",
-            "title": "Reserved"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "description",
-          "body",
-          "source",
-          "url_pattern",
-          "uri",
-          "reserved",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "SkillRecord",
-        "description": "Named prompt fragment loaded into an agent's system prompt."
-      },
       "TrajectoryChanges": {
         "properties": {
           "status": {
@@ -3284,67 +3118,6 @@
         ],
         "title": "UpdateEnvironment",
         "description": "``PUT /api/v2/environments/{env_identifier}`` body. Full replace; ``spec.id`` is immutable."
-      },
-      "UpdateSkill": {
-        "properties": {
-          "description": {
-            "type": "string",
-            "maxLength": 1024,
-            "minLength": 1,
-            "title": "Description"
-          },
-          "body": {
-            "type": "string",
-            "maxLength": 262144,
-            "title": "Body",
-            "default": ""
-          },
-          "source": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2048,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source"
-          },
-          "url_pattern": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1024,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Url Pattern"
-          },
-          "uri": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2048,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Uri"
-          }
-        },
-        "type": "object",
-        "required": [
-          "description"
-        ],
-        "title": "UpdateSkill",
-        "description": "Request to update a skill. Full replacement; `name` is immutable."
       },
       "UserMessageBatch": {
         "properties": {

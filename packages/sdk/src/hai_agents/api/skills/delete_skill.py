@@ -1,7 +1,6 @@
 from http import HTTPStatus
 from typing import Any, cast
 from urllib.parse import quote
-from uuid import UUID
 
 import httpx
 
@@ -12,13 +11,13 @@ from ...types import UNSET, Response
 
 
 def _get_kwargs(
-    id: UUID,
+    name: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/v2/skills/{id}".format(
-            id=quote(str(id), safe=""),
+        "url": "/api/v2/skills/{name}".format(
+            name=quote(str(name), safe=""),
         ),
     }
 
@@ -55,16 +54,16 @@ def _build_response(
 
 
 def sync_detailed(
-    id: UUID,
+    name: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[Any | HTTPValidationError]:
     """Delete Skill
 
-     Delete a skill.
+     Delete by name. Reserved rows: H employee only.
 
     Args:
-        id (UUID):
+        name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -75,7 +74,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        name=name,
     )
 
     response = client.get_httpx_client().request(
@@ -86,16 +85,16 @@ def sync_detailed(
 
 
 def sync(
-    id: UUID,
+    name: str,
     *,
     client: AuthenticatedClient,
 ) -> Any | HTTPValidationError | None:
     """Delete Skill
 
-     Delete a skill.
+     Delete by name. Reserved rows: H employee only.
 
     Args:
-        id (UUID):
+        name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -106,22 +105,22 @@ def sync(
     """
 
     return sync_detailed(
-        id=id,
+        name=name,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    id: UUID,
+    name: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[Any | HTTPValidationError]:
     """Delete Skill
 
-     Delete a skill.
+     Delete by name. Reserved rows: H employee only.
 
     Args:
-        id (UUID):
+        name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -132,7 +131,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        id=id,
+        name=name,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -141,16 +140,16 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    id: UUID,
+    name: str,
     *,
     client: AuthenticatedClient,
 ) -> Any | HTTPValidationError | None:
     """Delete Skill
 
-     Delete a skill.
+     Delete by name. Reserved rows: H employee only.
 
     Args:
-        id (UUID):
+        name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -162,7 +161,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            id=id,
+            name=name,
             client=client,
         )
     ).parsed
