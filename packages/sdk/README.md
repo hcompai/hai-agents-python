@@ -1,5 +1,4 @@
 <p align="center">
-  <a href="https://pypi.org/project/agent-platform/"><img src="https://img.shields.io/pypi/v/agent-platform.svg" alt="PyPI" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
 </p>
 
@@ -9,18 +8,18 @@ Python SDK for [H Company's Agent Platform](https://hcompany.ai). Sync and async
 
 ## Quickstart
 
-```bash
-pip install agent-platform
-```
-
-If the package is not available from your package index yet, install from a
-repository checkout:
+Install from a repository checkout:
 
 ```bash
 git clone https://github.com/hcompai/hai-agents-python.git
 cd hai-agents-python
 pip install ./packages/sdk
 ```
+
+Do not use `pip install agent-platform` from public PyPI yet. That package name
+currently resolves to an unrelated project and will not provide this SDK's
+`agent_platform` module. Use a repository checkout, or an internal package
+index only if your organization has published this SDK there.
 
 ```python
 from agent_platform import Client, Agent, SessionRequest
