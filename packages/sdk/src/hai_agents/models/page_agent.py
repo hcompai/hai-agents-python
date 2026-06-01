@@ -7,13 +7,13 @@ from pydantic import BaseModel, ConfigDict
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="PageAgentRecord")
+T = TypeVar("T", bound="PageAgent")
 
 
-class PageAgentRecord(BaseModel):
+class PageAgent(BaseModel):
     """
     Attributes:
-        items (list[AgentRecord]):
+        items (list[Agent]):
         total (int):
         page (int):
     """
@@ -25,13 +25,13 @@ class PageAgentRecord(BaseModel):
         defer_build=True,
     )
 
-    items: list[AgentRecord]
+    items: list[Agent]
     total: int
     page: int
     additional_properties: dict[str, Any] = {}
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.agent_record import AgentRecord
+        from ..models.agent import Agent
 
         items = []
         for items_item_data in self.items:
@@ -56,13 +56,13 @@ class PageAgentRecord(BaseModel):
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.agent_record import AgentRecord
+        from ..models.agent import Agent
 
         d = dict(src_dict)
         items = []
         _items = d.pop("items")
         for items_item_data in _items:
-            items_item = AgentRecord.from_dict(items_item_data)
+            items_item = Agent.from_dict(items_item_data)
 
             items.append(items_item)
 
@@ -70,14 +70,14 @@ class PageAgentRecord(BaseModel):
 
         page = d.pop("page")
 
-        page_agent_record = cls(
+        page_agent = cls(
             items=items,
             total=total,
             page=page,
         )
 
-        page_agent_record.additional_properties = d
-        return page_agent_record
+        page_agent.additional_properties = d
+        return page_agent
 
     @property
     def additional_keys(self) -> list[str]:
@@ -96,4 +96,4 @@ class PageAgentRecord(BaseModel):
         return key in self.additional_properties
 
 
-from ..models.agent_record import AgentRecord
+from ..models.agent import Agent
