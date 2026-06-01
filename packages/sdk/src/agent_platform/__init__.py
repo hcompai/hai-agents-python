@@ -11,6 +11,7 @@ instead; the schema-sync workflow restores it after each regeneration.
 
 from __future__ import annotations
 
+import agent_platform.models as _models_pkg
 from agent_platform.client import AuthenticatedClient as _AuthenticatedClient
 from agent_platform.models.agent import Agent
 from agent_platform.models.agent_record import AgentRecord
@@ -63,6 +64,18 @@ __all__ = [
     "SessionRequest",
     "SessionSummary",
 ]
+
+_MODEL_TYPES_NS = {name: getattr(_models_pkg, name) for name in _models_pkg.__all__}
+
+for _model_name in _models_pkg.__all__:
+    _model = getattr(_models_pkg, _model_name)
+    if hasattr(_model, "model_rebuild"):
+        try:
+            _model.model_rebuild(_types_namespace=_MODEL_TYPES_NS)
+        except Exception:
+            pass
+
+del _MODEL_TYPES_NS, _model_name, _model, _models_pkg
 
 
 class Client(_AuthenticatedClient):
