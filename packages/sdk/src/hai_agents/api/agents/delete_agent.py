@@ -11,13 +11,13 @@ from ...types import UNSET, Response
 
 
 def _get_kwargs(
-    agent_identifier: str,
+    agent_name: str,
 ) -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/v2/agents/{agent_identifier}".format(
-            agent_identifier=quote(str(agent_identifier), safe=""),
+        "url": "/api/v2/agents/{agent_name}".format(
+            agent_name=quote(str(agent_name), safe=""),
         ),
     }
 
@@ -54,7 +54,7 @@ def _build_response(
 
 
 def sync_detailed(
-    agent_identifier: str,
+    agent_name: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[Any | HTTPValidationError]:
@@ -63,7 +63,7 @@ def sync_detailed(
      Delete by identifier. Reserved rows: H employee only.
 
     Args:
-        agent_identifier (str):
+        agent_name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -74,7 +74,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        agent_identifier=agent_identifier,
+        agent_name=agent_name,
     )
 
     response = client.get_httpx_client().request(
@@ -85,7 +85,7 @@ def sync_detailed(
 
 
 def sync(
-    agent_identifier: str,
+    agent_name: str,
     *,
     client: AuthenticatedClient,
 ) -> Any | HTTPValidationError | None:
@@ -94,7 +94,7 @@ def sync(
      Delete by identifier. Reserved rows: H employee only.
 
     Args:
-        agent_identifier (str):
+        agent_name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -105,13 +105,13 @@ def sync(
     """
 
     return sync_detailed(
-        agent_identifier=agent_identifier,
+        agent_name=agent_name,
         client=client,
     ).parsed
 
 
 async def asyncio_detailed(
-    agent_identifier: str,
+    agent_name: str,
     *,
     client: AuthenticatedClient,
 ) -> Response[Any | HTTPValidationError]:
@@ -120,7 +120,7 @@ async def asyncio_detailed(
      Delete by identifier. Reserved rows: H employee only.
 
     Args:
-        agent_identifier (str):
+        agent_name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -131,7 +131,7 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
-        agent_identifier=agent_identifier,
+        agent_name=agent_name,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -140,7 +140,7 @@ async def asyncio_detailed(
 
 
 async def asyncio(
-    agent_identifier: str,
+    agent_name: str,
     *,
     client: AuthenticatedClient,
 ) -> Any | HTTPValidationError | None:
@@ -149,7 +149,7 @@ async def asyncio(
      Delete by identifier. Reserved rows: H employee only.
 
     Args:
-        agent_identifier (str):
+        agent_name (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -161,7 +161,7 @@ async def asyncio(
 
     return (
         await asyncio_detailed(
-            agent_identifier=agent_identifier,
+            agent_name=agent_name,
             client=client,
         )
     ).parsed

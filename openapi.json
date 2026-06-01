@@ -1717,7 +1717,7 @@
           "Agents"
         ],
         "summary": "Create Agent",
-        "description": "Create an agent. ``reserved=True`` and the ``h/`` namespace require H-employee privileges.",
+        "description": "Create an agent..",
         "operationId": "create_agent_api_v2_agents_post",
         "security": [
           {
@@ -1729,7 +1729,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateAgent"
+                "$ref": "#/components/schemas/Agent"
               }
             }
           }
@@ -1740,7 +1740,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AgentRecord"
+                  "$ref": "#/components/schemas/Agent"
                 }
               }
             }
@@ -1809,8 +1809,8 @@
                     "enum": [
                       "created_at",
                       "-created_at",
-                      "agent_identifier",
-                      "-agent_identifier"
+                      "agent_name",
+                      "-agent_name"
                     ],
                     "type": "string"
                   }
@@ -1834,7 +1834,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_AgentRecord_"
+                  "$ref": "#/components/schemas/Page_Agent_"
                 }
               }
             }
@@ -1852,14 +1852,14 @@
         }
       }
     },
-    "/api/v2/agents/{agent_identifier}": {
+    "/api/v2/agents/{agent_name}": {
       "get": {
         "tags": [
           "Agents"
         ],
         "summary": "Get Agent",
         "description": "Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.",
-        "operationId": "get_agent_api_v2_agents__agent_identifier__get",
+        "operationId": "get_agent_api_v2_agents__agent_name__get",
         "security": [
           {
             "HTTPBearer": []
@@ -1867,12 +1867,12 @@
         ],
         "parameters": [
           {
-            "name": "agent_identifier",
+            "name": "agent_name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Agent Identifier"
+              "title": "Agent Name"
             }
           }
         ],
@@ -1882,7 +1882,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AgentRecord"
+                  "$ref": "#/components/schemas/Agent"
                 }
               }
             }
@@ -1905,7 +1905,7 @@
         ],
         "summary": "Update Agent",
         "description": "Replace ``spec``. ``spec.name`` must match the URL identifier; renames are not supported.",
-        "operationId": "update_agent_api_v2_agents__agent_identifier__put",
+        "operationId": "update_agent_api_v2_agents__agent_name__put",
         "security": [
           {
             "HTTPBearer": []
@@ -1913,12 +1913,12 @@
         ],
         "parameters": [
           {
-            "name": "agent_identifier",
+            "name": "agent_name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Agent Identifier"
+              "title": "Agent Name"
             }
           }
         ],
@@ -1927,7 +1927,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateAgent"
+                "$ref": "#/components/schemas/Agent"
               }
             }
           }
@@ -1938,7 +1938,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AgentRecord"
+                  "$ref": "#/components/schemas/Agent"
                 }
               }
             }
@@ -1961,7 +1961,7 @@
         ],
         "summary": "Delete Agent",
         "description": "Delete by identifier. Reserved rows: H employee only.",
-        "operationId": "delete_agent_api_v2_agents__agent_identifier__delete",
+        "operationId": "delete_agent_api_v2_agents__agent_name__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -1969,12 +1969,12 @@
         ],
         "parameters": [
           {
-            "name": "agent_identifier",
+            "name": "agent_name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Agent Identifier"
+              "title": "Agent Name"
             }
           }
         ],
@@ -2116,45 +2116,6 @@
         "title": "Agent",
         "description": "Declarative agent definition."
       },
-      "AgentRecord": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "spec": {
-            "$ref": "#/components/schemas/Agent",
-            "description": "Typed agent definition consumed by the runtime."
-          },
-          "reserved": {
-            "type": "boolean",
-            "title": "Reserved",
-            "description": "True for H-owned rows; world-readable, write-locked behind employee_only."
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "id",
-          "spec",
-          "reserved",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "AgentRecord",
-        "description": "Catalog row exposing an ``Agent`` spec payload plus AgP metadata.\n\nThe catalog handle is ``spec.name``; callers reference it directly\nvia ``record.spec.name`` rather than a duplicated top-level field."
-      },
       "Browser": {
         "properties": {
           "id": {
@@ -2210,27 +2171,6 @@
         ],
         "title": "Browser",
         "description": "Browser environment."
-      },
-      "CreateAgent": {
-        "properties": {
-          "spec": {
-            "$ref": "#/components/schemas/Agent",
-            "description": "Typed agent definition consumed by the runtime."
-          },
-          "reserved": {
-            "type": "boolean",
-            "title": "Reserved",
-            "description": "H employees only; rejected with 403 otherwise.",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "spec"
-        ],
-        "title": "CreateAgent",
-        "description": "``POST /api/v2/agents`` body."
       },
       "CreateEnvironment": {
         "properties": {
@@ -2606,11 +2546,11 @@
         "title": "ModelUsage",
         "description": "Per-model token usage."
       },
-      "Page_AgentRecord_": {
+      "Page_Agent_": {
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/AgentRecord"
+              "$ref": "#/components/schemas/Agent"
             },
             "type": "array",
             "title": "Items"
@@ -2630,7 +2570,7 @@
           "total",
           "page"
         ],
-        "title": "Page[AgentRecord]"
+        "title": "Page[Agent]"
       },
       "Page_EnvironmentRecord_": {
         "properties": {
@@ -2831,8 +2771,7 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Agent",
-                "description": "Typed agent definition consumed by the runtime."
+                "$ref": "#/components/schemas/Agent"
               }
             ],
             "title": "Agent",
@@ -3315,21 +3254,6 @@
         ],
         "title": "TrajectoryStatus",
         "description": "State of a session/trajectory.\n\nLifecycle::\n\n    PENDING \u2192 RUNNING \u2192 {COMPLETED, FAILED, TIMED_OUT, INTERRUPTED}\n       |        \u2191  \u2191\n       |        |  \u2514\u2500\u2500\u2500\u2500\u2500\u2192 IDLE (interactive: agent waiting for next task)\n       |        \u2193\n       \u2514\u2500\u2500\u2500\u2500\u2500\u2192 PAUSED"
-      },
-      "UpdateAgent": {
-        "properties": {
-          "spec": {
-            "$ref": "#/components/schemas/Agent",
-            "description": "Typed agent definition consumed by the runtime."
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "spec"
-        ],
-        "title": "UpdateAgent",
-        "description": "``PUT /api/v2/agents/{agent_identifier}`` body. Full replace; ``spec.name`` is immutable."
       },
       "UpdateEnvironment": {
         "properties": {

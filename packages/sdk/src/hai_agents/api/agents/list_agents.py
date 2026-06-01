@@ -8,7 +8,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.http_validation_error import HTTPValidationError
 from ...models.list_agents_sort_type_0_item import ListAgentsSortType0Item
-from ...models.page_agent_record import PageAgentRecord
+from ...models.page_agent import PageAgent
 from ...types import UNSET, Response, Unset
 
 
@@ -51,9 +51,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> HTTPValidationError | PageAgentRecord | None:
+) -> HTTPValidationError | PageAgent | None:
     if response.status_code == 200:
-        response_200 = PageAgentRecord.from_dict(response.json())
+        response_200 = PageAgent.from_dict(response.json())
 
         return response_200
 
@@ -70,7 +70,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[HTTPValidationError | PageAgentRecord]:
+) -> Response[HTTPValidationError | PageAgent]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -85,7 +85,7 @@ def sync_detailed(
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListAgentsSortType0Item] | None | Unset = UNSET,
-) -> Response[HTTPValidationError | PageAgentRecord]:
+) -> Response[HTTPValidationError | PageAgent]:
     """List Agents
 
      List reserved + caller's org agents.
@@ -100,7 +100,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[HTTPValidationError | PageAgentRecord]
+        Response[HTTPValidationError | PageAgent]
     """
 
     kwargs = _get_kwargs(
@@ -122,7 +122,7 @@ def sync(
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListAgentsSortType0Item] | None | Unset = UNSET,
-) -> HTTPValidationError | PageAgentRecord | None:
+) -> HTTPValidationError | PageAgent | None:
     """List Agents
 
      List reserved + caller's org agents.
@@ -137,7 +137,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        HTTPValidationError | PageAgentRecord
+        HTTPValidationError | PageAgent
     """
 
     return sync_detailed(
@@ -154,7 +154,7 @@ async def asyncio_detailed(
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListAgentsSortType0Item] | None | Unset = UNSET,
-) -> Response[HTTPValidationError | PageAgentRecord]:
+) -> Response[HTTPValidationError | PageAgent]:
     """List Agents
 
      List reserved + caller's org agents.
@@ -169,7 +169,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[HTTPValidationError | PageAgentRecord]
+        Response[HTTPValidationError | PageAgent]
     """
 
     kwargs = _get_kwargs(
@@ -189,7 +189,7 @@ async def asyncio(
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListAgentsSortType0Item] | None | Unset = UNSET,
-) -> HTTPValidationError | PageAgentRecord | None:
+) -> HTTPValidationError | PageAgent | None:
     """List Agents
 
      List reserved + caller's org agents.
@@ -204,7 +204,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        HTTPValidationError | PageAgentRecord
+        HTTPValidationError | PageAgent
     """
 
     return (

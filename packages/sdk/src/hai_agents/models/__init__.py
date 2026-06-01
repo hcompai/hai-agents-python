@@ -1,9 +1,7 @@
 """Contains all the data models used in inputs/outputs"""
 
 from .agent import Agent
-from .agent_record import AgentRecord
 from .browser import Browser
-from .create_agent import CreateAgent
 from .create_environment import CreateEnvironment
 from .create_skill import CreateSkill
 from .environment_record import EnvironmentRecord
@@ -18,7 +16,7 @@ from .list_skills_sort_type_0_item import ListSkillsSortType0Item
 from .metrics import Metrics
 from .model_cost import ModelCost
 from .model_usage import ModelUsage
-from .page_agent_record import PageAgentRecord
+from .page_agent import PageAgent
 from .page_environment_record import PageEnvironmentRecord
 from .page_session_summary import PageSessionSummary
 from .page_skill_record import PageSkillRecord
@@ -37,7 +35,6 @@ from .trajectory_changes import TrajectoryChanges
 from .trajectory_changes_answer_type_1 import TrajectoryChangesAnswerType1
 from .trajectory_event import TrajectoryEvent
 from .trajectory_status import TrajectoryStatus
-from .update_agent import UpdateAgent
 from .update_environment import UpdateEnvironment
 from .update_skill import UpdateSkill
 from .user_message_batch import UserMessageBatch
@@ -47,9 +44,7 @@ from .validation_error_context import ValidationErrorContext
 
 __all__ = (
     "Agent",
-    "AgentRecord",
     "Browser",
-    "CreateAgent",
     "CreateEnvironment",
     "CreateSkill",
     "EnvironmentRecord",
@@ -64,7 +59,7 @@ __all__ = (
     "Metrics",
     "ModelCost",
     "ModelUsage",
-    "PageAgentRecord",
+    "PageAgent",
     "PageEnvironmentRecord",
     "PageSessionSummary",
     "PageSkillRecord",
@@ -83,7 +78,6 @@ __all__ = (
     "TrajectoryChangesAnswerType1",
     "TrajectoryEvent",
     "TrajectoryStatus",
-    "UpdateAgent",
     "UpdateEnvironment",
     "UpdateSkill",
     "UserMessageBatch",
