@@ -13,11 +13,11 @@ import datetime
 from pathlib import Path
 from typing import Any, Dict
 
-from agent_platform.models.agent import Agent
-from agent_platform.models.agent_record import AgentRecord
-from agent_platform.models.session import Session
-from agent_platform.models.session_request import SessionRequest
-from agent_platform.models.skill_record import SkillRecord
+from hai_agents.models.agent import Agent
+from hai_agents.models.agent_record import AgentRecord
+from hai_agents.models.session import Session
+from hai_agents.models.session_request import SessionRequest
+from hai_agents.models.skill_record import SkillRecord
 
 from .conftest import assert_json_equal
 
@@ -113,7 +113,7 @@ def test_no_attrs_in_generated_models() -> None:
     Note: client.py and types.py deliberately use attrs (for AuthenticatedClient
     and File/Response) — that is expected and out of scope here.  Only models/.
     """
-    import agent_platform.models as models_pkg
+    import hai_agents.models as models_pkg
 
     models_dir = Path(models_pkg.__file__).parent
     forbidden_patterns = [

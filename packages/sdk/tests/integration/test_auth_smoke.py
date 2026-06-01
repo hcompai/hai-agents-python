@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from agent_platform import Client
-from agent_platform.api.sessions import get_session_quota as get_quota
+from hai_agents import Client
+from hai_agents.api.sessions import get_session_quota as get_quota
 
 pytestmark = pytest.mark.integration
 

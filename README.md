@@ -12,10 +12,8 @@ Python developer libraries and tools for [H Company's Agent Platform](https://hc
 | --- | --- |
 | [`packages/sdk`](packages/sdk) | Python SDK source - sync and async clients, fully typed with Pydantic v2. |
 
-Do not install `agent-platform` from public PyPI yet: that name currently
-belongs to an unrelated package and does not provide this SDK's
-`agent_platform` module. Install from this repository until an H-owned public
-package is available.
+The public `hai-agents` package is not yet published to PyPI. Install from this
+repository until it is available.
 
 ## Development
 
