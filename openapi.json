@@ -1544,7 +1544,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_Annotated_Union_Browser__CodeSandbox__MCP__Memory___FieldInfo_annotation_NoneType__required_True__discriminator__kind____"
+                  "$ref": "#/components/schemas/EnvironmentPage"
                 }
               }
             }
@@ -2199,6 +2199,43 @@
         "title": "Browser",
         "description": "Browser environment."
       },
+      "EnvironmentPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Browser"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "web": "#/components/schemas/Browser"
+                }
+              }
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "title": "EnvironmentPage",
+        "description": "Named page subclass so OpenAPI emits a clean ``EnvironmentPage`` schema name.\n\n``Environment`` is ``Annotated[Browser | CodeSandbox | MCP | Memory, Field(discriminator=\"kind\")]``\nand has no ``__name__``. Without this subclass, Pydantic titles ``Page[Environment]``\nby repr()ing the type parameter, producing a 95-char schema name that leaks\nPydantic FieldInfo into generated SDKs."
+      },
       "Feedback": {
         "properties": {
           "success": {
@@ -2427,42 +2464,6 @@
           "page"
         ],
         "title": "Page[Agent]"
-      },
-      "Page_Annotated_Union_Browser__CodeSandbox__MCP__Memory___FieldInfo_annotation_NoneType__required_True__discriminator__kind____": {
-        "properties": {
-          "items": {
-            "items": {
-              "oneOf": [
-                {
-                  "$ref": "#/components/schemas/Browser"
-                }
-              ],
-              "discriminator": {
-                "propertyName": "kind",
-                "mapping": {
-                  "web": "#/components/schemas/Browser"
-                }
-              }
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total"
-          },
-          "page": {
-            "type": "integer",
-            "title": "Page"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items",
-          "total",
-          "page"
-        ],
-        "title": "Page[Annotated[Union[Browser, CodeSandbox, MCP, Memory], FieldInfo(annotation=NoneType, required=True, discriminator='kind')]]"
       },
       "Page_SessionSummary_": {
         "properties": {
