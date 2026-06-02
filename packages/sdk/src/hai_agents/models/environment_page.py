@@ -7,17 +7,21 @@ from pydantic import BaseModel, ConfigDict
 
 from ..types import UNSET, Unset
 
-T = TypeVar(
-    "T", bound="PageAnnotatedUnionBrowserCodeSandboxMCPMemoryFieldInfoannotationNoneTypeRequiredTrueDiscriminatorkind"
-)
+T = TypeVar("T", bound="EnvironmentPage")
 
 
-class PageAnnotatedUnionBrowserCodeSandboxMCPMemoryFieldInfoannotationNoneTypeRequiredTrueDiscriminatorkind(BaseModel):
-    """
-    Attributes:
-        items (list[Browser]):
-        total (int):
-        page (int):
+class EnvironmentPage(BaseModel):
+    """Named page subclass so OpenAPI emits a clean ``EnvironmentPage`` schema name.
+
+    ``Environment`` is ``Annotated[Browser | CodeSandbox | MCP | Memory, Field(discriminator="kind")]``
+    and has no ``__name__``. Without this subclass, Pydantic titles ``Page[Environment]``
+    by repr()ing the type parameter, producing a 95-char schema name that leaks
+    Pydantic FieldInfo into generated SDKs.
+
+        Attributes:
+            items (list[Browser]):
+            total (int):
+            page (int):
     """
 
     model_config = ConfigDict(
@@ -72,14 +76,14 @@ class PageAnnotatedUnionBrowserCodeSandboxMCPMemoryFieldInfoannotationNoneTypeRe
 
         page = d.pop("page")
 
-        page_annotated_union_browser_code_sandbox_mcp_memory_field_infoannotation_none_type_required_true_discriminatorkind = cls(
+        environment_page = cls(
             items=items,
             total=total,
             page=page,
         )
 
-        page_annotated_union_browser_code_sandbox_mcp_memory_field_infoannotation_none_type_required_true_discriminatorkind.additional_properties = d
-        return page_annotated_union_browser_code_sandbox_mcp_memory_field_infoannotation_none_type_required_true_discriminatorkind
+        environment_page.additional_properties = d
+        return environment_page
 
     @property
     def additional_keys(self) -> list[str]:
