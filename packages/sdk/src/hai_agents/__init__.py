@@ -11,6 +11,11 @@ instead; the schema-sync workflow restores it after each regeneration.
 
 from __future__ import annotations
 
+import ssl
+from typing import Any
+
+import httpx
+
 from hai_agents.client import AuthenticatedClient as _AuthenticatedClient
 from hai_agents.models.agent import Agent
 from hai_agents.models.browser import Browser
@@ -38,6 +43,16 @@ class Client(_AuthenticatedClient):
         api_key: Portal-H API key (``hk-*`` format). Sent as
             ``Authorization: Bearer <api_key>`` on every request.
         base_url: AgP base URL. Defaults to production.
+        cookies: Cookies sent with every request.
+        headers: Additional headers sent with every request.
+        timeout: Maximum request duration. ``httpx.TimeoutException`` is raised
+            if exceeded.
+        verify_ssl: Whether to verify TLS certificates.
+        follow_redirects: Whether to follow redirects.
+        httpx_args: Extra keyword arguments forwarded to ``httpx.Client`` and
+            ``httpx.AsyncClient``.
+        raise_on_unexpected_status: Raise ``UnexpectedStatus`` instead of
+            returning ``None`` for undocumented API statuses.
 
     Example:
         >>> from hai_agents import Client
@@ -49,11 +64,28 @@ class Client(_AuthenticatedClient):
         *,
         api_key: str,
         base_url: str = "https://agp.eu.hcompany.ai",
+        cookies: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: httpx.Timeout | None = None,
+        verify_ssl: str | bool | ssl.SSLContext = True,
+        follow_redirects: bool = False,
+        httpx_args: dict[str, Any] | None = None,
+        raise_on_unexpected_status: bool = True,
     ) -> None:
-        super().__init__(base_url=base_url, token=api_key)
+        super().__init__(
+            base_url=base_url,
+            token=api_key,
+            cookies=cookies or {},
+            headers=headers or {},
+            timeout=timeout,
+            verify_ssl=verify_ssl,
+            follow_redirects=follow_redirects,
+            httpx_args=httpx_args or {},
+            raise_on_unexpected_status=raise_on_unexpected_status,
+        )
 
 
-class AsyncClient(_AuthenticatedClient):
+class AsyncClient(Client):
     """Async Agent Platform SDK client.
 
     Same constructor as ``Client``. Use with ``asyncio``-flavoured endpoint
@@ -71,11 +103,3 @@ class AsyncClient(_AuthenticatedClient):
         >>> client = AsyncClient(api_key="hk-...")
         >>> events = await list_session_events.asyncio(client=client, id="…")
     """
-
-    def __init__(
-        self,
-        *,
-        api_key: str,
-        base_url: str = "https://agp.eu.hcompany.ai",
-    ) -> None:
-        super().__init__(base_url=base_url, token=api_key)

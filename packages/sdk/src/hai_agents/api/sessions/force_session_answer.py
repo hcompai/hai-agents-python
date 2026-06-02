@@ -29,7 +29,7 @@ def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Any | HTTPValidationError | None:
     if response.status_code == 202:
-        response_202 = response.json()
+        response_202 = cast(Any, None)
         return response_202
 
     if response.status_code == 422:
