@@ -6,7 +6,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:8000"
+      "url": "https://agp.eu.hcompany.ai"
     }
   ],
   "paths": {
@@ -482,12 +482,7 @@
         },
         "responses": {
           "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -529,12 +524,7 @@
         ],
         "responses": {
           "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -576,12 +566,7 @@
         ],
         "responses": {
           "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -623,12 +608,7 @@
         ],
         "responses": {
           "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -1101,13 +1081,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "302": {
+            "description": "Redirect to a presigned URL for a session-owned resource."
           },
           "422": {
             "description": "Validation Error",
