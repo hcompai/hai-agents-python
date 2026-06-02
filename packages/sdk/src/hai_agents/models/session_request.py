@@ -14,16 +14,17 @@ class SessionRequest(BaseModel):
     """``POST /api/v2/sessions`` body.
 
     Attributes:
-        agent (Agent | str): Catalog id or inline Agent. Carries its own environments.
-        messages (list[UserMessageEvent] | None | str | Unset | UserMessageEvent): Queued before turn 1. Accepts a
-            string, a single UserMessageEvent, or a list.
-        max_steps (int | None | Unset): Cap on policy calls; runtime default if null.
-        max_time_s (float | None | Unset): Cap on wall-clock seconds.
-        idle_timeout_s (int | None | Unset): Idle window before auto-termination; null terminates on Answer.
-        group_id (None | str | Unset): Group id for cascading and listing.
-        parent_session_id (None | str | Unset): Parent session id.
+        agent (Agent | str): Agent to run: a registered agent's name, or an inline Agent definition.
+        messages (list[UserMessageEvent] | None | str | Unset | UserMessageEvent): Initial task for the agent. A plain
+            string, a single message, or a list of messages.
+        max_steps (int | None | Unset): Maximum reasoning steps the agent may take. Unbounded if null.
+        max_time_s (float | None | Unset): Maximum wall-clock seconds the agent may run. Unbounded if null.
+        idle_timeout_s (int | None | Unset): Seconds to keep the session open for follow-up messages after each answer.
+            Null ends the session as soon as the agent answers.
+        group_id (None | str | Unset): Optional id to group and list related sessions together.
+        parent_session_id (None | str | Unset): Id of the parent session, when this is a child run.
         answer_format (None | SessionRequestAnswerFormatType0 | Unset): JSON Schema the final answer must conform to.
-            Null returns free-form text.
+            Null returns a free-form text answer.
     """
 
     model_config = ConfigDict(
@@ -41,6 +42,7 @@ class SessionRequest(BaseModel):
     group_id: None | str | Unset = UNSET
     parent_session_id: None | str | Unset = UNSET
     answer_format: None | SessionRequestAnswerFormatType0 | Unset = UNSET
+    additional_properties: dict[str, Any] = {}
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.agent import Agent
@@ -106,7 +108,7 @@ class SessionRequest(BaseModel):
             answer_format = self.answer_format
 
         field_dict: dict[str, Any] = {}
-
+        field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "agent": agent,
@@ -253,7 +255,24 @@ class SessionRequest(BaseModel):
             answer_format=answer_format,
         )
 
+        session_request.additional_properties = d
         return session_request
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties
 
 
 from ..models.agent import Agent

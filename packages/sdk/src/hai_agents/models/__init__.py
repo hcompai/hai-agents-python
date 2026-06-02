@@ -2,6 +2,7 @@
 
 from .agent import Agent
 from .browser import Browser
+from .browser_mode import BrowserMode
 from .environment_page import EnvironmentPage
 from .feedback import Feedback
 from .http_validation_error import HTTPValidationError
@@ -39,6 +40,7 @@ from .validation_error_context import ValidationErrorContext
 __all__ = (
     "Agent",
     "Browser",
+    "BrowserMode",
     "EnvironmentPage",
     "Feedback",
     "HTTPValidationError",

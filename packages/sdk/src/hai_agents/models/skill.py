@@ -11,15 +11,16 @@ T = TypeVar("T", bound="Skill")
 
 
 class Skill(BaseModel):
-    """Named instruction content. Loaded by name via ``load_skill`` or rendered inline by toolboxes.
+    """A named, reusable instruction an agent can draw on during a session.
 
     Attributes:
-        name (str): Catalog id. Format: lowercase ASCII letters, digits and hyphens; must start and end with
-            alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
-        description (str): One-line routing hint.
-        body (str): Markdown content.
-        source (None | str | Unset): Provenance URL.
-        url_pattern (None | str | Unset): Informational regex hinting at URLs where this skill applies (not gated).
+        name (str): Unique name for this skill in your catalog. Format: lowercase ASCII letters, digits and hyphens;
+            must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g.
+            'h/web-environment').
+        description (str): When to use this skill. The agent reads this to decide whether to load it.
+        body (str): Markdown instructions the agent loads when it uses the skill.
+        source (None | str | Unset): Optional URL the content was sourced from.
+        url_pattern (None | str | Unset): Optional regex hinting at URLs where this skill applies.
     """
 
     model_config = ConfigDict(
@@ -34,6 +35,7 @@ class Skill(BaseModel):
     body: str
     source: None | str | Unset = UNSET
     url_pattern: None | str | Unset = UNSET
+    additional_properties: dict[str, Any] = {}
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
@@ -55,7 +57,7 @@ class Skill(BaseModel):
             url_pattern = self.url_pattern
 
         field_dict: dict[str, Any] = {}
-
+        field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "name": name,
@@ -105,4 +107,21 @@ class Skill(BaseModel):
             url_pattern=url_pattern,
         )
 
+        skill.additional_properties = d
         return skill
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

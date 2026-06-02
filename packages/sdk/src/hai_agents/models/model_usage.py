@@ -14,10 +14,10 @@ class ModelUsage(BaseModel):
     """Per-model token usage.
 
     Attributes:
-        name (str):
-        input_tokens (int):
-        output_tokens (int):
-        reasoning_tokens (int):
+        name (str): Model id.
+        input_tokens (int): Input tokens consumed.
+        output_tokens (int): Output tokens produced.
+        reasoning_tokens (int): Reasoning tokens produced.
     """
 
     model_config = ConfigDict(

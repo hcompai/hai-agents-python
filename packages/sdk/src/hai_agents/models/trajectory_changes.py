@@ -45,7 +45,7 @@ class TrajectoryChanges(BaseModel):
             error (None | str | Unset):
             new_events (list[TrajectoryEvent] | Unset):
             answer (None | str | TrajectoryChangesAnswerType1 | Unset):
-            metrics (Metrics | Unset): Metrics for a trajectory.
+            metrics (Metrics | Unset): Rolled-up usage and cost for a session.
     """
 
     model_config = ConfigDict(

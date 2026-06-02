@@ -2032,13 +2032,13 @@
             "maxLength": 127,
             "minLength": 1,
             "title": "Name",
-            "description": "Unique catalog identifier for this agent. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment')."
+            "description": "Unique name for this agent in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment')."
           },
           "description": {
             "type": "string",
             "minLength": 1,
             "title": "Description",
-            "description": "Short summary advertised to parent agents that may delegate to this one."
+            "description": "What the agent does. Parent agents read this to decide when to delegate to it."
           },
           "environments": {
             "items": {
@@ -2063,7 +2063,7 @@
             },
             "type": "array",
             "title": "Environments",
-            "description": "Environments the agent runs in. A string entry references a catalog id; an inline Environment defines an ad-hoc environment. At least one entry, at most one per kind."
+            "description": "Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At least one, at most one per kind."
           },
           "model": {
             "anyOf": [
@@ -2075,7 +2075,7 @@
               }
             ],
             "title": "Model",
-            "description": "Model id; defaults to the platform-provided one if omitted."
+            "description": "Model that serves the agent. Defaults to the platform model if omitted."
           },
           "instructions": {
             "anyOf": [
@@ -2087,7 +2087,7 @@
               }
             ],
             "title": "Instructions",
-            "description": "Steering text appended to the system prompt."
+            "description": "Instructions appended to the agent's system prompt to steer behavior."
           },
           "subagents": {
             "anyOf": [
@@ -2109,7 +2109,7 @@
               }
             ],
             "title": "Subagents",
-            "description": "Agents this one can spawn. A string entry references another catalog id; an inline Agent defines an ad-hoc sub-agent."
+            "description": "Agents this one can delegate to. Each entry is a registered agent's name or an inline definition."
           },
           "skills": {
             "anyOf": [
@@ -2131,7 +2131,7 @@
               }
             ],
             "title": "Skills",
-            "description": "Skills available to this agent. A string entry references a catalog id; an inline Skill defines an ad-hoc skill."
+            "description": "Skills the agent can draw on. Each entry is a registered skill's name or an inline definition."
           }
         },
         "type": "object",
@@ -2149,7 +2149,7 @@
             "type": "string",
             "minLength": 1,
             "title": "Id",
-            "description": "Catalog id."
+            "description": "Catalog identifier for this environment."
           },
           "kind": {
             "type": "string",
@@ -2184,10 +2184,20 @@
               }
             ],
             "title": "Start Url",
-            "description": "Initial URL."
+            "description": "Initial URL to open. Null starts on a blank page."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "visual",
+              "text",
+              "multimodal"
+            ],
+            "title": "Mode",
+            "description": "How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.",
+            "default": "visual"
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "id",
@@ -2197,7 +2207,7 @@
           "start_url"
         ],
         "title": "Browser",
-        "description": "Browser environment."
+        "description": "A local web browser the agent navigates and acts on."
       },
       "EnvironmentPage": {
         "properties": {
@@ -2279,6 +2289,7 @@
           "steps": {
             "type": "integer",
             "title": "Steps",
+            "description": "Steps taken so far.",
             "default": 0
           },
           "cost_per_model": {
@@ -2286,7 +2297,8 @@
               "$ref": "#/components/schemas/ModelCost"
             },
             "type": "array",
-            "title": "Cost Per Model"
+            "title": "Cost Per Model",
+            "description": "Per-model token usage and cost."
           },
           "input_cost": {
             "anyOf": [
@@ -2297,7 +2309,8 @@
                 "type": "null"
               }
             ],
-            "title": "Input Cost"
+            "title": "Input Cost",
+            "description": "Total input cost in USD; null if any model is unpriced."
           },
           "output_cost": {
             "anyOf": [
@@ -2308,7 +2321,8 @@
                 "type": "null"
               }
             ],
-            "title": "Output Cost"
+            "title": "Output Cost",
+            "description": "Total output cost in USD; null if any model is unpriced."
           },
           "reasoning_cost": {
             "anyOf": [
@@ -2319,7 +2333,8 @@
                 "type": "null"
               }
             ],
-            "title": "Reasoning Cost"
+            "title": "Reasoning Cost",
+            "description": "Total reasoning cost in USD; null if any model is unpriced."
           },
           "total_cost": {
             "anyOf": [
@@ -2330,30 +2345,35 @@
                 "type": "null"
               }
             ],
-            "title": "Total Cost"
+            "title": "Total Cost",
+            "description": "Total cost in USD; null if any model is unpriced."
           }
         },
         "type": "object",
         "title": "Metrics",
-        "description": "Metrics for a trajectory."
+        "description": "Rolled-up usage and cost for a session."
       },
       "ModelCost": {
         "properties": {
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Model id."
           },
           "input_tokens": {
             "type": "integer",
-            "title": "Input Tokens"
+            "title": "Input Tokens",
+            "description": "Input tokens consumed."
           },
           "output_tokens": {
             "type": "integer",
-            "title": "Output Tokens"
+            "title": "Output Tokens",
+            "description": "Output tokens produced."
           },
           "reasoning_tokens": {
             "type": "integer",
-            "title": "Reasoning Tokens"
+            "title": "Reasoning Tokens",
+            "description": "Reasoning tokens produced."
           },
           "input_cost": {
             "anyOf": [
@@ -2364,7 +2384,8 @@
                 "type": "null"
               }
             ],
-            "title": "Input Cost"
+            "title": "Input Cost",
+            "description": "Input cost in USD; null if the model is unpriced."
           },
           "output_cost": {
             "anyOf": [
@@ -2375,7 +2396,8 @@
                 "type": "null"
               }
             ],
-            "title": "Output Cost"
+            "title": "Output Cost",
+            "description": "Output cost in USD; null if the model is unpriced."
           },
           "reasoning_cost": {
             "anyOf": [
@@ -2386,7 +2408,8 @@
                 "type": "null"
               }
             ],
-            "title": "Reasoning Cost"
+            "title": "Reasoning Cost",
+            "description": "Reasoning cost in USD; null if the model is unpriced."
           },
           "total_cost": {
             "anyOf": [
@@ -2397,7 +2420,8 @@
                 "type": "null"
               }
             ],
-            "title": "Total Cost"
+            "title": "Total Cost",
+            "description": "Total cost in USD; null if the model is unpriced."
           }
         },
         "type": "object",
@@ -2408,25 +2432,29 @@
           "reasoning_tokens"
         ],
         "title": "ModelCost",
-        "description": "Cost for a model."
+        "description": "Token usage and cost for a single model."
       },
       "ModelUsage": {
         "properties": {
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Model id."
           },
           "input_tokens": {
             "type": "integer",
-            "title": "Input Tokens"
+            "title": "Input Tokens",
+            "description": "Input tokens consumed."
           },
           "output_tokens": {
             "type": "integer",
-            "title": "Output Tokens"
+            "title": "Output Tokens",
+            "description": "Output tokens produced."
           },
           "reasoning_tokens": {
             "type": "integer",
-            "title": "Reasoning Tokens"
+            "title": "Reasoning Tokens",
+            "description": "Reasoning tokens produced."
           }
         },
         "type": "object",
@@ -2642,7 +2670,7 @@
               }
             ],
             "title": "Agent",
-            "description": "Catalog id or inline Agent. Carries its own environments."
+            "description": "Agent to run: a registered agent's name, or an inline Agent definition."
           },
           "messages": {
             "anyOf": [
@@ -2663,7 +2691,7 @@
               }
             ],
             "title": "Messages",
-            "description": "Queued before turn 1. Accepts a string, a single UserMessageEvent, or a list."
+            "description": "Initial task for the agent. A plain string, a single message, or a list of messages."
           },
           "max_steps": {
             "anyOf": [
@@ -2676,7 +2704,7 @@
               }
             ],
             "title": "Max Steps",
-            "description": "Cap on policy calls; runtime default if null."
+            "description": "Maximum reasoning steps the agent may take. Unbounded if null."
           },
           "max_time_s": {
             "anyOf": [
@@ -2689,7 +2717,7 @@
               }
             ],
             "title": "Max Time S",
-            "description": "Cap on wall-clock seconds."
+            "description": "Maximum wall-clock seconds the agent may run. Unbounded if null."
           },
           "idle_timeout_s": {
             "anyOf": [
@@ -2702,7 +2730,7 @@
               }
             ],
             "title": "Idle Timeout S",
-            "description": "Idle window before auto-termination; null terminates on Answer."
+            "description": "Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers."
           },
           "group_id": {
             "anyOf": [
@@ -2714,7 +2742,7 @@
               }
             ],
             "title": "Group Id",
-            "description": "Group id for cascading and listing."
+            "description": "Optional id to group and list related sessions together."
           },
           "parent_session_id": {
             "anyOf": [
@@ -2726,7 +2754,7 @@
               }
             ],
             "title": "Parent Session Id",
-            "description": "Parent session id."
+            "description": "Id of the parent session, when this is a child run."
           },
           "answer_format": {
             "anyOf": [
@@ -2739,10 +2767,9 @@
               }
             ],
             "title": "Answer Format",
-            "description": "JSON Schema the final answer must conform to. Null returns free-form text."
+            "description": "JSON Schema the final answer must conform to. Null returns a free-form text answer."
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "agent"
@@ -2753,7 +2780,8 @@
       "SessionStatus": {
         "properties": {
           "status": {
-            "$ref": "#/components/schemas/TrajectoryStatus"
+            "$ref": "#/components/schemas/TrajectoryStatus",
+            "description": "Current lifecycle state of the session."
           },
           "error": {
             "anyOf": [
@@ -2764,11 +2792,13 @@
                 "type": "null"
               }
             ],
-            "title": "Error"
+            "title": "Error",
+            "description": "Error message if the session failed; null otherwise."
           },
           "steps": {
             "type": "integer",
             "title": "Steps",
+            "description": "Number of steps the agent has taken.",
             "default": 0
           },
           "usage_per_model": {
@@ -2776,7 +2806,8 @@
               "$ref": "#/components/schemas/ModelUsage"
             },
             "type": "array",
-            "title": "Usage Per Model"
+            "title": "Usage Per Model",
+            "description": "Per-model token usage. Empty until the agent calls a model."
           },
           "subagent_session_ids": {
             "items": {
@@ -2784,7 +2815,8 @@
               "format": "uuid"
             },
             "type": "array",
-            "title": "Subagent Session Ids"
+            "title": "Subagent Session Ids",
+            "description": "Session ids of any subagents this session spawned."
           }
         },
         "type": "object",
@@ -2875,19 +2907,19 @@
             "type": "string",
             "minLength": 1,
             "title": "Name",
-            "description": "Catalog id. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment')."
+            "description": "Unique name for this skill in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment')."
           },
           "description": {
             "type": "string",
             "minLength": 1,
             "title": "Description",
-            "description": "One-line routing hint."
+            "description": "When to use this skill. The agent reads this to decide whether to load it."
           },
           "body": {
             "type": "string",
             "minLength": 1,
             "title": "Body",
-            "description": "Markdown content."
+            "description": "Markdown instructions the agent loads when it uses the skill."
           },
           "source": {
             "anyOf": [
@@ -2899,7 +2931,7 @@
               }
             ],
             "title": "Source",
-            "description": "Provenance URL."
+            "description": "Optional URL the content was sourced from."
           },
           "url_pattern": {
             "anyOf": [
@@ -2913,10 +2945,9 @@
               }
             ],
             "title": "Url Pattern",
-            "description": "Informational regex hinting at URLs where this skill applies (not gated)."
+            "description": "Optional regex hinting at URLs where this skill applies."
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "name",
@@ -2924,7 +2955,7 @@
           "body"
         ],
         "title": "Skill",
-        "description": "Named instruction content. Loaded by name via ``load_skill`` or rendered inline by toolboxes."
+        "description": "A named, reusable instruction an agent can draw on during a session."
       },
       "TrajectoryChanges": {
         "properties": {
@@ -3074,7 +3105,8 @@
           },
           "message": {
             "type": "string",
-            "title": "Message"
+            "title": "Message",
+            "description": "Message text sent to the agent."
           },
           "images": {
             "items": {
@@ -3082,7 +3114,7 @@
             },
             "type": "array",
             "title": "Images",
-            "default": []
+            "description": "Optional images attached to the message, as base64 data URIs."
           },
           "caller_id": {
             "type": "string",

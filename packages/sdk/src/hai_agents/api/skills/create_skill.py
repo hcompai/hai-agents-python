@@ -70,8 +70,7 @@ def sync_detailed(
      Create a skill. The ``h/`` namespace is reserved for built-in skills.
 
     Args:
-        body (Skill): Named instruction content. Loaded by name via ``load_skill`` or rendered
-            inline by toolboxes.
+        body (Skill): A named, reusable instruction an agent can draw on during a session.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -102,8 +101,7 @@ def sync(
      Create a skill. The ``h/`` namespace is reserved for built-in skills.
 
     Args:
-        body (Skill): Named instruction content. Loaded by name via ``load_skill`` or rendered
-            inline by toolboxes.
+        body (Skill): A named, reusable instruction an agent can draw on during a session.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -129,8 +127,7 @@ async def asyncio_detailed(
      Create a skill. The ``h/`` namespace is reserved for built-in skills.
 
     Args:
-        body (Skill): Named instruction content. Loaded by name via ``load_skill`` or rendered
-            inline by toolboxes.
+        body (Skill): A named, reusable instruction an agent can draw on during a session.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -159,8 +156,7 @@ async def asyncio(
      Create a skill. The ``h/`` namespace is reserved for built-in skills.
 
     Args:
-        body (Skill): Named instruction content. Loaded by name via ``load_skill`` or rendered
-            inline by toolboxes.
+        body (Skill): A named, reusable instruction an agent can draw on during a session.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

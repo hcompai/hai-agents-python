@@ -25,10 +25,10 @@ class SessionStatus(BaseModel):
                    |        |  └─────→ IDLE (interactive: agent waiting for next task)
                    |        ↓
                    └─────→ PAUSED
-        error (None | str | Unset):
-        steps (int | Unset):  Default: 0.
-        usage_per_model (list[ModelUsage] | Unset):
-        subagent_session_ids (list[UUID] | Unset):
+        error (None | str | Unset): Error message if the session failed; null otherwise.
+        steps (int | Unset): Number of steps the agent has taken. Default: 0.
+        usage_per_model (list[ModelUsage] | Unset): Per-model token usage. Empty until the agent calls a model.
+        subagent_session_ids (list[UUID] | Unset): Session ids of any subagents this session spawned.
     """
 
     model_config = ConfigDict(
