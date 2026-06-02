@@ -14,18 +14,18 @@ class Agent(BaseModel):
     """Declarative agent definition.
 
     Attributes:
-        name (str): Unique catalog identifier for this agent. Format: lowercase ASCII letters, digits and hyphens; must
-            start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-
-            environment').
-        description (str): Short summary advertised to parent agents that may delegate to this one.
-        environments (list[Browser | str]): Environments the agent runs in. A string entry references a catalog id; an
-            inline Environment defines an ad-hoc environment. At least one entry, at most one per kind.
-        model (None | str | Unset): Model id; defaults to the platform-provided one if omitted.
-        instructions (None | str | Unset): Steering text appended to the system prompt.
-        subagents (list[Agent | str] | None | Unset): Agents this one can spawn. A string entry references another
-            catalog id; an inline Agent defines an ad-hoc sub-agent.
-        skills (list[Skill | str] | None | Unset): Skills available to this agent. A string entry references a catalog
-            id; an inline Skill defines an ad-hoc skill.
+        name (str): Unique name for this agent in your catalog. Format: lowercase ASCII letters, digits and hyphens;
+            must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g.
+            'h/web-environment').
+        description (str): What the agent does. Parent agents read this to decide when to delegate to it.
+        environments (list[Browser | str]): Environments the agent runs in. Each entry is a registered environment's id
+            or an inline definition. At least one, at most one per kind.
+        model (None | str | Unset): Model that serves the agent. Defaults to the platform model if omitted.
+        instructions (None | str | Unset): Instructions appended to the agent's system prompt to steer behavior.
+        subagents (list[Agent | str] | None | Unset): Agents this one can delegate to. Each entry is a registered
+            agent's name or an inline definition.
+        skills (list[Skill | str] | None | Unset): Skills the agent can draw on. Each entry is a registered skill's name
+            or an inline definition.
     """
 
     model_config = ConfigDict(

@@ -14,9 +14,9 @@ class UserMessageEvent(BaseModel):
     """The user is sending a message to an active agent.
 
     Attributes:
-        message (str):
+        message (str): Message text sent to the agent.
         type_ (Literal['user_message'] | Unset):  Default: 'user_message'.
-        images (list[str] | Unset):
+        images (list[str] | Unset): Optional images attached to the message, as base64 data URIs.
         caller_id (str | Unset):  Default: 'user'.
     """
 

@@ -70,7 +70,7 @@ def sync_detailed(
      Create an environment.
 
     Args:
-        body (Browser): Browser environment.
+        body (Browser): A local web browser the agent navigates and acts on.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -101,7 +101,7 @@ def sync(
      Create an environment.
 
     Args:
-        body (Browser): Browser environment.
+        body (Browser): A local web browser the agent navigates and acts on.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -127,7 +127,7 @@ async def asyncio_detailed(
      Create an environment.
 
     Args:
-        body (Browser): Browser environment.
+        body (Browser): A local web browser the agent navigates and acts on.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -156,7 +156,7 @@ async def asyncio(
      Create an environment.
 
     Args:
-        body (Browser): Browser environment.
+        body (Browser): A local web browser the agent navigates and acts on.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

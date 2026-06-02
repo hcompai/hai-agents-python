@@ -11,15 +11,15 @@ T = TypeVar("T", bound="Metrics")
 
 
 class Metrics(BaseModel):
-    """Metrics for a trajectory.
+    """Rolled-up usage and cost for a session.
 
     Attributes:
-        steps (int | Unset):  Default: 0.
-        cost_per_model (list[ModelCost] | Unset):
-        input_cost (float | None | Unset):
-        output_cost (float | None | Unset):
-        reasoning_cost (float | None | Unset):
-        total_cost (float | None | Unset):
+        steps (int | Unset): Steps taken so far. Default: 0.
+        cost_per_model (list[ModelCost] | Unset): Per-model token usage and cost.
+        input_cost (float | None | Unset): Total input cost in USD; null if any model is unpriced.
+        output_cost (float | None | Unset): Total output cost in USD; null if any model is unpriced.
+        reasoning_cost (float | None | Unset): Total reasoning cost in USD; null if any model is unpriced.
+        total_cost (float | None | Unset): Total cost in USD; null if any model is unpriced.
     """
 
     model_config = ConfigDict(

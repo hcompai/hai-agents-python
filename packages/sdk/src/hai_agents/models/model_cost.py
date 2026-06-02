@@ -11,17 +11,17 @@ T = TypeVar("T", bound="ModelCost")
 
 
 class ModelCost(BaseModel):
-    """Cost for a model.
+    """Token usage and cost for a single model.
 
     Attributes:
-        name (str):
-        input_tokens (int):
-        output_tokens (int):
-        reasoning_tokens (int):
-        input_cost (float | None | Unset):
-        output_cost (float | None | Unset):
-        reasoning_cost (float | None | Unset):
-        total_cost (float | None | Unset):
+        name (str): Model id.
+        input_tokens (int): Input tokens consumed.
+        output_tokens (int): Output tokens produced.
+        reasoning_tokens (int): Reasoning tokens produced.
+        input_cost (float | None | Unset): Input cost in USD; null if the model is unpriced.
+        output_cost (float | None | Unset): Output cost in USD; null if the model is unpriced.
+        reasoning_cost (float | None | Unset): Reasoning cost in USD; null if the model is unpriced.
+        total_cost (float | None | Unset): Total cost in USD; null if the model is unpriced.
     """
 
     model_config = ConfigDict(
