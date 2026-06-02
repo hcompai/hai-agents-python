@@ -58,11 +58,11 @@ status = get_session_status.sync(client=client, id=session.id)
 # Long-poll for new events
 changes = get_session_changes.sync(client=client, id=session.id, from_index=0)
 
-# Inject a message mid-run
+# Inject a message mid-run (single event, or a UserMessageBatch for multiple)
 send_session_messages.sync(
     client=client,
     id=session.id,
-    body=[UserMessageEvent(message="Actually, switch to Lyon.")],
+    body=UserMessageEvent(message="Actually, switch to Lyon."),
 )
 ```
 
