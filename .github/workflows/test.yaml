@@ -35,6 +35,23 @@ jobs:
       - name: Collect integration tests
         run: /tmp/sdk-venv/bin/pytest packages/sdk/tests/integration --collect-only -m integration -q
 
+  cli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install SDK + CLI
+        run: |
+          python3 -m venv /tmp/cli-venv
+          /tmp/cli-venv/bin/pip install --quiet -e packages/sdk -e packages/cli "pytest>=8,<9"
+
+      - name: Smoke run
+        run: /tmp/cli-venv/bin/hai --help
+
+      - name: Contract + drift tests
+        run: /tmp/cli-venv/bin/pytest packages/cli/tests -v
+
   integration-live:
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
