@@ -54,15 +54,11 @@ print(result.status)  # "completed"
 print(result.answer)
 ```
 
-An `AsyncClient` mirrors this API for asyncio. Streaming progress, steering a live session, regions, structured output, and error handling are all covered in the documentation.
+An `AsyncClient` mirrors this API for asyncio.
 
 ## Documentation
 
-Guides, core concepts, and the full API reference live at **[hub.hcompany.ai/agent-api](https://hub.hcompany.ai/agent-api)**.
-
-- [Quickstart](https://hub.hcompany.ai/agent-api/quickstart)
-- [Observe and steer a session](https://hub.hcompany.ai/agent-api/observe-and-steer)
-- [Multi-agent orchestration](https://hub.hcompany.ai/agent-api/multi-agent)
+Guides, core concepts, and the full API reference live at **[hub.hcompany.ai/agent-api](https://hub.hcompany.ai/agent-api)**, covering streaming progress, steering a live session, regions, structured output, and error handling.
 
 ## License
 
