@@ -56,6 +56,18 @@ print(result.answer)
 
 An `AsyncClient` mirrors this API for asyncio.
 
+## Command line
+
+Installing the package also ships the `hai` command. Sign in once (opens your browser, mints a key, writes it to `.env`), then drive agents straight from the terminal:
+
+```bash
+hai login
+hai session run --agent h/web-surfer-holo3-1-35b \
+  --message "What are the top 3 stories on Hacker News right now?"
+```
+
+`hai` prints tables on a TTY and JSON when piped (`hai session list -o json | jq ...`), and `hai schema` describes every command for tooling. Run `hai --help` for the full surface.
+
 ## Documentation
 
 Guides, core concepts, and the full API reference live at **[hub.hcompany.ai/agent-api](https://hub.hcompany.ai/agent-api)**, covering streaming progress, steering a live session, regions, structured output, and error handling.
