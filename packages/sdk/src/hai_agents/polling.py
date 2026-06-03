@@ -2,178 +2,272 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+import time
+import typing
 from dataclasses import dataclass
-from uuid import UUID
 
-from hai_agents.api.sessions import create_session, get_session_changes
-from hai_agents.client import AuthenticatedClient
-from hai_agents.models.http_validation_error import HTTPValidationError
-from hai_agents.models.session import Session
-from hai_agents.models.session_request import SessionRequest
-from hai_agents.models.trajectory_changes import TrajectoryChanges
-from hai_agents.models.trajectory_event import TrajectoryEvent
-from hai_agents.models.trajectory_status import TrajectoryStatus
-from hai_agents.types import UNSET, Unset
+import typing_extensions
+
+from .client import AsyncClient, Client
+from .types.session_request_agent import SessionRequestAgent
+from .types.session_request_messages import SessionRequestMessages
+from .types.trajectory_changes import TrajectoryChanges
+from .types.trajectory_changes_answer import TrajectoryChangesAnswer
+from .types.trajectory_event import TrajectoryEvent
+from .types.trajectory_status import TrajectoryStatus
 
 TERMINAL_SESSION_STATUSES = frozenset({"completed", "failed", "timed_out", "interrupted"})
+
+# Server rejects request bodies above this size; enforced client-side for a clear early error.
+MAX_REQUEST_BYTES = 5 * 1024 * 1024
+
+
+class CreateSessionParams(typing_extensions.TypedDict, total=False):
+    """Typed ``create_session`` kwargs; mirror new ``SessionRequest`` fields here to keep autocomplete."""
+
+    agent: typing_extensions.Required[SessionRequestAgent]
+    idempotency_key: typing.Optional[str]
+    messages: typing.Optional[SessionRequestMessages]
+    max_steps: typing.Optional[int]
+    max_time_s: typing.Optional[float]
+    idle_timeout_s: typing.Optional[int]
+    group_id: typing.Optional[str]
+    parent_session_id: typing.Optional[str]
+    answer_format: typing.Optional[typing.Dict[str, typing.Any]]
 
 
 @dataclass(frozen=True)
 class SessionRunResult:
     """Result returned by ``run_session_until_done`` and ``wait_for_session``."""
 
-    id: UUID
-    final_changes: TrajectoryChanges
-    events: list[TrajectoryEvent]
+    id: str
+    status: TrajectoryStatus
+    events: typing.List[TrajectoryEvent]
     next_from_index: int
+    final_changes: typing.Optional[TrajectoryChanges] = None
 
     @property
-    def answer(self) -> object:
-        """Final answer from the terminal changes batch, if present."""
-        return None if isinstance(self.final_changes.answer, Unset) else self.final_changes.answer
+    def answer(self) -> typing.Optional[TrajectoryChangesAnswer]:
+        """Final answer, if the session produced one."""
+        return self.final_changes.answer if self.final_changes is not None else None
 
 
-def is_terminal_session_status(status: TrajectoryStatus | str) -> bool:
+def is_terminal_session_status(status: typing.Union[TrajectoryStatus, str]) -> bool:
     """Return whether a session status should end a polling loop."""
-    value = status.value if isinstance(status, TrajectoryStatus) else status
-    return value in TERMINAL_SESSION_STATUSES
+    return getattr(status, "value", status) in TERMINAL_SESSION_STATUSES
 
 
-def _new_events(changes: TrajectoryChanges) -> list[TrajectoryEvent]:
-    return [] if changes.new_events is None or isinstance(changes.new_events, Unset) else changes.new_events
+def _request_bytes(payload: typing.Any) -> int:
+    def default(obj: typing.Any) -> typing.Any:
+        dump = getattr(obj, "model_dump", None)
+        return dump(mode="json") if callable(dump) else str(obj)
+
+    return len(json.dumps(payload, default=default).encode("utf-8"))
 
 
-def _ensure_session(value: HTTPValidationError | Session | None) -> Session:
-    if isinstance(value, Session):
-        return value
-    raise RuntimeError(f"Could not create session: {value!r}")
+def assert_request_under_limit(
+    payload: typing.Any, max_bytes: int = MAX_REQUEST_BYTES
+) -> None:
+    """Raise if a request body exceeds ``max_bytes`` once serialized to JSON."""
+    size = _request_bytes(payload)
+    if size > max_bytes:
+        raise ValueError(
+            f"Request payload is {size / 1024 / 1024:.2f}MB, over the "
+            f"{max_bytes / 1024 / 1024:.2f}MB limit. Downscale images before sending."
+        )
 
 
-def _ensure_changes(value: object) -> TrajectoryChanges | None:
-    if value is None:
-        return None
-    if isinstance(value, TrajectoryChanges):
-        return value
-    raise RuntimeError(f"Unexpected session changes response: {value!r}")
+def _final_changes(
+    client: Client, id: str, last_changes: typing.Optional[TrajectoryChanges], limit: typing.Optional[int]
+) -> typing.Optional[TrajectoryChanges]:
+    """The terminal answer lives in ``/changes``; fetch it once if streaming didn't surface it."""
+    if last_changes is not None and last_changes.answer is not None:
+        return last_changes
+    fetched = client.sessions.get_session_changes(
+        id, from_index=0, limit=limit, include_events=False, wait_for_seconds=0
+    )
+    return fetched or last_changes
 
 
-def wait_for_session(  # noqa: PLR0913
-    id: UUID,
+def wait_for_session(
+    client: Client,
+    id: str,
     *,
-    client: AuthenticatedClient,
     from_index: int = 0,
     wait_for_seconds: int = 20,
-    limit: int | None | Unset = UNSET,
-    max_polls: int | None = None,
+    limit: typing.Optional[int] = None,
+    include_events: bool = True,
+    timeout_seconds: typing.Optional[float] = None,
+    poll_backoff_seconds: float = 0.0,
+    max_polls: typing.Optional[int] = None,
 ) -> SessionRunResult:
-    """Long-poll a session until it reaches a terminal status."""
-    events: list[TrajectoryEvent] = []
+    """Poll a session until it reaches a terminal status.
+
+    Terminal state is read from ``/status`` (authoritative); ``/changes`` only feeds
+    events and the final answer, since it 204s whenever no new events exist past
+    ``from_index`` -- even after the session has finished.
+    """
+    events: typing.List[TrajectoryEvent] = []
     next_from_index = from_index
+    last_changes: typing.Optional[TrajectoryChanges] = None
     polls = 0
+    deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
 
     while max_polls is None or polls < max_polls:
         polls += 1
-        changes = _ensure_changes(
-            get_session_changes.sync(
+        if deadline is not None and time.monotonic() >= deadline:
+            raise TimeoutError(
+                f"Session {id} did not reach a terminal status within {timeout_seconds}s"
+            )
+
+        if include_events:
+            changes = client.sessions.get_session_changes(
                 id,
-                client=client,
                 from_index=next_from_index,
                 limit=limit,
                 include_events=True,
                 wait_for_seconds=wait_for_seconds,
             )
-        )
-        if changes is None:
-            continue
+            if changes is not None:
+                last_changes = changes
+                batch = changes.new_events or []
+                events.extend(batch)
+                next_from_index += len(batch)
 
-        batch = _new_events(changes)
-        events.extend(batch)
-        next_from_index += len(batch)
-        if is_terminal_session_status(changes.status):
+        status = client.sessions.get_session_status(id)
+        if is_terminal_session_status(status.status):
             return SessionRunResult(
                 id=id,
-                final_changes=changes,
+                status=status.status,
                 events=events,
                 next_from_index=next_from_index,
+                final_changes=_final_changes(client, id, last_changes, limit),
             )
 
-    raise TimeoutError(f"Session {id} did not reach a terminal status before max_polls={max_polls}")
-
-
-async def async_wait_for_session(  # noqa: PLR0913
-    id: UUID,
-    *,
-    client: AuthenticatedClient,
-    from_index: int = 0,
-    wait_for_seconds: int = 20,
-    limit: int | None | Unset = UNSET,
-    max_polls: int | None = None,
-) -> SessionRunResult:
-    """Async version of ``wait_for_session``."""
-    events: list[TrajectoryEvent] = []
-    next_from_index = from_index
-    polls = 0
-
-    while max_polls is None or polls < max_polls:
-        polls += 1
-        changes = _ensure_changes(
-            await get_session_changes.asyncio(
-                id,
-                client=client,
-                from_index=next_from_index,
-                limit=limit,
-                include_events=True,
-                wait_for_seconds=wait_for_seconds,
-            )
-        )
-        if changes is None:
-            continue
-
-        batch = _new_events(changes)
-        events.extend(batch)
-        next_from_index += len(batch)
-        if is_terminal_session_status(changes.status):
-            return SessionRunResult(
-                id=id,
-                final_changes=changes,
-                events=events,
-                next_from_index=next_from_index,
-            )
+        # The long-poll above paces the loop when streaming events; otherwise sleep.
+        if not include_events:
+            time.sleep(poll_backoff_seconds or wait_for_seconds)
+        elif poll_backoff_seconds > 0:
+            time.sleep(poll_backoff_seconds)
 
     raise TimeoutError(f"Session {id} did not reach a terminal status before max_polls={max_polls}")
 
 
 def run_session_until_done(
+    client: Client,
     *,
-    client: AuthenticatedClient,
-    body: SessionRequest,
-    idempotency_key: None | str | Unset = UNSET,
     wait_for_seconds: int = 20,
-    max_polls: int | None = None,
+    include_events: bool = True,
+    timeout_seconds: typing.Optional[float] = None,
+    poll_backoff_seconds: float = 0.0,
+    max_polls: typing.Optional[int] = None,
+    **create_params: typing_extensions.Unpack[CreateSessionParams],
 ) -> SessionRunResult:
-    """Create a session, then long-poll ``/changes`` until it completes or fails."""
-    session = _ensure_session(create_session.sync(client=client, body=body, idempotency_key=idempotency_key))
+    """Create a session, then poll until it completes or fails."""
+    assert_request_under_limit(dict(create_params))
+    session = client.sessions.create_session(**create_params)
     return wait_for_session(
+        client,
         session.id,
-        client=client,
         wait_for_seconds=wait_for_seconds,
+        include_events=include_events,
+        timeout_seconds=timeout_seconds,
+        poll_backoff_seconds=poll_backoff_seconds,
         max_polls=max_polls,
     )
 
 
-async def async_run_session_until_done(
+async def _async_final_changes(
+    client: AsyncClient, id: str, last_changes: typing.Optional[TrajectoryChanges], limit: typing.Optional[int]
+) -> typing.Optional[TrajectoryChanges]:
+    """Async version of ``_final_changes``."""
+    if last_changes is not None and last_changes.answer is not None:
+        return last_changes
+    fetched = await client.sessions.get_session_changes(
+        id, from_index=0, limit=limit, include_events=False, wait_for_seconds=0
+    )
+    return fetched or last_changes
+
+
+async def async_wait_for_session(
+    client: AsyncClient,
+    id: str,
     *,
-    client: AuthenticatedClient,
-    body: SessionRequest,
-    idempotency_key: None | str | Unset = UNSET,
+    from_index: int = 0,
     wait_for_seconds: int = 20,
-    max_polls: int | None = None,
+    limit: typing.Optional[int] = None,
+    include_events: bool = True,
+    timeout_seconds: typing.Optional[float] = None,
+    poll_backoff_seconds: float = 0.0,
+    max_polls: typing.Optional[int] = None,
+) -> SessionRunResult:
+    """Async version of ``wait_for_session``."""
+    events: typing.List[TrajectoryEvent] = []
+    next_from_index = from_index
+    last_changes: typing.Optional[TrajectoryChanges] = None
+    polls = 0
+    deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
+
+    while max_polls is None or polls < max_polls:
+        polls += 1
+        if deadline is not None and time.monotonic() >= deadline:
+            raise TimeoutError(
+                f"Session {id} did not reach a terminal status within {timeout_seconds}s"
+            )
+
+        if include_events:
+            changes = await client.sessions.get_session_changes(
+                id,
+                from_index=next_from_index,
+                limit=limit,
+                include_events=True,
+                wait_for_seconds=wait_for_seconds,
+            )
+            if changes is not None:
+                last_changes = changes
+                batch = changes.new_events or []
+                events.extend(batch)
+                next_from_index += len(batch)
+
+        status = await client.sessions.get_session_status(id)
+        if is_terminal_session_status(status.status):
+            return SessionRunResult(
+                id=id,
+                status=status.status,
+                events=events,
+                next_from_index=next_from_index,
+                final_changes=await _async_final_changes(client, id, last_changes, limit),
+            )
+
+        if not include_events:
+            await asyncio.sleep(poll_backoff_seconds or wait_for_seconds)
+        elif poll_backoff_seconds > 0:
+            await asyncio.sleep(poll_backoff_seconds)
+
+    raise TimeoutError(f"Session {id} did not reach a terminal status before max_polls={max_polls}")
+
+
+async def async_run_session_until_done(
+    client: AsyncClient,
+    *,
+    wait_for_seconds: int = 20,
+    include_events: bool = True,
+    timeout_seconds: typing.Optional[float] = None,
+    poll_backoff_seconds: float = 0.0,
+    max_polls: typing.Optional[int] = None,
+    **create_params: typing_extensions.Unpack[CreateSessionParams],
 ) -> SessionRunResult:
     """Async version of ``run_session_until_done``."""
-    session = _ensure_session(await create_session.asyncio(client=client, body=body, idempotency_key=idempotency_key))
+    assert_request_under_limit(dict(create_params))
+    session = await client.sessions.create_session(**create_params)
     return await async_wait_for_session(
+        client,
         session.id,
-        client=client,
         wait_for_seconds=wait_for_seconds,
+        include_events=include_events,
+        timeout_seconds=timeout_seconds,
+        poll_backoff_seconds=poll_backoff_seconds,
         max_polls=max_polls,
     )

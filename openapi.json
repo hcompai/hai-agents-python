@@ -6,7 +6,14 @@
   },
   "servers": [
     {
-      "url": "https://agp.eu.hcompany.ai"
+      "url": "https://agp.eu.hcompany.ai",
+      "description": "Europe",
+      "x-fern-server-name": "Eu"
+    },
+    {
+      "url": "https://agp.hcompany.ai",
+      "description": "United States",
+      "x-fern-server-name": "Us"
     }
   ],
   "paths": {
@@ -1543,18 +1550,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Browser"
-                    }
-                  ],
-                  "discriminator": {
-                    "propertyName": "kind",
-                    "mapping": {
-                      "web": "#/components/schemas/Browser"
-                    }
-                  },
-                  "title": "Response Create Environment Api V2 Environments Post"
+                  "$ref": "#/components/schemas/Environment"
                 }
               }
             }
@@ -1750,18 +1746,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Browser"
-                    }
-                  ],
-                  "discriminator": {
-                    "propertyName": "kind",
-                    "mapping": {
-                      "web": "#/components/schemas/Browser"
-                    }
-                  },
-                  "title": "Response Get Environment Api V2 Environments  Id  Get"
+                  "$ref": "#/components/schemas/Environment"
                 }
               }
             }
@@ -1828,18 +1813,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Browser"
-                    }
-                  ],
-                  "discriminator": {
-                    "propertyName": "kind",
-                    "mapping": {
-                      "web": "#/components/schemas/Browser"
-                    }
-                  },
-                  "title": "Response Update Environment Api V2 Environments  Id  Put"
+                  "$ref": "#/components/schemas/Environment"
                 }
               }
             }
@@ -2241,17 +2215,7 @@
                   "type": "string"
                 },
                 {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Browser"
-                    }
-                  ],
-                  "discriminator": {
-                    "propertyName": "kind",
-                    "mapping": {
-                      "web": "#/components/schemas/Browser"
-                    }
-                  }
+                  "$ref": "#/components/schemas/Environment"
                 }
               ]
             },
@@ -2401,7 +2365,20 @@
           "start_url"
         ],
         "title": "Browser",
-        "description": "A local web browser the agent navigates and acts on."
+        "description": "A web browser the agent navigates and acts on."
+      },
+      "Environment": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Browser"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "web": "#/components/schemas/Browser"
+          }
+        }
       },
       "EnvironmentKind": {
         "type": "string",
@@ -2418,17 +2395,7 @@
         "properties": {
           "items": {
             "items": {
-              "oneOf": [
-                {
-                  "$ref": "#/components/schemas/Browser"
-                }
-              ],
-              "discriminator": {
-                "propertyName": "kind",
-                "mapping": {
-                  "web": "#/components/schemas/Browser"
-                }
-              }
+              "$ref": "#/components/schemas/Environment"
             },
             "type": "array",
             "title": "Items"
