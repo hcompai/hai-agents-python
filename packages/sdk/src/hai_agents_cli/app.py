@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import sys
 
 import typer
 from typer.main import get_command
 
+from . import auth
 from . import config as config_module
 from .commands import agent, environment, session, skill
 from .output import Output, OutputMode
@@ -55,6 +57,43 @@ def main(
 def schema() -> None:
     """Print a machine-readable JSON description of every command (for agents and tooling)."""
     print(json.dumps(describe(get_command(app), "hai"), indent=2))
+
+
+@app.command()
+def login(
+    ctx: typer.Context,
+    force: bool = typer.Option(False, "--force", help="Re-authenticate and rotate the stored key."),
+) -> None:
+    """Sign in via the browser and write a fresh API key to a local .env."""
+    state = get_state(ctx)
+    if config_module.read_env_key() and not force:
+        state.output.note("Already signed in. Pass --force to rotate the key.")
+        return
+    if state.no_input or not sys.stdin.isatty():
+        state.output.fail("needs_browser", "login needs an interactive terminal and a browser.")
+        raise typer.Exit(2)
+
+    label = f"hai CLI ({socket.gethostname()})"
+    try:
+        with state.output.status("Waiting for browser sign-in..."):
+            key = auth.login_and_mint(
+                config_module.portal_base(),
+                label,
+                lambda url: state.output.note(f"Opening your browser. If it doesn't open, visit:\n  {url}"),
+            )
+    except (RuntimeError, OSError) as err:
+        state.output.fail("login_failed", str(err))
+        raise typer.Exit(1) from err
+
+    path = config_module.save_env_key(key)
+    state.output.note(f"Signed in. Wrote {config_module.TOKEN_VAR} to [bold]{path}[/bold].")
+
+
+@app.command()
+def logout(ctx: typer.Context) -> None:
+    """Remove the stored API key from the local .env."""
+    path = config_module.clear_env_key()
+    get_state(ctx).output.note(f"Removed {config_module.TOKEN_VAR} from {path}." if path else "No stored key found.")
 
 
 @app.command()

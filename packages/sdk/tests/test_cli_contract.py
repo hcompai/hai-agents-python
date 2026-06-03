@@ -122,7 +122,7 @@ def test_schema_is_valid_json() -> None:
     data = json.loads(result.stdout)
     assert data["name"] == "hai"
     names = {command["name"] for command in data["commands"]}
-    assert {"session", "agent", "skill", "env", "schema", "configure"} <= names
+    assert {"session", "agent", "skill", "env", "schema", "configure", "login", "logout"} <= names
 
 
 def test_json_error_is_structured(capsys: pytest.CaptureFixture) -> None:
