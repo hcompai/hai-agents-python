@@ -56,7 +56,9 @@ class Output:
     def json_mode(self) -> bool:
         if self.mode is OutputMode.JSON:
             return True
-        return not self.out.is_terminal
+        # Key off the raw fd, not Rich's is_terminal: FORCE_COLOR/CI flip the latter
+        # to True even when piped, which would leak tables into a JSON consumer.
+        return not sys.stdout.isatty()
 
     def print_json(self, data: typing.Any) -> None:
         print(json.dumps(to_jsonable(data), indent=2, default=str), file=sys.stdout)
