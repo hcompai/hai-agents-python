@@ -36,8 +36,8 @@ An `AsyncClient` with the same surface is available for asyncio code.
 
 ## Run a task to completion
 
-`run_session_until_done` creates a session and long-polls `/changes` until the
-agent reaches a terminal state, returning the accumulated events and final answer.
+`run_session_until_done` creates a session and polls until the agent reaches a
+terminal state, returning the terminal `status`, accumulated events, and final answer.
 
 ```python
 from hai_agents import run_session_until_done
@@ -51,7 +51,7 @@ result = run_session_until_done(
     include_events=True,        # set False to poll status only, without streaming events
 )
 
-print(result.answer)
+print(result.status, result.answer)
 ```
 
 ## Error handling

@@ -43,14 +43,15 @@ class SessionRunResult:
     """Result returned by ``run_session_until_done`` and ``wait_for_session``."""
 
     id: str
-    final_changes: TrajectoryChanges
+    status: TrajectoryStatus
     events: typing.List[TrajectoryEvent]
     next_from_index: int
+    final_changes: typing.Optional[TrajectoryChanges] = None
 
     @property
     def answer(self) -> typing.Optional[TrajectoryChangesAnswer]:
-        """Final answer from the terminal changes batch, if present."""
-        return self.final_changes.answer
+        """Final answer, if the session produced one."""
+        return self.final_changes.answer if self.final_changes is not None else None
 
 
 def is_terminal_session_status(status: typing.Union[TrajectoryStatus, str]) -> bool:
@@ -78,6 +79,18 @@ def assert_request_under_limit(
         )
 
 
+def _final_changes(
+    client: Client, id: str, last_changes: typing.Optional[TrajectoryChanges], limit: typing.Optional[int]
+) -> typing.Optional[TrajectoryChanges]:
+    """The terminal answer lives in ``/changes``; fetch it once if streaming didn't surface it."""
+    if last_changes is not None and last_changes.answer is not None:
+        return last_changes
+    fetched = client.sessions.get_session_changes(
+        id, from_index=0, limit=limit, include_events=False, wait_for_seconds=0
+    )
+    return fetched or last_changes
+
+
 def wait_for_session(
     client: Client,
     id: str,
@@ -90,9 +103,15 @@ def wait_for_session(
     poll_backoff_seconds: float = 0.0,
     max_polls: typing.Optional[int] = None,
 ) -> SessionRunResult:
-    """Long-poll a session until it reaches a terminal status."""
+    """Poll a session until it reaches a terminal status.
+
+    Terminal state is read from ``/status`` (authoritative); ``/changes`` only feeds
+    events and the final answer, since it 204s whenever no new events exist past
+    ``from_index`` -- even after the session has finished.
+    """
     events: typing.List[TrajectoryEvent] = []
     next_from_index = from_index
+    last_changes: typing.Optional[TrajectoryChanges] = None
     polls = 0
     deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
 
@@ -103,24 +122,34 @@ def wait_for_session(
                 f"Session {id} did not reach a terminal status within {timeout_seconds}s"
             )
 
-        changes = client.sessions.get_session_changes(
-            id,
-            from_index=next_from_index,
-            limit=limit,
-            include_events=include_events,
-            wait_for_seconds=wait_for_seconds,
-        )
-        if changes is not None:
-            if include_events:
+        if include_events:
+            changes = client.sessions.get_session_changes(
+                id,
+                from_index=next_from_index,
+                limit=limit,
+                include_events=True,
+                wait_for_seconds=wait_for_seconds,
+            )
+            if changes is not None:
+                last_changes = changes
                 batch = changes.new_events or []
                 events.extend(batch)
                 next_from_index += len(batch)
-            if is_terminal_session_status(changes.status):
-                return SessionRunResult(
-                    id=id, final_changes=changes, events=events, next_from_index=next_from_index
-                )
 
-        if poll_backoff_seconds > 0:
+        status = client.sessions.get_session_status(id)
+        if is_terminal_session_status(status.status):
+            return SessionRunResult(
+                id=id,
+                status=status.status,
+                events=events,
+                next_from_index=next_from_index,
+                final_changes=_final_changes(client, id, last_changes, limit),
+            )
+
+        # The long-poll above paces the loop when streaming events; otherwise sleep.
+        if not include_events:
+            time.sleep(poll_backoff_seconds or wait_for_seconds)
+        elif poll_backoff_seconds > 0:
             time.sleep(poll_backoff_seconds)
 
     raise TimeoutError(f"Session {id} did not reach a terminal status before max_polls={max_polls}")
@@ -136,7 +165,7 @@ def run_session_until_done(
     max_polls: typing.Optional[int] = None,
     **create_params: typing_extensions.Unpack[CreateSessionParams],
 ) -> SessionRunResult:
-    """Create a session, then long-poll ``/changes`` until it completes or fails."""
+    """Create a session, then poll until it completes or fails."""
     assert_request_under_limit(dict(create_params))
     session = client.sessions.create_session(**create_params)
     return wait_for_session(
@@ -148,6 +177,18 @@ def run_session_until_done(
         poll_backoff_seconds=poll_backoff_seconds,
         max_polls=max_polls,
     )
+
+
+async def _async_final_changes(
+    client: AsyncClient, id: str, last_changes: typing.Optional[TrajectoryChanges], limit: typing.Optional[int]
+) -> typing.Optional[TrajectoryChanges]:
+    """Async version of ``_final_changes``."""
+    if last_changes is not None and last_changes.answer is not None:
+        return last_changes
+    fetched = await client.sessions.get_session_changes(
+        id, from_index=0, limit=limit, include_events=False, wait_for_seconds=0
+    )
+    return fetched or last_changes
 
 
 async def async_wait_for_session(
@@ -165,6 +206,7 @@ async def async_wait_for_session(
     """Async version of ``wait_for_session``."""
     events: typing.List[TrajectoryEvent] = []
     next_from_index = from_index
+    last_changes: typing.Optional[TrajectoryChanges] = None
     polls = 0
     deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
 
@@ -175,24 +217,33 @@ async def async_wait_for_session(
                 f"Session {id} did not reach a terminal status within {timeout_seconds}s"
             )
 
-        changes = await client.sessions.get_session_changes(
-            id,
-            from_index=next_from_index,
-            limit=limit,
-            include_events=include_events,
-            wait_for_seconds=wait_for_seconds,
-        )
-        if changes is not None:
-            if include_events:
+        if include_events:
+            changes = await client.sessions.get_session_changes(
+                id,
+                from_index=next_from_index,
+                limit=limit,
+                include_events=True,
+                wait_for_seconds=wait_for_seconds,
+            )
+            if changes is not None:
+                last_changes = changes
                 batch = changes.new_events or []
                 events.extend(batch)
                 next_from_index += len(batch)
-            if is_terminal_session_status(changes.status):
-                return SessionRunResult(
-                    id=id, final_changes=changes, events=events, next_from_index=next_from_index
-                )
 
-        if poll_backoff_seconds > 0:
+        status = await client.sessions.get_session_status(id)
+        if is_terminal_session_status(status.status):
+            return SessionRunResult(
+                id=id,
+                status=status.status,
+                events=events,
+                next_from_index=next_from_index,
+                final_changes=await _async_final_changes(client, id, last_changes, limit),
+            )
+
+        if not include_events:
+            await asyncio.sleep(poll_backoff_seconds or wait_for_seconds)
+        elif poll_backoff_seconds > 0:
             await asyncio.sleep(poll_backoff_seconds)
 
     raise TimeoutError(f"Session {id} did not reach a terminal status before max_polls={max_polls}")

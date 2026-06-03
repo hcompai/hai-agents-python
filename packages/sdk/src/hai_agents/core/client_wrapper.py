@@ -26,12 +26,7 @@ class BaseClientWrapper:
         self._logging = logging
 
     def get_headers(self) -> typing.Dict[str, str]:
-        import platform
-
         headers: typing.Dict[str, str] = {
-            "X-Fern-Language": "Python",
-            "X-Fern-Runtime": f"python/{platform.python_version()}",
-            "X-Fern-Platform": f"{platform.system().lower()}/{platform.release()}",
             **(self.get_custom_headers() or {}),
         }
         headers["Authorization"] = f"Bearer {self._get_token()}"
