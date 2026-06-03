@@ -6,6 +6,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.environment_kind import EnvironmentKind
 from ...models.environment_page import EnvironmentPage
 from ...models.http_validation_error import HTTPValidationError
 from ...models.list_environments_sort_type_0_item import ListEnvironmentsSortType0Item
@@ -14,12 +15,38 @@ from ...types import UNSET, Response, Unset
 
 def _get_kwargs(
     *,
+    id: None | str | Unset = UNSET,
+    kind: EnvironmentKind | None | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListEnvironmentsSortType0Item] | None | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
+
+    json_id: None | str | Unset
+    if isinstance(id, Unset):
+        json_id = UNSET
+    else:
+        json_id = id
+    params["id"] = json_id
+
+    json_kind: None | str | Unset
+    if isinstance(kind, Unset):
+        json_kind = UNSET
+    elif isinstance(kind, EnvironmentKind):
+        json_kind = kind.value
+    else:
+        json_kind = kind
+    params["kind"] = json_kind
+
+    json_search: None | str | Unset
+    if isinstance(search, Unset):
+        json_search = UNSET
+    else:
+        json_search = search
+    params["search"] = json_search
 
     params["page"] = page
 
@@ -82,6 +109,9 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
+    id: None | str | Unset = UNSET,
+    kind: EnvironmentKind | None | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListEnvironmentsSortType0Item] | None | Unset = UNSET,
@@ -91,6 +121,9 @@ def sync_detailed(
      List reserved + caller's org environments.
 
     Args:
+        id (None | str | Unset): Case-insensitive substring match on environment id.
+        kind (EnvironmentKind | None | Unset): Filter by environment kind.
+        search (None | str | Unset): Case-insensitive match on environment id or description.
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListEnvironmentsSortType0Item] | None | Unset): Sort by field
@@ -104,6 +137,9 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
+        id=id,
+        kind=kind,
+        search=search,
         page=page,
         size=size,
         sort=sort,
@@ -119,6 +155,9 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
+    id: None | str | Unset = UNSET,
+    kind: EnvironmentKind | None | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListEnvironmentsSortType0Item] | None | Unset = UNSET,
@@ -128,6 +167,9 @@ def sync(
      List reserved + caller's org environments.
 
     Args:
+        id (None | str | Unset): Case-insensitive substring match on environment id.
+        kind (EnvironmentKind | None | Unset): Filter by environment kind.
+        search (None | str | Unset): Case-insensitive match on environment id or description.
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListEnvironmentsSortType0Item] | None | Unset): Sort by field
@@ -142,6 +184,9 @@ def sync(
 
     return sync_detailed(
         client=client,
+        id=id,
+        kind=kind,
+        search=search,
         page=page,
         size=size,
         sort=sort,
@@ -151,6 +196,9 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
+    id: None | str | Unset = UNSET,
+    kind: EnvironmentKind | None | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListEnvironmentsSortType0Item] | None | Unset = UNSET,
@@ -160,6 +208,9 @@ async def asyncio_detailed(
      List reserved + caller's org environments.
 
     Args:
+        id (None | str | Unset): Case-insensitive substring match on environment id.
+        kind (EnvironmentKind | None | Unset): Filter by environment kind.
+        search (None | str | Unset): Case-insensitive match on environment id or description.
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListEnvironmentsSortType0Item] | None | Unset): Sort by field
@@ -173,6 +224,9 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
+        id=id,
+        kind=kind,
+        search=search,
         page=page,
         size=size,
         sort=sort,
@@ -186,6 +240,9 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
+    id: None | str | Unset = UNSET,
+    kind: EnvironmentKind | None | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListEnvironmentsSortType0Item] | None | Unset = UNSET,
@@ -195,6 +252,9 @@ async def asyncio(
      List reserved + caller's org environments.
 
     Args:
+        id (None | str | Unset): Case-insensitive substring match on environment id.
+        kind (EnvironmentKind | None | Unset): Filter by environment kind.
+        search (None | str | Unset): Case-insensitive match on environment id or description.
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListEnvironmentsSortType0Item] | None | Unset): Sort by field
@@ -210,6 +270,9 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
+            id=id,
+            kind=kind,
+            search=search,
             page=page,
             size=size,
             sort=sort,
