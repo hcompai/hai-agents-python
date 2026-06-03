@@ -21,6 +21,9 @@ class Session(BaseModel):
         request (SessionRequest): ``POST /api/v2/sessions`` body.
         status (SessionStatus): ``GET /api/v2/sessions/{id}/status`` response.
         created_at (datetime.datetime):
+        latest_answer (Any | Unset): The agent's most recent final answer: free-form text, or structured data when the
+            agent runs with a custom answer format. Null until the agent first answers. Mirrors the answer streamed from the
+            changes endpoint, surfaced here for non-interactive runs.
         started_at (datetime.datetime | None | Unset):
         finished_at (datetime.datetime | None | Unset):
     """
@@ -36,6 +39,7 @@ class Session(BaseModel):
     request: SessionRequest
     status: SessionStatus
     created_at: datetime.datetime
+    latest_answer: Any | Unset = UNSET
     started_at: datetime.datetime | None | Unset = UNSET
     finished_at: datetime.datetime | None | Unset = UNSET
 
@@ -50,6 +54,8 @@ class Session(BaseModel):
         status = self.status.to_dict()
 
         created_at = self.created_at.isoformat()
+
+        latest_answer = self.latest_answer
 
         started_at: None | str | Unset
         if isinstance(self.started_at, Unset):
@@ -77,6 +83,8 @@ class Session(BaseModel):
                 "created_at": created_at,
             }
         )
+        if latest_answer is not UNSET:
+            field_dict["latest_answer"] = latest_answer
         if started_at is not UNSET:
             field_dict["started_at"] = started_at
         if finished_at is not UNSET:
@@ -97,6 +105,8 @@ class Session(BaseModel):
         status = SessionStatus.from_dict(d.pop("status"))
 
         created_at = isoparse(d.pop("created_at"))
+
+        latest_answer = d.pop("latest_answer", UNSET)
 
         def _parse_started_at(data: object) -> datetime.datetime | None | Unset:
             if data is None:
@@ -137,6 +147,7 @@ class Session(BaseModel):
             request=request,
             status=status,
             created_at=created_at,
+            latest_answer=latest_answer,
             started_at=started_at,
             finished_at=finished_at,
         )

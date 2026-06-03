@@ -14,12 +14,28 @@ from ...types import UNSET, Response, Unset
 
 def _get_kwargs(
     *,
+    agent_name: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListAgentsSortType0Item] | None | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
+
+    json_agent_name: None | str | Unset
+    if isinstance(agent_name, Unset):
+        json_agent_name = UNSET
+    else:
+        json_agent_name = agent_name
+    params["agent_name"] = json_agent_name
+
+    json_search: None | str | Unset
+    if isinstance(search, Unset):
+        json_search = UNSET
+    else:
+        json_search = search
+    params["search"] = json_search
 
     params["page"] = page
 
@@ -82,6 +98,8 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
+    agent_name: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListAgentsSortType0Item] | None | Unset = UNSET,
@@ -91,6 +109,8 @@ def sync_detailed(
      List reserved + caller's org agents.
 
     Args:
+        agent_name (None | str | Unset): Case-insensitive substring match on agent name.
+        search (None | str | Unset): Case-insensitive match on agent name or description.
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListAgentsSortType0Item] | None | Unset): Sort by field
@@ -104,6 +124,8 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
+        agent_name=agent_name,
+        search=search,
         page=page,
         size=size,
         sort=sort,
@@ -119,6 +141,8 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
+    agent_name: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListAgentsSortType0Item] | None | Unset = UNSET,
@@ -128,6 +152,8 @@ def sync(
      List reserved + caller's org agents.
 
     Args:
+        agent_name (None | str | Unset): Case-insensitive substring match on agent name.
+        search (None | str | Unset): Case-insensitive match on agent name or description.
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListAgentsSortType0Item] | None | Unset): Sort by field
@@ -142,6 +168,8 @@ def sync(
 
     return sync_detailed(
         client=client,
+        agent_name=agent_name,
+        search=search,
         page=page,
         size=size,
         sort=sort,
@@ -151,6 +179,8 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
+    agent_name: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListAgentsSortType0Item] | None | Unset = UNSET,
@@ -160,6 +190,8 @@ async def asyncio_detailed(
      List reserved + caller's org agents.
 
     Args:
+        agent_name (None | str | Unset): Case-insensitive substring match on agent name.
+        search (None | str | Unset): Case-insensitive match on agent name or description.
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListAgentsSortType0Item] | None | Unset): Sort by field
@@ -173,6 +205,8 @@ async def asyncio_detailed(
     """
 
     kwargs = _get_kwargs(
+        agent_name=agent_name,
+        search=search,
         page=page,
         size=size,
         sort=sort,
@@ -186,6 +220,8 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
+    agent_name: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListAgentsSortType0Item] | None | Unset = UNSET,
@@ -195,6 +231,8 @@ async def asyncio(
      List reserved + caller's org agents.
 
     Args:
+        agent_name (None | str | Unset): Case-insensitive substring match on agent name.
+        search (None | str | Unset): Case-insensitive match on agent name or description.
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListAgentsSortType0Item] | None | Unset): Sort by field
@@ -210,6 +248,8 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
+            agent_name=agent_name,
+            search=search,
             page=page,
             size=size,
             sort=sort,

@@ -176,6 +176,92 @@
             }
           },
           {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive match on the session's first message or answer.",
+              "title": "Search"
+            },
+            "description": "Case-insensitive match on the session's first message or answer."
+          },
+          {
+            "name": "created_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Created Before"
+            }
+          },
+          {
+            "name": "created_after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Created After"
+            }
+          },
+          {
+            "name": "finished_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Finished Before"
+            }
+          },
+          {
+            "name": "finished_after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Finished After"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -1148,7 +1234,7 @@
           "Skills"
         ],
         "summary": "List Skills",
-        "description": "List reserved + caller's org skills, optionally filtered by name prefix.",
+        "description": "List reserved + caller's org skills, optionally filtered by name or text search.",
         "operationId": "list_skills_api_v2_skills_get",
         "security": [
           {
@@ -1169,10 +1255,28 @@
                   "type": "null"
                 }
               ],
-              "description": "Filter by name prefix.",
+              "description": "Case-insensitive substring match on skill name.",
               "title": "Name"
             },
-            "description": "Filter by name prefix."
+            "description": "Case-insensitive substring match on skill name."
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive match on skill name or description.",
+              "title": "Search"
+            },
+            "description": "Case-insensitive match on skill name or description."
           },
           {
             "name": "page",
@@ -1480,6 +1584,60 @@
           }
         ],
         "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive substring match on environment id.",
+              "title": "Id"
+            },
+            "description": "Case-insensitive substring match on environment id."
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/EnvironmentKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by environment kind.",
+              "title": "Kind"
+            },
+            "description": "Filter by environment kind."
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive match on environment id or description.",
+              "title": "Search"
+            },
+            "description": "Case-insensitive match on environment id or description."
+          },
           {
             "name": "page",
             "in": "query",
@@ -1797,6 +1955,42 @@
           }
         ],
         "parameters": [
+          {
+            "name": "agent_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive substring match on agent name.",
+              "title": "Agent Name"
+            },
+            "description": "Case-insensitive substring match on agent name."
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive match on agent name or description.",
+              "title": "Search"
+            },
+            "description": "Case-insensitive match on agent name or description."
+          },
           {
             "name": "page",
             "in": "query",
@@ -2209,6 +2403,17 @@
         "title": "Browser",
         "description": "A local web browser the agent navigates and acts on."
       },
+      "EnvironmentKind": {
+        "type": "string",
+        "enum": [
+          "web",
+          "code",
+          "mcp",
+          "memory"
+        ],
+        "title": "EnvironmentKind",
+        "description": "Environment family."
+      },
       "EnvironmentPage": {
         "properties": {
           "items": {
@@ -2616,6 +2821,10 @@
           },
           "status": {
             "$ref": "#/components/schemas/SessionStatus"
+          },
+          "latest_answer": {
+            "title": "Latest Answer",
+            "description": "The agent's most recent final answer: free-form text, or structured data when the agent runs with a custom answer format. Null until the agent first answers. Mirrors the answer streamed from the changes endpoint, surfaced here for non-interactive runs."
           },
           "created_at": {
             "type": "string",
