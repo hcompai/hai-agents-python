@@ -40,7 +40,7 @@ Issues = "https://github.com/hcompai/hai-agents-python/issues"
 Documentation = "https://hub.hcompany.ai/agent-api"
 
 [project.scripts]
-hai = "hai_agents_cli.app:app"
+hai = "hai_agents_cli.app:run"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hai_agents_cli"]

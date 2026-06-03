@@ -44,24 +44,30 @@ def _table(*columns: str) -> Table:
 def sessions_table(items: typing.Iterable[typing.Any]) -> Table:
     table = _table("ID", "STATUS", "AGENT", "CREATED")
     for item in items:
-        table.add_row(_str(getattr(item, "id", "")), _status_text(getattr(item, "status", None)),
-                      _str(getattr(item, "agent", "")), _str(getattr(item, "created_at", "")))
+        table.add_row(
+            _str(getattr(item, "id", "")),
+            _status_text(getattr(item, "status", None)),
+            _str(getattr(item, "agent", "")),
+            _str(getattr(item, "created_at", "")),
+        )
     return table
 
 
 def agents_table(items: typing.Iterable[typing.Any]) -> Table:
     table = _table("NAME", "MODEL", "DESCRIPTION")
     for item in items:
-        table.add_row(_str(getattr(item, "name", "")), _str(getattr(item, "model", "")),
-                      _str(getattr(item, "description", "")))
+        table.add_row(
+            _str(getattr(item, "name", "")), _str(getattr(item, "model", "")), _str(getattr(item, "description", ""))
+        )
     return table
 
 
 def skills_table(items: typing.Iterable[typing.Any]) -> Table:
     table = _table("NAME", "SOURCE", "DESCRIPTION")
     for item in items:
-        table.add_row(_str(getattr(item, "name", "")), _str(getattr(item, "source", "")),
-                      _str(getattr(item, "description", "")))
+        table.add_row(
+            _str(getattr(item, "name", "")), _str(getattr(item, "source", "")), _str(getattr(item, "description", ""))
+        )
     return table
 
 
@@ -69,8 +75,12 @@ def environments_table(items: typing.Iterable[typing.Any]) -> Table:
     table = _table("ID", "KIND", "MODE", "SIZE")
     for item in items:
         size = f"{_str(getattr(item, 'width', ''))}x{_str(getattr(item, 'height', ''))}"
-        table.add_row(_str(getattr(item, "id", "")), _str(getattr(item, "kind", "")),
-                      _str(getattr(item, "mode", "")), size if size != "x" else "")
+        table.add_row(
+            _str(getattr(item, "id", "")),
+            _str(getattr(item, "kind", "")),
+            _str(getattr(item, "mode", "")),
+            size if size != "x" else "",
+        )
     return table
 
 

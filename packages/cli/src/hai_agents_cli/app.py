@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import json
+import os
+import sys
+
 import typer
+from typer.main import get_command
 
 from . import config as config_module
 from .commands import agent, environment, session, skill
 from .output import Output, OutputMode
+from .schema import describe
 from .state import AppState, get_state
 
 app = typer.Typer(
@@ -35,12 +41,20 @@ def main(
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress and notes on stderr."),
     no_color: bool = typer.Option(False, "--no-color", help="Disable ANSI colors."),
     assume_yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompts."),
+    no_input: bool = typer.Option(False, "--no-input", help="Never prompt; fail instead of asking."),
 ) -> None:
     ctx.obj = AppState(
         output=Output.create(output, quiet=quiet, no_color=no_color),
         config=config_module.resolve(token=token, region=region, base_url=base_url),
         assume_yes=assume_yes,
+        no_input=no_input,
     )
+
+
+@app.command()
+def schema() -> None:
+    """Print a machine-readable JSON description of every command (for agents and tooling)."""
+    print(json.dumps(describe(get_command(app), "hai"), indent=2))
 
 
 @app.command()
@@ -56,7 +70,17 @@ def configure(
 
 
 def run() -> None:
-    app()
+    try:
+        app()
+    except BrokenPipeError:
+        # A downstream reader (e.g. `| head`) closed the pipe. Silence the flush
+        # error on interpreter shutdown by pointing stdout at the void, then exit.
+        try:
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, sys.stdout.fileno())
+        except OSError:
+            pass
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":

@@ -77,8 +77,16 @@ class Output:
         if not self.quiet and not self.json_mode:
             self.err.print(message)
 
-    def error(self, message: str) -> None:
-        self.err.print(f"[red]error:[/red] {message}")
+    def fail(self, kind: str, message: str, status: int | None = None) -> None:
+        """Report an error on stderr: structured JSON in json mode, human text otherwise."""
+        if self.json_mode:
+            error: dict[str, typing.Any] = {"kind": kind, "message": message}
+            if status is not None:
+                error["status"] = status
+            print(json.dumps({"error": error}), file=sys.stderr)
+        else:
+            label = f"error {status}" if status is not None else "error"
+            self.err.print(f"[red]{label}:[/red] {message}")
 
     def status(self, message: str) -> typing.ContextManager:
         if self.json_mode or self.quiet or not self.err.is_terminal:

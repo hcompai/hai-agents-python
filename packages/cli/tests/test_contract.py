@@ -8,11 +8,13 @@ fails on the auto-sync PR instead of in a user's terminal.
 from __future__ import annotations
 
 import inspect
+import json
 
 import hai_agents
 import pytest
 from hai_agents import Client
 from hai_agents_cli.app import app
+from hai_agents_cli.output import Output, OutputMode
 from typer.main import get_command
 from typer.testing import CliRunner
 
@@ -51,17 +53,34 @@ def test_api_error_importable() -> None:
 def test_session_method_signatures() -> None:
     sessions = _client().sessions
     assert {
-        "agent", "messages", "max_steps", "max_time_s", "idle_timeout_s",
-        "group_id", "parent_session_id", "answer_format", "idempotency_key",
+        "agent",
+        "messages",
+        "max_steps",
+        "max_time_s",
+        "idle_timeout_s",
+        "group_id",
+        "parent_session_id",
+        "answer_format",
+        "idempotency_key",
     } <= _params(sessions.create_session)
     assert {"owner", "status", "agent", "group_id", "parent_session_id", "search", "page", "size"} <= _params(
         sessions.list_sessions
     )
     assert "request" in _params(sessions.send_session_messages)
     for method in [
-        "get_session", "get_session_status", "get_session_changes", "list_session_events", "cancel_session",
-        "pause_session", "resume_session", "force_session_answer", "submit_session_feedback", "submit_event_feedback",
-        "share_session", "unshare_session", "get_session_quota",
+        "get_session",
+        "get_session_status",
+        "get_session_changes",
+        "list_session_events",
+        "cancel_session",
+        "pause_session",
+        "resume_session",
+        "force_session_answer",
+        "submit_session_feedback",
+        "submit_event_feedback",
+        "share_session",
+        "unshare_session",
+        "get_session_quota",
     ]:
         assert hasattr(sessions, method), f"sessions.{method} is gone."
 
@@ -94,3 +113,18 @@ def test_help_renders_for_every_command() -> None:
     for path in _command_paths(get_command(app)):
         result = runner.invoke(app, path + ["--help"])
         assert result.exit_code == 0, f"`hai {' '.join(path)} --help` failed:\n{result.output}"
+
+
+def test_schema_is_valid_json() -> None:
+    result = runner.invoke(app, ["schema"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.stdout)
+    assert data["name"] == "hai"
+    names = {command["name"] for command in data["commands"]}
+    assert {"session", "agent", "skill", "env", "schema", "configure"} <= names
+
+
+def test_json_error_is_structured(capsys: pytest.CaptureFixture) -> None:
+    Output.create(OutputMode.JSON, quiet=False, no_color=True).fail("api_error", "not found", status=404)
+    payload = json.loads(capsys.readouterr().err)
+    assert payload["error"] == {"kind": "api_error", "message": "not found", "status": 404}

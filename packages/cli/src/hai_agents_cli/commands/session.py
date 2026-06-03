@@ -53,8 +53,9 @@ def _create_params(
     return params
 
 
-def _stream(state: AppState, client: typing.Any, session_id: str, from_index: int, wait_for_seconds: int,
-            timeout: float | None) -> typing.Any:
+def _stream(
+    state: AppState, client: typing.Any, session_id: str, from_index: int, wait_for_seconds: int, timeout: float | None
+) -> typing.Any:
     """Tail a live session, printing events to stderr until it reaches a terminal status."""
     cursor = from_index
     last_changes = None
@@ -195,8 +196,14 @@ def list_(
 ) -> None:
     """List sessions visible to you."""
     result = get_client(ctx).sessions.list_sessions(
-        owner=owner, status=list(status) if status else None, agent=list(agent) if agent else None,
-        group_id=group_id, parent_session_id=parent, search=search, page=page, size=size
+        owner=owner,
+        status=list(status) if status else None,
+        agent=list(agent) if agent else None,
+        group_id=group_id,
+        parent_session_id=parent,
+        search=search,
+        page=page,
+        size=size,
     )
     get_state(ctx).output.render(result, views.sessions_table(result.items))
 

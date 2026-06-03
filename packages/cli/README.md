@@ -35,13 +35,18 @@ On a terminal you get tables and styled text; when piped, `hai` emits JSON so it
 hai session list -o json | jq '.items[].id'
 ```
 
-Data goes to stdout, progress and notes to stderr. Force a format with `--output/-o [auto|json]`.
+Data goes to stdout, progress and notes to stderr. Force a format with `--output/-o [auto|json]`. In JSON mode, errors are emitted to stderr as `{"error": {"kind", "message", "status"}}` so they stay parseable.
+
+## Scripting and agents
+
+`hai` is non-interactive by default: it never blocks on a prompt without a TTY. Pass `--yes/-y` to skip confirmations, `--no-input` to fail instead of prompting, and `--quiet/-q` to silence stderr notes. `hai schema` prints a machine-readable JSON description of every command and option, so tools and agents can discover the surface without scraping `--help`.
 
 ## Commands
 
 - `hai session` - `run`, `create`, `tail`, `status`, `get`, `list`, `events`, `send`, `pause`, `resume`, `force-answer`, `cancel`, `feedback`, `event-feedback`, `share`, `unshare`, `quota`
 - `hai agent` / `hai skill` / `hai env` - `list`, `get`, `create`, `update`, `delete`
 - `hai configure` - save credentials
+- `hai schema` - machine-readable description of all commands
 
 Run `hai --help` or `hai <command> --help` for details.
 
