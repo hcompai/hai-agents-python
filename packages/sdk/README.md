@@ -35,18 +35,16 @@ Requires Python 3.10 or newer. Grab an API key at [portal.hcompany.ai](https://p
 
 ## Quickstart
 
-List the agents available to your account, then launch one with a task described in plain language. Built-in agents, such as a web surfer that ships with its own browser, live under the `h/` namespace. `run_session_until_done` polls until the agent finishes and returns the final answer.
+Launch the built-in `h/web-surfer-holo3-1-35b` agent, which ships with its own browser, and describe the task in plain language. `run_session_until_done` polls until the agent finishes and returns the final answer.
 
 ```python
 from hai_agents import Client, run_session_until_done
 
 client = Client(token="YOUR_API_KEY")
 
-agents = client.agents.list_agents().items
-
 result = run_session_until_done(
     client,
-    agent=agents[0].name,
+    agent="h/web-surfer-holo3-1-35b",
     messages="What are the top 3 stories on Hacker News right now?",
 )
 
