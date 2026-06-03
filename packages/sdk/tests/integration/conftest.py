@@ -1,7 +1,7 @@
 """Fixtures for live integration tests against the Agent Platform API.
 
 These tests hit a real backend (staging by default). They are skipped when
-``HAI_API_KEY_TEST`` is unset, so the suite is safe to run anywhere — CI only
+``HAI_API_KEY_TEST`` is unset, so the suite is safe to run anywhere -- CI only
 exercises them when the secret is wired up.
 
 Never point these tests at production. The default base URL is staging, and
@@ -25,24 +25,22 @@ try:
 except ImportError:
     pass
 
-# Loading the models package eagerly resolves the SDK's forward refs (mirrors
-# the workaround in sdk/python/tests/conftest.py — Pydantic 2 needs every
-# referenced class loaded before instantiation works).
-import hai_agents.models  # noqa: F401
 from hai_agents import Client
 
 DEFAULT_BASE_URL = "https://agp.staging.sandboxh.ai"
+
+# IDLE is included: a session waiting for follow-up messages is a stopping point
+# for these one-shot tests, not a state to keep polling through.
+TERMINAL_STATUSES = {"completed", "failed", "timed_out", "interrupted", "idle"}
 
 
 def _require_key() -> str:
     key = os.environ.get("HAI_API_KEY_TEST")
     if not key:
         pytest.skip(
-            "HAI_API_KEY_TEST is not set — live integration tests skipped. "
+            "HAI_API_KEY_TEST is not set -- live integration tests skipped. "
             "Set it to a STAGING key (never prod) to run the suite."
         )
-    # pytest.skip raises, so this assert is reachable only when key is non-empty.
-    # Without it, mypy doesn't narrow `key` past the skip.
     assert key is not None
     if not key.startswith("hk-"):
         pytest.skip("HAI_API_KEY_TEST does not look like a portal-H key (hk-*).")
@@ -56,77 +54,43 @@ def base_url() -> str:
 
 
 @pytest.fixture(scope="session")
-def api_key() -> str:
+def token() -> str:
     return _require_key()
 
 
 @pytest.fixture
-def client(api_key: str, base_url: str) -> Client:
+def client(token: str, base_url: str) -> Client:
     """A fresh Client per test (cheap; no connection pool reuse needed)."""
-    return Client(api_key=api_key, base_url=base_url)
+    return Client(token=token, base_url=base_url)
 
 
 @pytest.fixture
 def run_id() -> str:
-    """Short unique id used to namespace resources created during the test.
-
-    Combines a timestamp + 6 hex chars so concurrent runs don't collide and
-    leaked resources (cleanup failed, test crashed) can be identified after
-    the fact by their prefix.
-    """
+    """Short unique id used to namespace resources created during the test."""
     return f"sdkit-{int(time.time())}-{uuid.uuid4().hex[:6]}"
 
 
 @pytest.fixture
 def created_skills(client: Client) -> Iterator[list]:
-    """Track skill names created during a test and delete them on teardown.
-
-    Tests append each created skill's name to this list; the fixture calls
-    DELETE on each, ignoring 404s. Cleanup failures log a warning but never
-    fail the test — a leaked skill in staging is not a test bug.
-    """
-    from hai_agents.api.skills import (
-        delete_skill as delete_skill,
-    )
-
+    """Track skill names created during a test and delete them on teardown."""
     names: list = []
     yield names
     for name in names:
         try:
-            delete_skill.sync_detailed(client=client, name=name)
+            client.skills.delete_skill(name)
         except Exception as exc:  # noqa: BLE001
             print(f"warning: cleanup failed for skill {name}: {exc}")
 
 
 @pytest.fixture
 def created_sessions(client: Client) -> Iterator[list]:
-    """Track session ids and cancel any non-terminal session on teardown.
-
-    Sessions can't be hard-deleted; the best we can do is cancel running ones
-    so they stop consuming quota. Terminal sessions stay in history.
-    """
-    from hai_agents.api.sessions import (
-        cancel_session as cancel_session,
-    )
-    from hai_agents.api.sessions import (
-        get_session_status as get_status,
-    )
-    from hai_agents.models.trajectory_status import TrajectoryStatus
-
-    TERMINAL = {
-        TrajectoryStatus.COMPLETED,
-        TrajectoryStatus.FAILED,
-        TrajectoryStatus.TIMED_OUT,
-        TrajectoryStatus.INTERRUPTED,
-        TrajectoryStatus.IDLE,
-    }
-
+    """Track session ids and cancel any non-terminal session on teardown."""
     ids: list = []
     yield ids
     for sid in ids:
         try:
-            s = get_status.sync(client=client, id=sid)
-            if s and s.status not in TERMINAL:
-                cancel_session.sync_detailed(client=client, id=sid)
+            status = client.sessions.get_session_status(sid)
+            if str(status.status) not in TERMINAL_STATUSES:
+                client.sessions.cancel_session(sid)
         except Exception as exc:  # noqa: BLE001
             print(f"warning: cleanup failed for session {sid}: {exc}")

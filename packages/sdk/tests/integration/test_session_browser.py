@@ -1,21 +1,16 @@
 """Browser-environment session against a search engine.
 
-The agent is dropped on a search-engine start URL (passed as a parameter on
-the environment spec) and asked for Paris weather without being told which
-search engine to use. This exercises:
+The agent is dropped on a search-engine start URL (set on the environment spec)
+and asked for Paris weather without being told which engine to use. Exercises
+local_browser provisioning, the agent using whatever page it lands on, and
+end-to-end answer extraction.
 
-  - the local_browser environment provisioning,
-  - the agent's ability to use whatever page it lands on (typing into a
-    search box, clicking results, extracting structured data),
-  - end-to-end answer extraction.
+Bing is used because headless browsers can read it without CAPTCHA. The engine
+lives in the env spec, not the prompt -- mirroring how a product injects a start
+URL via config.
 
-Bing is used because headless browsers can read it without CAPTCHA, unlike
-Google. The choice of engine lives in the env spec — keeping it out of the
-prompt mirrors how a real product would inject the start URL via config.
-
-Marked ``slow`` because it takes ~60-120s and consumes more tokens than the
-code-env test. Skipped by default; opt in with
-``pytest -m "integration and slow"`` or set ``RUN_SLOW_SDK_TESTS=1``.
+Marked ``slow`` (~60-120s, more tokens than the code-env test). Skipped by
+default; opt in with ``pytest -m "integration and slow"`` or RUN_SLOW_SDK_TESTS=1.
 """
 
 from __future__ import annotations
@@ -27,77 +22,56 @@ import time
 
 import pytest
 
-from hai_agents import Client
-from hai_agents.api.sessions import (
-    get_session_changes as get_changes,
-)
-from hai_agents.api.sessions import (
-    get_session_status as get_status,
-)
-from hai_agents.models.session_status import SessionStatus
-from hai_agents.models.trajectory_status import TrajectoryStatus
+from hai_agents import Client, SessionStatus
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
-
 
 # Engine is a test-level parameter, NOT part of the prompt. To swap engines,
 # change this line and leave the prompt alone.
 SEARCH_ENGINE_START_URL = "https://www.bing.com/"
 
-TERMINAL = {
-    TrajectoryStatus.COMPLETED,
-    TrajectoryStatus.FAILED,
-    TrajectoryStatus.TIMED_OUT,
-    TrajectoryStatus.INTERRUPTED,
-    TrajectoryStatus.IDLE,
-}
+TERMINAL = {"completed", "failed", "timed_out", "interrupted", "idle"}
 
 
 def _poll_until_terminal(client: Client, session_id: str, timeout_s: float = 420.0) -> SessionStatus:
     start = time.time()
     while True:
-        s = get_status.sync(client=client, id=session_id)
-        if s.status in TERMINAL:
+        s = client.sessions.get_session_status(session_id)
+        if str(s.status) in TERMINAL:
             return s
         if time.time() - start > timeout_s:
             pytest.fail(
-                f"session {session_id} did not finish in {timeout_s}s (last status: {s.status}, steps: {s.steps})"
+                f"session {session_id} did not finish in {timeout_s}s "
+                f"(last status: {s.status}, steps: {s.steps})"
             )
         time.sleep(3)
 
 
 @pytest.mark.skipif(
     not os.environ.get("RUN_SLOW_SDK_TESTS"),
-    reason="Slow browser test — set RUN_SLOW_SDK_TESTS=1 or use -m 'integration and slow'",
+    reason="Slow browser test -- set RUN_SLOW_SDK_TESTS=1 or use -m 'integration and slow'",
 )
 def test_browser_session_finds_paris_weather(client: Client, run_id: str, created_sessions: list) -> None:
-    """Agent lands on the configured search engine and finds Paris weather.
-
-    The prompt deliberately doesn't name the search engine — the agent uses
-    whatever page the environment opened. This validates the "drop the agent
-    on a useful starting page and let it figure out the rest" pattern.
-    """
-    payload = {
-        "agent": {
+    session = client.sessions.create_session(
+        agent={
             "name": f"{run_id}-weather",
             "description": "Integration test browser agent for weather lookup",
             "instructions": (
-                "You navigate the web to answer the user's question. Use the "
-                "search box on the page you land on, search for what you need, "
-                "and read the result. Reply in a single concise sentence."
+                "You navigate the web to answer the user's question. Use the search box on the page you "
+                "land on, search for what you need, and read the result. Reply in a single concise sentence."
             ),
+            "environments": [
+                {
+                    "id": "browser",
+                    "kind": "local_browser",
+                    "headless": True,
+                    "width": 1280,
+                    "height": 800,
+                    "start_url": SEARCH_ENGINE_START_URL,
+                }
+            ],
         },
-        "environments": [
-            {
-                "id": "browser",
-                "kind": "local_browser",
-                "headless": True,
-                "width": 1280,
-                "height": 800,
-                "start_url": SEARCH_ENGINE_START_URL,
-            }
-        ],
-        "messages": [
+        messages=[
             {
                 "type": "user_message",
                 "message": (
@@ -106,29 +80,21 @@ def test_browser_session_finds_paris_weather(client: Client, run_id: str, create
                 ),
             }
         ],
-        "max_steps": 25,
-        "max_time_s": 360.0,
-        "idle_timeout_s": 60,
-    }
-
-    resp = client.get_httpx_client().post("/api/v2/sessions", json=payload, timeout=60.0)
-    assert resp.status_code == 201, f"create failed: {resp.status_code} {resp.text[:500]}"
-    session_id = resp.json()["id"]
-    created_sessions.append(session_id)
-
-    final = _poll_until_terminal(client, session_id)
-    assert final.status in (TrajectoryStatus.COMPLETED, TrajectoryStatus.IDLE), (
-        f"session ended in {final.status}; error={final.error}"
+        max_steps=25,
+        max_time_s=360.0,
+        idle_timeout_s=60,
     )
+    created_sessions.append(session.id)
+
+    final = _poll_until_terminal(client, session.id)
+    assert str(final.status) in ("completed", "idle"), f"session ended in {final.status}; error={final.error}"
     assert final.error is None
 
-    ch = get_changes.sync(client=client, id=session_id).to_dict()
-    answer = ch.get("answer")
-    assert answer is not None, f"no answer in /changes response: {ch}"
+    changes = client.sessions.get_session_changes(session.id)
+    answer = changes.answer
+    assert answer is not None, "no answer in /changes response"
     answer_str = answer if isinstance(answer, str) else json.dumps(answer, default=str)
 
-    # The agent must mention Paris (loose match, case-insensitive) and report a
-    # temperature: a number followed by °, C, "celsius", or "degrees".
     assert re.search(r"paris", answer_str, re.IGNORECASE), f"answer doesn't mention Paris: {answer_str!r}"
     assert re.search(
         r"-?\d+(?:[.,]\d+)?\s*(?:°|degr(?:e|é|ee)s?|celsius|c\b)",
