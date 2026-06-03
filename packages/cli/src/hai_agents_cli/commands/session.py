@@ -167,6 +167,23 @@ def tail(
     state.output.note(f"Finished: {_status_label(status.status)}")
 
 
+@app.command("changes")
+@safe
+def changes(
+    ctx: typer.Context,
+    session_id: str = typer.Argument(...),
+    from_index: int = typer.Option(0, "--from-index", help="Return events from this index onward."),
+    limit: int = typer.Option(None, "--limit", help="Max events to return."),
+    include_events: bool = typer.Option(True, "--include-events/--no-include-events"),
+    wait: int = typer.Option(0, "--wait", help="Long-poll seconds to wait for new events (0 = no wait)."),
+) -> None:
+    """Fetch a single page of session changes (events and final answer)."""
+    result = get_client(ctx).sessions.get_session_changes(
+        session_id, from_index=from_index, limit=limit, include_events=include_events, wait_for_seconds=wait
+    )
+    get_state(ctx).output.render(result)
+
+
 @app.command("status")
 @safe
 def status(ctx: typer.Context, session_id: str = typer.Argument(...)) -> None:
@@ -314,6 +331,19 @@ def unshare(ctx: typer.Context, session_id: str = typer.Argument(...)) -> None:
     """Revoke public access to a session."""
     get_client(ctx).sessions.unshare_session(session_id)
     get_state(ctx).output.note("Sharing revoked.")
+
+
+@app.command("resource")
+@safe
+def resource(
+    ctx: typer.Context,
+    session_id: str = typer.Argument(...),
+    bucket: str = typer.Argument(...),
+    key: str = typer.Argument(...),
+) -> None:
+    """Request a session-owned resource (the API redirects to a presigned URL)."""
+    get_client(ctx).sessions.get_session_resource(session_id, bucket, key)
+    get_state(ctx).output.note("Resource request completed.")
 
 
 @app.command("quota")

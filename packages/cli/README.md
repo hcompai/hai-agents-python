@@ -43,7 +43,7 @@ Data goes to stdout, progress and notes to stderr. Force a format with `--output
 
 ## Commands
 
-- `hai session` - `run`, `create`, `tail`, `status`, `get`, `list`, `events`, `send`, `pause`, `resume`, `force-answer`, `cancel`, `feedback`, `event-feedback`, `share`, `unshare`, `quota`
+- `hai session` - `run`, `create`, `tail`, `changes`, `status`, `get`, `list`, `events`, `send`, `pause`, `resume`, `force-answer`, `cancel`, `feedback`, `event-feedback`, `share`, `unshare`, `resource`, `quota`
 - `hai agent` / `hai skill` / `hai env` - `list`, `get`, `create`, `update`, `delete`
 - `hai configure` - save credentials
 - `hai schema` - machine-readable description of all commands

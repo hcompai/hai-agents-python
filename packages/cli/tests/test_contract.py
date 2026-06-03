@@ -71,6 +71,7 @@ def test_session_method_signatures() -> None:
         "get_session",
         "get_session_status",
         "get_session_changes",
+        "get_session_resource",
         "list_session_events",
         "cancel_session",
         "pause_session",
