@@ -4,7 +4,7 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .environment_page_items_item import EnvironmentPageItemsItem
+from .environment import Environment
 
 
 class EnvironmentPage(UniversalBaseModel):
@@ -17,7 +17,7 @@ class EnvironmentPage(UniversalBaseModel):
     Pydantic FieldInfo into generated SDKs.
     """
 
-    items: typing.List[EnvironmentPageItemsItem]
+    items: typing.List[Environment]
     total: int
     page: int
 

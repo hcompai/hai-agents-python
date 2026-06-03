@@ -12,15 +12,13 @@ from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
 from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
+from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
 from ..types.http_validation_error import HttpValidationError
 from .types.create_environment_request import CreateEnvironmentRequest
-from .types.create_environment_response import CreateEnvironmentResponse
-from .types.get_environment_response import GetEnvironmentResponse
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
 from .types.update_environment_request_body import UpdateEnvironmentRequestBody
-from .types.update_environment_response import UpdateEnvironmentResponse
 from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
@@ -118,7 +116,7 @@ class RawEnvironmentsClient:
 
     def create_environment(
         self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
-    ) -> HttpResponse[CreateEnvironmentResponse]:
+    ) -> HttpResponse[Environment]:
         """
         Create an environment.
 
@@ -131,7 +129,7 @@ class RawEnvironmentsClient:
 
         Returns
         -------
-        HttpResponse[CreateEnvironmentResponse]
+        HttpResponse[Environment]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
@@ -149,9 +147,9 @@ class RawEnvironmentsClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    CreateEnvironmentResponse,
+                    Environment,
                     parse_obj_as(
-                        type_=CreateEnvironmentResponse,  # type: ignore
+                        type_=Environment,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -178,7 +176,7 @@ class RawEnvironmentsClient:
 
     def get_environment(
         self, id: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> HttpResponse[GetEnvironmentResponse]:
+    ) -> HttpResponse[Environment]:
         """
         Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
 
@@ -191,7 +189,7 @@ class RawEnvironmentsClient:
 
         Returns
         -------
-        HttpResponse[GetEnvironmentResponse]
+        HttpResponse[Environment]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
@@ -202,9 +200,9 @@ class RawEnvironmentsClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    GetEnvironmentResponse,
+                    Environment,
                     parse_obj_as(
-                        type_=GetEnvironmentResponse,  # type: ignore
+                        type_=Environment,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -231,7 +229,7 @@ class RawEnvironmentsClient:
 
     def update_environment(
         self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
-    ) -> HttpResponse[UpdateEnvironmentResponse]:
+    ) -> HttpResponse[Environment]:
         """
         Replace the environment spec.
 
@@ -246,7 +244,7 @@ class RawEnvironmentsClient:
 
         Returns
         -------
-        HttpResponse[UpdateEnvironmentResponse]
+        HttpResponse[Environment]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
@@ -264,9 +262,9 @@ class RawEnvironmentsClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    UpdateEnvironmentResponse,
+                    Environment,
                     parse_obj_as(
-                        type_=UpdateEnvironmentResponse,  # type: ignore
+                        type_=Environment,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -428,7 +426,7 @@ class AsyncRawEnvironmentsClient:
 
     async def create_environment(
         self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[CreateEnvironmentResponse]:
+    ) -> AsyncHttpResponse[Environment]:
         """
         Create an environment.
 
@@ -441,7 +439,7 @@ class AsyncRawEnvironmentsClient:
 
         Returns
         -------
-        AsyncHttpResponse[CreateEnvironmentResponse]
+        AsyncHttpResponse[Environment]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
@@ -459,9 +457,9 @@ class AsyncRawEnvironmentsClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    CreateEnvironmentResponse,
+                    Environment,
                     parse_obj_as(
-                        type_=CreateEnvironmentResponse,  # type: ignore
+                        type_=Environment,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -488,7 +486,7 @@ class AsyncRawEnvironmentsClient:
 
     async def get_environment(
         self, id: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[GetEnvironmentResponse]:
+    ) -> AsyncHttpResponse[Environment]:
         """
         Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
 
@@ -501,7 +499,7 @@ class AsyncRawEnvironmentsClient:
 
         Returns
         -------
-        AsyncHttpResponse[GetEnvironmentResponse]
+        AsyncHttpResponse[Environment]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
@@ -512,9 +510,9 @@ class AsyncRawEnvironmentsClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    GetEnvironmentResponse,
+                    Environment,
                     parse_obj_as(
-                        type_=GetEnvironmentResponse,  # type: ignore
+                        type_=Environment,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -541,7 +539,7 @@ class AsyncRawEnvironmentsClient:
 
     async def update_environment(
         self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[UpdateEnvironmentResponse]:
+    ) -> AsyncHttpResponse[Environment]:
         """
         Replace the environment spec.
 
@@ -556,7 +554,7 @@ class AsyncRawEnvironmentsClient:
 
         Returns
         -------
-        AsyncHttpResponse[UpdateEnvironmentResponse]
+        AsyncHttpResponse[Environment]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
@@ -574,9 +572,9 @@ class AsyncRawEnvironmentsClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    UpdateEnvironmentResponse,
+                    Environment,
                     parse_obj_as(
-                        type_=UpdateEnvironmentResponse,  # type: ignore
+                        type_=Environment,  # type: ignore
                         object_=_response.json(),
                     ),
                 )

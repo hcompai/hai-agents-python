@@ -1,96 +1,125 @@
 <p align="center">
+  <a href="https://pypi.org/project/hai-agents/"><img src="https://img.shields.io/pypi/v/hai-agents.svg" alt="PyPI" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
 </p>
 
 # hai-agents
 
-Python SDK for [H Company's Agent Platform](https://hcompany.ai). Sync and async clients, fully typed with Pydantic v2.
+Python SDK for [H Company's Agent Platform](https://hcompany.ai). A fully typed, class-based client covering sessions, agents, memories, skills, and environments.
+
+## Install
+
+```bash
+pip install hai-agents
+```
+
+Requires Python 3.9 or newer. Grab an API key at [portal.hcompany.ai](https://portal.hcompany.ai).
 
 ## Quickstart
 
-Install from a repository checkout:
-
-```bash
-git clone https://github.com/hcompai/hai-agents-python.git
-cd hai-agents-python
-pip install ./packages/sdk
-```
-
-The public `hai-agents` package is not yet published to PyPI. Until it is,
-install from a repository checkout as shown above.
-
 ```python
-from hai_agents import Client, Agent, SessionRequest
-from hai_agents.api.sessions import create_session
-from hai_agents.models.browser import Browser
-from hai_agents.models.user_message_event import UserMessageEvent
+from hai_agents import Client
 
-client = Client(api_key="hk-...")
+client = Client(token="YOUR_API_KEY")
 
-session = create_session.sync(
-    client=client,
-    body=SessionRequest(
-        agent=Agent(
-            name="my-agent",
-            description="A demo agent.",
-            instructions="Reply concisely.",
-            environments=[Browser(id="browser", kind="web",
-                                  headless=True,
-                                  width=1280, height=800,
-                                  start_url="https://bing.com")],
-        ),
-        messages=[UserMessageEvent(message="What is the weather in Paris?")],
-        max_steps=12,
-    ),
+session = client.sessions.create_session(
+    agent="h/web",
+    messages="What is the H1 on example.com?",
+    max_steps=10,
+    max_time_s=150,
 )
+
 print(session.id)
 ```
 
-Grab a key at [portal.hcompany.ai](https://portal.hcompany.ai). The default `base_url` is the production endpoint; pass `base_url=` to point at staging.
+An `AsyncClient` with the same surface is available for asyncio code.
 
-## Poll, stream, send
+## Run a task to completion
+
+`run_session_until_done` creates a session and long-polls `/changes` until the
+agent reaches a terminal state, returning the accumulated events and final answer.
 
 ```python
-from hai_agents.api.sessions import get_session_status, get_session_changes, send_session_messages
+from hai_agents import run_session_until_done
 
-status = get_session_status.sync(client=client, id=session.id)
+result = run_session_until_done(
+    client,
+    agent="h/web",
+    messages="What is the H1 on example.com?",
+    timeout_seconds=180,        # overall wall-clock budget
+    poll_backoff_seconds=1.0,   # delay between polls, on top of the server long-poll
+    include_events=True,        # set False to poll status only, without streaming events
+)
 
-# Long-poll for new events
-changes = get_session_changes.sync(client=client, id=session.id, from_index=0)
+print(result.answer)
+```
 
-# Inject a message mid-run (single event, or a UserMessageBatch for multiple)
-send_session_messages.sync(
-    client=client,
-    id=session.id,
-    body=UserMessageEvent(message="Actually, switch to Lyon."),
+## Error handling
+
+Operations raise `ApiError` on a non-2xx response; inspect `status_code` and `body`.
+
+```python
+from hai_agents.core import ApiError
+
+try:
+    session = client.sessions.get_session(session_id)
+    print(session.status)
+except ApiError as err:
+    print(err.status_code, err.body)
+    raise
+```
+
+## Regions
+
+The client targets the EU region by default. Select a region with `environment`,
+or point at a custom URL with `base_url`.
+
+```python
+from hai_agents import Client, HaiAgentsEnvironment
+
+us_client = Client(token="YOUR_API_KEY", environment=HaiAgentsEnvironment.US)
+
+proxied = Client(token="YOUR_API_KEY", base_url="https://my-proxy.example.com")
+```
+
+## Messages and feedback
+
+```python
+from hai_agents import SendSessionMessagesRequestBody_UserMessage
+
+client.sessions.send_session_messages(
+    session.id,
+    request=SendSessionMessagesRequestBody_UserMessage(
+        message="Keep the answer under one sentence.",
+    ),
+)
+
+client.sessions.submit_session_feedback(
+    session.id,
+    success=True,
+    message="The answer matched the page heading.",
 )
 ```
 
-## Async
+## Cancelling a session
+
+`cancel_session` asks the platform to interrupt the run. The session may still
+report `running` briefly while the worker stops; poll until it reaches a terminal
+state such as `interrupted`.
 
 ```python
-from hai_agents import AsyncClient
-from hai_agents.api.sessions import list_session_events
-
-client = AsyncClient(api_key="hk-...")
-events = await list_session_events.asyncio(client=client, id="...")
+client.sessions.cancel_session(session.id)
 ```
 
-## Memories, skills, environments, agents
+## Request size limit
 
-CRUD endpoints for each catalog live under `hai_agents.api.{memories,skills,environments,agents}`.
-
-## Errors
+The platform rejects request bodies above 5MB. `run_session_until_done` enforces
+this on the create payload; for ad-hoc requests, validate first to fail fast with
+a clear message instead of a server error.
 
 ```python
-from hai_agents.errors import UnexpectedStatus
+from hai_agents import MAX_REQUEST_BYTES, assert_request_under_limit
 
-try:
-    get_session_status.sync(client=client, id="missing")
-except UnexpectedStatus as e:
-    print(e.status_code, e.content)
+assert_request_under_limit({"agent": "h/web", "messages": messages})
+print(f"limit: {MAX_REQUEST_BYTES} bytes")
 ```
-
-## Requirements
-
-Python 3.10+. Runtime deps: `httpx`, `pydantic>=2`, `python-dateutil`, `attrs`.

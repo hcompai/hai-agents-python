@@ -7,23 +7,14 @@ from importlib import import_module
 
 if typing.TYPE_CHECKING:
     from .create_environment_request import CreateEnvironmentRequest, CreateEnvironmentRequest_Web
-    from .create_environment_response import CreateEnvironmentResponse, CreateEnvironmentResponse_Web
-    from .get_environment_response import GetEnvironmentResponse, GetEnvironmentResponse_Web
     from .list_environments_request_sort_item import ListEnvironmentsRequestSortItem
     from .update_environment_request_body import UpdateEnvironmentRequestBody, UpdateEnvironmentRequestBody_Web
-    from .update_environment_response import UpdateEnvironmentResponse, UpdateEnvironmentResponse_Web
 _dynamic_imports: typing.Dict[str, str] = {
     "CreateEnvironmentRequest": ".create_environment_request",
     "CreateEnvironmentRequest_Web": ".create_environment_request",
-    "CreateEnvironmentResponse": ".create_environment_response",
-    "CreateEnvironmentResponse_Web": ".create_environment_response",
-    "GetEnvironmentResponse": ".get_environment_response",
-    "GetEnvironmentResponse_Web": ".get_environment_response",
     "ListEnvironmentsRequestSortItem": ".list_environments_request_sort_item",
     "UpdateEnvironmentRequestBody": ".update_environment_request_body",
     "UpdateEnvironmentRequestBody_Web": ".update_environment_request_body",
-    "UpdateEnvironmentResponse": ".update_environment_response",
-    "UpdateEnvironmentResponse_Web": ".update_environment_response",
 }
 
 
@@ -51,13 +42,7 @@ def __dir__():
 __all__ = [
     "CreateEnvironmentRequest",
     "CreateEnvironmentRequest_Web",
-    "CreateEnvironmentResponse",
-    "CreateEnvironmentResponse_Web",
-    "GetEnvironmentResponse",
-    "GetEnvironmentResponse_Web",
     "ListEnvironmentsRequestSortItem",
     "UpdateEnvironmentRequestBody",
     "UpdateEnvironmentRequestBody_Web",
-    "UpdateEnvironmentResponse",
-    "UpdateEnvironmentResponse_Web",
 ]

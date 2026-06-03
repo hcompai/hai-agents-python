@@ -8,14 +8,13 @@ from importlib import import_module
 if typing.TYPE_CHECKING:
     from .agent import Agent
     from .agent_environments_item import AgentEnvironmentsItem
-    from .agent_environments_item_one import AgentEnvironmentsItemOne, AgentEnvironmentsItemOne_Web
     from .agent_skills_item import AgentSkillsItem
     from .agent_subagents_item import AgentSubagentsItem
     from .browser import Browser
     from .browser_mode import BrowserMode
+    from .environment import Environment, Environment_Web
     from .environment_kind import EnvironmentKind
     from .environment_page import EnvironmentPage
-    from .environment_page_items_item import EnvironmentPageItemsItem, EnvironmentPageItemsItem_Web
     from .feedback import Feedback
     from .http_validation_error import HttpValidationError
     from .metrics import Metrics
@@ -47,16 +46,14 @@ if typing.TYPE_CHECKING:
 _dynamic_imports: typing.Dict[str, str] = {
     "Agent": ".agent",
     "AgentEnvironmentsItem": ".agent_environments_item",
-    "AgentEnvironmentsItemOne": ".agent_environments_item_one",
-    "AgentEnvironmentsItemOne_Web": ".agent_environments_item_one",
     "AgentSkillsItem": ".agent_skills_item",
     "AgentSubagentsItem": ".agent_subagents_item",
     "Browser": ".browser",
     "BrowserMode": ".browser_mode",
+    "Environment": ".environment",
     "EnvironmentKind": ".environment_kind",
     "EnvironmentPage": ".environment_page",
-    "EnvironmentPageItemsItem": ".environment_page_items_item",
-    "EnvironmentPageItemsItem_Web": ".environment_page_items_item",
+    "Environment_Web": ".environment",
     "Feedback": ".feedback",
     "HttpValidationError": ".http_validation_error",
     "Metrics": ".metrics",
@@ -112,16 +109,14 @@ def __dir__():
 __all__ = [
     "Agent",
     "AgentEnvironmentsItem",
-    "AgentEnvironmentsItemOne",
-    "AgentEnvironmentsItemOne_Web",
     "AgentSkillsItem",
     "AgentSubagentsItem",
     "Browser",
     "BrowserMode",
+    "Environment",
     "EnvironmentKind",
     "EnvironmentPage",
-    "EnvironmentPageItemsItem",
-    "EnvironmentPageItemsItem_Web",
+    "Environment_Web",
     "Feedback",
     "HttpValidationError",
     "Metrics",

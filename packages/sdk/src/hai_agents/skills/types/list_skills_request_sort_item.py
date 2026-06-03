@@ -2,4 +2,4 @@
 
 import typing
 
-ListSkillsRequestSortItem = typing.Union[typing.Literal["created_at", "-created_at", "name"], typing.Any]
+ListSkillsRequestSortItem = typing.Union[typing.Literal["created_at", "-created_at", "name", "-name"], typing.Any]

@@ -9,7 +9,7 @@ from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .browser_mode import BrowserMode
 
 
-class EnvironmentPageItemsItem_Web(UniversalBaseModel):
+class Environment_Web(UniversalBaseModel):
     kind: typing.Literal["web"] = "web"
     id: str
     headless: bool
@@ -28,4 +28,4 @@ class EnvironmentPageItemsItem_Web(UniversalBaseModel):
             extra = pydantic.Extra.allow
 
 
-EnvironmentPageItemsItem = EnvironmentPageItemsItem_Web
+Environment = Environment_Web

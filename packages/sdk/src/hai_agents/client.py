@@ -30,7 +30,7 @@ class Client:
 
 
 
-        Defaults to HaiAgentsEnvironment.DEFAULT
+        Defaults to HaiAgentsEnvironment.EU
 
 
 
@@ -66,7 +66,7 @@ class Client:
         self,
         *,
         base_url: typing.Optional[str] = None,
-        environment: HaiAgentsEnvironment = HaiAgentsEnvironment.DEFAULT,
+        environment: HaiAgentsEnvironment = HaiAgentsEnvironment.EU,
         token: typing.Union[str, typing.Callable[[], str]],
         headers: typing.Optional[typing.Dict[str, str]] = None,
         timeout: typing.Optional[float] = None,
@@ -162,7 +162,7 @@ class AsyncClient:
 
 
 
-        Defaults to HaiAgentsEnvironment.DEFAULT
+        Defaults to HaiAgentsEnvironment.EU
 
 
 
@@ -201,7 +201,7 @@ class AsyncClient:
         self,
         *,
         base_url: typing.Optional[str] = None,
-        environment: HaiAgentsEnvironment = HaiAgentsEnvironment.DEFAULT,
+        environment: HaiAgentsEnvironment = HaiAgentsEnvironment.EU,
         token: typing.Union[str, typing.Callable[[], str]],
         headers: typing.Optional[typing.Dict[str, str]] = None,
         async_token: typing.Optional[typing.Callable[[], typing.Awaitable[str]]] = None,

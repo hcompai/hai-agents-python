@@ -2,6 +2,6 @@
 
 import typing
 
-from .agent_environments_item_one import AgentEnvironmentsItemOne
+from .environment import Environment
 
-AgentEnvironmentsItem = typing.Union[str, AgentEnvironmentsItemOne]
+AgentEnvironmentsItem = typing.Union[str, Environment]

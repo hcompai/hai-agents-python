@@ -2,4 +2,4 @@
 
 import typing
 
-ListSessionEventsRequestSortItem = typing.Union[typing.Literal["timestamp"], typing.Any]
+ListSessionEventsRequestSortItem = typing.Union[typing.Literal["timestamp", "-timestamp"], typing.Any]

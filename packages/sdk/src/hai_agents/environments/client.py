@@ -4,15 +4,13 @@ import typing
 
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
+from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
 from .raw_client import AsyncRawEnvironmentsClient, RawEnvironmentsClient
 from .types.create_environment_request import CreateEnvironmentRequest
-from .types.create_environment_response import CreateEnvironmentResponse
-from .types.get_environment_response import GetEnvironmentResponse
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
 from .types.update_environment_request_body import UpdateEnvironmentRequestBody
-from .types.update_environment_response import UpdateEnvironmentResponse
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -91,7 +89,7 @@ class EnvironmentsClient:
 
     def create_environment(
         self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
-    ) -> CreateEnvironmentResponse:
+    ) -> Environment:
         """
         Create an environment.
 
@@ -104,7 +102,7 @@ class EnvironmentsClient:
 
         Returns
         -------
-        CreateEnvironmentResponse
+        Environment
             Successful Response
 
         Examples
@@ -127,9 +125,7 @@ class EnvironmentsClient:
         _response = self._raw_client.create_environment(request=request, request_options=request_options)
         return _response.data
 
-    def get_environment(
-        self, id: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> GetEnvironmentResponse:
+    def get_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Environment:
         """
         Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
 
@@ -142,7 +138,7 @@ class EnvironmentsClient:
 
         Returns
         -------
-        GetEnvironmentResponse
+        Environment
             Successful Response
 
         Examples
@@ -161,7 +157,7 @@ class EnvironmentsClient:
 
     def update_environment(
         self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
-    ) -> UpdateEnvironmentResponse:
+    ) -> Environment:
         """
         Replace the environment spec.
 
@@ -176,7 +172,7 @@ class EnvironmentsClient:
 
         Returns
         -------
-        UpdateEnvironmentResponse
+        Environment
             Successful Response
 
         Examples
@@ -311,7 +307,7 @@ class AsyncEnvironmentsClient:
 
     async def create_environment(
         self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
-    ) -> CreateEnvironmentResponse:
+    ) -> Environment:
         """
         Create an environment.
 
@@ -324,7 +320,7 @@ class AsyncEnvironmentsClient:
 
         Returns
         -------
-        CreateEnvironmentResponse
+        Environment
             Successful Response
 
         Examples
@@ -355,9 +351,7 @@ class AsyncEnvironmentsClient:
         _response = await self._raw_client.create_environment(request=request, request_options=request_options)
         return _response.data
 
-    async def get_environment(
-        self, id: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> GetEnvironmentResponse:
+    async def get_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Environment:
         """
         Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
 
@@ -370,7 +364,7 @@ class AsyncEnvironmentsClient:
 
         Returns
         -------
-        GetEnvironmentResponse
+        Environment
             Successful Response
 
         Examples
@@ -397,7 +391,7 @@ class AsyncEnvironmentsClient:
 
     async def update_environment(
         self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
-    ) -> UpdateEnvironmentResponse:
+    ) -> Environment:
         """
         Replace the environment spec.
 
@@ -412,7 +406,7 @@ class AsyncEnvironmentsClient:
 
         Returns
         -------
-        UpdateEnvironmentResponse
+        Environment
             Successful Response
 
         Examples

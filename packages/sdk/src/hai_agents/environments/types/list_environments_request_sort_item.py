@@ -2,4 +2,4 @@
 
 import typing
 
-ListEnvironmentsRequestSortItem = typing.Union[typing.Literal["created_at", "-created_at", "id"], typing.Any]
+ListEnvironmentsRequestSortItem = typing.Union[typing.Literal["created_at", "-created_at", "id", "-id"], typing.Any]

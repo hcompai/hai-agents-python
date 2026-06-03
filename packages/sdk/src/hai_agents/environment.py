@@ -4,4 +4,5 @@ import enum
 
 
 class HaiAgentsEnvironment(enum.Enum):
-    DEFAULT = "https://agp.eu.hcompany.ai"
+    EU = "https://agp.eu.hcompany.ai"
+    US = "https://agp.hcompany.ai"

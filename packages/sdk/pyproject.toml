@@ -28,9 +28,11 @@ classifiers = [
 dependencies = [
   "httpx>=0.23.0,<0.29.0",
   "pydantic>=2.0,<3",
-  "python-dateutil>=2.8.0,<3",
-  "attrs>=22.2.0"
+  "typing_extensions>=4.6",
 ]
+
+[project.optional-dependencies]
+aiohttp = ["httpx-aiohttp>=0.1.8"]
 
 [project.urls]
 Homepage = "https://hcompany.ai"

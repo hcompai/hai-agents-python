@@ -9,7 +9,7 @@ from .browser_mode import BrowserMode
 
 class Browser(UniversalBaseModel):
     """
-    A local web browser the agent navigates and acts on.
+    A web browser the agent navigates and acts on.
     """
 
     id: str = pydantic.Field()

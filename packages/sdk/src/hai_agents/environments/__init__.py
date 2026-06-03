@@ -9,28 +9,16 @@ if typing.TYPE_CHECKING:
     from .types import (
         CreateEnvironmentRequest,
         CreateEnvironmentRequest_Web,
-        CreateEnvironmentResponse,
-        CreateEnvironmentResponse_Web,
-        GetEnvironmentResponse,
-        GetEnvironmentResponse_Web,
         ListEnvironmentsRequestSortItem,
         UpdateEnvironmentRequestBody,
         UpdateEnvironmentRequestBody_Web,
-        UpdateEnvironmentResponse,
-        UpdateEnvironmentResponse_Web,
     )
 _dynamic_imports: typing.Dict[str, str] = {
     "CreateEnvironmentRequest": ".types",
     "CreateEnvironmentRequest_Web": ".types",
-    "CreateEnvironmentResponse": ".types",
-    "CreateEnvironmentResponse_Web": ".types",
-    "GetEnvironmentResponse": ".types",
-    "GetEnvironmentResponse_Web": ".types",
     "ListEnvironmentsRequestSortItem": ".types",
     "UpdateEnvironmentRequestBody": ".types",
     "UpdateEnvironmentRequestBody_Web": ".types",
-    "UpdateEnvironmentResponse": ".types",
-    "UpdateEnvironmentResponse_Web": ".types",
 }
 
 
@@ -58,13 +46,7 @@ def __dir__():
 __all__ = [
     "CreateEnvironmentRequest",
     "CreateEnvironmentRequest_Web",
-    "CreateEnvironmentResponse",
-    "CreateEnvironmentResponse_Web",
-    "GetEnvironmentResponse",
-    "GetEnvironmentResponse_Web",
     "ListEnvironmentsRequestSortItem",
     "UpdateEnvironmentRequestBody",
     "UpdateEnvironmentRequestBody_Web",
-    "UpdateEnvironmentResponse",
-    "UpdateEnvironmentResponse_Web",
 ]
