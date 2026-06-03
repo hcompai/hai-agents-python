@@ -15,6 +15,7 @@ from ...types import UNSET, Response, Unset
 def _get_kwargs(
     *,
     name: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSkillsSortType0Item] | None | Unset = UNSET,
@@ -28,6 +29,13 @@ def _get_kwargs(
     else:
         json_name = name
     params["name"] = json_name
+
+    json_search: None | str | Unset
+    if isinstance(search, Unset):
+        json_search = UNSET
+    else:
+        json_search = search
+    params["search"] = json_search
 
     params["page"] = page
 
@@ -91,16 +99,18 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     name: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSkillsSortType0Item] | None | Unset = UNSET,
 ) -> Response[HTTPValidationError | PageSkill]:
     """List Skills
 
-     List reserved + caller's org skills, optionally filtered by name prefix.
+     List reserved + caller's org skills, optionally filtered by name or text search.
 
     Args:
-        name (None | str | Unset): Filter by name prefix.
+        name (None | str | Unset): Case-insensitive substring match on skill name.
+        search (None | str | Unset): Case-insensitive match on skill name or description.
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListSkillsSortType0Item] | None | Unset): Sort by field
@@ -115,6 +125,7 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         name=name,
+        search=search,
         page=page,
         size=size,
         sort=sort,
@@ -131,16 +142,18 @@ def sync(
     *,
     client: AuthenticatedClient,
     name: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSkillsSortType0Item] | None | Unset = UNSET,
 ) -> HTTPValidationError | PageSkill | None:
     """List Skills
 
-     List reserved + caller's org skills, optionally filtered by name prefix.
+     List reserved + caller's org skills, optionally filtered by name or text search.
 
     Args:
-        name (None | str | Unset): Filter by name prefix.
+        name (None | str | Unset): Case-insensitive substring match on skill name.
+        search (None | str | Unset): Case-insensitive match on skill name or description.
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListSkillsSortType0Item] | None | Unset): Sort by field
@@ -156,6 +169,7 @@ def sync(
     return sync_detailed(
         client=client,
         name=name,
+        search=search,
         page=page,
         size=size,
         sort=sort,
@@ -166,16 +180,18 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     name: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSkillsSortType0Item] | None | Unset = UNSET,
 ) -> Response[HTTPValidationError | PageSkill]:
     """List Skills
 
-     List reserved + caller's org skills, optionally filtered by name prefix.
+     List reserved + caller's org skills, optionally filtered by name or text search.
 
     Args:
-        name (None | str | Unset): Filter by name prefix.
+        name (None | str | Unset): Case-insensitive substring match on skill name.
+        search (None | str | Unset): Case-insensitive match on skill name or description.
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListSkillsSortType0Item] | None | Unset): Sort by field
@@ -190,6 +206,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         name=name,
+        search=search,
         page=page,
         size=size,
         sort=sort,
@@ -204,16 +221,18 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     name: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSkillsSortType0Item] | None | Unset = UNSET,
 ) -> HTTPValidationError | PageSkill | None:
     """List Skills
 
-     List reserved + caller's org skills, optionally filtered by name prefix.
+     List reserved + caller's org skills, optionally filtered by name or text search.
 
     Args:
-        name (None | str | Unset): Filter by name prefix.
+        name (None | str | Unset): Case-insensitive substring match on skill name.
+        search (None | str | Unset): Case-insensitive match on skill name or description.
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListSkillsSortType0Item] | None | Unset): Sort by field
@@ -230,6 +249,7 @@ async def asyncio(
         await asyncio_detailed(
             client=client,
             name=name,
+            search=search,
             page=page,
             size=size,
             sort=sort,

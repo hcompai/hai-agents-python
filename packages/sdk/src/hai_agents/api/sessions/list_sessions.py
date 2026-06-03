@@ -1,8 +1,10 @@
+import datetime
 from http import HTTPStatus
 from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
+from dateutil.parser import isoparse
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
@@ -21,6 +23,11 @@ def _get_kwargs(
     agent: list[str] | None | Unset = UNSET,
     group_id: None | str | Unset = UNSET,
     parent_session_id: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
+    created_before: datetime.datetime | None | Unset = UNSET,
+    created_after: datetime.datetime | None | Unset = UNSET,
+    finished_before: datetime.datetime | None | Unset = UNSET,
+    finished_after: datetime.datetime | None | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSessionsSortType0Item] | None | Unset = UNSET,
@@ -70,6 +77,49 @@ def _get_kwargs(
     else:
         json_parent_session_id = parent_session_id
     params["parent_session_id"] = json_parent_session_id
+
+    json_search: None | str | Unset
+    if isinstance(search, Unset):
+        json_search = UNSET
+    else:
+        json_search = search
+    params["search"] = json_search
+
+    json_created_before: None | str | Unset
+    if isinstance(created_before, Unset):
+        json_created_before = UNSET
+    elif isinstance(created_before, datetime.datetime):
+        json_created_before = created_before.isoformat()
+    else:
+        json_created_before = created_before
+    params["created_before"] = json_created_before
+
+    json_created_after: None | str | Unset
+    if isinstance(created_after, Unset):
+        json_created_after = UNSET
+    elif isinstance(created_after, datetime.datetime):
+        json_created_after = created_after.isoformat()
+    else:
+        json_created_after = created_after
+    params["created_after"] = json_created_after
+
+    json_finished_before: None | str | Unset
+    if isinstance(finished_before, Unset):
+        json_finished_before = UNSET
+    elif isinstance(finished_before, datetime.datetime):
+        json_finished_before = finished_before.isoformat()
+    else:
+        json_finished_before = finished_before
+    params["finished_before"] = json_finished_before
+
+    json_finished_after: None | str | Unset
+    if isinstance(finished_after, Unset):
+        json_finished_after = UNSET
+    elif isinstance(finished_after, datetime.datetime):
+        json_finished_after = finished_after.isoformat()
+    else:
+        json_finished_after = finished_after
+    params["finished_after"] = json_finished_after
 
     params["page"] = page
 
@@ -137,6 +187,11 @@ def sync_detailed(
     agent: list[str] | None | Unset = UNSET,
     group_id: None | str | Unset = UNSET,
     parent_session_id: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
+    created_before: datetime.datetime | None | Unset = UNSET,
+    created_after: datetime.datetime | None | Unset = UNSET,
+    finished_before: datetime.datetime | None | Unset = UNSET,
+    finished_after: datetime.datetime | None | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSessionsSortType0Item] | None | Unset = UNSET,
@@ -151,6 +206,12 @@ def sync_detailed(
         agent (list[str] | None | Unset):
         group_id (None | str | Unset):
         parent_session_id (None | str | Unset):
+        search (None | str | Unset): Case-insensitive match on the session's first message or
+            answer.
+        created_before (datetime.datetime | None | Unset):
+        created_after (datetime.datetime | None | Unset):
+        finished_before (datetime.datetime | None | Unset):
+        finished_after (datetime.datetime | None | Unset):
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListSessionsSortType0Item] | None | Unset): Sort by field
@@ -169,6 +230,11 @@ def sync_detailed(
         agent=agent,
         group_id=group_id,
         parent_session_id=parent_session_id,
+        search=search,
+        created_before=created_before,
+        created_after=created_after,
+        finished_before=finished_before,
+        finished_after=finished_after,
         page=page,
         size=size,
         sort=sort,
@@ -189,6 +255,11 @@ def sync(
     agent: list[str] | None | Unset = UNSET,
     group_id: None | str | Unset = UNSET,
     parent_session_id: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
+    created_before: datetime.datetime | None | Unset = UNSET,
+    created_after: datetime.datetime | None | Unset = UNSET,
+    finished_before: datetime.datetime | None | Unset = UNSET,
+    finished_after: datetime.datetime | None | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSessionsSortType0Item] | None | Unset = UNSET,
@@ -203,6 +274,12 @@ def sync(
         agent (list[str] | None | Unset):
         group_id (None | str | Unset):
         parent_session_id (None | str | Unset):
+        search (None | str | Unset): Case-insensitive match on the session's first message or
+            answer.
+        created_before (datetime.datetime | None | Unset):
+        created_after (datetime.datetime | None | Unset):
+        finished_before (datetime.datetime | None | Unset):
+        finished_after (datetime.datetime | None | Unset):
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListSessionsSortType0Item] | None | Unset): Sort by field
@@ -222,6 +299,11 @@ def sync(
         agent=agent,
         group_id=group_id,
         parent_session_id=parent_session_id,
+        search=search,
+        created_before=created_before,
+        created_after=created_after,
+        finished_before=finished_before,
+        finished_after=finished_after,
         page=page,
         size=size,
         sort=sort,
@@ -236,6 +318,11 @@ async def asyncio_detailed(
     agent: list[str] | None | Unset = UNSET,
     group_id: None | str | Unset = UNSET,
     parent_session_id: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
+    created_before: datetime.datetime | None | Unset = UNSET,
+    created_after: datetime.datetime | None | Unset = UNSET,
+    finished_before: datetime.datetime | None | Unset = UNSET,
+    finished_after: datetime.datetime | None | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSessionsSortType0Item] | None | Unset = UNSET,
@@ -250,6 +337,12 @@ async def asyncio_detailed(
         agent (list[str] | None | Unset):
         group_id (None | str | Unset):
         parent_session_id (None | str | Unset):
+        search (None | str | Unset): Case-insensitive match on the session's first message or
+            answer.
+        created_before (datetime.datetime | None | Unset):
+        created_after (datetime.datetime | None | Unset):
+        finished_before (datetime.datetime | None | Unset):
+        finished_after (datetime.datetime | None | Unset):
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListSessionsSortType0Item] | None | Unset): Sort by field
@@ -268,6 +361,11 @@ async def asyncio_detailed(
         agent=agent,
         group_id=group_id,
         parent_session_id=parent_session_id,
+        search=search,
+        created_before=created_before,
+        created_after=created_after,
+        finished_before=finished_before,
+        finished_after=finished_after,
         page=page,
         size=size,
         sort=sort,
@@ -286,6 +384,11 @@ async def asyncio(
     agent: list[str] | None | Unset = UNSET,
     group_id: None | str | Unset = UNSET,
     parent_session_id: None | str | Unset = UNSET,
+    search: None | str | Unset = UNSET,
+    created_before: datetime.datetime | None | Unset = UNSET,
+    created_after: datetime.datetime | None | Unset = UNSET,
+    finished_before: datetime.datetime | None | Unset = UNSET,
+    finished_after: datetime.datetime | None | Unset = UNSET,
     page: int | Unset = 1,
     size: int | Unset = 10,
     sort: list[ListSessionsSortType0Item] | None | Unset = UNSET,
@@ -300,6 +403,12 @@ async def asyncio(
         agent (list[str] | None | Unset):
         group_id (None | str | Unset):
         parent_session_id (None | str | Unset):
+        search (None | str | Unset): Case-insensitive match on the session's first message or
+            answer.
+        created_before (datetime.datetime | None | Unset):
+        created_after (datetime.datetime | None | Unset):
+        finished_before (datetime.datetime | None | Unset):
+        finished_after (datetime.datetime | None | Unset):
         page (int | Unset): Page number (1-based) Default: 1.
         size (int | Unset): Number of items per page Default: 10.
         sort (list[ListSessionsSortType0Item] | None | Unset): Sort by field
@@ -320,6 +429,11 @@ async def asyncio(
             agent=agent,
             group_id=group_id,
             parent_session_id=parent_session_id,
+            search=search,
+            created_before=created_before,
+            created_after=created_after,
+            finished_before=finished_before,
+            finished_after=finished_after,
             page=page,
             size=size,
             sort=sort,

@@ -15,7 +15,7 @@ T = TypeVar("T", bound="SessionSummary")
 
 
 class SessionSummary(BaseModel):
-    """Flat projection for session listings.
+    """Flat projection for session listings, including child rosters via ``?parent_session_id=``.
 
     Attributes:
         id (UUID):
@@ -29,6 +29,7 @@ class SessionSummary(BaseModel):
                    |        ↓
                    └─────→ PAUSED
         created_at (datetime.datetime):
+        agent (None | str | Unset):
         first_message (None | Unset | UserMessageEvent):
         started_at (datetime.datetime | None | Unset):
         finished_at (datetime.datetime | None | Unset):
@@ -44,6 +45,7 @@ class SessionSummary(BaseModel):
     id: UUID
     status: TrajectoryStatus
     created_at: datetime.datetime
+    agent: None | str | Unset = UNSET
     first_message: None | Unset | UserMessageEvent = UNSET
     started_at: datetime.datetime | None | Unset = UNSET
     finished_at: datetime.datetime | None | Unset = UNSET
@@ -56,6 +58,12 @@ class SessionSummary(BaseModel):
         status = self.status.value
 
         created_at = self.created_at.isoformat()
+
+        agent: None | str | Unset
+        if isinstance(self.agent, Unset):
+            agent = UNSET
+        else:
+            agent = self.agent
 
         first_message: dict[str, Any] | None | Unset
         if isinstance(self.first_message, Unset):
@@ -90,6 +98,8 @@ class SessionSummary(BaseModel):
                 "created_at": created_at,
             }
         )
+        if agent is not UNSET:
+            field_dict["agent"] = agent
         if first_message is not UNSET:
             field_dict["first_message"] = first_message
         if started_at is not UNSET:
@@ -109,6 +119,15 @@ class SessionSummary(BaseModel):
         status = TrajectoryStatus(d.pop("status"))
 
         created_at = isoparse(d.pop("created_at"))
+
+        def _parse_agent(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        agent = _parse_agent(d.pop("agent", UNSET))
 
         def _parse_first_message(data: object) -> None | Unset | UserMessageEvent:
             if data is None:
@@ -165,6 +184,7 @@ class SessionSummary(BaseModel):
             id=id,
             status=status,
             created_at=created_at,
+            agent=agent,
             first_message=first_message,
             started_at=started_at,
             finished_at=finished_at,
