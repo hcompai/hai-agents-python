@@ -1,0 +1,54 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+
+      - name: Verify release tag matches package version
+        if: github.event_name == 'release'
+        run: |
+          VERSION=$(grep -m1 '^version = ' packages/sdk/pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "::error::Release tag '$TAG' does not match packages/sdk/pyproject.toml version '$VERSION'."
+            exit 1
+          fi
+          echo "Publishing hai-agents $VERSION"
+
+      - name: Build sdist and wheel
+        run: uv build packages/sdk --out-dir dist
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
