@@ -22,6 +22,8 @@
   &nbsp;·&nbsp;
   <a href="https://pypi.org/project/hai-agents/">PyPI</a>
   &nbsp;·&nbsp;
+  <a href="https://github.com/hcompai/hai-agents-ts">TypeScript SDK</a>
+  &nbsp;·&nbsp;
   <a href="https://hcompany.ai">H Company</a>
 </p>
 
