@@ -37,9 +37,9 @@ def main(
     output: OutputMode = typer.Option(
         OutputMode.AUTO, "--output", "-o", help="Output format. 'auto' uses tables on a TTY, JSON when piped."
     ),
-    region: str = typer.Option(None, "--region", help="API region: eu (default) or us.", envvar="H_REGION"),
-    base_url: str = typer.Option(None, "--base-url", help="Override the API base URL.", envvar="H_BASE_URL"),
-    token: str = typer.Option(None, "--token", help="API key.", envvar="H_API_KEY"),
+    region: str = typer.Option(None, "--region", help="API region: eu (default) or us.", envvar="HAI_REGION"),
+    base_url: str = typer.Option(None, "--base-url", help="Override the API base URL.", envvar="HAI_BASE_URL"),
+    token: str = typer.Option(None, "--token", help="API key.", envvar="HAI_API_KEY"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress and notes on stderr."),
     no_color: bool = typer.Option(False, "--no-color", help="Disable ANSI colors."),
     assume_yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompts."),

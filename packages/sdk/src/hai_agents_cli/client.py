@@ -12,7 +12,7 @@ _REGIONS = {"eu": HaiAgentsEnvironment.EU, "us": HaiAgentsEnvironment.US}
 
 def build_client(cfg: Config) -> Client:
     if not cfg.token:
-        raise typer.BadParameter("No API key. Set H_API_KEY, pass --token, or run 'hai configure'.")
+        raise typer.BadParameter("No API key. Set HAI_API_KEY, pass --token, or run 'hai configure' / 'hai login'.")
     if cfg.base_url:
         return Client(token=cfg.token, base_url=cfg.base_url)
     environment = _REGIONS.get(cfg.region)

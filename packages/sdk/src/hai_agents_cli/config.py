@@ -16,7 +16,7 @@ else:
     import tomli as tomllib
 
 DEFAULT_REGION = "eu"
-TOKEN_VAR = "H_API_KEY"
+TOKEN_VAR = "HAI_API_KEY"
 
 CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")) / "hai"
 CONFIG_PATH = CONFIG_DIR / "config.toml"
@@ -25,7 +25,7 @@ PORTAL_BASE = "https://portal.production.hcompany.ai"
 
 
 def portal_base() -> str:
-    return os.environ.get("H_PORTAL_URL") or PORTAL_BASE
+    return os.environ.get("HAI_PORTAL_URL") or PORTAL_BASE
 
 
 @dataclass(frozen=True)
@@ -56,9 +56,9 @@ def resolve(
     return Config(
         token=token or os.environ.get(TOKEN_VAR) or env.get(TOKEN_VAR) or saved.get("token"),
         region=(
-            region or os.environ.get("H_REGION") or env.get("H_REGION") or saved.get("region") or DEFAULT_REGION
+            region or os.environ.get("HAI_REGION") or env.get("HAI_REGION") or saved.get("region") or DEFAULT_REGION
         ).lower(),
-        base_url=base_url or os.environ.get("H_BASE_URL") or env.get("H_BASE_URL") or saved.get("base_url"),
+        base_url=base_url or os.environ.get("HAI_BASE_URL") or env.get("HAI_BASE_URL") or saved.get("base_url"),
     )
 
 
