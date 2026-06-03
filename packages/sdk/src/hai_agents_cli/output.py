@@ -70,6 +70,8 @@ class Output:
                 self.print_json(model)
             else:
                 self.out.print_json(json.dumps(to_jsonable(model), default=str))
+        elif getattr(view, "row_count", None) == 0:
+            self.note("[dim]Nothing to show.[/dim]")
         else:
             self.out.print(view)
 

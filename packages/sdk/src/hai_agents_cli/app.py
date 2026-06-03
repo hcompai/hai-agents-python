@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import os
 import socket
@@ -11,19 +12,40 @@ import typer
 from typer.main import get_command
 
 from . import auth
+from . import client as client_module
 from . import config as config_module
 from .commands import agent, environment, session, skill
 from .output import Output, OutputMode
 from .schema import describe
 from .state import AppState, get_state
+from .views import kv_table
+
+_EPILOG = """\
+[bold]Examples[/bold]
+  hai login
+  hai session run -a h/web-surfer-holo3-1-35b -m "Top 3 Hacker News stories?"
+  hai session list -o json | jq '.items[].id'
+"""
 
 app = typer.Typer(
     name="hai",
     help="Launch and steer H Company agents from your terminal.",
+    epilog=_EPILOG,
     no_args_is_help=True,
     add_completion=True,
     rich_markup_mode="rich",
 )
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        try:
+            version = importlib.metadata.version("hai-agents")
+        except importlib.metadata.PackageNotFoundError:
+            version = "unknown"
+        print(f"hai {version}")
+        raise typer.Exit()
+
 
 app.add_typer(session.app, name="session", help="Create, run, and steer sessions.")
 app.add_typer(agent.app, name="agent", help="Manage agents.")
@@ -44,6 +66,9 @@ def main(
     no_color: bool = typer.Option(False, "--no-color", help="Disable ANSI colors."),
     assume_yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompts."),
     no_input: bool = typer.Option(False, "--no-input", help="Never prompt; fail instead of asking."),
+    version: bool = typer.Option(
+        None, "--version", "-V", callback=_version_callback, is_eager=True, help="Show the version and exit."
+    ),
 ) -> None:
     ctx.obj = AppState(
         output=Output.create(output, quiet=quiet, no_color=no_color),
@@ -94,6 +119,29 @@ def logout(ctx: typer.Context) -> None:
     """Remove the stored API key from the local .env."""
     path = config_module.clear_env_key()
     get_state(ctx).output.note(f"Removed {config_module.TOKEN_VAR} from {path}." if path else "No stored key found.")
+
+
+@app.command()
+def whoami(ctx: typer.Context) -> None:
+    """Show the resolved region, endpoint, and API key (masked)."""
+    cfg = get_state(ctx).config
+    data = {
+        "region": cfg.region,
+        "base_url": client_module.effective_base_url(cfg),
+        "api_key": config_module.mask(cfg.token) if cfg.token else None,
+        "key_source": config_module.key_source(),
+    }
+    get_state(ctx).output.render(
+        data,
+        kv_table(
+            [
+                ("Region", data["region"]),
+                ("Endpoint", data["base_url"]),
+                ("API key", data["api_key"]),
+                ("Key source", data["key_source"]),
+            ]
+        ),
+    )
 
 
 @app.command()

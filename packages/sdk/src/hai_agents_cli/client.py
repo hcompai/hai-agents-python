@@ -10,6 +10,13 @@ from .config import Config
 _REGIONS = {"eu": HaiAgentsEnvironment.EU, "us": HaiAgentsEnvironment.US}
 
 
+def effective_base_url(cfg: Config) -> str | None:
+    """The URL requests will actually hit, given an explicit base_url or the region default."""
+    if cfg.base_url:
+        return cfg.base_url
+    return getattr(_REGIONS.get(cfg.region), "value", None)
+
+
 def build_client(cfg: Config) -> Client:
     if not cfg.token:
         raise typer.BadParameter("No API key. Set HAI_API_KEY, pass --token, or run 'hai configure' / 'hai login'.")

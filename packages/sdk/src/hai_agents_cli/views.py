@@ -91,6 +91,15 @@ def events_table(events: typing.Iterable[typing.Any]) -> Table:
     return table
 
 
+def kv_table(rows: typing.Iterable[tuple[str, typing.Any]]) -> Table:
+    table = Table(show_header=False, show_edge=False, box=None, pad_edge=False)
+    table.add_column(style="bold")
+    table.add_column()
+    for label, value in rows:
+        table.add_row(label, _str(value) if value is not None else Text("not set", style="dim"))
+    return table
+
+
 def event_line(index: int, event: typing.Any) -> Text:
     timestamp = getattr(event, "timestamp", None)
     stamp = timestamp.astimezone().strftime("%H:%M:%S") if isinstance(timestamp, dt.datetime) else ""

@@ -90,6 +90,22 @@ def clear_env_key() -> Path | None:
     return DOTENV_PATH
 
 
+def key_source() -> str | None:
+    """Where the resolved API key comes from, for ``hai whoami``."""
+    if os.environ.get(TOKEN_VAR):
+        return "environment"
+    if DOTENV_PATH.exists() and dotenv_values(DOTENV_PATH).get(TOKEN_VAR):
+        return str(DOTENV_PATH)
+    if _read_file().get("token"):
+        return str(CONFIG_PATH)
+    return None
+
+
+def mask(secret: str) -> str:
+    """Reveal just enough of a key to recognise it, hiding the rest."""
+    return f"{secret[:6]}...{secret[-2:]}" if len(secret) > 10 else "(set)"
+
+
 def save(token: str | None, region: str | None, base_url: str | None) -> Path:
     """Persist non-empty values to the config file with owner-only permissions."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
