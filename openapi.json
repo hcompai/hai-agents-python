@@ -2221,7 +2221,7 @@
             },
             "type": "array",
             "title": "Environments",
-            "description": "Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At least one, at most one per kind."
+            "description": "Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents (a pure orchestrator owns none)."
           },
           "model": {
             "anyOf": [
@@ -2944,6 +2944,18 @@
             ],
             "title": "Answer Format",
             "description": "JSON Schema the final answer must conform to. Null returns a free-form text answer."
+          },
+          "agent_artifact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Artifact",
+            "description": "Target version of the agent artifact to use."
           }
         },
         "type": "object",
