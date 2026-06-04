@@ -106,7 +106,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.list_sessions()
         """
@@ -193,7 +193,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.create_session(
             agent="agent",
@@ -233,7 +233,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.get_session_quota()
         """
@@ -261,7 +261,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.get_session(
             id="id",
@@ -290,7 +290,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.cancel_session(
             id="id",
@@ -320,7 +320,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.get_session_status(
             id="id",
@@ -358,7 +358,7 @@ class SessionsClient:
         from hai_agents.sessions import SendSessionMessagesRequestBody_UserMessage
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.send_session_messages(
             id="id",
@@ -391,7 +391,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.pause_session(
             id="id",
@@ -420,7 +420,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.resume_session(
             id="id",
@@ -449,7 +449,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.force_session_answer(
             id="id",
@@ -496,7 +496,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.get_session_changes(
             id="id",
@@ -550,7 +550,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.list_session_events(
             id="id",
@@ -592,7 +592,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.submit_session_feedback(
             id="id",
@@ -638,7 +638,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.submit_event_feedback(
             id="id",
@@ -672,7 +672,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.share_session(
             id="id",
@@ -701,7 +701,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.unshare_session(
             id="id",
@@ -736,7 +736,7 @@ class SessionsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.sessions.get_session_resource(
             id="id",
@@ -831,7 +831,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -926,7 +926,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -974,7 +974,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1010,7 +1010,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1047,7 +1047,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1087,7 +1087,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1133,7 +1133,7 @@ class AsyncSessionsClient:
         from hai_agents.sessions import SendSessionMessagesRequestBody_UserMessage
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1174,7 +1174,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1211,7 +1211,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1248,7 +1248,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1303,7 +1303,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1365,7 +1365,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1415,7 +1415,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1469,7 +1469,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1511,7 +1511,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1548,7 +1548,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -1591,7 +1591,7 @@ class AsyncSessionsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 

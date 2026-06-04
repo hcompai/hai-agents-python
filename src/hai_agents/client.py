@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import typing
 
 import httpx
+from .core.api_error import ApiError
 from .core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from .core.logging import LogConfig, Logger
 from .environment import HaiAgentsEnvironment
@@ -34,7 +36,7 @@ class Client:
 
 
 
-    token : typing.Union[str, typing.Callable[[], str]]
+    api_key : typing.Optional[typing.Union[str, typing.Callable[[], str]]]
     headers : typing.Optional[typing.Dict[str, str]]
         Additional headers to send with every request.
 
@@ -58,7 +60,7 @@ class Client:
     from hai_agents import Client
 
     client = Client(
-        token="YOUR_TOKEN",
+        api_key="YOUR_API_KEY",
     )
     """
 
@@ -67,7 +69,7 @@ class Client:
         *,
         base_url: typing.Optional[str] = None,
         environment: HaiAgentsEnvironment = HaiAgentsEnvironment.EU,
-        token: typing.Union[str, typing.Callable[[], str]],
+        api_key: typing.Optional[typing.Union[str, typing.Callable[[], str]]] = os.getenv("H_API_KEY"),
         headers: typing.Optional[typing.Dict[str, str]] = None,
         timeout: typing.Optional[float] = None,
         max_retries: typing.Optional[int] = None,
@@ -79,9 +81,11 @@ class Client:
             timeout if timeout is not None else 60 if httpx_client is None else httpx_client.timeout.read
         )
         _defaulted_max_retries = max_retries if max_retries is not None else 2
+        if api_key is None:
+            raise ApiError(body="The client must be instantiated be either passing in api_key or setting H_API_KEY")
         self._client_wrapper = SyncClientWrapper(
             base_url=_get_base_url(base_url=base_url, environment=environment),
-            token=token,
+            api_key=api_key,
             headers=headers,
             httpx_client=httpx_client
             if httpx_client is not None
@@ -166,7 +170,7 @@ class AsyncClient:
 
 
 
-    token : typing.Union[str, typing.Callable[[], str]]
+    api_key : typing.Optional[typing.Union[str, typing.Callable[[], str]]]
     headers : typing.Optional[typing.Dict[str, str]]
         Additional headers to send with every request.
 
@@ -193,7 +197,7 @@ class AsyncClient:
     from hai_agents import AsyncClient
 
     client = AsyncClient(
-        token="YOUR_TOKEN",
+        api_key="YOUR_API_KEY",
     )
     """
 
@@ -202,7 +206,7 @@ class AsyncClient:
         *,
         base_url: typing.Optional[str] = None,
         environment: HaiAgentsEnvironment = HaiAgentsEnvironment.EU,
-        token: typing.Union[str, typing.Callable[[], str]],
+        api_key: typing.Optional[typing.Union[str, typing.Callable[[], str]]] = os.getenv("H_API_KEY"),
         headers: typing.Optional[typing.Dict[str, str]] = None,
         async_token: typing.Optional[typing.Callable[[], typing.Awaitable[str]]] = None,
         timeout: typing.Optional[float] = None,
@@ -215,9 +219,11 @@ class AsyncClient:
             timeout if timeout is not None else 60 if httpx_client is None else httpx_client.timeout.read
         )
         _defaulted_max_retries = max_retries if max_retries is not None else 2
+        if api_key is None:
+            raise ApiError(body="The client must be instantiated be either passing in api_key or setting H_API_KEY")
         self._client_wrapper = AsyncClientWrapper(
             base_url=_get_base_url(base_url=base_url, environment=environment),
-            token=token,
+            api_key=api_key,
             headers=headers,
             async_token=async_token,
             httpx_client=httpx_client

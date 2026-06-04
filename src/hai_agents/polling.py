@@ -40,7 +40,7 @@ class CreateSessionParams(typing_extensions.TypedDict, total=False):
 
 @dataclass(frozen=True)
 class SessionRunResult:
-    """Result returned by ``run_session_until_done`` and ``wait_for_session``."""
+    """Result returned by ``run_session`` and ``wait_for_session``."""
 
     id: str
     status: TrajectoryStatus
@@ -155,7 +155,7 @@ def wait_for_session(
     raise TimeoutError(f"Session {id} did not reach a terminal status before max_polls={max_polls}")
 
 
-def run_session_until_done(
+def run_session(
     client: Client,
     *,
     wait_for_seconds: int = 20,
@@ -249,7 +249,7 @@ async def async_wait_for_session(
     raise TimeoutError(f"Session {id} did not reach a terminal status before max_polls={max_polls}")
 
 
-async def async_run_session_until_done(
+async def async_run_session(
     client: AsyncClient,
     *,
     wait_for_seconds: int = 20,
@@ -259,7 +259,7 @@ async def async_run_session_until_done(
     max_polls: typing.Optional[int] = None,
     **create_params: typing_extensions.Unpack[CreateSessionParams],
 ) -> SessionRunResult:
-    """Async version of ``run_session_until_done``."""
+    """Async version of ``run_session``."""
     assert_request_under_limit(dict(create_params))
     session = await client.sessions.create_session(**create_params)
     return await async_wait_for_session(
