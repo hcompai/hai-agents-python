@@ -21,16 +21,16 @@ jobs:
       - name: Verify release tag matches package version
         if: github.event_name == 'release'
         run: |
-          VERSION=$(grep -m1 '^version = ' packages/sdk/pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+          VERSION=$(grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
           TAG="${GITHUB_REF_NAME#v}"
           if [ "$VERSION" != "$TAG" ]; then
-            echo "::error::Release tag '$TAG' does not match packages/sdk/pyproject.toml version '$VERSION'."
+            echo "::error::Release tag '$TAG' does not match pyproject.toml version '$VERSION'."
             exit 1
           fi
           echo "Publishing hai-agents $VERSION"
 
       - name: Build sdist and wheel
-        run: uv build packages/sdk --out-dir dist
+        run: uv build --out-dir dist
 
       - uses: actions/upload-artifact@v5
         with:

@@ -33,7 +33,7 @@ jobs:
           languages: ${{ matrix.language }}
           config: |
             paths-ignore:
-              - "packages/sdk/src/**"
+              - "src/hai_agents/**"
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
