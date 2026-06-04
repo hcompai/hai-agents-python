@@ -37,14 +37,14 @@ Requires Python 3.10 or newer. Grab an API key at [portal.hcompany.ai](https://p
 
 ## Quickstart
 
-Launch the built-in `h/web-surfer-holo3-1-35b` agent, which ships with its own browser, and describe the task in plain language. `run_session_until_done` polls until the agent finishes and returns the final answer.
+Launch the built-in `h/web-surfer-holo3-1-35b` agent, which ships with its own browser, and describe the task in plain language. `run_session` polls until the agent finishes and returns the final answer.
 
 ```python
-from hai_agents import Client, run_session_until_done
+from hai_agents import Client, run_session
 
-client = Client(token="YOUR_API_KEY")
+client = Client(api_key="YOUR_API_KEY")  # or set H_API_KEY in the environment and call Client()
 
-result = run_session_until_done(
+result = run_session(
     client,
     agent="h/web-surfer-holo3-1-35b",
     messages="What are the top 3 stories on Hacker News right now?",

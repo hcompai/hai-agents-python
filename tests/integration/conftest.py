@@ -54,14 +54,14 @@ def base_url() -> str:
 
 
 @pytest.fixture(scope="session")
-def token() -> str:
+def api_key() -> str:
     return _require_key()
 
 
 @pytest.fixture
-def client(token: str, base_url: str) -> Client:
+def client(api_key: str, base_url: str) -> Client:
     """A fresh Client per test (cheap; no connection pool reuse needed)."""
-    return Client(token=token, base_url=base_url)
+    return Client(api_key=api_key, base_url=base_url)
 
 
 @pytest.fixture

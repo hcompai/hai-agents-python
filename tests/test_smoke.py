@@ -6,8 +6,8 @@ from hai_agents import AsyncClient, Client, SessionStatus
 
 
 def test_clients_construct_and_expose_resources() -> None:
-    client = Client(token="hk-smoke", base_url="http://x")
-    AsyncClient(token="hk-smoke", base_url="http://x")
+    client = Client(api_key="hk-smoke", base_url="http://x")
+    AsyncClient(api_key="hk-smoke", base_url="http://x")
     for resource in ("sessions", "agents", "skills", "environments"):
         assert hasattr(client, resource), f"missing resource namespace: {resource}"
 
