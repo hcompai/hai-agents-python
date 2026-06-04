@@ -162,6 +162,7 @@ class RawSessionsClient:
         group_id: typing.Optional[str] = OMIT,
         parent_session_id: typing.Optional[str] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        agent_artifact: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Session]:
         """
@@ -198,6 +199,9 @@ class RawSessionsClient:
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the final answer must conform to. Null returns a free-form text answer.
 
+        agent_artifact : typing.Optional[str]
+            Target version of the agent artifact to use.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -222,6 +226,7 @@ class RawSessionsClient:
                 "group_id": group_id,
                 "parent_session_id": parent_session_id,
                 "answer_format": answer_format,
+                "agent_artifact": agent_artifact,
             },
             headers={
                 "content-type": "application/json",
@@ -1199,6 +1204,7 @@ class AsyncRawSessionsClient:
         group_id: typing.Optional[str] = OMIT,
         parent_session_id: typing.Optional[str] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        agent_artifact: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Session]:
         """
@@ -1235,6 +1241,9 @@ class AsyncRawSessionsClient:
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the final answer must conform to. Null returns a free-form text answer.
 
+        agent_artifact : typing.Optional[str]
+            Target version of the agent artifact to use.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -1259,6 +1268,7 @@ class AsyncRawSessionsClient:
                 "group_id": group_id,
                 "parent_session_id": parent_session_id,
                 "answer_format": answer_format,
+                "agent_artifact": agent_artifact,
             },
             headers={
                 "content-type": "application/json",

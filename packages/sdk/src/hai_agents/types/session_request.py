@@ -55,6 +55,11 @@ class SessionRequest(UniversalBaseModel):
     JSON Schema the final answer must conform to. Null returns a free-form text answer.
     """
 
+    agent_artifact: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    Target version of the agent artifact to use.
+    """
+
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
     else:
