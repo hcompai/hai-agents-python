@@ -3,7 +3,7 @@
 test: test-unit
 
 test-unit:
-	uv run pytest packages/sdk/tests -m "not integration"
+	uv run pytest tests -m "not integration"
 
 test-integration:
-	uv run pytest packages/sdk/tests/integration -m "integration and not slow"
+	uv run pytest tests/integration -m "integration and not slow"
