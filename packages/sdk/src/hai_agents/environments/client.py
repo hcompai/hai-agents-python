@@ -78,7 +78,7 @@ class EnvironmentsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.environments.list_environments()
         """
@@ -111,7 +111,7 @@ class EnvironmentsClient:
         from hai_agents.environments import CreateEnvironmentRequest_Web
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.environments.create_environment(
             request=CreateEnvironmentRequest_Web(
@@ -146,7 +146,7 @@ class EnvironmentsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.environments.get_environment(
             id="id",
@@ -181,7 +181,7 @@ class EnvironmentsClient:
         from hai_agents.environments import UpdateEnvironmentRequestBody_Web
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.environments.update_environment(
             id="id",
@@ -216,7 +216,7 @@ class EnvironmentsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.environments.delete_environment(
             id="id",
@@ -290,7 +290,7 @@ class AsyncEnvironmentsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -331,7 +331,7 @@ class AsyncEnvironmentsClient:
         from hai_agents.environments import CreateEnvironmentRequest_Web
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -374,7 +374,7 @@ class AsyncEnvironmentsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -417,7 +417,7 @@ class AsyncEnvironmentsClient:
         from hai_agents.environments import UpdateEnvironmentRequestBody_Web
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -460,7 +460,7 @@ class AsyncEnvironmentsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 

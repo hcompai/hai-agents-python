@@ -74,7 +74,7 @@ class AgentsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.agents.list_agents()
         """
@@ -134,7 +134,7 @@ class AgentsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.agents.create_agent(
             name="name",
@@ -175,7 +175,7 @@ class AgentsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.agents.get_agent(
             agent_name="agent_name",
@@ -238,7 +238,7 @@ class AgentsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.agents.update_agent(
             agent_name="agent_name",
@@ -280,7 +280,7 @@ class AgentsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.agents.delete_agent(
             agent_name="agent_name",
@@ -350,7 +350,7 @@ class AsyncAgentsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -418,7 +418,7 @@ class AsyncAgentsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -467,7 +467,7 @@ class AsyncAgentsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -538,7 +538,7 @@ class AsyncAgentsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -588,7 +588,7 @@ class AsyncAgentsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 

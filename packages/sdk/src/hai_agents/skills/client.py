@@ -71,7 +71,7 @@ class SkillsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.skills.list_skills()
         """
@@ -123,7 +123,7 @@ class SkillsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.skills.create_skill(
             name="name",
@@ -162,7 +162,7 @@ class SkillsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.skills.get_skill(
             name="name",
@@ -217,7 +217,7 @@ class SkillsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.skills.update_skill(
             name_="name",
@@ -257,7 +257,7 @@ class SkillsClient:
         from hai_agents import Client
 
         client = Client(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
         client.skills.delete_skill(
             name="name",
@@ -327,7 +327,7 @@ class AsyncSkillsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -387,7 +387,7 @@ class AsyncSkillsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -434,7 +434,7 @@ class AsyncSkillsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -497,7 +497,7 @@ class AsyncSkillsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
@@ -545,7 +545,7 @@ class AsyncSkillsClient:
         from hai_agents import AsyncClient
 
         client = AsyncClient(
-            token="YOUR_TOKEN",
+            api_key="YOUR_API_KEY",
         )
 
 
