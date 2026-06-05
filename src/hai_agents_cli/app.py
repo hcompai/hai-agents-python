@@ -98,13 +98,12 @@ def logout() -> None:
 
 @app.command()
 def whoami(ctx: typer.Context) -> None:
-    """Show the resolved endpoint and API key (masked)."""
+    """Show the resolved endpoint and authentication status."""
     state = _state(ctx)
-    key = credentials.current_api_key(state.api_key)
-    base_url = credentials.resolve_base_url(state.base_url)
+    authenticated = credentials.current_api_key(state.api_key) is not None
     data = {
-        "base_url": base_url,
-        "api_key": credentials.mask(key) if isinstance(key, str) else None,
+        "base_url": credentials.resolve_base_url(state.base_url),
+        "authenticated": authenticated,
         "key_source": credentials.api_key_source(),
     }
     if state.json_output:
@@ -112,7 +111,7 @@ def whoami(ctx: typer.Context) -> None:
         return
     table = Table("Field", "Value", show_header=False)
     table.add_row("Endpoint", data["base_url"] or "(SDK default)")
-    table.add_row("API key", data["api_key"] or "(none)")
+    table.add_row("Authenticated", "yes" if authenticated else "no")
     table.add_row("Key source", data["key_source"] or "(none)")
     console.print(table)
 

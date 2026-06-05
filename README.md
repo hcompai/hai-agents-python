@@ -84,8 +84,8 @@ hai sessions share <session-id>
 ```
 
 `hai login` opens your browser, mints a per-machine API key, and writes it to
-`~/.config/hai/.env`. `hai whoami` shows the resolved endpoint and key; `hai logout`
-removes it.
+`~/.config/hai/.env`. `hai whoami` shows the resolved endpoint and whether you are
+authenticated; `hai logout` removes the stored key.
 
 Credentials resolve from flags, then `HAI_API_KEY`/`H_API_KEY` in the environment,
 then a local `.env`, then `~/.config/hai/.env`. Use `--base-url` or `HAI_API_BASE_URL`

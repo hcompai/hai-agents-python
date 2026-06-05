@@ -99,11 +99,6 @@ def api_key_source() -> str | None:
     return None
 
 
-def mask(secret: str) -> str:
-    """Reveal just enough of a key to recognize it."""
-    return f"{secret[:6]}...{secret[-2:]}" if len(secret) > 10 else "(set)"
-
-
 def _client_kwargs(api_key: ApiKey | None, base_url: str | None) -> dict[str, ApiKey | str]:
     kwargs: dict[str, ApiKey | str] = {"api_key": resolve_api_key(api_key)}
     resolved_base_url = resolve_base_url(base_url)
