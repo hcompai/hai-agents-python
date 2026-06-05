@@ -24,7 +24,7 @@ jobs:
       - name: Install SDK + dev deps
         run: |
           python3 -m venv /tmp/sdk-venv
-          /tmp/sdk-venv/bin/pip install --quiet -e . "pytest>=8,<9" "python-dotenv>=1,<2"
+          /tmp/sdk-venv/bin/pip install --quiet -e . "pytest>=8,<9" "pytest-asyncio>=1.2,<2" "python-dotenv>=1,<2"
 
       - name: Smoke import
         run: /tmp/sdk-venv/bin/python -c "from hai_agents import Client, AsyncClient; Client(api_key='hk-smoke', base_url='http://x'); print('SDK install + import OK')"
@@ -32,8 +32,17 @@ jobs:
       - name: Unit tests
         run: /tmp/sdk-venv/bin/pytest tests -m "not integration" -v
 
+      - name: Install extras
+        run: /tmp/sdk-venv/bin/pip install --quiet -e packages/sdk-extras
+
+      - name: Extras unit + MCP contract tests
+        run: /tmp/sdk-venv/bin/pytest packages/sdk-extras/tests -m "not integration" -v
+
       - name: Collect integration tests
         run: /tmp/sdk-venv/bin/pytest tests/integration --collect-only -m integration -q
+
+      - name: Collect extras integration tests
+        run: /tmp/sdk-venv/bin/pytest packages/sdk-extras/tests/integration --collect-only -m integration -q
 
   integration-live:
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
@@ -50,8 +59,14 @@ jobs:
         run: |
           python3 -m venv /tmp/sdk-venv
           /tmp/sdk-venv/bin/pip install --quiet --index-url https://pypi.org/simple \
-            -e . "pytest>=8,<9" "python-dotenv>=1,<2"
+            -e . "pytest>=8,<9" "pytest-asyncio>=1.2,<2" "python-dotenv>=1,<2"
+          /tmp/sdk-venv/bin/pip install --quiet --index-url https://pypi.org/simple \
+            -e packages/sdk-extras
 
       - name: Run fast integration tier
         if: env.HAI_API_KEY_TEST != ''
         run: /tmp/sdk-venv/bin/pytest tests/integration -m "integration and not slow" -v --tb=short
+
+      - name: Run extras integration tier
+        if: env.HAI_API_KEY_TEST != ''
+        run: /tmp/sdk-venv/bin/pytest packages/sdk-extras/tests/integration -m integration -v --tb=short
