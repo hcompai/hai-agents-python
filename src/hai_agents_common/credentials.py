@@ -88,8 +88,8 @@ def clear_api_key() -> Path | None:
     return GLOBAL_ENV_PATH
 
 
-def api_key_source() -> str | None:
-    """Where the resolved API key comes from, for `hai whoami`."""
+def source() -> str | None:
+    """Where the resolved credential comes from (`environment` or a file path), for `hai whoami`."""
     for name in API_KEY_ENV_VARS:
         if os.environ.get(name):
             return "environment"

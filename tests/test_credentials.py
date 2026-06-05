@@ -24,7 +24,7 @@ def test_env_var_beats_dotenv(monkeypatch):
     monkeypatch.setenv("HAI_API_KEY", "hk-from-env")
 
     assert credentials.resolve_api_key() == "hk-from-env"
-    assert credentials.api_key_source() == "environment"
+    assert credentials.source() == "environment"
 
 
 def test_local_dotenv_overrides_global():
@@ -32,7 +32,7 @@ def test_local_dotenv_overrides_global():
     credentials.LOCAL_ENV_PATH.write_text("HAI_API_KEY=hk-local\n")
 
     assert credentials.resolve_api_key() == "hk-local"
-    assert credentials.api_key_source() == str(credentials.LOCAL_ENV_PATH)
+    assert credentials.source() == str(credentials.LOCAL_ENV_PATH)
 
 
 def test_h_api_key_is_a_fallback(monkeypatch):

@@ -104,7 +104,7 @@ def whoami(ctx: typer.Context) -> None:
     data = {
         "base_url": credentials.resolve_base_url(state.base_url),
         "authenticated": authenticated,
-        "key_source": credentials.api_key_source(),
+        "source": credentials.source(),
     }
     if state.json_output:
         _print_json(data)
@@ -112,7 +112,7 @@ def whoami(ctx: typer.Context) -> None:
     table = Table("Field", "Value", show_header=False)
     table.add_row("Endpoint", data["base_url"] or "(SDK default)")
     table.add_row("Authenticated", "yes" if authenticated else "no")
-    table.add_row("Key source", data["key_source"] or "(none)")
+    table.add_row("Key source", data["source"] or "(none)")
     console.print(table)
 
 
