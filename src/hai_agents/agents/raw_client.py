@@ -212,14 +212,21 @@ class RawAgentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     def get_agent(
-        self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None
+        self,
+        agent_name: str,
+        *,
+        resolve: typing.Optional[bool] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Agent]:
         """
-        Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
+        Fetch by identifier; 404 if not visible. ``resolve=true`` materialises spec leaves.
 
         Parameters
         ----------
         agent_name : str
+
+        resolve : typing.Optional[bool]
+            Materialise string environment/skill/subagent leaves into full specs.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -232,6 +239,9 @@ class RawAgentsClient:
         _response = self._client_wrapper.httpx_client.request(
             f"api/v2/agents/{encode_path_param(agent_name)}",
             method="GET",
+            params={
+                "resolve": resolve,
+            },
             request_options=request_options,
         )
         try:
@@ -602,14 +612,21 @@ class AsyncRawAgentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     async def get_agent(
-        self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None
+        self,
+        agent_name: str,
+        *,
+        resolve: typing.Optional[bool] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Agent]:
         """
-        Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
+        Fetch by identifier; 404 if not visible. ``resolve=true`` materialises spec leaves.
 
         Parameters
         ----------
         agent_name : str
+
+        resolve : typing.Optional[bool]
+            Materialise string environment/skill/subagent leaves into full specs.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -622,6 +639,9 @@ class AsyncRawAgentsClient:
         _response = await self._client_wrapper.httpx_client.request(
             f"api/v2/agents/{encode_path_param(agent_name)}",
             method="GET",
+            params={
+                "resolve": resolve,
+            },
             request_options=request_options,
         )
         try:

@@ -2053,7 +2053,7 @@
           "Agents"
         ],
         "summary": "Get Agent",
-        "description": "Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.",
+        "description": "Fetch by identifier; 404 if not visible. ``resolve=true`` materialises spec leaves.",
         "operationId": "get_agent_api_v2_agents__agent_name__get",
         "security": [
           {
@@ -2069,6 +2069,18 @@
               "type": "string",
               "title": "Agent Name"
             }
+          },
+          {
+            "name": "resolve",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Materialise string environment/skill/subagent leaves into full specs.",
+              "default": false,
+              "title": "Resolve"
+            },
+            "description": "Materialise string environment/skill/subagent leaves into full specs."
           }
         ],
         "responses": {

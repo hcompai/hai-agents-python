@@ -154,13 +154,22 @@ class AgentsClient:
         )
         return _response.data
 
-    def get_agent(self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None) -> Agent:
+    def get_agent(
+        self,
+        agent_name: str,
+        *,
+        resolve: typing.Optional[bool] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Agent:
         """
-        Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
+        Fetch by identifier; 404 if not visible. ``resolve=true`` materialises spec leaves.
 
         Parameters
         ----------
         agent_name : str
+
+        resolve : typing.Optional[bool]
+            Materialise string environment/skill/subagent leaves into full specs.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -181,7 +190,7 @@ class AgentsClient:
             agent_name="agent_name",
         )
         """
-        _response = self._raw_client.get_agent(agent_name, request_options=request_options)
+        _response = self._raw_client.get_agent(agent_name, resolve=resolve, request_options=request_options)
         return _response.data
 
     def update_agent(
@@ -444,13 +453,22 @@ class AsyncAgentsClient:
         )
         return _response.data
 
-    async def get_agent(self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None) -> Agent:
+    async def get_agent(
+        self,
+        agent_name: str,
+        *,
+        resolve: typing.Optional[bool] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Agent:
         """
-        Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
+        Fetch by identifier; 404 if not visible. ``resolve=true`` materialises spec leaves.
 
         Parameters
         ----------
         agent_name : str
+
+        resolve : typing.Optional[bool]
+            Materialise string environment/skill/subagent leaves into full specs.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -479,7 +497,7 @@ class AsyncAgentsClient:
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.get_agent(agent_name, request_options=request_options)
+        _response = await self._raw_client.get_agent(agent_name, resolve=resolve, request_options=request_options)
         return _response.data
 
     async def update_agent(
