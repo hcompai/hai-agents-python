@@ -10,13 +10,19 @@ from dataclasses import dataclass
 
 import typing_extensions
 
-from .client import AsyncClient, Client
 from .types.session_request_agent import SessionRequestAgent
 from .types.session_request_messages import SessionRequestMessages
 from .types.trajectory_changes import TrajectoryChanges
 from .types.trajectory_changes_answer import TrajectoryChangesAnswer
 from .types.trajectory_event import TrajectoryEvent
 from .types.trajectory_status import TrajectoryStatus
+
+# Type-only: the client subclasses import from this module, so importing them at
+# runtime here would be circular. Annotations are strings (PEP 563), so this is safe.
+if typing.TYPE_CHECKING:
+    from .client import AsyncClient, Client
+    from .types.session import Session
+    from .types.session_status import SessionStatus
 
 TERMINAL_SESSION_STATUSES = frozenset({"completed", "failed", "timed_out", "interrupted"})
 
@@ -271,3 +277,75 @@ async def async_run_session(
         poll_backoff_seconds=poll_backoff_seconds,
         max_polls=max_polls,
     )
+
+
+class SessionHandle:
+    """A created session bound to its client: object-oriented sugar over the polling helpers."""
+
+    def __init__(self, client: Client, id: str) -> None:
+        self._client = client
+        self.id = id
+
+    def get(self) -> Session:
+        return self._client.sessions.get_session(self.id)
+
+    def status(self) -> SessionStatus:
+        return self._client.sessions.get_session_status(self.id)
+
+    def changes(self, *, from_index: int = 0, **kwargs: typing.Any) -> typing.Optional[TrajectoryChanges]:
+        return self._client.sessions.get_session_changes(self.id, from_index=from_index, **kwargs)
+
+    def send_message(self, message: typing.Any) -> None:
+        self._client.sessions.send_session_messages(self.id, request=message)
+
+    def pause(self) -> None:
+        self._client.sessions.pause_session(self.id)
+
+    def resume(self) -> None:
+        self._client.sessions.resume_session(self.id)
+
+    def cancel(self) -> None:
+        self._client.sessions.cancel_session(self.id)
+
+    def force_answer(self) -> None:
+        self._client.sessions.force_session_answer(self.id)
+
+    def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult:
+        """Block until the session reaches a terminal status; returns the result and final answer."""
+        return wait_for_session(self._client, self.id, **kwargs)
+
+
+class AsyncSessionHandle:
+    """Async version of :class:`SessionHandle`."""
+
+    def __init__(self, client: AsyncClient, id: str) -> None:
+        self._client = client
+        self.id = id
+
+    async def get(self) -> Session:
+        return await self._client.sessions.get_session(self.id)
+
+    async def status(self) -> SessionStatus:
+        return await self._client.sessions.get_session_status(self.id)
+
+    async def changes(self, *, from_index: int = 0, **kwargs: typing.Any) -> typing.Optional[TrajectoryChanges]:
+        return await self._client.sessions.get_session_changes(self.id, from_index=from_index, **kwargs)
+
+    async def send_message(self, message: typing.Any) -> None:
+        await self._client.sessions.send_session_messages(self.id, request=message)
+
+    async def pause(self) -> None:
+        await self._client.sessions.pause_session(self.id)
+
+    async def resume(self) -> None:
+        await self._client.sessions.resume_session(self.id)
+
+    async def cancel(self) -> None:
+        await self._client.sessions.cancel_session(self.id)
+
+    async def force_answer(self) -> None:
+        await self._client.sessions.force_session_answer(self.id)
+
+    async def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult:
+        """Block until the session reaches a terminal status; returns the result and final answer."""
+        return await async_wait_for_session(self._client, self.id, **kwargs)
