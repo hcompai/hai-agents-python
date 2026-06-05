@@ -224,7 +224,7 @@ def share(ctx: typer.Context, session_id: str = typer.Argument(...)) -> None:
     if state.json_output:
         _print_json({"share_url": share_url})
     else:
-        console.print(share_url)
+        print(share_url)
 
 
 app.add_typer(sessions_app, name="sessions")
@@ -270,7 +270,8 @@ def _print_ack(action: str, json_output: bool) -> None:
 
 
 def _print_json(value) -> None:
-    console.print(json.dumps(to_jsonable(value), indent=2, sort_keys=True))
+    # Emit raw JSON to stdout; rich's Console would soft-wrap and corrupt long values.
+    print(json.dumps(to_jsonable(value), indent=2, sort_keys=True))
 
 
 def _status_text(status) -> str:

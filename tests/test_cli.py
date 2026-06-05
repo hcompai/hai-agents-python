@@ -7,6 +7,7 @@ from typer.testing import CliRunner
 import hai_agents_cli.app as app_module
 from hai_agents.polling import SessionRunResult
 from hai_agents_cli.app import app
+from hai_agents_common import credentials
 
 runner = CliRunner()
 
@@ -19,9 +20,11 @@ def test_help_renders_h_glyph() -> None:
     assert "hai" in result.output
 
 
-def test_missing_api_key_is_clear(monkeypatch) -> None:
+def test_missing_api_key_is_clear(monkeypatch, tmp_path) -> None:
     monkeypatch.delenv("HAI_API_KEY", raising=False)
     monkeypatch.delenv("H_API_KEY", raising=False)
+    monkeypatch.setattr(credentials, "LOCAL_ENV_PATH", tmp_path / "local.env")
+    monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", tmp_path / "global.env")
 
     result = runner.invoke(app, ["sessions", "get", "sess_1"], env={})
 
@@ -48,6 +51,26 @@ def test_share_session_prints_absolute_url(monkeypatch) -> None:
 
     assert result.exit_code == 0, result.output
     assert "https://agp.example.test/share/sess_1" in result.output
+
+
+def test_json_output_is_pipe_safe_for_long_values(monkeypatch) -> None:
+    long_id = "x" * 200
+
+    class _LongSessions:
+        def share_session(self, session_id: str):
+            return type("Share", (), {"share_url": f"/share/{long_id}"})()
+
+    class _LongClient:
+        _client_wrapper = _ClientWrapper()
+        sessions = _LongSessions()
+
+    monkeypatch.setattr(app_module, "_client", lambda state: _LongClient())
+
+    result = runner.invoke(app, ["--json", "sessions", "share", "sess_1"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)  # raises if rich wrapped the value mid-string
+    assert payload["share_url"].endswith(long_id)
 
 
 def test_state_missing_is_a_programming_error() -> None:
