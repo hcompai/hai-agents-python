@@ -373,7 +373,7 @@ class RawAgentsClient:
         self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> HttpResponse[None]:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete by identifier. Reserved rows: H admin only.
 
         Parameters
         ----------
@@ -763,7 +763,7 @@ class AsyncRawAgentsClient:
         self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> AsyncHttpResponse[None]:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete by identifier. Reserved rows: H admin only.
 
         Parameters
         ----------

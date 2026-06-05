@@ -1475,7 +1475,7 @@
           "Skills"
         ],
         "summary": "Delete Skill",
-        "description": "Delete by name. Reserved rows: H employee only.",
+        "description": "Delete by name. Reserved rows: H admin only.",
         "operationId": "delete_skill_api_v2_skills__name__delete",
         "security": [
           {
@@ -1835,7 +1835,7 @@
           "Environments"
         ],
         "summary": "Delete Environment",
-        "description": "Delete by identifier. Reserved rows: H employee only.",
+        "description": "Delete by identifier. Reserved rows: H admin only.",
         "operationId": "delete_environment_api_v2_environments__id__delete",
         "security": [
           {
@@ -2155,7 +2155,7 @@
           "Agents"
         ],
         "summary": "Delete Agent",
-        "description": "Delete by identifier. Reserved rows: H employee only.",
+        "description": "Delete by identifier. Reserved rows: H admin only.",
         "operationId": "delete_agent_api_v2_agents__agent_name__delete",
         "security": [
           {

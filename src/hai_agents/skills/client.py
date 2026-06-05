@@ -239,7 +239,7 @@ class SkillsClient:
 
     def delete_skill(self, name: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         """
-        Delete by name. Reserved rows: H employee only.
+        Delete by name. Reserved rows: H admin only.
 
         Parameters
         ----------
@@ -525,7 +525,7 @@ class AsyncSkillsClient:
 
     async def delete_skill(self, name: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         """
-        Delete by name. Reserved rows: H employee only.
+        Delete by name. Reserved rows: H admin only.
 
         Parameters
         ----------
