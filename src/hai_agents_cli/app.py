@@ -21,6 +21,17 @@ from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
 
 from . import auth
+from .hosts import (
+    CLIENTS,
+    Status,
+    host_present,
+    host_target,
+    unwire_mcp,
+    unwire_skill,
+    wire_mcp,
+    wire_skill,
+)
+from .hosts import Client as HostClient
 
 H_GLYPH = "\n".join(
     (
@@ -224,6 +235,80 @@ def share(ctx: typer.Context, session_id: str = typer.Argument(...)) -> None:
         _print_json({"share_url": share_url})
     else:
         print(share_url)
+
+
+_STATUS_STYLE: dict[Status, tuple[str, str]] = {
+    Status.INSTALLED: ("[bold green]+[/bold green]", "dim"),
+    Status.REMOVED: ("[bold green]-[/bold green]", "dim"),
+    Status.SKIPPED: ("[dim green].[/dim green]", "dim"),
+    Status.ABSENT: ("[yellow]o[/yellow]", "yellow"),
+    Status.FAILED: ("[bold red]x[/bold red]", "red"),
+}
+_ID_WIDTH = max(len(host_id) for host_id in CLIENTS)
+
+
+@app.command()
+def install(
+    host: str = typer.Argument(None, help="Host id, 'list' to enumerate, or omit to wire all detected."),
+) -> None:
+    """Wire the hai MCP server (and a delegation skill) into MCP hosts like Cursor or Claude Code."""
+    if host == "list":
+        _list_hosts()
+        return
+    _apply_hosts(host, wire_mcp, wire_skill, verb="install")
+
+
+@app.command()
+def uninstall(
+    host: str = typer.Argument(None, help="Host id, or omit to remove from all detected."),
+) -> None:
+    """Remove the hai MCP server and delegation skill from MCP hosts."""
+    _apply_hosts(host, unwire_mcp, unwire_skill, verb="uninstall")
+
+
+def _list_hosts() -> None:
+    console.print()
+    for host_id, c in CLIENTS.items():
+        glyph = "[green]+[/green]" if host_present(c) else "[dim].[/dim]"
+        console.print(f"  {glyph} [bold cyan]{host_id:<{_ID_WIDTH}}[/bold cyan]  [dim]{host_target(c)}[/dim]")
+    console.print("\n  [dim]+ = detected; wire with[/dim] [cyan]hai install <id>[/cyan]\n")
+
+
+def _resolve_targets(host: str | None) -> list[tuple[str, HostClient]]:
+    if host is None:
+        targets = [(host_id, c) for host_id, c in CLIENTS.items() if host_present(c)]
+        if not targets:
+            err_console.print("[yellow]No supported hosts detected.[/yellow] Try [cyan]hai install list[/cyan].")
+            raise typer.Exit(1)
+        return targets
+    if host in CLIENTS:
+        return [(host, CLIENTS[host])]
+    err_console.print(f"[red]Error:[/red] unknown host {host!r}. Try [cyan]hai install list[/cyan].")
+    raise typer.Exit(2)
+
+
+def _apply_hosts(host: str | None, mcp_fn, skill_fn, verb: str) -> None:
+    targets = _resolve_targets(host)
+    console.print()
+    failed = False
+    for host_id, c in targets:
+        status, detail = mcp_fn(c)
+        glyph, color = _STATUS_STYLE[status]
+        line = f"  {glyph} [bold cyan]{host_id:<{_ID_WIDTH}}[/bold cyan]  [{color}]{detail}[/{color}]"
+        skill_fatal = False
+        if c.skills_dir is not None:
+            s_status, s_detail = skill_fn(c)
+            skill_fatal = s_status.fatal
+            if s_status.ok:
+                line += f"  [dim]-> {s_detail}[/dim]"
+            else:
+                s_glyph, s_color = _STATUS_STYLE[s_status]
+                line += f"  {s_glyph} [{s_color}]{s_detail}[/{s_color}]"
+        console.print(line)
+        failed |= status.fatal or skill_fatal
+    console.print()
+    if failed:
+        raise typer.Exit(1)
 
 
 app.add_typer(sessions_app, name="sessions")

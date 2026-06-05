@@ -118,6 +118,23 @@ Example MCP client configuration:
 The MCP server exposes tools to run an agent task, list available agents, inspect
 sessions, send follow-up messages, cancel sessions, and create share URLs.
 
+### Plug into your coding agent
+
+`hai install` wires the MCP server into MCP hosts on your machine. It merges the
+server into each host's config (preserving anything already there) and, for hosts
+that support Agent Skills, drops in a skill that teaches the host when to delegate
+to H agents.
+
+```bash
+hai install            # wire every detected host
+hai install cursor     # wire one host
+hai install list       # show supported hosts and which are detected
+hai uninstall          # remove from detected hosts
+```
+
+Supported hosts: Cursor, Claude Code, Claude Desktop, Codex, GitHub Copilot CLI,
+OpenCode, and Antigravity. Requires the `mcp` extra so `hai-mcp` is on your PATH.
+
 ## Documentation
 
 Guides, core concepts, and the full API reference live at **[hub.hcompany.ai/agent-api](https://hub.hcompany.ai/agent-api)**, covering streaming progress, steering a live session, regions, structured output, and error handling.
