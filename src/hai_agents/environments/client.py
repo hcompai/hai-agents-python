@@ -198,7 +198,7 @@ class EnvironmentsClient:
 
     def delete_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete by identifier. Reserved rows: H admin only.
 
         Parameters
         ----------
@@ -440,7 +440,7 @@ class AsyncEnvironmentsClient:
 
     async def delete_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete by identifier. Reserved rows: H admin only.
 
         Parameters
         ----------
