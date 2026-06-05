@@ -1,4 +1,4 @@
-"""Small JSON helpers for CLI and MCP responses."""
+"""Small JSON helpers for MCP responses."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ def to_jsonable(value: Any) -> Any:
     """Convert SDK/Pydantic objects into JSON-compatible values.
 
     Args:
-        value: Arbitrary value returned by the SDK or extras package.
+        value: Arbitrary value returned by the SDK.
 
     Returns:
         A JSON-compatible value.
