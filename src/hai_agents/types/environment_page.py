@@ -10,11 +10,6 @@ from .environment import Environment
 class EnvironmentPage(UniversalBaseModel):
     """
     Named page subclass so OpenAPI emits a clean ``EnvironmentPage`` schema name.
-
-    ``Environment`` is ``Annotated[Browser | CodeSandbox | MCP | Memory, Field(discriminator="kind")]``
-    and has no ``__name__``. Without this subclass, Pydantic titles ``Page[Environment]``
-    by repr()ing the type parameter, producing a 95-char schema name that leaks
-    Pydantic FieldInfo into generated SDKs.
     """
 
     items: typing.List[Environment]

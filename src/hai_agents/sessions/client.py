@@ -146,9 +146,6 @@ class SessionsClient:
         """
         Create an agentic session.
 
-        Pass ``Idempotency-Key`` for safe retries: identical requests within 24h
-        return the original session; reuse with a different body returns 422.
-
         Parameters
         ----------
         agent : SessionRequestAgent
@@ -876,9 +873,6 @@ class AsyncSessionsClient:
     ) -> Session:
         """
         Create an agentic session.
-
-        Pass ``Idempotency-Key`` for safe retries: identical requests within 24h
-        return the original session; reuse with a different body returns 422.
 
         Parameters
         ----------
