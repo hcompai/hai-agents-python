@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
+import socket
+import sys
 from dataclasses import dataclass
 from typing import NoReturn
 
-import click
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -14,10 +15,12 @@ from rich.table import Table
 from hai_agents import Client, run_session
 from hai_agents.core.api_error import ApiError
 from hai_agents.sessions import SendSessionMessagesRequestBody_UserMessage
-from hai_agents.types import PageSessionSummary, SessionSummary
+from hai_agents.types import PageSessionSummary
+from hai_agents_common import credentials
+from hai_agents_common.credentials import absolute_share_url, make_client
+from hai_agents_common.jsonable import to_jsonable
 
-from ._client import absolute_share_url, make_client
-from ._json import to_jsonable
+from . import auth
 
 H_GLYPH = "\n".join(
     (
@@ -32,6 +35,7 @@ H_GLYPH = "\n".join(
 DEFAULT_AGENT = "h/web-surfer-holo3-1-35b"
 
 console = Console()
+err_console = Console(stderr=True)
 
 app = typer.Typer(
     name="hai",
@@ -59,6 +63,58 @@ def configure(
     json_output: bool = typer.Option(False, "--json", help="Print machine-readable JSON."),
 ) -> None:
     ctx.obj = AppState(api_key=api_key, base_url=base_url, json_output=json_output)
+
+
+@app.command()
+def login(
+    force: bool = typer.Option(False, "--force", help="Re-authenticate and rotate the stored key."),
+) -> None:
+    """Sign in through the browser and store an API key in ~/.config/hai/.env."""
+    if credentials.current_api_key() and not force:
+        console.print("Already signed in. Pass --force to rotate the key.")
+        return
+    if not sys.stdin.isatty():
+        _raise_cli_error(RuntimeError("login needs an interactive terminal and a browser."))
+
+    label = f"hai CLI ({socket.gethostname()})"
+    try:
+        key = auth.login_and_mint(
+            credentials.portal_base(),
+            label,
+            lambda url: console.print(f"Opening your browser. If it does not open, visit:\n  {url}", style="dim"),
+        )
+    except Exception as exc:
+        _raise_cli_error(exc)
+    path = credentials.save_api_key(key)
+    console.print(f"Signed in. Wrote {credentials.API_KEY_VAR} to {path}.")
+
+
+@app.command()
+def logout() -> None:
+    """Remove the stored API key from ~/.config/hai/.env."""
+    path = credentials.clear_api_key()
+    console.print(f"Removed {credentials.API_KEY_VAR} from {path}." if path else "No stored key found.")
+
+
+@app.command()
+def whoami(ctx: typer.Context) -> None:
+    """Show the resolved endpoint and API key (masked)."""
+    state = _state(ctx)
+    key = credentials.current_api_key(state.api_key)
+    base_url = credentials.resolve_base_url(state.base_url)
+    data = {
+        "base_url": base_url,
+        "api_key": credentials.mask(key) if isinstance(key, str) else None,
+        "key_source": credentials.api_key_source(),
+    }
+    if state.json_output:
+        _print_json(data)
+        return
+    table = Table("Field", "Value", show_header=False)
+    table.add_row("Endpoint", data["base_url"] or "(SDK default)")
+    table.add_row("API key", data["api_key"] or "(none)")
+    table.add_row("Key source", data["key_source"] or "(none)")
+    console.print(table)
 
 
 @app.command()
@@ -113,18 +169,27 @@ def list_sessions(
 @sessions_app.command("get")
 def get(ctx: typer.Context, session_id: str = typer.Argument(...)) -> None:
     """Fetch a full session envelope."""
+    client = _client(_state(ctx))
     try:
-        _print_json(_client(_state(ctx)).sessions.get_session(session_id))
+        result = client.sessions.get_session(session_id)
     except Exception as exc:
         _raise_cli_error(exc)
+    _print_json(result)
 
 
 @sessions_app.command("cancel")
-def cancel(ctx: typer.Context, session_id: str = typer.Argument(...)) -> None:
+def cancel(
+    ctx: typer.Context,
+    session_id: str = typer.Argument(...),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt."),
+) -> None:
     """Cancel a session."""
     state = _state(ctx)
+    if not yes and sys.stdin.isatty():
+        typer.confirm(f"Cancel session {session_id}?", abort=True)
+    client = _client(state)
     try:
-        _client(state).sessions.cancel_session(session_id)
+        client.sessions.cancel_session(session_id)
     except Exception as exc:
         _raise_cli_error(exc)
     _print_ack("cancelled", state.json_output)
@@ -138,9 +203,10 @@ def send(
 ) -> None:
     """Send a follow-up message to a session."""
     state = _state(ctx)
+    client = _client(state)
     request = SendSessionMessagesRequestBody_UserMessage(message=message)
     try:
-        _client(state).sessions.send_session_messages(session_id, request=request)
+        client.sessions.send_session_messages(session_id, request=request)
     except Exception as exc:
         _raise_cli_error(exc)
     _print_ack("sent", state.json_output)
@@ -178,7 +244,7 @@ def _client(state: AppState) -> Client:
     try:
         return make_client(api_key=state.api_key, base_url=state.base_url)
     except RuntimeError as exc:
-        raise typer.BadParameter(str(exc)) from exc
+        _raise_cli_error(exc)
 
 
 def _print_run_result(result, json_output: bool) -> None:
@@ -217,5 +283,7 @@ def _raise_cli_error(exc: Exception) -> NoReturn:
         message = body if isinstance(body, str) else json.dumps(to_jsonable(body), sort_keys=True)
         if exc.status_code is not None:
             message = f"API error {exc.status_code}: {message}"
-        raise click.ClickException(message) from exc
-    raise click.ClickException(str(exc)) from exc
+    else:
+        message = str(exc)
+    err_console.print(f"[red]Error:[/red] {message}")
+    raise typer.Exit(1)

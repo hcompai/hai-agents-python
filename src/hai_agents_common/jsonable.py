@@ -1,4 +1,4 @@
-"""Small JSON helpers for MCP responses."""
+"""Convert SDK/Pydantic objects into JSON-compatible values."""
 
 from __future__ import annotations
 
@@ -9,14 +9,7 @@ from typing import Any
 
 
 def to_jsonable(value: Any) -> Any:
-    """Convert SDK/Pydantic objects into JSON-compatible values.
-
-    Args:
-        value: Arbitrary value returned by the SDK.
-
-    Returns:
-        A JSON-compatible value.
-    """
+    """Return a JSON-serializable view of an arbitrary SDK value."""
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, (dt.date, dt.datetime)):

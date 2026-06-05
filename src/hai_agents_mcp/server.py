@@ -11,17 +11,22 @@ from mcp.server.fastmcp import FastMCP
 
 from hai_agents import async_run_session
 from hai_agents.sessions import SendSessionMessagesRequestBody_UserMessage
-
-from ._client import absolute_share_url, make_async_client
-from ._json import to_jsonable
+from hai_agents_common.credentials import absolute_share_url, make_async_client
+from hai_agents_common.jsonable import to_jsonable
 
 DEFAULT_AGENT = "h/web-surfer-holo3-1-35b"
 
 mcp = FastMCP(
     name="hai-agents",
     instructions=(
-        "Run and steer H Company Agent API sessions. Use run_agent for a complete one-shot task, "
-        "send_message to continue an existing session, and list_agents to inspect available agents."
+        "Tools to run and steer H Company browser and computer-use agents through the Agent API.\n"
+        "- run_agent: run a self-contained task end to end and return the final answer. "
+        "Blocks until the session reaches a terminal state; prefer it for one-shot tasks. "
+        "Pass the user's task text verbatim.\n"
+        "- list_agents: discover available agents; use a returned name as run_agent's `agent`.\n"
+        "- send_message: add a follow-up instruction to an existing session by id.\n"
+        "- get_session / cancel_session / share_session: inspect, stop, or produce a public link for a session.\n"
+        "Credentials come from HAI_API_KEY (process env or ~/.config/hai/.env); run `hai login` to set one."
     ),
 )
 

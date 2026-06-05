@@ -33,14 +33,17 @@ dependencies = [
 
 [project.optional-dependencies]
 cli = [
+  "python-dotenv>=1.2.2,<2",
   "rich>=13,<15",
   "typer>=0.12,<1",
 ]
 mcp = [
   "mcp>=1.10,<2",
+  "python-dotenv>=1.2.2,<2",
 ]
 all = [
   "mcp>=1.10,<2",
+  "python-dotenv>=1.2.2,<2",
   "rich>=13,<15",
   "typer>=0.12,<1",
 ]
@@ -56,7 +59,7 @@ Issues = "https://github.com/hcompai/hai-agents-python/issues"
 Documentation = "https://hub.hcompany.ai/agent-api"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/hai_agents", "src/hai_agents_cli", "src/hai_agents_mcp"]
+packages = ["src/hai_agents", "src/hai_agents_cli", "src/hai_agents_common", "src/hai_agents_mcp"]
 
 [dependency-groups]
 dev = [
