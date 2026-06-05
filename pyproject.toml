@@ -45,7 +45,7 @@ dev = [
   "pytest>=9.0.3,<10",
   # Used only by tests/integration/ — read HAI_API_KEY_TEST when running locally.
   "python-dotenv>=1.2.2,<2",
-  "ruff==0.15.15"
+  "ruff==0.15.16"
 ]
 
 [tool.ruff]
