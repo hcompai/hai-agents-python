@@ -271,7 +271,7 @@ class AgentsClient:
 
     def delete_agent(self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         """
-        Delete by identifier. Reserved rows: H admin only.
+        Delete by identifier. Reserved rows: H employee only.
 
         Parameters
         ----------
@@ -586,7 +586,7 @@ class AsyncAgentsClient:
 
     async def delete_agent(self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         """
-        Delete by identifier. Reserved rows: H admin only.
+        Delete by identifier. Reserved rows: H employee only.
 
         Parameters
         ----------
