@@ -50,14 +50,14 @@ class SessionRequest(UniversalBaseModel):
     Id of the parent session, when this is a child run.
     """
 
-    answer_format: typing.Optional[typing.Dict[str, typing.Any]] = pydantic.Field(default=None)
-    """
-    JSON Schema the final answer must conform to. Null returns a free-form text answer.
-    """
-
     agent_artifact: typing.Optional[str] = pydantic.Field(default=None)
     """
     Target version of the agent artifact to use.
+    """
+
+    overrides: typing.Optional[typing.Dict[str, typing.Any]] = pydantic.Field(default=None)
+    """
+    Per-run overrides applied to the resolved request, keyed by a dotted path. List members are selected with an explicit [field=value] clause, e.g. {"agent.environments[kind=web].start_url": "https://bing.com"}. Each value must match the type of the field its path targets.
     """
 
     if IS_PYDANTIC_V2:

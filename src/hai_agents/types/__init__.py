@@ -20,6 +20,8 @@ if typing.TYPE_CHECKING:
     from .metrics import Metrics
     from .model_cost import ModelCost
     from .model_usage import ModelUsage
+    from .one_password_config import OnePasswordConfig
+    from .one_password_config_provider import OnePasswordConfigProvider
     from .page_agent import PageAgent
     from .page_session_summary import PageSessionSummary
     from .page_skill import PageSkill
@@ -43,6 +45,9 @@ if typing.TYPE_CHECKING:
     from .user_message_event_type import UserMessageEventType
     from .validation_error import ValidationError
     from .validation_error_loc_item import ValidationErrorLocItem
+    from .vault_config_list import VaultConfigList
+    from .vault_config_read import VaultConfigRead
+    from .vault_health import VaultHealth
 _dynamic_imports: typing.Dict[str, str] = {
     "Agent": ".agent",
     "AgentEnvironmentsItem": ".agent_environments_item",
@@ -59,6 +64,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "Metrics": ".metrics",
     "ModelCost": ".model_cost",
     "ModelUsage": ".model_usage",
+    "OnePasswordConfig": ".one_password_config",
+    "OnePasswordConfigProvider": ".one_password_config_provider",
     "PageAgent": ".page_agent",
     "PageSessionSummary": ".page_session_summary",
     "PageSkill": ".page_skill",
@@ -82,6 +89,9 @@ _dynamic_imports: typing.Dict[str, str] = {
     "UserMessageEventType": ".user_message_event_type",
     "ValidationError": ".validation_error",
     "ValidationErrorLocItem": ".validation_error_loc_item",
+    "VaultConfigList": ".vault_config_list",
+    "VaultConfigRead": ".vault_config_read",
+    "VaultHealth": ".vault_health",
 }
 
 
@@ -122,6 +132,8 @@ __all__ = [
     "Metrics",
     "ModelCost",
     "ModelUsage",
+    "OnePasswordConfig",
+    "OnePasswordConfigProvider",
     "PageAgent",
     "PageSessionSummary",
     "PageSkill",
@@ -145,4 +157,7 @@ __all__ = [
     "UserMessageEventType",
     "ValidationError",
     "ValidationErrorLocItem",
+    "VaultConfigList",
+    "VaultConfigRead",
+    "VaultHealth",
 ]

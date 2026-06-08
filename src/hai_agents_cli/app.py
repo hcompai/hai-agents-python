@@ -6,7 +6,7 @@ import json
 import socket
 import sys
 from dataclasses import dataclass
-from typing import NoReturn
+from typing import Any, NoReturn
 
 import typer
 from rich.console import Console
@@ -116,6 +116,35 @@ def whoami(ctx: typer.Context) -> None:
     console.print(table)
 
 
+def _parse_overrides(items: list[str]) -> dict[str, Any]:
+    """Parse repeated ``PATH=VALUE`` flags into an overrides dict.
+
+    The separating ``=`` is the first one outside ``[...]``, since selector
+    clauses like ``[kind=web]`` carry their own ``=``. VALUE is read as JSON,
+    falling back to a plain string when it is not valid JSON.
+    """
+    overrides: dict[str, Any] = {}
+    for item in items:
+        depth = 0
+        cut = None
+        for i, char in enumerate(item):
+            if char == "[":
+                depth += 1
+            elif char == "]":
+                depth -= 1
+            elif char == "=" and depth == 0:
+                cut = i
+                break
+        if cut is None:
+            raise typer.BadParameter(f"override must be PATH=VALUE: {item!r}")
+        path, raw = item[:cut], item[cut + 1 :]
+        try:
+            overrides[path] = json.loads(raw)
+        except json.JSONDecodeError:
+            overrides[path] = raw
+    return overrides
+
+
 @app.command()
 def run(
     ctx: typer.Context,
@@ -123,10 +152,20 @@ def run(
     agent: str = typer.Option(DEFAULT_AGENT, "--agent", "-a", help="Registered agent name."),
     max_steps: int = typer.Option(20, "--max-steps", min=1, max=200, help="Maximum reasoning steps."),
     max_time_s: float = typer.Option(180.0, "--max-time", min=1.0, max=1800.0, help="Maximum run seconds."),
+    override: list[str] = typer.Option(
+        None,
+        "--override",
+        "-o",
+        help=(
+            "Per-run override as PATH=VALUE, repeatable. VALUE is parsed as JSON, else a string. "
+            "Example: -o 'agent.environments[kind=web].start_url=https://bing.com'"
+        ),
+    ),
 ) -> None:
     """Run an agent task and print the final answer."""
     state = _state(ctx)
     client = _client(state)
+    overrides = _parse_overrides(override or [])
     try:
         result = run_session(
             client,
@@ -135,6 +174,7 @@ def run(
             max_steps=max_steps,
             max_time_s=max_time_s,
             timeout_seconds=max_time_s + 30.0,
+            overrides=overrides or None,
         )
     except Exception as exc:
         _raise_cli_error(exc)

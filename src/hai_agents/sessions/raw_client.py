@@ -161,15 +161,12 @@ class RawSessionsClient:
         idle_timeout_s: typing.Optional[int] = OMIT,
         group_id: typing.Optional[str] = OMIT,
         parent_session_id: typing.Optional[str] = OMIT,
-        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         agent_artifact: typing.Optional[str] = OMIT,
+        overrides: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Session]:
         """
         Create an agentic session.
-
-        Pass ``Idempotency-Key`` for safe retries: identical requests within 24h
-        return the original session; reuse with a different body returns 422.
 
         Parameters
         ----------
@@ -196,11 +193,11 @@ class RawSessionsClient:
         parent_session_id : typing.Optional[str]
             Id of the parent session, when this is a child run.
 
-        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
-            JSON Schema the final answer must conform to. Null returns a free-form text answer.
-
         agent_artifact : typing.Optional[str]
             Target version of the agent artifact to use.
+
+        overrides : typing.Optional[typing.Dict[str, typing.Any]]
+            Per-run overrides applied to the resolved request, keyed by a dotted path. List members are selected with an explicit [field=value] clause, e.g. {"agent.environments[kind=web].start_url": "https://bing.com"}. Each value must match the type of the field its path targets.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -225,8 +222,8 @@ class RawSessionsClient:
                 "idle_timeout_s": idle_timeout_s,
                 "group_id": group_id,
                 "parent_session_id": parent_session_id,
-                "answer_format": answer_format,
                 "agent_artifact": agent_artifact,
+                "overrides": overrides,
             },
             headers={
                 "content-type": "application/json",
@@ -1203,15 +1200,12 @@ class AsyncRawSessionsClient:
         idle_timeout_s: typing.Optional[int] = OMIT,
         group_id: typing.Optional[str] = OMIT,
         parent_session_id: typing.Optional[str] = OMIT,
-        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         agent_artifact: typing.Optional[str] = OMIT,
+        overrides: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Session]:
         """
         Create an agentic session.
-
-        Pass ``Idempotency-Key`` for safe retries: identical requests within 24h
-        return the original session; reuse with a different body returns 422.
 
         Parameters
         ----------
@@ -1238,11 +1232,11 @@ class AsyncRawSessionsClient:
         parent_session_id : typing.Optional[str]
             Id of the parent session, when this is a child run.
 
-        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
-            JSON Schema the final answer must conform to. Null returns a free-form text answer.
-
         agent_artifact : typing.Optional[str]
             Target version of the agent artifact to use.
+
+        overrides : typing.Optional[typing.Dict[str, typing.Any]]
+            Per-run overrides applied to the resolved request, keyed by a dotted path. List members are selected with an explicit [field=value] clause, e.g. {"agent.environments[kind=web].start_url": "https://bing.com"}. Each value must match the type of the field its path targets.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -1267,8 +1261,8 @@ class AsyncRawSessionsClient:
                 "idle_timeout_s": idle_timeout_s,
                 "group_id": group_id,
                 "parent_session_id": parent_session_id,
-                "answer_format": answer_format,
                 "agent_artifact": agent_artifact,
+                "overrides": overrides,
             },
             headers={
                 "content-type": "application/json",

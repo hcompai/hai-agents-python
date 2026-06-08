@@ -36,12 +36,12 @@ class CreateSessionParams(typing_extensions.TypedDict, total=False):
     agent: typing_extensions.Required[SessionRequestAgent]
     idempotency_key: typing.Optional[str]
     messages: typing.Optional[SessionRequestMessages]
+    overrides: typing.Optional[typing.Dict[str, typing.Any]]
     max_steps: typing.Optional[int]
     max_time_s: typing.Optional[float]
     idle_timeout_s: typing.Optional[int]
     group_id: typing.Optional[str]
     parent_session_id: typing.Optional[str]
-    answer_format: typing.Optional[typing.Dict[str, typing.Any]]
 
 
 @dataclass(frozen=True)

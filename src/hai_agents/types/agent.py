@@ -50,6 +50,11 @@ class Agent(UniversalBaseModel):
     Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
     """
 
+    answer_format: typing.Optional[typing.Dict[str, typing.Any]] = pydantic.Field(default=None)
+    """
+    JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
+    """
+
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
     else:

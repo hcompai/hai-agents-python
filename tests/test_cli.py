@@ -82,6 +82,36 @@ def test_state_missing_is_a_programming_error() -> None:
         raise AssertionError("_state should fail when Typer state is missing")
 
 
+def test_run_parses_overrides(monkeypatch) -> None:
+    captured: dict = {}
+
+    def _capture(client, **kwargs):
+        captured.update(kwargs)
+        return SessionRunResult(id="sess_1", status="completed", events=[], next_from_index=0, final_changes=_Answer())
+
+    monkeypatch.setattr(app_module, "_client", lambda state: object())
+    monkeypatch.setattr(app_module, "run_session", _capture)
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "hello",
+            "-o",
+            "agent.environments[kind=web].start_url=https://bing.com",
+            "-o",
+            "agent.max_steps=5",
+        ],
+        env={"HAI_API_KEY": "hk-test"},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["overrides"] == {
+        "agent.environments[kind=web].start_url": "https://bing.com",
+        "agent.max_steps": 5,
+    }
+
+
 def _fake_run_session(client, **kwargs):
     assert kwargs["messages"] == "hello"
     assert kwargs["agent"] == "h/web-surfer-holo3-1-35b"
