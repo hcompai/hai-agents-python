@@ -119,6 +119,7 @@ class RawAgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Agent]:
         """
@@ -147,6 +148,9 @@ class RawAgentsClient:
         skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
             Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
 
+        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+            JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -174,6 +178,7 @@ class RawAgentsClient:
                 "skills": convert_and_respect_annotation_metadata(
                     object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
                 ),
+                "answer_format": answer_format,
             },
             headers={
                 "content-type": "application/json",
@@ -285,6 +290,7 @@ class RawAgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Agent]:
         """
@@ -315,6 +321,9 @@ class RawAgentsClient:
         skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
             Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
 
+        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+            JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -342,6 +351,7 @@ class RawAgentsClient:
                 "skills": convert_and_respect_annotation_metadata(
                     object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
                 ),
+                "answer_format": answer_format,
             },
             headers={
                 "content-type": "application/json",
@@ -383,7 +393,7 @@ class RawAgentsClient:
         self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> HttpResponse[None]:
         """
-        Delete by identifier. Reserved rows: H admin only.
+        Delete by identifier. Reserved rows: H employee only.
 
         Parameters
         ----------
@@ -519,6 +529,7 @@ class AsyncRawAgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Agent]:
         """
@@ -547,6 +558,9 @@ class AsyncRawAgentsClient:
         skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
             Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
 
+        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+            JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -574,6 +588,7 @@ class AsyncRawAgentsClient:
                 "skills": convert_and_respect_annotation_metadata(
                     object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
                 ),
+                "answer_format": answer_format,
             },
             headers={
                 "content-type": "application/json",
@@ -685,6 +700,7 @@ class AsyncRawAgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Agent]:
         """
@@ -715,6 +731,9 @@ class AsyncRawAgentsClient:
         skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
             Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
 
+        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+            JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -742,6 +761,7 @@ class AsyncRawAgentsClient:
                 "skills": convert_and_respect_annotation_metadata(
                     object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
                 ),
+                "answer_format": answer_format,
             },
             headers={
                 "content-type": "application/json",
@@ -783,7 +803,7 @@ class AsyncRawAgentsClient:
         self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> AsyncHttpResponse[None]:
         """
-        Delete by identifier. Reserved rows: H admin only.
+        Delete by identifier. Reserved rows: H employee only.
 
         Parameters
         ----------

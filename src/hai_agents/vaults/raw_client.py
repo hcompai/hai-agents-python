@@ -10,77 +10,62 @@ from ..core.jsonable_encoder import encode_path_param
 from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
+from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.http_validation_error import HttpValidationError
-from ..types.page_skill import PageSkill
-from ..types.skill import Skill
-from .types.list_skills_request_sort_item import ListSkillsRequestSortItem
+from ..types.one_password_config import OnePasswordConfig
+from ..types.vault_config_list import VaultConfigList
+from ..types.vault_config_read import VaultConfigRead
+from ..types.vault_health import VaultHealth
 from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
 
 
-class RawSkillsClient:
+class RawVaultsClient:
     def __init__(self, *, client_wrapper: SyncClientWrapper):
         self._client_wrapper = client_wrapper
 
-    def list_skills(
+    def list_vaults(
         self,
         *,
-        name: typing.Optional[str] = None,
-        search: typing.Optional[str] = None,
-        page: typing.Optional[int] = None,
-        size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSkillsRequestSortItem]] = None,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[PageSkill]:
+    ) -> HttpResponse[VaultConfigList]:
         """
-        List reserved + caller's org skills, optionally filtered by name or text search.
+        List the caller's org vault configs.
 
         Parameters
         ----------
-        name : typing.Optional[str]
-            Case-insensitive substring match on skill name.
+        limit : typing.Optional[int]
 
-        search : typing.Optional[str]
-            Case-insensitive match on skill name or description.
-
-        page : typing.Optional[int]
-            Page number (1-based)
-
-        size : typing.Optional[int]
-            Number of items per page
-
-        sort : typing.Optional[typing.Sequence[ListSkillsRequestSortItem]]
-            Sort by field
+        offset : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        HttpResponse[PageSkill]
+        HttpResponse[VaultConfigList]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
-            "api/v2/skills",
+            "api/v2/vaults",
             method="GET",
             params={
-                "name": name,
-                "search": search,
-                "page": page,
-                "size": size,
-                "sort": sort,
+                "limit": limit,
+                "offset": offset,
             },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    PageSkill,
+                    VaultConfigList,
                     parse_obj_as(
-                        type_=PageSkill,  # type: ignore
+                        type_=VaultConfigList,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -105,53 +90,42 @@ class RawSkillsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def create_skill(
+    def create_vault(
         self,
         *,
         name: str,
-        description: str,
-        body: str,
-        source: typing.Optional[str] = OMIT,
-        url_pattern: typing.Optional[str] = OMIT,
+        provider_config: OnePasswordConfig,
+        token: str,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[Skill]:
+    ) -> HttpResponse[VaultConfigRead]:
         """
-        Create a skill. The ``h/`` namespace is reserved for built-in skills.
+        Create a vault config. The provider token is validated by env-manager before storage.
 
         Parameters
         ----------
         name : str
-            Unique name for this skill in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
 
-        description : str
-            When to use this skill. The agent reads this to decide whether to load it.
+        provider_config : OnePasswordConfig
 
-        body : str
-            Markdown instructions the agent loads when it uses the skill.
-
-        source : typing.Optional[str]
-            Optional URL the content was sourced from.
-
-        url_pattern : typing.Optional[str]
-            Optional regex hinting at URLs where this skill applies.
+        token : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        HttpResponse[Skill]
+        HttpResponse[VaultConfigRead]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
-            "api/v2/skills",
+            "api/v2/vaults",
             method="POST",
             json={
                 "name": name,
-                "description": description,
-                "body": body,
-                "source": source,
-                "url_pattern": url_pattern,
+                "provider_config": convert_and_respect_annotation_metadata(
+                    object_=provider_config, annotation=OnePasswordConfig, direction="write"
+                ),
+                "token": token,
             },
             headers={
                 "content-type": "application/json",
@@ -162,9 +136,9 @@ class RawSkillsClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    Skill,
+                    VaultConfigRead,
                     parse_obj_as(
-                        type_=Skill,  # type: ignore
+                        type_=VaultConfigRead,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -189,33 +163,35 @@ class RawSkillsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def get_skill(self, name: str, *, request_options: typing.Optional[RequestOptions] = None) -> HttpResponse[Skill]:
+    def get_vault(
+        self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[VaultConfigRead]:
         """
-        Fetch by name; 404 if not visible. ``:path`` so slash-containing names round-trip.
+        Fetch a vault config by id.
 
         Parameters
         ----------
-        name : str
+        vault_id : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        HttpResponse[Skill]
+        HttpResponse[VaultConfigRead]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
-            f"api/v2/skills/{encode_path_param(name)}",
+            f"api/v2/vaults/{encode_path_param(vault_id)}",
             method="GET",
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    Skill,
+                    VaultConfigRead,
                     parse_obj_as(
-                        type_=Skill,  # type: ignore
+                        type_=VaultConfigRead,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -240,100 +216,15 @@ class RawSkillsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def update_skill(
-        self,
-        name_: str,
-        *,
-        name: str,
-        description: str,
-        body: str,
-        source: typing.Optional[str] = OMIT,
-        url_pattern: typing.Optional[str] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[Skill]:
+    def delete_vault(
+        self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[None]:
         """
-        Replace a skill's content. ``name`` must match the URL identifier; renames are not supported.
+        Delete a vault config.
 
         Parameters
         ----------
-        name_ : str
-
-        name : str
-            Unique name for this skill in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
-
-        description : str
-            When to use this skill. The agent reads this to decide whether to load it.
-
-        body : str
-            Markdown instructions the agent loads when it uses the skill.
-
-        source : typing.Optional[str]
-            Optional URL the content was sourced from.
-
-        url_pattern : typing.Optional[str]
-            Optional regex hinting at URLs where this skill applies.
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        HttpResponse[Skill]
-            Successful Response
-        """
-        _response = self._client_wrapper.httpx_client.request(
-            f"api/v2/skills/{encode_path_param(name_)}",
-            method="PUT",
-            json={
-                "name": name,
-                "description": description,
-                "body": body,
-                "source": source,
-                "url_pattern": url_pattern,
-            },
-            headers={
-                "content-type": "application/json",
-            },
-            request_options=request_options,
-            omit=OMIT,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    Skill,
-                    parse_obj_as(
-                        type_=Skill,  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return HttpResponse(response=_response, data=_data)
-            if _response.status_code == 422:
-                raise UnprocessableEntityError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        HttpValidationError,
-                        parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        except ValidationError as e:
-            raise ParsingError(
-                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
-            )
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-    def delete_skill(self, name: str, *, request_options: typing.Optional[RequestOptions] = None) -> HttpResponse[None]:
-        """
-        Delete by name. Reserved rows: H employee only.
-
-        Parameters
-        ----------
-        name : str
+        vault_id : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -343,7 +234,7 @@ class RawSkillsClient:
         HttpResponse[None]
         """
         _response = self._client_wrapper.httpx_client.request(
-            f"api/v2/skills/{encode_path_param(name)}",
+            f"api/v2/vaults/{encode_path_param(vault_id)}",
             method="DELETE",
             request_options=request_options,
         )
@@ -370,67 +261,229 @@ class RawSkillsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
+    def update_vault(
+        self,
+        vault_id: str,
+        *,
+        name: typing.Optional[str] = OMIT,
+        provider_config: typing.Optional[OnePasswordConfig] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[VaultConfigRead]:
+        """
+        Partial update of a vault config (name and/or provider_config).
 
-class AsyncRawSkillsClient:
+        Parameters
+        ----------
+        vault_id : str
+
+        name : typing.Optional[str]
+
+        provider_config : typing.Optional[OnePasswordConfig]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[VaultConfigRead]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}",
+            method="PATCH",
+            json={
+                "name": name,
+                "provider_config": convert_and_respect_annotation_metadata(
+                    object_=provider_config, annotation=typing.Optional[OnePasswordConfig], direction="write"
+                ),
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultConfigRead,
+                    parse_obj_as(
+                        type_=VaultConfigRead,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def rotate_vault_token(
+        self, vault_id: str, *, token: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[None]:
+        """
+        Rotate the stored provider token. env-manager health-checks it before writing.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        token : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[None]
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/token",
+            method="PUT",
+            json={
+                "token": token,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return HttpResponse(response=_response, data=None)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def vault_health(
+        self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[VaultHealth]:
+        """
+        Probe the vault's provider. Always 200 when reachable; branch on ``ok``.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[VaultHealth]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/health",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultHealth,
+                    parse_obj_as(
+                        type_=VaultHealth,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+
+class AsyncRawVaultsClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
         self._client_wrapper = client_wrapper
 
-    async def list_skills(
+    async def list_vaults(
         self,
         *,
-        name: typing.Optional[str] = None,
-        search: typing.Optional[str] = None,
-        page: typing.Optional[int] = None,
-        size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSkillsRequestSortItem]] = None,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[PageSkill]:
+    ) -> AsyncHttpResponse[VaultConfigList]:
         """
-        List reserved + caller's org skills, optionally filtered by name or text search.
+        List the caller's org vault configs.
 
         Parameters
         ----------
-        name : typing.Optional[str]
-            Case-insensitive substring match on skill name.
+        limit : typing.Optional[int]
 
-        search : typing.Optional[str]
-            Case-insensitive match on skill name or description.
-
-        page : typing.Optional[int]
-            Page number (1-based)
-
-        size : typing.Optional[int]
-            Number of items per page
-
-        sort : typing.Optional[typing.Sequence[ListSkillsRequestSortItem]]
-            Sort by field
+        offset : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        AsyncHttpResponse[PageSkill]
+        AsyncHttpResponse[VaultConfigList]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            "api/v2/skills",
+            "api/v2/vaults",
             method="GET",
             params={
-                "name": name,
-                "search": search,
-                "page": page,
-                "size": size,
-                "sort": sort,
+                "limit": limit,
+                "offset": offset,
             },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    PageSkill,
+                    VaultConfigList,
                     parse_obj_as(
-                        type_=PageSkill,  # type: ignore
+                        type_=VaultConfigList,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -455,53 +508,42 @@ class AsyncRawSkillsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def create_skill(
+    async def create_vault(
         self,
         *,
         name: str,
-        description: str,
-        body: str,
-        source: typing.Optional[str] = OMIT,
-        url_pattern: typing.Optional[str] = OMIT,
+        provider_config: OnePasswordConfig,
+        token: str,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[Skill]:
+    ) -> AsyncHttpResponse[VaultConfigRead]:
         """
-        Create a skill. The ``h/`` namespace is reserved for built-in skills.
+        Create a vault config. The provider token is validated by env-manager before storage.
 
         Parameters
         ----------
         name : str
-            Unique name for this skill in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
 
-        description : str
-            When to use this skill. The agent reads this to decide whether to load it.
+        provider_config : OnePasswordConfig
 
-        body : str
-            Markdown instructions the agent loads when it uses the skill.
-
-        source : typing.Optional[str]
-            Optional URL the content was sourced from.
-
-        url_pattern : typing.Optional[str]
-            Optional regex hinting at URLs where this skill applies.
+        token : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        AsyncHttpResponse[Skill]
+        AsyncHttpResponse[VaultConfigRead]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            "api/v2/skills",
+            "api/v2/vaults",
             method="POST",
             json={
                 "name": name,
-                "description": description,
-                "body": body,
-                "source": source,
-                "url_pattern": url_pattern,
+                "provider_config": convert_and_respect_annotation_metadata(
+                    object_=provider_config, annotation=OnePasswordConfig, direction="write"
+                ),
+                "token": token,
             },
             headers={
                 "content-type": "application/json",
@@ -512,9 +554,9 @@ class AsyncRawSkillsClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    Skill,
+                    VaultConfigRead,
                     parse_obj_as(
-                        type_=Skill,  # type: ignore
+                        type_=VaultConfigRead,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -539,35 +581,35 @@ class AsyncRawSkillsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def get_skill(
-        self, name: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[Skill]:
+    async def get_vault(
+        self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[VaultConfigRead]:
         """
-        Fetch by name; 404 if not visible. ``:path`` so slash-containing names round-trip.
+        Fetch a vault config by id.
 
         Parameters
         ----------
-        name : str
+        vault_id : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        AsyncHttpResponse[Skill]
+        AsyncHttpResponse[VaultConfigRead]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            f"api/v2/skills/{encode_path_param(name)}",
+            f"api/v2/vaults/{encode_path_param(vault_id)}",
             method="GET",
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    Skill,
+                    VaultConfigRead,
                     parse_obj_as(
-                        type_=Skill,  # type: ignore
+                        type_=VaultConfigRead,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -592,102 +634,15 @@ class AsyncRawSkillsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def update_skill(
-        self,
-        name_: str,
-        *,
-        name: str,
-        description: str,
-        body: str,
-        source: typing.Optional[str] = OMIT,
-        url_pattern: typing.Optional[str] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[Skill]:
-        """
-        Replace a skill's content. ``name`` must match the URL identifier; renames are not supported.
-
-        Parameters
-        ----------
-        name_ : str
-
-        name : str
-            Unique name for this skill in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
-
-        description : str
-            When to use this skill. The agent reads this to decide whether to load it.
-
-        body : str
-            Markdown instructions the agent loads when it uses the skill.
-
-        source : typing.Optional[str]
-            Optional URL the content was sourced from.
-
-        url_pattern : typing.Optional[str]
-            Optional regex hinting at URLs where this skill applies.
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        AsyncHttpResponse[Skill]
-            Successful Response
-        """
-        _response = await self._client_wrapper.httpx_client.request(
-            f"api/v2/skills/{encode_path_param(name_)}",
-            method="PUT",
-            json={
-                "name": name,
-                "description": description,
-                "body": body,
-                "source": source,
-                "url_pattern": url_pattern,
-            },
-            headers={
-                "content-type": "application/json",
-            },
-            request_options=request_options,
-            omit=OMIT,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    Skill,
-                    parse_obj_as(
-                        type_=Skill,  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return AsyncHttpResponse(response=_response, data=_data)
-            if _response.status_code == 422:
-                raise UnprocessableEntityError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        HttpValidationError,
-                        parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        except ValidationError as e:
-            raise ParsingError(
-                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
-            )
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-    async def delete_skill(
-        self, name: str, *, request_options: typing.Optional[RequestOptions] = None
+    async def delete_vault(
+        self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> AsyncHttpResponse[None]:
         """
-        Delete by name. Reserved rows: H employee only.
+        Delete a vault config.
 
         Parameters
         ----------
-        name : str
+        vault_id : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -697,13 +652,192 @@ class AsyncRawSkillsClient:
         AsyncHttpResponse[None]
         """
         _response = await self._client_wrapper.httpx_client.request(
-            f"api/v2/skills/{encode_path_param(name)}",
+            f"api/v2/vaults/{encode_path_param(vault_id)}",
             method="DELETE",
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def update_vault(
+        self,
+        vault_id: str,
+        *,
+        name: typing.Optional[str] = OMIT,
+        provider_config: typing.Optional[OnePasswordConfig] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[VaultConfigRead]:
+        """
+        Partial update of a vault config (name and/or provider_config).
+
+        Parameters
+        ----------
+        vault_id : str
+
+        name : typing.Optional[str]
+
+        provider_config : typing.Optional[OnePasswordConfig]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[VaultConfigRead]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}",
+            method="PATCH",
+            json={
+                "name": name,
+                "provider_config": convert_and_respect_annotation_metadata(
+                    object_=provider_config, annotation=typing.Optional[OnePasswordConfig], direction="write"
+                ),
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultConfigRead,
+                    parse_obj_as(
+                        type_=VaultConfigRead,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def rotate_vault_token(
+        self, vault_id: str, *, token: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[None]:
+        """
+        Rotate the stored provider token. env-manager health-checks it before writing.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        token : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[None]
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/token",
+            method="PUT",
+            json={
+                "token": token,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def vault_health(
+        self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[VaultHealth]:
+        """
+        Probe the vault's provider. Always 200 when reachable; branch on ``ok``.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[VaultHealth]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/health",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultHealth,
+                    parse_obj_as(
+                        type_=VaultHealth,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),

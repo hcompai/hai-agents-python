@@ -93,6 +93,7 @@ class AgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -120,6 +121,9 @@ class AgentsClient:
 
         skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
             Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
+
+        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+            JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -150,6 +154,7 @@ class AgentsClient:
             instructions=instructions,
             subagents=subagents,
             skills=skills,
+            answer_format=answer_format,
             request_options=request_options,
         )
         return _response.data
@@ -204,6 +209,7 @@ class AgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -233,6 +239,9 @@ class AgentsClient:
 
         skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
             Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
+
+        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+            JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -265,13 +274,14 @@ class AgentsClient:
             instructions=instructions,
             subagents=subagents,
             skills=skills,
+            answer_format=answer_format,
             request_options=request_options,
         )
         return _response.data
 
     def delete_agent(self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         """
-        Delete by identifier. Reserved rows: H admin only.
+        Delete by identifier. Reserved rows: H employee only.
 
         Parameters
         ----------
@@ -384,6 +394,7 @@ class AsyncAgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -411,6 +422,9 @@ class AsyncAgentsClient:
 
         skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
             Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
+
+        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+            JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -449,6 +463,7 @@ class AsyncAgentsClient:
             instructions=instructions,
             subagents=subagents,
             skills=skills,
+            answer_format=answer_format,
             request_options=request_options,
         )
         return _response.data
@@ -511,6 +526,7 @@ class AsyncAgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -540,6 +556,9 @@ class AsyncAgentsClient:
 
         skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
             Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
+
+        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+            JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -580,13 +599,14 @@ class AsyncAgentsClient:
             instructions=instructions,
             subagents=subagents,
             skills=skills,
+            answer_format=answer_format,
             request_options=request_options,
         )
         return _response.data
 
     async def delete_agent(self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         """
-        Delete by identifier. Reserved rows: H admin only.
+        Delete by identifier. Reserved rows: H employee only.
 
         Parameters
         ----------

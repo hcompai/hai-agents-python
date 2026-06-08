@@ -4,17 +4,18 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .environment import Environment
+from .vault_config_read import VaultConfigRead
 
 
-class EnvironmentPage(UniversalBaseModel):
+class VaultConfigList(UniversalBaseModel):
     """
-    Named page subclass so OpenAPI emits a clean ``EnvironmentPage`` schema name.
+    Response model for listing vault configs.
     """
 
-    items: typing.List[Environment]
     total: int
-    page: int
+    limit: int
+    offset: int
+    vaults: typing.List[VaultConfigRead]
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
