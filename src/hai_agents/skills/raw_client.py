@@ -329,7 +329,7 @@ class RawSkillsClient:
 
     def delete_skill(self, name: str, *, request_options: typing.Optional[RequestOptions] = None) -> HttpResponse[None]:
         """
-        Delete by name. Reserved rows: H admin only.
+        Delete by name. Reserved rows: H employee only.
 
         Parameters
         ----------
@@ -683,7 +683,7 @@ class AsyncRawSkillsClient:
         self, name: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> AsyncHttpResponse[None]:
         """
-        Delete by name. Reserved rows: H admin only.
+        Delete by name. Reserved rows: H employee only.
 
         Parameters
         ----------

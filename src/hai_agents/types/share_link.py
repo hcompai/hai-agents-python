@@ -9,10 +9,6 @@ from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 class ShareLink(UniversalBaseModel):
     """
     Public share URL for a session.
-
-    ``share_url`` is a path; clients prepend the AgP host. Today this points at the
-    v1 share router (``/share/api/v1/trajectories/{id}``); will migrate to
-    ``/share/v1/sessions/{id}`` once the v2 share router lands.
     """
 
     share_url: str

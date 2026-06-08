@@ -23,7 +23,7 @@
           "Sessions"
         ],
         "summary": "Create Session",
-        "description": "Create an agentic session.\n\nPass ``Idempotency-Key`` for safe retries: identical requests within 24h\nreturn the original session; reuse with a different body returns 422.",
+        "description": "Create an agentic session.",
         "operationId": "create_session_api_v2_sessions_post",
         "security": [
           {
@@ -1475,7 +1475,7 @@
           "Skills"
         ],
         "summary": "Delete Skill",
-        "description": "Delete by name. Reserved rows: H admin only.",
+        "description": "Delete by name. Reserved rows: H employee only.",
         "operationId": "delete_skill_api_v2_skills__name__delete",
         "security": [
           {
@@ -1835,7 +1835,7 @@
           "Environments"
         ],
         "summary": "Delete Environment",
-        "description": "Delete by identifier. Reserved rows: H admin only.",
+        "description": "Delete by identifier. Reserved rows: H employee only.",
         "operationId": "delete_environment_api_v2_environments__id__delete",
         "security": [
           {
@@ -2167,7 +2167,7 @@
           "Agents"
         ],
         "summary": "Delete Agent",
-        "description": "Delete by identifier. Reserved rows: H admin only.",
+        "description": "Delete by identifier. Reserved rows: H employee only.",
         "operationId": "delete_agent_api_v2_agents__agent_name__delete",
         "security": [
           {
@@ -2428,7 +2428,7 @@
           "page"
         ],
         "title": "EnvironmentPage",
-        "description": "Named page subclass so OpenAPI emits a clean ``EnvironmentPage`` schema name.\n\n``Environment`` is ``Annotated[Browser | CodeSandbox | MCP | Memory, Field(discriminator=\"kind\")]``\nand has no ``__name__``. Without this subclass, Pydantic titles ``Page[Environment]``\nby repr()ing the type parameter, producing a 95-char schema name that leaks\nPydantic FieldInfo into generated SDKs."
+        "description": "Named page subclass so OpenAPI emits a clean ``EnvironmentPage`` schema name."
       },
       "Feedback": {
         "properties": {
@@ -3110,7 +3110,7 @@
           "share_url"
         ],
         "title": "ShareLink",
-        "description": "Public share URL for a session.\n\n``share_url`` is a path; clients prepend the AgP host. Today this points at the\nv1 share router (``/share/api/v1/trajectories/{id}``); will migrate to\n``/share/v1/sessions/{id}`` once the v2 share router lands."
+        "description": "Public share URL for a session."
       },
       "Skill": {
         "properties": {
