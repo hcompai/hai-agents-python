@@ -37,12 +37,7 @@ cli = [
   "rich>=13,<15",
   "typer>=0.12,<1",
 ]
-mcp = [
-  "mcp>=1.10,<2",
-  "python-dotenv>=1.2.2,<2",
-]
 all = [
-  "mcp>=1.10,<2",
   "python-dotenv>=1.2.2,<2",
   "rich>=13,<15",
   "typer>=0.12,<1",
@@ -50,7 +45,6 @@ all = [
 
 [project.scripts]
 hai = "hai_agents_cli.app:main"
-hai-mcp = "hai_agents_mcp.server:main"
 
 [project.urls]
 Homepage = "https://hcompany.ai"
@@ -59,11 +53,10 @@ Issues = "https://github.com/hcompai/hai-agents-python/issues"
 Documentation = "https://hub.hcompany.ai/agent-api"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/hai_agents", "src/hai_agents_cli", "src/hai_agents_common", "src/hai_agents_mcp"]
+packages = ["src/hai_agents", "src/hai_agents_cli", "src/hai_agents_common"]
 
 [dependency-groups]
 dev = [
-  "mcp>=1.10,<2",
   "pytest>=9.0.3,<10",
   "pytest-asyncio>=1.2,<2",
   # Used only by tests/integration/ — read HAI_API_KEY_TEST when running locally.

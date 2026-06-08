@@ -10,7 +10,7 @@ from hai_agents import AsyncClient, Client
 from hai_agents.sessions import SendSessionMessagesRequestBody_UserMessage
 
 
-def test_sdk_exposes_symbols_used_by_cli_and_mcp() -> None:
+def test_sdk_exposes_symbols_used_by_cli() -> None:
     for name in [
         "AsyncClient",
         "Client",
@@ -45,12 +45,12 @@ def test_message_request_body_still_has_message_field() -> None:
     assert request.message == "hello"
 
 
-def test_project_exposes_cli_and_mcp_extras() -> None:
+def test_project_exposes_cli_extras() -> None:
     pyproject = tomllib.loads(Path("pyproject.toml").read_text())
 
-    assert set(pyproject["project"]["optional-dependencies"]) >= {"cli", "mcp", "all"}
+    assert set(pyproject["project"]["optional-dependencies"]) >= {"cli", "all"}
     assert pyproject["project"]["scripts"]["hai"] == "hai_agents_cli.app:main"
-    assert pyproject["project"]["scripts"]["hai-mcp"] == "hai_agents_mcp.server:main"
+    assert "hai-mcp" not in pyproject["project"]["scripts"]
 
 
 def _params(fn) -> set[str]:

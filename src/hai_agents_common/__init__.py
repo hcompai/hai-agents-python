@@ -1,1 +1,1 @@
-"""Shared helpers for the `hai` CLI and MCP server."""
+"""Shared helpers for the `hai` CLI."""

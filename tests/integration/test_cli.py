@@ -7,8 +7,6 @@ import sys
 
 import pytest
 
-from hai_agents_mcp import server
-
 
 @pytest.mark.integration
 def test_cli_help_entrypoint() -> None:
@@ -55,29 +53,3 @@ def test_cli_live_run(api_key: str, base_url: str, created_sessions: list[str]) 
     created_sessions.append(payload["session_id"])
     assert payload["session_id"]
     assert payload["status"] in {"completed", "failed", "timed_out", "interrupted"}
-
-
-@pytest.mark.integration
-async def test_mcp_run_agent_live(api_key: str, base_url: str, created_sessions: list[str]) -> None:
-    server._config = server.ServerConfig(api_key=api_key, base_url=base_url)
-
-    result = await server.mcp.call_tool(
-        "run_agent",
-        {"task": "Reply with exactly: hello", "max_steps": 3, "max_time_s": 60.0},
-    )
-
-    payload = _tool_payload(result)
-    created_sessions.append(payload["session_id"])
-    assert payload["session_id"]
-    assert payload["status"] in {"completed", "failed", "timed_out", "interrupted"}
-    assert payload["answer"] is not None
-
-
-def _tool_payload(result) -> dict:
-    if isinstance(result, dict):
-        return result
-    if result:
-        text = getattr(result[0], "text", None)
-        if text:
-            return json.loads(text)
-    raise AssertionError(f"Cannot extract tool payload from {result!r}")

@@ -1,4 +1,4 @@
-"""Resolve, construct, and persist Agent API credentials for the CLI and MCP server."""
+"""Resolve, construct, and persist Agent API credentials for the CLI."""
 
 from __future__ import annotations
 
