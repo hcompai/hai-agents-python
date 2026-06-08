@@ -33,12 +33,10 @@
 pip install hai-agents
 ```
 
-Install the optional command-line and MCP entry points when you want local tools:
+Install the optional command-line entry point when you want local tools:
 
 ```bash
 pip install "hai-agents[cli]"
-pip install "hai-agents[mcp]"
-pip install "hai-agents[all]"
 ```
 
 Requires Python 3.10 or newer. Grab an API key at [portal.hcompany.ai](https://portal.hcompany.ai) and export it:
@@ -90,33 +88,6 @@ authenticated; `hai logout` removes the stored key.
 Credentials resolve from flags, then `HAI_API_KEY`/`H_API_KEY` in the environment,
 then a local `.env`, then `~/.config/hai/.env`. Use `--base-url` or `HAI_API_BASE_URL`
 to target a specific Agent Platform host.
-
-## MCP
-
-The `hai-agents[mcp]` extra installs the stdio MCP server:
-
-```bash
-hai-mcp
-hai-mcp --api-key hk-... --base-url https://agp.eu.hcompany.ai
-```
-
-Example MCP client configuration:
-
-```json
-{
-  "mcpServers": {
-    "hai-agents": {
-      "command": "hai-mcp",
-      "env": {
-        "HAI_API_KEY": "hk-..."
-      }
-    }
-  }
-}
-```
-
-The MCP server exposes tools to run an agent task, list available agents, inspect
-sessions, send follow-up messages, cancel sessions, and create share URLs.
 
 ## Documentation
 
