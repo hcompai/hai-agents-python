@@ -16,6 +16,7 @@ if typing.TYPE_CHECKING:
     from .environments.client import AsyncEnvironmentsClient, EnvironmentsClient
     from .sessions.client import AsyncSessionsClient, SessionsClient
     from .skills.client import AsyncSkillsClient, SkillsClient
+    from .vaults.client import AsyncVaultsClient, VaultsClient
 
 
 class BaseClient:
@@ -100,6 +101,7 @@ class BaseClient:
         self._skills: typing.Optional[SkillsClient] = None
         self._environments: typing.Optional[EnvironmentsClient] = None
         self._agents: typing.Optional[AgentsClient] = None
+        self._vaults: typing.Optional[VaultsClient] = None
 
     @property
     def sessions(self):
@@ -132,6 +134,14 @@ class BaseClient:
 
             self._agents = AgentsClient(client_wrapper=self._client_wrapper)
         return self._agents
+
+    @property
+    def vaults(self):
+        if self._vaults is None:
+            from .vaults.client import VaultsClient  # noqa: E402
+
+            self._vaults = VaultsClient(client_wrapper=self._client_wrapper)
+        return self._vaults
 
 
 def _make_default_async_client(
@@ -237,6 +247,7 @@ class AsyncBaseClient:
         self._skills: typing.Optional[AsyncSkillsClient] = None
         self._environments: typing.Optional[AsyncEnvironmentsClient] = None
         self._agents: typing.Optional[AsyncAgentsClient] = None
+        self._vaults: typing.Optional[AsyncVaultsClient] = None
 
     @property
     def sessions(self):
@@ -269,6 +280,14 @@ class AsyncBaseClient:
 
             self._agents = AsyncAgentsClient(client_wrapper=self._client_wrapper)
         return self._agents
+
+    @property
+    def vaults(self):
+        if self._vaults is None:
+            from .vaults.client import AsyncVaultsClient  # noqa: E402
+
+            self._vaults = AsyncVaultsClient(client_wrapper=self._client_wrapper)
+        return self._vaults
 
 
 def _get_base_url(*, base_url: typing.Optional[str] = None, environment: HaiAgentsEnvironment) -> str:

@@ -22,6 +22,8 @@ if typing.TYPE_CHECKING:
         Metrics,
         ModelCost,
         ModelUsage,
+        OnePasswordConfig,
+        OnePasswordConfigProvider,
         PageAgent,
         PageSessionSummary,
         PageSkill,
@@ -45,9 +47,12 @@ if typing.TYPE_CHECKING:
         UserMessageEventType,
         ValidationError,
         ValidationErrorLocItem,
+        VaultConfigList,
+        VaultConfigRead,
+        VaultHealth,
     )
     from .errors import UnprocessableEntityError
-    from . import agents, environments, sessions, skills
+    from . import agents, environments, sessions, skills, vaults
     from ._default_clients import DefaultAioHttpClient, DefaultAsyncHttpxClient
     from .agents import ListAgentsRequestSortItem
     from .client import AsyncClient, Client
@@ -112,6 +117,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "Metrics": ".types",
     "ModelCost": ".types",
     "ModelUsage": ".types",
+    "OnePasswordConfig": ".types",
+    "OnePasswordConfigProvider": ".types",
     "PageAgent": ".types",
     "PageSessionSummary": ".types",
     "PageSkill": ".types",
@@ -144,6 +151,9 @@ _dynamic_imports: typing.Dict[str, str] = {
     "UserMessageEventType": ".types",
     "ValidationError": ".types",
     "ValidationErrorLocItem": ".types",
+    "VaultConfigList": ".types",
+    "VaultConfigRead": ".types",
+    "VaultHealth": ".types",
     "agents": ".agents",
     "assert_request_under_limit": ".polling",
     "async_run_session": ".polling",
@@ -153,6 +163,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "run_session": ".polling",
     "sessions": ".sessions",
     "skills": ".skills",
+    "vaults": ".vaults",
     "wait_for_session": ".polling",
 }
 
@@ -209,6 +220,8 @@ __all__ = [
     "Metrics",
     "ModelCost",
     "ModelUsage",
+    "OnePasswordConfig",
+    "OnePasswordConfigProvider",
     "PageAgent",
     "PageSessionSummary",
     "PageSkill",
@@ -241,6 +254,9 @@ __all__ = [
     "UserMessageEventType",
     "ValidationError",
     "ValidationErrorLocItem",
+    "VaultConfigList",
+    "VaultConfigRead",
+    "VaultHealth",
     "agents",
     "assert_request_under_limit",
     "async_run_session",
@@ -250,5 +266,6 @@ __all__ = [
     "run_session",
     "sessions",
     "skills",
+    "vaults",
     "wait_for_session",
 ]

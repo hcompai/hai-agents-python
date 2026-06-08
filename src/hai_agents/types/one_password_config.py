@@ -4,17 +4,16 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .environment import Environment
+from .one_password_config_provider import OnePasswordConfigProvider
 
 
-class EnvironmentPage(UniversalBaseModel):
+class OnePasswordConfig(UniversalBaseModel):
     """
-    Named page subclass so OpenAPI emits a clean ``EnvironmentPage`` schema name.
+    1Password vault provider config.
     """
 
-    items: typing.List[Environment]
-    total: int
-    page: int
+    provider: typing.Optional[OnePasswordConfigProvider] = None
+    op_vault_id: str
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

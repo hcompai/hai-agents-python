@@ -12,79 +12,60 @@ from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
 from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
-from ..types.agent import Agent
-from ..types.agent_environments_item import AgentEnvironmentsItem
-from ..types.agent_skills_item import AgentSkillsItem
-from ..types.agent_subagents_item import AgentSubagentsItem
 from ..types.http_validation_error import HttpValidationError
-from ..types.page_agent import PageAgent
-from .types.list_agents_request_sort_item import ListAgentsRequestSortItem
+from ..types.one_password_config import OnePasswordConfig
+from ..types.vault_config_list import VaultConfigList
+from ..types.vault_config_read import VaultConfigRead
+from ..types.vault_health import VaultHealth
 from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
 
 
-class RawAgentsClient:
+class RawVaultsClient:
     def __init__(self, *, client_wrapper: SyncClientWrapper):
         self._client_wrapper = client_wrapper
 
-    def list_agents(
+    def list_vaults(
         self,
         *,
-        agent_name: typing.Optional[str] = None,
-        search: typing.Optional[str] = None,
-        page: typing.Optional[int] = None,
-        size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListAgentsRequestSortItem]] = None,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[PageAgent]:
+    ) -> HttpResponse[VaultConfigList]:
         """
-        List reserved + caller's org agents.
+        List the caller's org vault configs.
 
         Parameters
         ----------
-        agent_name : typing.Optional[str]
-            Case-insensitive substring match on agent name.
+        limit : typing.Optional[int]
 
-        search : typing.Optional[str]
-            Case-insensitive match on agent name or description.
-
-        page : typing.Optional[int]
-            Page number (1-based)
-
-        size : typing.Optional[int]
-            Number of items per page
-
-        sort : typing.Optional[typing.Sequence[ListAgentsRequestSortItem]]
-            Sort by field
+        offset : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        HttpResponse[PageAgent]
+        HttpResponse[VaultConfigList]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
-            "api/v2/agents",
+            "api/v2/vaults",
             method="GET",
             params={
-                "agent_name": agent_name,
-                "search": search,
-                "page": page,
-                "size": size,
-                "sort": sort,
+                "limit": limit,
+                "offset": offset,
             },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    PageAgent,
+                    VaultConfigList,
                     parse_obj_as(
-                        type_=PageAgent,  # type: ignore
+                        type_=VaultConfigList,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -109,71 +90,42 @@ class RawAgentsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def create_agent(
+    def create_vault(
         self,
         *,
         name: str,
-        description: str,
-        environments: typing.Sequence[AgentEnvironmentsItem],
-        model: typing.Optional[str] = OMIT,
-        instructions: typing.Optional[str] = OMIT,
-        subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
-        skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        provider_config: OnePasswordConfig,
+        token: str,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[Agent]:
+    ) -> HttpResponse[VaultConfigRead]:
         """
-        Create an agent..
+        Create a vault config. The provider token is validated by env-manager before storage.
 
         Parameters
         ----------
         name : str
-            Unique name for this agent in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
 
-        description : str
-            What the agent does. Parent agents read this to decide when to delegate to it.
+        provider_config : OnePasswordConfig
 
-        environments : typing.Sequence[AgentEnvironmentsItem]
-            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents (a pure orchestrator owns none).
-
-        model : typing.Optional[str]
-            Model that serves the agent. Defaults to the platform model if omitted.
-
-        instructions : typing.Optional[str]
-            Instructions appended to the agent's system prompt to steer behavior.
-
-        subagents : typing.Optional[typing.Sequence[AgentSubagentsItem]]
-            Agents this one can delegate to. Each entry is a registered agent's name or an inline definition.
-
-        skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
-            Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
+        token : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        HttpResponse[Agent]
+        HttpResponse[VaultConfigRead]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
-            "api/v2/agents",
+            "api/v2/vaults",
             method="POST",
             json={
                 "name": name,
-                "description": description,
-                "environments": convert_and_respect_annotation_metadata(
-                    object_=environments, annotation=typing.Sequence[AgentEnvironmentsItem], direction="write"
+                "provider_config": convert_and_respect_annotation_metadata(
+                    object_=provider_config, annotation=OnePasswordConfig, direction="write"
                 ),
-                "model": model,
-                "instructions": instructions,
-                "subagents": convert_and_respect_annotation_metadata(
-                    object_=subagents,
-                    annotation=typing.Optional[typing.Sequence[AgentSubagentsItem]],
-                    direction="write",
-                ),
-                "skills": convert_and_respect_annotation_metadata(
-                    object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
-                ),
+                "token": token,
             },
             headers={
                 "content-type": "application/json",
@@ -184,9 +136,9 @@ class RawAgentsClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    Agent,
+                    VaultConfigRead,
                     parse_obj_as(
-                        type_=Agent,  # type: ignore
+                        type_=VaultConfigRead,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -211,45 +163,35 @@ class RawAgentsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def get_agent(
-        self,
-        agent_name: str,
-        *,
-        resolve: typing.Optional[bool] = None,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[Agent]:
+    def get_vault(
+        self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[VaultConfigRead]:
         """
-        Fetch by identifier; 404 if not visible. ``resolve=true`` materialises spec leaves.
+        Fetch a vault config by id.
 
         Parameters
         ----------
-        agent_name : str
-
-        resolve : typing.Optional[bool]
-            Materialise string environment/skill/subagent leaves into full specs.
+        vault_id : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        HttpResponse[Agent]
+        HttpResponse[VaultConfigRead]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
-            f"api/v2/agents/{encode_path_param(agent_name)}",
+            f"api/v2/vaults/{encode_path_param(vault_id)}",
             method="GET",
-            params={
-                "resolve": resolve,
-            },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    Agent,
+                    VaultConfigRead,
                     parse_obj_as(
-                        type_=Agent,  # type: ignore
+                        type_=VaultConfigRead,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -274,120 +216,15 @@ class RawAgentsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def update_agent(
-        self,
-        agent_name: str,
-        *,
-        name: str,
-        description: str,
-        environments: typing.Sequence[AgentEnvironmentsItem],
-        model: typing.Optional[str] = OMIT,
-        instructions: typing.Optional[str] = OMIT,
-        subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
-        skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[Agent]:
-        """
-        Replace ``spec``. ``spec.name`` must match the URL identifier; renames are not supported.
-
-        Parameters
-        ----------
-        agent_name : str
-
-        name : str
-            Unique name for this agent in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
-
-        description : str
-            What the agent does. Parent agents read this to decide when to delegate to it.
-
-        environments : typing.Sequence[AgentEnvironmentsItem]
-            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents (a pure orchestrator owns none).
-
-        model : typing.Optional[str]
-            Model that serves the agent. Defaults to the platform model if omitted.
-
-        instructions : typing.Optional[str]
-            Instructions appended to the agent's system prompt to steer behavior.
-
-        subagents : typing.Optional[typing.Sequence[AgentSubagentsItem]]
-            Agents this one can delegate to. Each entry is a registered agent's name or an inline definition.
-
-        skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
-            Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        HttpResponse[Agent]
-            Successful Response
-        """
-        _response = self._client_wrapper.httpx_client.request(
-            f"api/v2/agents/{encode_path_param(agent_name)}",
-            method="PUT",
-            json={
-                "name": name,
-                "description": description,
-                "environments": convert_and_respect_annotation_metadata(
-                    object_=environments, annotation=typing.Sequence[AgentEnvironmentsItem], direction="write"
-                ),
-                "model": model,
-                "instructions": instructions,
-                "subagents": convert_and_respect_annotation_metadata(
-                    object_=subagents,
-                    annotation=typing.Optional[typing.Sequence[AgentSubagentsItem]],
-                    direction="write",
-                ),
-                "skills": convert_and_respect_annotation_metadata(
-                    object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
-                ),
-            },
-            headers={
-                "content-type": "application/json",
-            },
-            request_options=request_options,
-            omit=OMIT,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    Agent,
-                    parse_obj_as(
-                        type_=Agent,  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return HttpResponse(response=_response, data=_data)
-            if _response.status_code == 422:
-                raise UnprocessableEntityError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        HttpValidationError,
-                        parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        except ValidationError as e:
-            raise ParsingError(
-                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
-            )
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-    def delete_agent(
-        self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None
+    def delete_vault(
+        self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> HttpResponse[None]:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete a vault config.
 
         Parameters
         ----------
-        agent_name : str
+        vault_id : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -397,7 +234,7 @@ class RawAgentsClient:
         HttpResponse[None]
         """
         _response = self._client_wrapper.httpx_client.request(
-            f"api/v2/agents/{encode_path_param(agent_name)}",
+            f"api/v2/vaults/{encode_path_param(vault_id)}",
             method="DELETE",
             request_options=request_options,
         )
@@ -424,67 +261,229 @@ class RawAgentsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
+    def update_vault(
+        self,
+        vault_id: str,
+        *,
+        name: typing.Optional[str] = OMIT,
+        provider_config: typing.Optional[OnePasswordConfig] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[VaultConfigRead]:
+        """
+        Partial update of a vault config (name and/or provider_config).
 
-class AsyncRawAgentsClient:
+        Parameters
+        ----------
+        vault_id : str
+
+        name : typing.Optional[str]
+
+        provider_config : typing.Optional[OnePasswordConfig]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[VaultConfigRead]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}",
+            method="PATCH",
+            json={
+                "name": name,
+                "provider_config": convert_and_respect_annotation_metadata(
+                    object_=provider_config, annotation=typing.Optional[OnePasswordConfig], direction="write"
+                ),
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultConfigRead,
+                    parse_obj_as(
+                        type_=VaultConfigRead,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def rotate_vault_token(
+        self, vault_id: str, *, token: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[None]:
+        """
+        Rotate the stored provider token. env-manager health-checks it before writing.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        token : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[None]
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/token",
+            method="PUT",
+            json={
+                "token": token,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return HttpResponse(response=_response, data=None)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def vault_health(
+        self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[VaultHealth]:
+        """
+        Probe the vault's provider. Always 200 when reachable; branch on ``ok``.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[VaultHealth]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/health",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultHealth,
+                    parse_obj_as(
+                        type_=VaultHealth,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+
+class AsyncRawVaultsClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
         self._client_wrapper = client_wrapper
 
-    async def list_agents(
+    async def list_vaults(
         self,
         *,
-        agent_name: typing.Optional[str] = None,
-        search: typing.Optional[str] = None,
-        page: typing.Optional[int] = None,
-        size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListAgentsRequestSortItem]] = None,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[PageAgent]:
+    ) -> AsyncHttpResponse[VaultConfigList]:
         """
-        List reserved + caller's org agents.
+        List the caller's org vault configs.
 
         Parameters
         ----------
-        agent_name : typing.Optional[str]
-            Case-insensitive substring match on agent name.
+        limit : typing.Optional[int]
 
-        search : typing.Optional[str]
-            Case-insensitive match on agent name or description.
-
-        page : typing.Optional[int]
-            Page number (1-based)
-
-        size : typing.Optional[int]
-            Number of items per page
-
-        sort : typing.Optional[typing.Sequence[ListAgentsRequestSortItem]]
-            Sort by field
+        offset : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        AsyncHttpResponse[PageAgent]
+        AsyncHttpResponse[VaultConfigList]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            "api/v2/agents",
+            "api/v2/vaults",
             method="GET",
             params={
-                "agent_name": agent_name,
-                "search": search,
-                "page": page,
-                "size": size,
-                "sort": sort,
+                "limit": limit,
+                "offset": offset,
             },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    PageAgent,
+                    VaultConfigList,
                     parse_obj_as(
-                        type_=PageAgent,  # type: ignore
+                        type_=VaultConfigList,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -509,71 +508,42 @@ class AsyncRawAgentsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def create_agent(
+    async def create_vault(
         self,
         *,
         name: str,
-        description: str,
-        environments: typing.Sequence[AgentEnvironmentsItem],
-        model: typing.Optional[str] = OMIT,
-        instructions: typing.Optional[str] = OMIT,
-        subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
-        skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        provider_config: OnePasswordConfig,
+        token: str,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[Agent]:
+    ) -> AsyncHttpResponse[VaultConfigRead]:
         """
-        Create an agent..
+        Create a vault config. The provider token is validated by env-manager before storage.
 
         Parameters
         ----------
         name : str
-            Unique name for this agent in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
 
-        description : str
-            What the agent does. Parent agents read this to decide when to delegate to it.
+        provider_config : OnePasswordConfig
 
-        environments : typing.Sequence[AgentEnvironmentsItem]
-            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents (a pure orchestrator owns none).
-
-        model : typing.Optional[str]
-            Model that serves the agent. Defaults to the platform model if omitted.
-
-        instructions : typing.Optional[str]
-            Instructions appended to the agent's system prompt to steer behavior.
-
-        subagents : typing.Optional[typing.Sequence[AgentSubagentsItem]]
-            Agents this one can delegate to. Each entry is a registered agent's name or an inline definition.
-
-        skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
-            Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
+        token : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        AsyncHttpResponse[Agent]
+        AsyncHttpResponse[VaultConfigRead]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            "api/v2/agents",
+            "api/v2/vaults",
             method="POST",
             json={
                 "name": name,
-                "description": description,
-                "environments": convert_and_respect_annotation_metadata(
-                    object_=environments, annotation=typing.Sequence[AgentEnvironmentsItem], direction="write"
+                "provider_config": convert_and_respect_annotation_metadata(
+                    object_=provider_config, annotation=OnePasswordConfig, direction="write"
                 ),
-                "model": model,
-                "instructions": instructions,
-                "subagents": convert_and_respect_annotation_metadata(
-                    object_=subagents,
-                    annotation=typing.Optional[typing.Sequence[AgentSubagentsItem]],
-                    direction="write",
-                ),
-                "skills": convert_and_respect_annotation_metadata(
-                    object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
-                ),
+                "token": token,
             },
             headers={
                 "content-type": "application/json",
@@ -584,9 +554,9 @@ class AsyncRawAgentsClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    Agent,
+                    VaultConfigRead,
                     parse_obj_as(
-                        type_=Agent,  # type: ignore
+                        type_=VaultConfigRead,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -611,45 +581,35 @@ class AsyncRawAgentsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def get_agent(
-        self,
-        agent_name: str,
-        *,
-        resolve: typing.Optional[bool] = None,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[Agent]:
+    async def get_vault(
+        self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[VaultConfigRead]:
         """
-        Fetch by identifier; 404 if not visible. ``resolve=true`` materialises spec leaves.
+        Fetch a vault config by id.
 
         Parameters
         ----------
-        agent_name : str
-
-        resolve : typing.Optional[bool]
-            Materialise string environment/skill/subagent leaves into full specs.
+        vault_id : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        AsyncHttpResponse[Agent]
+        AsyncHttpResponse[VaultConfigRead]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            f"api/v2/agents/{encode_path_param(agent_name)}",
+            f"api/v2/vaults/{encode_path_param(vault_id)}",
             method="GET",
-            params={
-                "resolve": resolve,
-            },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    Agent,
+                    VaultConfigRead,
                     parse_obj_as(
-                        type_=Agent,  # type: ignore
+                        type_=VaultConfigRead,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -674,120 +634,15 @@ class AsyncRawAgentsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def update_agent(
-        self,
-        agent_name: str,
-        *,
-        name: str,
-        description: str,
-        environments: typing.Sequence[AgentEnvironmentsItem],
-        model: typing.Optional[str] = OMIT,
-        instructions: typing.Optional[str] = OMIT,
-        subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
-        skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[Agent]:
-        """
-        Replace ``spec``. ``spec.name`` must match the URL identifier; renames are not supported.
-
-        Parameters
-        ----------
-        agent_name : str
-
-        name : str
-            Unique name for this agent in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
-
-        description : str
-            What the agent does. Parent agents read this to decide when to delegate to it.
-
-        environments : typing.Sequence[AgentEnvironmentsItem]
-            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents (a pure orchestrator owns none).
-
-        model : typing.Optional[str]
-            Model that serves the agent. Defaults to the platform model if omitted.
-
-        instructions : typing.Optional[str]
-            Instructions appended to the agent's system prompt to steer behavior.
-
-        subagents : typing.Optional[typing.Sequence[AgentSubagentsItem]]
-            Agents this one can delegate to. Each entry is a registered agent's name or an inline definition.
-
-        skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
-            Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        AsyncHttpResponse[Agent]
-            Successful Response
-        """
-        _response = await self._client_wrapper.httpx_client.request(
-            f"api/v2/agents/{encode_path_param(agent_name)}",
-            method="PUT",
-            json={
-                "name": name,
-                "description": description,
-                "environments": convert_and_respect_annotation_metadata(
-                    object_=environments, annotation=typing.Sequence[AgentEnvironmentsItem], direction="write"
-                ),
-                "model": model,
-                "instructions": instructions,
-                "subagents": convert_and_respect_annotation_metadata(
-                    object_=subagents,
-                    annotation=typing.Optional[typing.Sequence[AgentSubagentsItem]],
-                    direction="write",
-                ),
-                "skills": convert_and_respect_annotation_metadata(
-                    object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
-                ),
-            },
-            headers={
-                "content-type": "application/json",
-            },
-            request_options=request_options,
-            omit=OMIT,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    Agent,
-                    parse_obj_as(
-                        type_=Agent,  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return AsyncHttpResponse(response=_response, data=_data)
-            if _response.status_code == 422:
-                raise UnprocessableEntityError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        HttpValidationError,
-                        parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        except ValidationError as e:
-            raise ParsingError(
-                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
-            )
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-    async def delete_agent(
-        self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None
+    async def delete_vault(
+        self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> AsyncHttpResponse[None]:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete a vault config.
 
         Parameters
         ----------
-        agent_name : str
+        vault_id : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -797,13 +652,192 @@ class AsyncRawAgentsClient:
         AsyncHttpResponse[None]
         """
         _response = await self._client_wrapper.httpx_client.request(
-            f"api/v2/agents/{encode_path_param(agent_name)}",
+            f"api/v2/vaults/{encode_path_param(vault_id)}",
             method="DELETE",
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def update_vault(
+        self,
+        vault_id: str,
+        *,
+        name: typing.Optional[str] = OMIT,
+        provider_config: typing.Optional[OnePasswordConfig] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[VaultConfigRead]:
+        """
+        Partial update of a vault config (name and/or provider_config).
+
+        Parameters
+        ----------
+        vault_id : str
+
+        name : typing.Optional[str]
+
+        provider_config : typing.Optional[OnePasswordConfig]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[VaultConfigRead]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}",
+            method="PATCH",
+            json={
+                "name": name,
+                "provider_config": convert_and_respect_annotation_metadata(
+                    object_=provider_config, annotation=typing.Optional[OnePasswordConfig], direction="write"
+                ),
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultConfigRead,
+                    parse_obj_as(
+                        type_=VaultConfigRead,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def rotate_vault_token(
+        self, vault_id: str, *, token: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[None]:
+        """
+        Rotate the stored provider token. env-manager health-checks it before writing.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        token : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[None]
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/token",
+            method="PUT",
+            json={
+                "token": token,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def vault_health(
+        self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[VaultHealth]:
+        """
+        Probe the vault's provider. Always 200 when reachable; branch on ``ok``.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[VaultHealth]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/health",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultHealth,
+                    parse_obj_as(
+                        type_=VaultHealth,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),

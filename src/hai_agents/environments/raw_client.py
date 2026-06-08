@@ -293,7 +293,7 @@ class RawEnvironmentsClient:
         self, id: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> HttpResponse[None]:
         """
-        Delete by identifier. Reserved rows: H admin only.
+        Delete by identifier. Reserved rows: H employee only.
 
         Parameters
         ----------
@@ -603,7 +603,7 @@ class AsyncRawEnvironmentsClient:
         self, id: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> AsyncHttpResponse[None]:
         """
-        Delete by identifier. Reserved rows: H admin only.
+        Delete by identifier. Reserved rows: H employee only.
 
         Parameters
         ----------

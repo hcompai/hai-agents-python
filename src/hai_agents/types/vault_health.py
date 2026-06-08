@@ -4,17 +4,15 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .environment import Environment
 
 
-class EnvironmentPage(UniversalBaseModel):
+class VaultHealth(UniversalBaseModel):
     """
-    Named page subclass so OpenAPI emits a clean ``EnvironmentPage`` schema name.
+    Result of a provider health check. The API always returns 200; branch on ``ok``.
     """
 
-    items: typing.List[Environment]
-    total: int
-    page: int
+    ok: bool
+    error: typing.Optional[str] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
