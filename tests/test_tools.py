@@ -1,4 +1,4 @@
-"""Client tool schema derivation and the dispatch loop, offline."""
+"""Custom tool schema derivation and the dispatch loop, offline."""
 
 from types import SimpleNamespace
 

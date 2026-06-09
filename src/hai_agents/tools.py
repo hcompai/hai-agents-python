@@ -1,4 +1,4 @@
-"""Client-executed tools: the agent requests them, your Python process runs them."""
+"""Custom tools: the agent requests them, your Python process runs them."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import pydantic
 
 @dataclass(frozen=True)
 class Tool:
-    """A local Python function exposed to the agent as a client-executed tool."""
+    """A local Python function exposed to the agent as a custom tool."""
 
     name: str
     description: str
@@ -49,7 +49,7 @@ def tool(
     name: typing.Optional[str] = None,
     description: typing.Optional[str] = None,
 ) -> typing.Any:
-    """Wrap a function as a client-executed :class:`Tool`; the input schema is derived from its signature."""
+    """Wrap a function as a custom :class:`Tool` executed in your process; the input schema is derived from its signature."""
 
     def wrap(f: typing.Callable[..., typing.Any]) -> Tool:
         resolved = description or inspect.getdoc(f)

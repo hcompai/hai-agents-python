@@ -102,7 +102,7 @@ def _attach_tool_definitions(create_params: typing.Dict[str, typing.Any], tools:
 
 
 def _pending_tool_calls(batch: typing.Sequence[TrajectoryEvent]) -> typing.List[typing.Dict[str, typing.Any]]:
-    """Pending client tool calls advertised by ``ActiveStateChangeEvent``s in an event batch."""
+    """Pending custom tool calls advertised by ``ActiveStateChangeEvent``s in an event batch."""
     calls: typing.Dict[str, typing.Dict[str, typing.Any]] = {}
     for event in batch:
         if event.type != "ActiveStateChangeEvent":
@@ -223,7 +223,7 @@ def wait_for_session(
     max_polls: typing.Optional[int] = None,
     tools: typing.Optional[typing.Sequence[ToolInput]] = None,
 ) -> SessionRunResult:
-    """Poll a session until it reaches a terminal status, running client tools along the way.
+    """Poll a session until it reaches a terminal status, running custom tools along the way.
 
     Terminal state is read from ``/status`` (authoritative); ``/changes`` only feeds
     events and the final answer, since it 204s whenever no new events exist past
@@ -295,7 +295,7 @@ def run_session(
     tools: typing.Optional[typing.Sequence[ToolInput]] = None,
     **create_params: typing_extensions.Unpack[CreateSessionParams],
 ) -> SessionRunResult:
-    """Create a session, then poll until it completes or fails, running client tools along the way."""
+    """Create a session, then poll until it completes or fails, running custom tools along the way."""
     normalized_tools = as_tools(tools) if tools else []
     params = dict(create_params)
     if normalized_tools:

@@ -66,7 +66,7 @@ print(result.answer)
 
 An `AsyncClient` mirrors this API for asyncio.
 
-## Client tools
+## Custom tools
 
 Expose your own Python functions to the agent. Decorate a function with `@tool` (the input schema is derived from its signature), pass it to `run_session`, and the polling loop executes it whenever the agent calls it, posting the result back so the session resumes.
 
