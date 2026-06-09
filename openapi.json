@@ -1528,18 +1528,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/Browser"
-                  }
-                ],
-                "discriminator": {
-                  "propertyName": "kind",
-                  "mapping": {
-                    "web": "#/components/schemas/Browser"
-                  }
-                },
-                "title": "Create"
+                "$ref": "#/components/schemas/Browser"
               }
             }
           }
@@ -1791,18 +1780,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/Browser"
-                  }
-                ],
-                "discriminator": {
-                  "propertyName": "kind",
-                  "mapping": {
-                    "web": "#/components/schemas/Browser"
-                  }
-                },
-                "title": "Update"
+                "$ref": "#/components/schemas/Browser"
               }
             }
           }
@@ -2697,31 +2675,28 @@
           "headless": {
             "type": "boolean",
             "title": "Headless",
-            "description": "Run without a visible window."
+            "description": "Run without a visible window.",
+            "default": false
           },
           "width": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Width",
-            "description": "Viewport width in pixels."
+            "description": "Viewport width in pixels.",
+            "default": 1200
           },
           "height": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Height",
-            "description": "Viewport height in pixels."
+            "description": "Viewport height in pixels.",
+            "default": 1200
           },
           "start_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Start Url",
-            "description": "Initial URL to open. Null starts on a blank page."
+            "description": "Initial URL to open.",
+            "default": "https://www.bing.com"
           },
           "mode": {
             "type": "string",
@@ -2733,31 +2708,24 @@
             "title": "Mode",
             "description": "How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.",
             "default": "visual"
+          },
+          "page_chars": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Page Chars",
+            "description": "Characters of page text shown per page in 'text' mode.",
+            "default": 20000
           }
         },
         "type": "object",
         "required": [
-          "id",
-          "headless",
-          "width",
-          "height",
-          "start_url"
+          "id"
         ],
         "title": "Browser",
         "description": "A web browser the agent navigates and acts on."
       },
       "Environment": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/Browser"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "kind",
-          "mapping": {
-            "web": "#/components/schemas/Browser"
-          }
-        }
+        "$ref": "#/components/schemas/Browser"
       },
       "EnvironmentKind": {
         "type": "string",

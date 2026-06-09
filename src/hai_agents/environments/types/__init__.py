@@ -6,16 +6,8 @@ import typing
 from importlib import import_module
 
 if typing.TYPE_CHECKING:
-    from .create_environment_request import CreateEnvironmentRequest, CreateEnvironmentRequest_Web
     from .list_environments_request_sort_item import ListEnvironmentsRequestSortItem
-    from .update_environment_request_body import UpdateEnvironmentRequestBody, UpdateEnvironmentRequestBody_Web
-_dynamic_imports: typing.Dict[str, str] = {
-    "CreateEnvironmentRequest": ".create_environment_request",
-    "CreateEnvironmentRequest_Web": ".create_environment_request",
-    "ListEnvironmentsRequestSortItem": ".list_environments_request_sort_item",
-    "UpdateEnvironmentRequestBody": ".update_environment_request_body",
-    "UpdateEnvironmentRequestBody_Web": ".update_environment_request_body",
-}
+_dynamic_imports: typing.Dict[str, str] = {"ListEnvironmentsRequestSortItem": ".list_environments_request_sort_item"}
 
 
 def __getattr__(attr_name: str) -> typing.Any:
@@ -39,10 +31,4 @@ def __dir__():
     return sorted(lazy_attrs)
 
 
-__all__ = [
-    "CreateEnvironmentRequest",
-    "CreateEnvironmentRequest_Web",
-    "ListEnvironmentsRequestSortItem",
-    "UpdateEnvironmentRequestBody",
-    "UpdateEnvironmentRequestBody_Web",
-]
+__all__ = ["ListEnvironmentsRequestSortItem"]
