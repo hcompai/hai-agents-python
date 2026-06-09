@@ -66,6 +66,29 @@ print(result.answer)
 
 An `AsyncClient` mirrors this API for asyncio.
 
+## Client tools
+
+Expose your own Python functions to the agent. Decorate a function with `@tool` (the input schema is derived from its signature), pass it to `run_session`, and the polling loop executes it whenever the agent calls it, posting the result back so the session resumes.
+
+```python
+from hai_agents import Client, tool
+
+@tool
+def get_weather(city: str) -> str:
+    """Get the current weather for a city."""
+    return f"Sunny in {city}"
+
+client = Client()
+
+result = client.run_session(
+    agent="h/researcher",
+    messages="What's the weather in Paris?",
+    tools=[get_weather],
+)
+```
+
+Tool exceptions are reported to the agent as tool errors rather than crashing the loop. With `AsyncClient`, tools may be `async def`. For manual control, `client.start_session(tools=[...])` returns a handle whose `wait_for_completion()` dispatches the same way, and sessions awaiting results report the `awaiting_tool_results` status with the pending calls.
+
 ## CLI
 
 The `hai-agents[cli]` extra installs the `hai` command:

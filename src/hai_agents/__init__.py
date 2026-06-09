@@ -80,6 +80,7 @@ if typing.TYPE_CHECKING:
         SendSessionMessagesRequestBody_UserMessage,
     )
     from .skills import ListSkillsRequestSortItem
+    from .tools import Tool, as_tools, tool
 _dynamic_imports: typing.Dict[str, str] = {
     "Agent": ".types",
     "AgentEnvironmentsItem": ".types",
@@ -131,6 +132,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ShareLink": ".types",
     "Skill": ".types",
     "TERMINAL_SESSION_STATUSES": ".polling",
+    "Tool": ".tools",
     "TrajectoryChanges": ".types",
     "TrajectoryChangesAnswer": ".types",
     "TrajectoryEvent": ".types",
@@ -145,6 +147,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "VaultConfigRead": ".types",
     "VaultHealth": ".types",
     "agents": ".agents",
+    "as_tools": ".tools",
     "assert_request_under_limit": ".polling",
     "async_run_session": ".polling",
     "async_wait_for_session": ".polling",
@@ -153,6 +156,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "run_session": ".polling",
     "sessions": ".sessions",
     "skills": ".skills",
+    "tool": ".tools",
     "vaults": ".vaults",
     "wait_for_session": ".polling",
 }
@@ -230,6 +234,7 @@ __all__ = [
     "ShareLink",
     "Skill",
     "TERMINAL_SESSION_STATUSES",
+    "Tool",
     "TrajectoryChanges",
     "TrajectoryChangesAnswer",
     "TrajectoryEvent",
@@ -244,6 +249,7 @@ __all__ = [
     "VaultConfigRead",
     "VaultHealth",
     "agents",
+    "as_tools",
     "assert_request_under_limit",
     "async_run_session",
     "async_wait_for_session",
@@ -252,6 +258,7 @@ __all__ = [
     "run_session",
     "sessions",
     "skills",
+    "tool",
     "vaults",
     "wait_for_session",
 ]

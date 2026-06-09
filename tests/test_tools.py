@@ -1,0 +1,127 @@
+"""Client tool schema derivation and the dispatch loop, offline."""
+
+from types import SimpleNamespace
+
+import pytest
+
+from hai_agents import Tool, tool
+from hai_agents.polling import _attach_tool_definitions, run_session
+
+
+@tool
+def get_weather(city: str, unit: str = "celsius") -> str:
+    """Get the current weather for a city."""
+    return f"Sunny in {city} ({unit})"
+
+
+def test_tool_decorator_derives_schema():
+    assert isinstance(get_weather, Tool)
+    assert get_weather.name == "get_weather"
+    assert get_weather.description == "Get the current weather for a city."
+    schema = get_weather.input_schema
+    assert schema["type"] == "object"
+    assert set(schema["properties"]) == {"city", "unit"}
+    assert schema["required"] == ["city"]
+    assert get_weather(city="Paris") == "Sunny in Paris (celsius)"
+
+
+def test_tool_without_description_raises():
+    with pytest.raises(ValueError, match="needs a description"):
+
+        @tool
+        def nameless(x: int) -> int:
+            return x
+
+
+def test_attach_definitions_string_agent_uses_overrides():
+    params = {"agent": "h/researcher"}
+    _attach_tool_definitions(params, [get_weather])
+    assert params["agent"] == "h/researcher"
+    assert params["overrides"]["agent.tools"] == [get_weather.definition()]
+
+
+def test_attach_definitions_inline_agent_sets_tools():
+    params = {"agent": {"name": "mine", "description": "d", "environments": []}}
+    _attach_tool_definitions(params, [get_weather])
+    assert params["agent"]["tools"] == [get_weather.definition()]
+
+
+class _FakeHttpx:
+    def __init__(self):
+        self.requests = []
+
+    def request(self, path, *, method, json=None, headers=None):
+        self.requests.append({"path": path, "method": method, "json": json})
+        return SimpleNamespace(status_code=202, headers={}, text="")
+
+
+class _FakeSessions:
+    def __init__(self, polls):
+        self._polls = list(polls)
+        self.created_with = None
+
+    def create_session(self, **kwargs):
+        self.created_with = kwargs
+        return SimpleNamespace(id="sess_1")
+
+    def get_session_changes(self, id, *, from_index, limit, include_events, wait_for_seconds):
+        return self._polls[0][0] if self._polls else None
+
+    def get_session_status(self, id):
+        changes, status = self._polls.pop(0)
+        return SimpleNamespace(status=status)
+
+
+def _awaiting_changes(*calls):
+    event = SimpleNamespace(
+        type="ActiveStateChangeEvent",
+        data={"state": "awaiting_tool_results", "pending_tool_calls": list(calls)},
+    )
+    return SimpleNamespace(new_events=[event], answer=None)
+
+
+def test_run_session_dispatches_pending_calls_and_posts_results():
+    sessions = _FakeSessions(
+        polls=[
+            (_awaiting_changes({"id": "c1", "name": "get_weather", "arguments": {"city": "Paris"}}), "running"),
+            (None, "completed"),
+        ]
+    )
+    httpx = _FakeHttpx()
+    client = SimpleNamespace(sessions=sessions, _client_wrapper=SimpleNamespace(httpx_client=httpx))
+
+    result = run_session(client, agent="h/researcher", tools=[get_weather])
+
+    assert sessions.created_with["overrides"]["agent.tools"] == [get_weather.definition()]
+    assert [r["path"] for r in httpx.requests] == ["api/v2/sessions/sess_1/tool_results"]
+    assert httpx.requests[0]["json"] == {
+        "type": "tool_result",
+        "tool_call_id": "c1",
+        "result": "Sunny in Paris (celsius)",
+        "is_error": False,
+    }
+    assert result.status == "completed"
+
+
+def test_dispatch_reports_tool_exceptions_as_errors():
+    @tool(description="always fails")
+    def broken():
+        raise RuntimeError("boom")
+
+    sessions = _FakeSessions(
+        polls=[
+            (_awaiting_changes({"id": "c1", "name": "broken", "arguments": {}}), "running"),
+            (None, "completed"),
+        ]
+    )
+    httpx = _FakeHttpx()
+    client = SimpleNamespace(sessions=sessions, _client_wrapper=SimpleNamespace(httpx_client=httpx))
+
+    run_session(client, agent="h/researcher", tools=[broken])
+
+    assert httpx.requests[0]["json"] == {
+        "type": "tool_result",
+        "tool_call_id": "c1",
+        "result": "RuntimeError: boom",
+        "is_error": True,
+    }
