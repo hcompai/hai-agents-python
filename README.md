@@ -79,7 +79,14 @@ hai sessions get <session-id>
 hai sessions send <session-id> "continue"
 hai sessions cancel <session-id>
 hai sessions share <session-id>
+hai mcp install            # wire the hai-agents MCP server into every detected editor
+hai mcp install list       # see supported clients (Cursor, VS Code, Claude Code, Windsurf)
 ```
+
+`hai mcp install` adds the remote `hai-agents` MCP server to your local editors and
+writes your API key into each client config (in plaintext, so keep them private). On
+clients that support agent skills (Cursor, Claude Code) it also symlinks a `SKILL.md`
+that teaches the model how to drive the server.
 
 `hai login` opens your browser, mints a per-machine API key, and writes it to
 `~/.config/hai/.env`. `hai whoami` shows the resolved endpoint and whether you are

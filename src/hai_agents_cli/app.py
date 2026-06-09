@@ -20,7 +20,7 @@ from hai_agents_common import credentials
 from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
 
-from . import auth
+from . import auth, mcp_hosts
 
 H_GLYPH = "\n".join(
     (
@@ -46,6 +46,7 @@ app = typer.Typer(
     rich_markup_mode=None,
 )
 sessions_app = typer.Typer(no_args_is_help=True, help="Inspect and steer sessions.")
+mcp_app = typer.Typer(no_args_is_help=True, help="Manage the hai-agents MCP server.")
 
 
 @dataclass(frozen=True)
@@ -266,7 +267,100 @@ def share(ctx: typer.Context, session_id: str = typer.Argument(...)) -> None:
         print(share_url)
 
 
+@mcp_app.command("install")
+def mcp_install(
+    ctx: typer.Context,
+    client: str = typer.Argument(
+        None, help="Client id (cursor, vscode, ...), 'list' to enumerate, or omit to wire every detected client."
+    ),
+    url: str = typer.Option(None, "--url", help="MCP endpoint. Defaults to your --base-url region or the EU host."),
+) -> None:
+    """Wire the hai-agents MCP server into local clients (writes your API key into each config in plaintext)."""
+    state = _state(ctx)
+    if client == "list":
+        _mcp_list(state.json_output)
+        return
+
+    if client is None:
+        targets = [(cid, c) for cid, c in mcp_hosts.CLIENTS.items() if mcp_hosts.host_present(c)]
+        if not targets:
+            _raise_cli_error(RuntimeError("No supported MCP clients detected. Run `hai mcp install list`."))
+    elif client in mcp_hosts.CLIENTS:
+        targets = [(client, mcp_hosts.CLIENTS[client])]
+    else:
+        _raise_cli_error(RuntimeError(f"Unknown client {client!r}. Run `hai mcp install list` to see supported ids."))
+
+    try:
+        resolved = credentials.resolve_api_key(state.api_key)
+        key = resolved() if callable(resolved) else resolved
+    except RuntimeError as exc:
+        _raise_cli_error(exc)
+    server_url = mcp_hosts.resolve_mcp_url(credentials.resolve_base_url(state.base_url), url)
+
+    results = [_install_one(cid, c, server_url, key) for cid, c in targets]
+    _print_mcp_results(results, server_url, state.json_output)
+    if any(r["status"].fatal or (r["skill"] and r["skill"][0].fatal) for r in results):
+        raise typer.Exit(1)
+
+
+def _install_one(cid: str, c: mcp_hosts.Client, url: str, key: str) -> dict:
+    status, detail = mcp_hosts.wire_mcp(c, url, key)
+    skill = mcp_hosts.wire_skill(c) if c.skills_dir is not None else None
+    return {"client": cid, "status": status, "detail": detail, "skill": skill}
+
+
+def _mcp_list(json_output: bool) -> None:
+    rows = [(cid, mcp_hosts.host_present(c), mcp_hosts.host_target(c)) for cid, c in mcp_hosts.CLIENTS.items()]
+    if json_output:
+        _print_json({cid: {"detected": detected, "target": tgt} for cid, detected, tgt in rows})
+        return
+    table = Table("Client", "Detected", "Config")
+    for cid, detected, tgt in rows:
+        table.add_row(cid, "[green]yes[/green]" if detected else "[dim]no[/dim]", tgt)
+    console.print(table)
+    console.print(
+        "[dim]Wire one with[/dim] [cyan]hai mcp install <id>[/cyan][dim], or all detected with[/dim] [cyan]hai mcp install[/cyan]."
+    )
+
+
+_MCP_GLYPH: dict[mcp_hosts.Status, str] = {
+    mcp_hosts.Status.INSTALLED: "[bold green]+[/bold green]",
+    mcp_hosts.Status.SKIPPED: "[dim green]=[/dim green]",
+    mcp_hosts.Status.ABSENT: "[yellow]-[/yellow]",
+    mcp_hosts.Status.FAILED: "[bold red]x[/bold red]",
+}
+
+
+def _print_mcp_results(results: list[dict], server_url: str, json_output: bool) -> None:
+    if json_output:
+        _print_json(
+            {
+                "url": server_url,
+                "results": [
+                    {
+                        "client": r["client"],
+                        "status": r["status"].value,
+                        "detail": r["detail"],
+                        "skill": ({"status": r["skill"][0].value, "detail": r["skill"][1]} if r["skill"] else None),
+                    }
+                    for r in results
+                ],
+            }
+        )
+        return
+    for r in results:
+        line = f"  {_MCP_GLYPH[r['status']]} [bold cyan]{r['client']}[/bold cyan]  {r['detail']}"
+        if r["skill"] and r["skill"][0].ok:
+            line += f"  [dim]+ skill {r['skill'][1]}[/dim]"
+        elif r["skill"]:
+            line += f"  {_MCP_GLYPH[r['skill'][0]]} [dim]skill: {r['skill'][1]}[/dim]"
+        console.print(line)
+    console.print(f"\n[bold]Server:[/bold] {server_url}")
+    console.print("[yellow]Your API key was written into these configs in plaintext. Keep them private.[/yellow]")
+
+
 app.add_typer(sessions_app, name="sessions")
+app.add_typer(mcp_app, name="mcp")
 
 
 def main() -> None:
