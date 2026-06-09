@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import stat
+import subprocess
 
 from typer.testing import CliRunner
 
@@ -48,6 +49,25 @@ def test_wire_json_merges_preserves_and_is_idempotent(tmp_path) -> None:
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
     assert wire_mcp(c, "https://u/mcp", "hk-secret")[0] is Status.SKIPPED
+
+
+def test_cli_install_removes_then_adds_at_user_scope(monkeypatch) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr(mcp_hosts.shutil, "which", lambda name: f"/usr/bin/{name}")
+
+    def fake_run(cmd, **_):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(mcp_hosts.subprocess, "run", fake_run)
+
+    status, _ = wire_mcp(mcp_hosts.CLIENTS["claude-code"], "https://u/mcp", "hk-rotated")
+
+    assert status is Status.INSTALLED
+    remove, add = calls
+    assert remove[1:3] == ["mcp", "remove"] and remove[remove.index("--scope") + 1] == "user"
+    assert add[1:3] == ["mcp", "add"] and add[add.index("--scope") + 1] == "user"
+    assert "Authorization: Bearer hk-rotated" in add
 
 
 def test_install_writes_detected_client_and_warns(monkeypatch, tmp_path) -> None:
