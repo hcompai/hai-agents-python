@@ -51,7 +51,7 @@ class Client:
     name: str
     config_path: str | None = None
     cli_cmd: tuple[str, ...] | None = None
-    cli_remove_cmd: tuple[str, ...] | None = None
+    cli_remove_cmds: tuple[tuple[str, ...], ...] = ()
     key_path: tuple[str, ...] | None = None
     leaf: dict[str, Any] | None = None
     skills_dir: str | None = None  # under $HOME; None if the client has no SKILL.md auto-load
@@ -104,7 +104,12 @@ CLIENTS: dict[str, Client] = {
             "--header",
             f"Authorization: Bearer {_KEY}",
         ),
-        cli_remove_cmd=("claude", "mcp", "remove", "--scope", "user", SERVER_NAME),
+        cli_remove_cmds=(
+            # Clear any prior entry at either writable scope so a rotated key / url can't survive,
+            # and a narrower local entry can't shadow the user-scoped one we install.
+            ("claude", "mcp", "remove", "--scope", "local", SERVER_NAME),
+            ("claude", "mcp", "remove", "--scope", "user", SERVER_NAME),
+        ),
         skills_dir=".claude/skills",
     ),
     "windsurf": Client(
@@ -183,8 +188,8 @@ def wire_mcp(c: Client, url: str, key: str) -> tuple[Status, str]:
     """Install the server into `c`: a CLI `add`, or a JSON config merge."""
     if c.cli_cmd is not None:
         add = [_render(arg, url, key) for arg in c.cli_cmd]
-        remove = list(c.cli_remove_cmd) if c.cli_remove_cmd else None
-        return _install_via_cli(add, remove)
+        removes = [list(rm) for rm in c.cli_remove_cmds]
+        return _install_via_cli(add, removes)
     assert c.config_path is not None and c.key_path is not None and c.leaf is not None
     return _wire_json(Path(c.config_path).expanduser(), c.key_path, _render(c.leaf, url, key))
 
@@ -200,14 +205,14 @@ def _render(obj: Any, url: str, key: str) -> Any:
     return obj
 
 
-def _install_via_cli(add_cmd: list[str], remove_cmd: list[str] | None = None) -> tuple[Status, str]:
+def _install_via_cli(add_cmd: list[str], remove_cmds: list[list[str]] | None = None) -> tuple[Status, str]:
     exe = shutil.which(add_cmd[0])
     if exe is None:
         return Status.ABSENT, f"{add_cmd[0]!r} not on PATH"
     # `add` refuses to overwrite, so drop any existing entry first; otherwise a rotated key or
     # changed url is silently kept. Re-adding always reflects the current url + key.
-    if remove_cmd is not None:
-        subprocess.run([exe, *remove_cmd[1:]], capture_output=True, text=True, check=False)
+    for rm in remove_cmds or []:
+        subprocess.run([exe, *rm[1:]], capture_output=True, text=True, check=False)
     try:
         subprocess.run([exe, *add_cmd[1:]], check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as exc:
