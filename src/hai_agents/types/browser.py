@@ -4,6 +4,7 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .browser_kind import BrowserKind
 from .browser_mode import BrowserMode
 
 
@@ -17,29 +18,35 @@ class Browser(UniversalBaseModel):
     Catalog identifier for this environment.
     """
 
-    headless: bool = pydantic.Field()
+    kind: typing.Optional[BrowserKind] = None
+    headless: typing.Optional[bool] = pydantic.Field(default=None)
     """
     Run without a visible window.
     """
 
-    width: int = pydantic.Field()
+    width: typing.Optional[int] = pydantic.Field(default=None)
     """
     Viewport width in pixels.
     """
 
-    height: int = pydantic.Field()
+    height: typing.Optional[int] = pydantic.Field(default=None)
     """
     Viewport height in pixels.
     """
 
     start_url: typing.Optional[str] = pydantic.Field(default=None)
     """
-    Initial URL to open. Null starts on a blank page.
+    Initial URL to open.
     """
 
     mode: typing.Optional[BrowserMode] = pydantic.Field(default=None)
     """
     How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
+    """
+
+    page_chars: typing.Optional[int] = pydantic.Field(default=None)
+    """
+    Characters of page text shown per page in 'text' mode.
     """
 
     if IS_PYDANTIC_V2:

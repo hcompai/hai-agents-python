@@ -4,13 +4,13 @@ import typing
 
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
+from ..types.browser_kind import BrowserKind
+from ..types.browser_mode import BrowserMode
 from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
 from .raw_client import AsyncRawEnvironmentsClient, RawEnvironmentsClient
-from .types.create_environment_request import CreateEnvironmentRequest
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
-from .types.update_environment_request_body import UpdateEnvironmentRequestBody
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -88,14 +88,45 @@ class EnvironmentsClient:
         return _response.data
 
     def create_environment(
-        self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        id: str,
+        kind: typing.Optional[BrowserKind] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
+        width: typing.Optional[int] = OMIT,
+        height: typing.Optional[int] = OMIT,
+        start_url: typing.Optional[str] = OMIT,
+        mode: typing.Optional[BrowserMode] = OMIT,
+        page_chars: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
         Create an environment.
 
         Parameters
         ----------
-        request : CreateEnvironmentRequest
+        id : str
+            Catalog identifier for this environment.
+
+        kind : typing.Optional[BrowserKind]
+
+        headless : typing.Optional[bool]
+            Run without a visible window.
+
+        width : typing.Optional[int]
+            Viewport width in pixels.
+
+        height : typing.Optional[int]
+            Viewport height in pixels.
+
+        start_url : typing.Optional[str]
+            Initial URL to open.
+
+        mode : typing.Optional[BrowserMode]
+            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
+
+        page_chars : typing.Optional[int]
+            Characters of page text shown per page in 'text' mode.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -108,21 +139,25 @@ class EnvironmentsClient:
         Examples
         --------
         from hai_agents import Client
-        from hai_agents.environments import CreateEnvironmentRequest_Web
 
         client = Client(
             api_key="YOUR_API_KEY",
         )
         client.environments.create_environment(
-            request=CreateEnvironmentRequest_Web(
-                id="id",
-                headless=True,
-                width=1,
-                height=1,
-            ),
+            id="id",
         )
         """
-        _response = self._raw_client.create_environment(request=request, request_options=request_options)
+        _response = self._raw_client.create_environment(
+            id=id,
+            kind=kind,
+            headless=headless,
+            width=width,
+            height=height,
+            start_url=start_url,
+            mode=mode,
+            page_chars=page_chars,
+            request_options=request_options,
+        )
         return _response.data
 
     def get_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Environment:
@@ -156,16 +191,48 @@ class EnvironmentsClient:
         return _response.data
 
     def update_environment(
-        self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
+        self,
+        id_: str,
+        *,
+        id: str,
+        kind: typing.Optional[BrowserKind] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
+        width: typing.Optional[int] = OMIT,
+        height: typing.Optional[int] = OMIT,
+        start_url: typing.Optional[str] = OMIT,
+        mode: typing.Optional[BrowserMode] = OMIT,
+        page_chars: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
         Replace the environment spec.
 
         Parameters
         ----------
-        id : str
+        id_ : str
 
-        request : UpdateEnvironmentRequestBody
+        id : str
+            Catalog identifier for this environment.
+
+        kind : typing.Optional[BrowserKind]
+
+        headless : typing.Optional[bool]
+            Run without a visible window.
+
+        width : typing.Optional[int]
+            Viewport width in pixels.
+
+        height : typing.Optional[int]
+            Viewport height in pixels.
+
+        start_url : typing.Optional[str]
+            Initial URL to open.
+
+        mode : typing.Optional[BrowserMode]
+            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
+
+        page_chars : typing.Optional[int]
+            Characters of page text shown per page in 'text' mode.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -178,22 +245,27 @@ class EnvironmentsClient:
         Examples
         --------
         from hai_agents import Client
-        from hai_agents.environments import UpdateEnvironmentRequestBody_Web
 
         client = Client(
             api_key="YOUR_API_KEY",
         )
         client.environments.update_environment(
+            id_="id",
             id="id",
-            request=UpdateEnvironmentRequestBody_Web(
-                id="id",
-                headless=True,
-                width=1,
-                height=1,
-            ),
         )
         """
-        _response = self._raw_client.update_environment(id, request=request, request_options=request_options)
+        _response = self._raw_client.update_environment(
+            id_,
+            id=id,
+            kind=kind,
+            headless=headless,
+            width=width,
+            height=height,
+            start_url=start_url,
+            mode=mode,
+            page_chars=page_chars,
+            request_options=request_options,
+        )
         return _response.data
 
     def delete_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
@@ -306,14 +378,45 @@ class AsyncEnvironmentsClient:
         return _response.data
 
     async def create_environment(
-        self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        id: str,
+        kind: typing.Optional[BrowserKind] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
+        width: typing.Optional[int] = OMIT,
+        height: typing.Optional[int] = OMIT,
+        start_url: typing.Optional[str] = OMIT,
+        mode: typing.Optional[BrowserMode] = OMIT,
+        page_chars: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
         Create an environment.
 
         Parameters
         ----------
-        request : CreateEnvironmentRequest
+        id : str
+            Catalog identifier for this environment.
+
+        kind : typing.Optional[BrowserKind]
+
+        headless : typing.Optional[bool]
+            Run without a visible window.
+
+        width : typing.Optional[int]
+            Viewport width in pixels.
+
+        height : typing.Optional[int]
+            Viewport height in pixels.
+
+        start_url : typing.Optional[str]
+            Initial URL to open.
+
+        mode : typing.Optional[BrowserMode]
+            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
+
+        page_chars : typing.Optional[int]
+            Characters of page text shown per page in 'text' mode.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -328,7 +431,6 @@ class AsyncEnvironmentsClient:
         import asyncio
 
         from hai_agents import AsyncClient
-        from hai_agents.environments import CreateEnvironmentRequest_Web
 
         client = AsyncClient(
             api_key="YOUR_API_KEY",
@@ -337,18 +439,23 @@ class AsyncEnvironmentsClient:
 
         async def main() -> None:
             await client.environments.create_environment(
-                request=CreateEnvironmentRequest_Web(
-                    id="id",
-                    headless=True,
-                    width=1,
-                    height=1,
-                ),
+                id="id",
             )
 
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.create_environment(request=request, request_options=request_options)
+        _response = await self._raw_client.create_environment(
+            id=id,
+            kind=kind,
+            headless=headless,
+            width=width,
+            height=height,
+            start_url=start_url,
+            mode=mode,
+            page_chars=page_chars,
+            request_options=request_options,
+        )
         return _response.data
 
     async def get_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Environment:
@@ -390,16 +497,48 @@ class AsyncEnvironmentsClient:
         return _response.data
 
     async def update_environment(
-        self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
+        self,
+        id_: str,
+        *,
+        id: str,
+        kind: typing.Optional[BrowserKind] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
+        width: typing.Optional[int] = OMIT,
+        height: typing.Optional[int] = OMIT,
+        start_url: typing.Optional[str] = OMIT,
+        mode: typing.Optional[BrowserMode] = OMIT,
+        page_chars: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
         Replace the environment spec.
 
         Parameters
         ----------
-        id : str
+        id_ : str
 
-        request : UpdateEnvironmentRequestBody
+        id : str
+            Catalog identifier for this environment.
+
+        kind : typing.Optional[BrowserKind]
+
+        headless : typing.Optional[bool]
+            Run without a visible window.
+
+        width : typing.Optional[int]
+            Viewport width in pixels.
+
+        height : typing.Optional[int]
+            Viewport height in pixels.
+
+        start_url : typing.Optional[str]
+            Initial URL to open.
+
+        mode : typing.Optional[BrowserMode]
+            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
+
+        page_chars : typing.Optional[int]
+            Characters of page text shown per page in 'text' mode.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -414,7 +553,6 @@ class AsyncEnvironmentsClient:
         import asyncio
 
         from hai_agents import AsyncClient
-        from hai_agents.environments import UpdateEnvironmentRequestBody_Web
 
         client = AsyncClient(
             api_key="YOUR_API_KEY",
@@ -423,19 +561,25 @@ class AsyncEnvironmentsClient:
 
         async def main() -> None:
             await client.environments.update_environment(
+                id_="id",
                 id="id",
-                request=UpdateEnvironmentRequestBody_Web(
-                    id="id",
-                    headless=True,
-                    width=1,
-                    height=1,
-                ),
             )
 
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.update_environment(id, request=request, request_options=request_options)
+        _response = await self._raw_client.update_environment(
+            id_,
+            id=id,
+            kind=kind,
+            headless=headless,
+            width=width,
+            height=height,
+            start_url=start_url,
+            mode=mode,
+            page_chars=page_chars,
+            request_options=request_options,
+        )
         return _response.data
 
     async def delete_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
