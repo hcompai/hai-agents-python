@@ -10,15 +10,14 @@ from ..core.jsonable_encoder import encode_path_param
 from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
-from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
+from ..types.browser_kind import BrowserKind
+from ..types.browser_mode import BrowserMode
 from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
 from ..types.http_validation_error import HttpValidationError
-from .types.create_environment_request import CreateEnvironmentRequest
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
-from .types.update_environment_request_body import UpdateEnvironmentRequestBody
 from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
@@ -115,14 +114,41 @@ class RawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     def create_environment(
-        self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        id: str,
+        headless: bool,
+        width: int,
+        height: int,
+        kind: typing.Optional[BrowserKind] = OMIT,
+        start_url: typing.Optional[str] = OMIT,
+        mode: typing.Optional[BrowserMode] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Environment]:
         """
         Create an environment.
 
         Parameters
         ----------
-        request : CreateEnvironmentRequest
+        id : str
+            Catalog identifier for this environment.
+
+        headless : bool
+            Run without a visible window.
+
+        width : int
+            Viewport width in pixels.
+
+        height : int
+            Viewport height in pixels.
+
+        kind : typing.Optional[BrowserKind]
+
+        start_url : typing.Optional[str]
+            Initial URL to open. Null starts on a blank page.
+
+        mode : typing.Optional[BrowserMode]
+            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -135,9 +161,15 @@ class RawEnvironmentsClient:
         _response = self._client_wrapper.httpx_client.request(
             "api/v2/environments",
             method="POST",
-            json=convert_and_respect_annotation_metadata(
-                object_=request, annotation=CreateEnvironmentRequest, direction="write"
-            ),
+            json={
+                "id": id,
+                "kind": kind,
+                "headless": headless,
+                "width": width,
+                "height": height,
+                "start_url": start_url,
+                "mode": mode,
+            },
             headers={
                 "content-type": "application/json",
             },
@@ -228,16 +260,44 @@ class RawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     def update_environment(
-        self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
+        self,
+        id_: str,
+        *,
+        id: str,
+        headless: bool,
+        width: int,
+        height: int,
+        kind: typing.Optional[BrowserKind] = OMIT,
+        start_url: typing.Optional[str] = OMIT,
+        mode: typing.Optional[BrowserMode] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Environment]:
         """
         Replace the environment spec.
 
         Parameters
         ----------
-        id : str
+        id_ : str
 
-        request : UpdateEnvironmentRequestBody
+        id : str
+            Catalog identifier for this environment.
+
+        headless : bool
+            Run without a visible window.
+
+        width : int
+            Viewport width in pixels.
+
+        height : int
+            Viewport height in pixels.
+
+        kind : typing.Optional[BrowserKind]
+
+        start_url : typing.Optional[str]
+            Initial URL to open. Null starts on a blank page.
+
+        mode : typing.Optional[BrowserMode]
+            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -248,11 +308,17 @@ class RawEnvironmentsClient:
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
-            f"api/v2/environments/{encode_path_param(id)}",
+            f"api/v2/environments/{encode_path_param(id_)}",
             method="PUT",
-            json=convert_and_respect_annotation_metadata(
-                object_=request, annotation=UpdateEnvironmentRequestBody, direction="write"
-            ),
+            json={
+                "id": id,
+                "kind": kind,
+                "headless": headless,
+                "width": width,
+                "height": height,
+                "start_url": start_url,
+                "mode": mode,
+            },
             headers={
                 "content-type": "application/json",
             },
@@ -425,14 +491,41 @@ class AsyncRawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     async def create_environment(
-        self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        id: str,
+        headless: bool,
+        width: int,
+        height: int,
+        kind: typing.Optional[BrowserKind] = OMIT,
+        start_url: typing.Optional[str] = OMIT,
+        mode: typing.Optional[BrowserMode] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Environment]:
         """
         Create an environment.
 
         Parameters
         ----------
-        request : CreateEnvironmentRequest
+        id : str
+            Catalog identifier for this environment.
+
+        headless : bool
+            Run without a visible window.
+
+        width : int
+            Viewport width in pixels.
+
+        height : int
+            Viewport height in pixels.
+
+        kind : typing.Optional[BrowserKind]
+
+        start_url : typing.Optional[str]
+            Initial URL to open. Null starts on a blank page.
+
+        mode : typing.Optional[BrowserMode]
+            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -445,9 +538,15 @@ class AsyncRawEnvironmentsClient:
         _response = await self._client_wrapper.httpx_client.request(
             "api/v2/environments",
             method="POST",
-            json=convert_and_respect_annotation_metadata(
-                object_=request, annotation=CreateEnvironmentRequest, direction="write"
-            ),
+            json={
+                "id": id,
+                "kind": kind,
+                "headless": headless,
+                "width": width,
+                "height": height,
+                "start_url": start_url,
+                "mode": mode,
+            },
             headers={
                 "content-type": "application/json",
             },
@@ -538,16 +637,44 @@ class AsyncRawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     async def update_environment(
-        self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
+        self,
+        id_: str,
+        *,
+        id: str,
+        headless: bool,
+        width: int,
+        height: int,
+        kind: typing.Optional[BrowserKind] = OMIT,
+        start_url: typing.Optional[str] = OMIT,
+        mode: typing.Optional[BrowserMode] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Environment]:
         """
         Replace the environment spec.
 
         Parameters
         ----------
-        id : str
+        id_ : str
 
-        request : UpdateEnvironmentRequestBody
+        id : str
+            Catalog identifier for this environment.
+
+        headless : bool
+            Run without a visible window.
+
+        width : int
+            Viewport width in pixels.
+
+        height : int
+            Viewport height in pixels.
+
+        kind : typing.Optional[BrowserKind]
+
+        start_url : typing.Optional[str]
+            Initial URL to open. Null starts on a blank page.
+
+        mode : typing.Optional[BrowserMode]
+            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -558,11 +685,17 @@ class AsyncRawEnvironmentsClient:
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            f"api/v2/environments/{encode_path_param(id)}",
+            f"api/v2/environments/{encode_path_param(id_)}",
             method="PUT",
-            json=convert_and_respect_annotation_metadata(
-                object_=request, annotation=UpdateEnvironmentRequestBody, direction="write"
-            ),
+            json={
+                "id": id,
+                "kind": kind,
+                "headless": headless,
+                "width": width,
+                "height": height,
+                "start_url": start_url,
+                "mode": mode,
+            },
             headers={
                 "content-type": "application/json",
             },

@@ -4,6 +4,7 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .browser_kind import BrowserKind
 from .browser_mode import BrowserMode
 
 
@@ -17,6 +18,7 @@ class Browser(UniversalBaseModel):
     Catalog identifier for this environment.
     """
 
+    kind: typing.Optional[BrowserKind] = None
     headless: bool = pydantic.Field()
     """
     Run without a visible window.

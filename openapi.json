@@ -1528,18 +1528,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/Browser"
-                  }
-                ],
-                "discriminator": {
-                  "propertyName": "kind",
-                  "mapping": {
-                    "web": "#/components/schemas/Browser"
-                  }
-                },
-                "title": "Create"
+                "$ref": "#/components/schemas/Browser"
               }
             }
           }
@@ -1791,18 +1780,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/Browser"
-                  }
-                ],
-                "discriminator": {
-                  "propertyName": "kind",
-                  "mapping": {
-                    "web": "#/components/schemas/Browser"
-                  }
-                },
-                "title": "Update"
+                "$ref": "#/components/schemas/Browser"
               }
             }
           }
@@ -2747,17 +2725,7 @@
         "description": "A web browser the agent navigates and acts on."
       },
       "Environment": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/Browser"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "kind",
-          "mapping": {
-            "web": "#/components/schemas/Browser"
-          }
-        }
+        "$ref": "#/components/schemas/Browser"
       },
       "EnvironmentKind": {
         "type": "string",
