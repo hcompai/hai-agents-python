@@ -64,8 +64,9 @@ def test_cli_install_removes_then_adds_at_user_scope(monkeypatch) -> None:
     status, _ = wire_mcp(mcp_hosts.CLIENTS["claude-code"], "https://u/mcp", "hk-rotated")
 
     assert status is Status.INSTALLED
-    remove, add = calls
-    assert remove[1:3] == ["mcp", "remove"] and remove[remove.index("--scope") + 1] == "user"
+    *removes, add = calls
+    assert {rm[rm.index("--scope") + 1] for rm in removes} == {"local", "user"}
+    assert all(rm[1:3] == ["mcp", "remove"] for rm in removes)
     assert add[1:3] == ["mcp", "add"] and add[add.index("--scope") + 1] == "user"
     assert "Authorization: Bearer hk-rotated" in add
 
