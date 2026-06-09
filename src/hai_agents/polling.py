@@ -272,8 +272,8 @@ def wait_for_session(
         if tools_by_name:
             calls = [c for c in _pending_tool_calls(batch) if c["id"] not in answered]
             if calls:
-                answered.update(c["id"] for c in calls)
                 _post_tool_results(client, id, [_execute_tool_call(tools_by_name, c) for c in calls])
+                answered.update(c["id"] for c in calls)
 
         # The long-poll above paces the loop when streaming events; otherwise sleep.
         if not include_events:
@@ -383,9 +383,9 @@ async def async_wait_for_session(
         if tools_by_name:
             calls = [c for c in _pending_tool_calls(batch) if c["id"] not in answered]
             if calls:
-                answered.update(c["id"] for c in calls)
                 results = [await _async_execute_tool_call(tools_by_name, c) for c in calls]
                 await _async_post_tool_results(client, id, results)
+                answered.update(c["id"] for c in calls)
 
         if not include_events:
             await asyncio.sleep(poll_backoff_seconds or wait_for_seconds)
