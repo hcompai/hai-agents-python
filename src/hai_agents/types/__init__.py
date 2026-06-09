@@ -11,8 +11,9 @@ if typing.TYPE_CHECKING:
     from .agent_skills_item import AgentSkillsItem
     from .agent_subagents_item import AgentSubagentsItem
     from .browser import Browser
+    from .browser_kind import BrowserKind
     from .browser_mode import BrowserMode
-    from .environment import Environment, Environment_Web
+    from .environment import Environment
     from .environment_kind import EnvironmentKind
     from .environment_page import EnvironmentPage
     from .feedback import Feedback
@@ -54,11 +55,11 @@ _dynamic_imports: typing.Dict[str, str] = {
     "AgentSkillsItem": ".agent_skills_item",
     "AgentSubagentsItem": ".agent_subagents_item",
     "Browser": ".browser",
+    "BrowserKind": ".browser_kind",
     "BrowserMode": ".browser_mode",
     "Environment": ".environment",
     "EnvironmentKind": ".environment_kind",
     "EnvironmentPage": ".environment_page",
-    "Environment_Web": ".environment",
     "Feedback": ".feedback",
     "HttpValidationError": ".http_validation_error",
     "Metrics": ".metrics",
@@ -122,11 +123,11 @@ __all__ = [
     "AgentSkillsItem",
     "AgentSubagentsItem",
     "Browser",
+    "BrowserKind",
     "BrowserMode",
     "Environment",
     "EnvironmentKind",
     "EnvironmentPage",
-    "Environment_Web",
     "Feedback",
     "HttpValidationError",
     "Metrics",
