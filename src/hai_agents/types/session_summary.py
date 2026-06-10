@@ -17,6 +17,11 @@ class SessionSummary(UniversalBaseModel):
     id: str
     agent: typing.Optional[str] = None
     status: TrajectoryStatus
+    agent_view_url: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    URL of the session's Agent View page on the H Platform (live view and replay).
+    """
+
     first_message: typing.Optional[UserMessageEvent] = None
     created_at: dt.datetime
     started_at: typing.Optional[dt.datetime] = None
