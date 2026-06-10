@@ -122,6 +122,22 @@ class TestAnswerParseBack:
         assert result.answer == _VALID_ANSWER
 
 
+class TestComposesWithTools:
+    def test_schema_and_tools_attach_independent_overrides(self) -> None:
+        def get_weather(city: str) -> str:
+            """Get the weather."""
+            return "sunny"
+
+        client = _Client(_VALID_ANSWER)
+        result = run_session(  # type: ignore[arg-type]
+            client, agent="h/web-surfer", messages="go", answer_schema=JobListings, tools=[get_weather]
+        )
+        overrides = client.sessions.created_with["overrides"]
+        assert overrides["agent.answer_format"]["title"] == "JobListings"
+        assert overrides["agent.tools"][0]["name"] == "get_weather"
+        assert isinstance(result.answer, JobListings)
+
+
 class TestSessionHandle:
     def test_handle_carries_schema_into_wait_for_completion(self) -> None:
         client = _Client(_VALID_ANSWER)
