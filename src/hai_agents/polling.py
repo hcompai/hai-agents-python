@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import inspect
 import json
 import time
@@ -145,7 +146,7 @@ def _execute_tool_call(
         try:
             result = local_tool.fn(**(call.get("arguments") or {}))
             if inspect.isawaitable(result):
-                result = asyncio.run(_await_result(result))
+                result = _run_awaitable(result)
         except Exception as exc:
             result = f"{type(exc).__name__}: {exc}"
         else:
@@ -155,6 +156,16 @@ def _execute_tool_call(
 
 async def _await_result(value: typing.Awaitable[typing.Any]) -> typing.Any:
     return await value
+
+
+def _run_awaitable(value: typing.Awaitable[typing.Any]) -> typing.Any:
+    """``asyncio.run`` fails inside a running loop (e.g. notebooks); run on a fresh thread there."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(_await_result(value))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, _await_result(value)).result()
 
 
 async def _async_execute_tool_call(
@@ -188,6 +199,19 @@ def _raise_unless_posted(response: typing.Any) -> None:
     if 200 <= response.status_code < 300 or response.status_code == 409:
         return
     raise ApiError(status_code=response.status_code, headers=dict(response.headers), body=response.text)
+
+
+def _recover_pending_tool_calls(client: Client, id: str) -> typing.List[typing.Dict[str, typing.Any]]:
+    """A wait that joins mid-stream may start past the advertising event; replay from 0 to find the latest batch."""
+    changes = client.sessions.get_session_changes(id, from_index=0, limit=None, include_events=True, wait_for_seconds=0)
+    return _latest_pending_tool_calls(changes.new_events or [], []) if changes is not None else []
+
+
+async def _async_recover_pending_tool_calls(client: AsyncClient, id: str) -> typing.List[typing.Dict[str, typing.Any]]:
+    changes = await client.sessions.get_session_changes(
+        id, from_index=0, limit=None, include_events=True, wait_for_seconds=0
+    )
+    return _latest_pending_tool_calls(changes.new_events or [], []) if changes is not None else []
 
 
 def _post_tool_results(client: Client, id: str, results: typing.List[typing.Dict[str, typing.Any]]) -> None:
@@ -288,6 +312,8 @@ def wait_for_session(
             advertised = _latest_pending_tool_calls(batch, advertised)
             # Status gate: on a replayed stream the live status decides whether calls are still open.
             if status.status == "awaiting_tool_results":
+                if not advertised:
+                    advertised = _recover_pending_tool_calls(client, id)
                 calls = [c for c in advertised if c["id"] not in answered]
                 if calls:
                     _post_tool_results(client, id, [_execute_tool_call(tools_by_name, c) for c in calls])
@@ -403,6 +429,8 @@ async def async_wait_for_session(
             advertised = _latest_pending_tool_calls(batch, advertised)
             # Status gate: on a replayed stream the live status decides whether calls are still open.
             if status.status == "awaiting_tool_results":
+                if not advertised:
+                    advertised = await _async_recover_pending_tool_calls(client, id)
                 calls = [c for c in advertised if c["id"] not in answered]
                 if calls:
                     results = [await _async_execute_tool_call(tools_by_name, c) for c in calls]
