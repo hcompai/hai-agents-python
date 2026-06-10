@@ -29,6 +29,7 @@ from .types.list_session_events_request_sort_item import ListSessionEventsReques
 from .types.list_sessions_request_owner import ListSessionsRequestOwner
 from .types.list_sessions_request_sort_item import ListSessionsRequestSortItem
 from .types.send_session_messages_request_body import SendSessionMessagesRequestBody
+from .types.send_session_tool_results_request_body import SendSessionToolResultsRequestBody
 from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
@@ -488,6 +489,64 @@ class RawSessionsClient:
             method="POST",
             json=convert_and_respect_annotation_metadata(
                 object_=request, annotation=SendSessionMessagesRequestBody, direction="write"
+            ),
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return HttpResponse(response=_response, data=None)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def send_session_tool_results(
+        self,
+        id: str,
+        *,
+        request: SendSessionToolResultsRequestBody,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[None]:
+        """
+        Send results for custom tool calls (single or batch).
+
+        Parameters
+        ----------
+        id : str
+
+        request : SendSessionToolResultsRequestBody
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[None]
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{encode_path_param(id)}/tool_results",
+            method="POST",
+            json=convert_and_respect_annotation_metadata(
+                object_=request, annotation=SendSessionToolResultsRequestBody, direction="write"
             ),
             headers={
                 "content-type": "application/json",
@@ -1531,6 +1590,64 @@ class AsyncRawSessionsClient:
             method="POST",
             json=convert_and_respect_annotation_metadata(
                 object_=request, annotation=SendSessionMessagesRequestBody, direction="write"
+            ),
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def send_session_tool_results(
+        self,
+        id: str,
+        *,
+        request: SendSessionToolResultsRequestBody,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[None]:
+        """
+        Send results for custom tool calls (single or batch).
+
+        Parameters
+        ----------
+        id : str
+
+        request : SendSessionToolResultsRequestBody
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[None]
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{encode_path_param(id)}/tool_results",
+            method="POST",
+            json=convert_and_respect_annotation_metadata(
+                object_=request, annotation=SendSessionToolResultsRequestBody, direction="write"
             ),
             headers={
                 "content-type": "application/json",

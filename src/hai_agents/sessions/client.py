@@ -20,6 +20,7 @@ from .types.list_session_events_request_sort_item import ListSessionEventsReques
 from .types.list_sessions_request_owner import ListSessionsRequestOwner
 from .types.list_sessions_request_sort_item import ListSessionsRequestSortItem
 from .types.send_session_messages_request_body import SendSessionMessagesRequestBody
+from .types.send_session_tool_results_request_body import SendSessionToolResultsRequestBody
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -366,6 +367,48 @@ class SessionsClient:
         )
         """
         _response = self._raw_client.send_session_messages(id, request=request, request_options=request_options)
+        return _response.data
+
+    def send_session_tool_results(
+        self,
+        id: str,
+        *,
+        request: SendSessionToolResultsRequestBody,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
+        """
+        Send results for custom tool calls (single or batch).
+
+        Parameters
+        ----------
+        id : str
+
+        request : SendSessionToolResultsRequestBody
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from hai_agents import Client
+        from hai_agents.sessions import SendSessionToolResultsRequestBody_ToolResult
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.sessions.send_session_tool_results(
+            id="id",
+            request=SendSessionToolResultsRequestBody_ToolResult(
+                tool_call_id="tool_call_id",
+                type="tool_result",
+            ),
+        )
+        """
+        _response = self._raw_client.send_session_tool_results(id, request=request, request_options=request_options)
         return _response.data
 
     def pause_session(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
@@ -1144,6 +1187,58 @@ class AsyncSessionsClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.send_session_messages(id, request=request, request_options=request_options)
+        return _response.data
+
+    async def send_session_tool_results(
+        self,
+        id: str,
+        *,
+        request: SendSessionToolResultsRequestBody,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
+        """
+        Send results for custom tool calls (single or batch).
+
+        Parameters
+        ----------
+        id : str
+
+        request : SendSessionToolResultsRequestBody
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+        from hai_agents.sessions import SendSessionToolResultsRequestBody_ToolResult
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.sessions.send_session_tool_results(
+                id="id",
+                request=SendSessionToolResultsRequestBody_ToolResult(
+                    tool_call_id="tool_call_id",
+                    type="tool_result",
+                ),
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.send_session_tool_results(
+            id, request=request, request_options=request_options
+        )
         return _response.data
 
     async def pause_session(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:

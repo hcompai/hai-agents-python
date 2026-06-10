@@ -18,6 +18,7 @@ from ..types.agent_skills_item import AgentSkillsItem
 from ..types.agent_subagents_item import AgentSubagentsItem
 from ..types.http_validation_error import HttpValidationError
 from ..types.page_agent import PageAgent
+from ..types.tool_definition import ToolDefinition
 from .types.list_agents_request_sort_item import ListAgentsRequestSortItem
 from pydantic import ValidationError
 
@@ -120,6 +121,7 @@ class RawAgentsClient:
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Agent]:
         """
@@ -151,6 +153,9 @@ class RawAgentsClient:
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
+        tools : typing.Optional[typing.Sequence[ToolDefinition]]
+            Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -179,6 +184,9 @@ class RawAgentsClient:
                     object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
                 ),
                 "answer_format": answer_format,
+                "tools": convert_and_respect_annotation_metadata(
+                    object_=tools, annotation=typing.Optional[typing.Sequence[ToolDefinition]], direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
@@ -291,6 +299,7 @@ class RawAgentsClient:
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Agent]:
         """
@@ -324,6 +333,9 @@ class RawAgentsClient:
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
+        tools : typing.Optional[typing.Sequence[ToolDefinition]]
+            Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -352,6 +364,9 @@ class RawAgentsClient:
                     object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
                 ),
                 "answer_format": answer_format,
+                "tools": convert_and_respect_annotation_metadata(
+                    object_=tools, annotation=typing.Optional[typing.Sequence[ToolDefinition]], direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
@@ -530,6 +545,7 @@ class AsyncRawAgentsClient:
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Agent]:
         """
@@ -561,6 +577,9 @@ class AsyncRawAgentsClient:
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
+        tools : typing.Optional[typing.Sequence[ToolDefinition]]
+            Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -589,6 +608,9 @@ class AsyncRawAgentsClient:
                     object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
                 ),
                 "answer_format": answer_format,
+                "tools": convert_and_respect_annotation_metadata(
+                    object_=tools, annotation=typing.Optional[typing.Sequence[ToolDefinition]], direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
@@ -701,6 +723,7 @@ class AsyncRawAgentsClient:
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Agent]:
         """
@@ -734,6 +757,9 @@ class AsyncRawAgentsClient:
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
+        tools : typing.Optional[typing.Sequence[ToolDefinition]]
+            Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -762,6 +788,9 @@ class AsyncRawAgentsClient:
                     object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
                 ),
                 "answer_format": answer_format,
+                "tools": convert_and_respect_annotation_metadata(
+                    object_=tools, annotation=typing.Optional[typing.Sequence[ToolDefinition]], direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
