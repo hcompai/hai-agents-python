@@ -89,18 +89,10 @@ def assert_request_under_limit(payload: typing.Any, max_bytes: int = MAX_REQUEST
 
 
 def _attach_tool_definitions(create_params: typing.Dict[str, typing.Any], tools: typing.Sequence[Tool]) -> None:
-    """Carry the tool definitions on the agent spec (inline) or via an ``agent.tools`` override (reference)."""
-    definitions = [t.definition() for t in tools]
-    agent = create_params.get("agent")
-    if isinstance(agent, str):
-        overrides = dict(create_params.get("overrides") or {})
-        overrides["agent.tools"] = definitions
-        create_params["overrides"] = overrides
-    elif isinstance(agent, dict):
-        create_params["agent"] = {**agent, "tools": definitions}
-    else:
-        dump = agent.model_dump() if hasattr(agent, "model_dump") else dict(agent)  # type: ignore[arg-type]
-        create_params["agent"] = {**dump, "tools": definitions}
+    """Carry the tool definitions via the ``agent.tools`` override; the server applies it to referenced and inline agents alike."""
+    overrides = dict(create_params.get("overrides") or {})
+    overrides["agent.tools"] = [t.definition() for t in tools]
+    create_params["overrides"] = overrides
 
 
 def _latest_pending_tool_calls(

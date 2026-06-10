@@ -41,23 +41,12 @@ def test_attach_definitions_string_agent_uses_overrides():
     assert params["overrides"]["agent.tools"] == [get_weather.definition()]
 
 
-def test_attach_definitions_inline_agent_sets_tools():
-    params = {"agent": {"name": "mine", "description": "d", "environments": []}}
+def test_attach_definitions_inline_agent_uses_overrides():
+    agent = {"name": "mine", "description": "d", "environments": []}
+    params = {"agent": dict(agent)}
     _attach_tool_definitions(params, [get_weather])
-    assert params["agent"]["tools"] == [get_weather.definition()]
-
-
-def test_attach_definitions_pydantic_inline_agent():
-    import pydantic
-
-    class AgentModel(pydantic.BaseModel):
-        name: str
-        environments: list = []
-
-    params = {"agent": AgentModel(name="mine")}
-    _attach_tool_definitions(params, [get_weather])
-    assert params["agent"]["name"] == "mine"
-    assert params["agent"]["tools"] == [get_weather.definition()]
+    assert params["agent"] == agent
+    assert params["overrides"]["agent.tools"] == [get_weather.definition()]
 
 
 class _FakeHttpx:
