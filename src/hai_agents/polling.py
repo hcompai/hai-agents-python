@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
+import inspect
 import json
 import time
 import typing
@@ -11,6 +13,9 @@ from dataclasses import dataclass
 import pydantic
 import typing_extensions
 
+from .core.api_error import ApiError
+from .core.request_options import RequestOptions
+from .tools import Tool, ToolInput, as_tools
 from .types.session_request_agent import SessionRequestAgent
 from .types.session_request_messages import SessionRequestMessages
 from .types.trajectory_changes import TrajectoryChanges
@@ -135,6 +140,162 @@ def assert_request_under_limit(payload: typing.Any, max_bytes: int = MAX_REQUEST
         )
 
 
+def _attach_tool_definitions(create_params: typing.Dict[str, typing.Any], tools: typing.Sequence[Tool]) -> None:
+    """Carry the tool definitions via the ``agent.tools`` override; the server applies it to referenced and inline agents alike."""
+    overrides = dict(create_params.get("overrides") or {})
+    overrides["agent.tools"] = [t.definition() for t in tools]
+    create_params["overrides"] = overrides
+
+
+def _latest_pending_tool_calls(
+    batch: typing.Sequence[TrajectoryEvent],
+    previous: typing.List[typing.Dict[str, typing.Any]],
+) -> typing.List[typing.Dict[str, typing.Any]]:
+    """Pending custom tool calls per the latest ``ActiveStateChangeEvent``.
+
+    The agent re-publishes the surviving list whenever a call settles, so the
+    latest event is the source of truth; ``previous`` carries it across polls
+    whose batches contain no state change.
+    """
+    calls = previous
+    for event in batch:
+        if event.type != "ActiveStateChangeEvent":
+            continue
+        data = event.data if isinstance(event.data, dict) else {}
+        if data.get("state") == "awaiting_tool_results":
+            calls = list(data.get("pending_tool_calls") or [])
+        else:
+            calls = []
+    return calls
+
+
+def _json_safe(value: typing.Any) -> typing.Any:
+    try:
+        json.dumps(value)
+        return value
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _execute_tool_call(
+    tools_by_name: typing.Mapping[str, Tool], call: typing.Dict[str, typing.Any]
+) -> typing.Dict[str, typing.Any]:
+    """Run one pending call locally and shape the ``tool_result`` payload."""
+    name = call.get("name", "")
+    local_tool = tools_by_name.get(name)
+    result: typing.Any
+    is_error = True
+    if local_tool is None:
+        result = f"Tool {name!r} is not registered with this client."
+    else:
+        try:
+            result = local_tool.fn(**(call.get("arguments") or {}))
+            if inspect.isawaitable(result):
+                result = _run_awaitable(result)
+        except Exception as exc:
+            result = f"{type(exc).__name__}: {exc}"
+        else:
+            is_error = False
+    return {"type": "tool_result", "tool_call_id": call["id"], "result": _json_safe(result), "is_error": is_error}
+
+
+async def _await_result(value: typing.Awaitable[typing.Any]) -> typing.Any:
+    return await value
+
+
+def _run_awaitable(value: typing.Awaitable[typing.Any]) -> typing.Any:
+    """``asyncio.run`` fails inside a running loop (e.g. notebooks); run on a fresh thread there."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(_await_result(value))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, _await_result(value)).result()
+
+
+async def _async_execute_tool_call(
+    tools_by_name: typing.Mapping[str, Tool], call: typing.Dict[str, typing.Any]
+) -> typing.Dict[str, typing.Any]:
+    """Async version of ``_execute_tool_call``; awaits coroutine tools."""
+    name = call.get("name", "")
+    local_tool = tools_by_name.get(name)
+    result: typing.Any
+    is_error = True
+    if local_tool is None:
+        result = f"Tool {name!r} is not registered with this client."
+    else:
+        try:
+            result = local_tool.fn(**(call.get("arguments") or {}))
+            if inspect.isawaitable(result):
+                result = await result
+        except Exception as exc:
+            result = f"{type(exc).__name__}: {exc}"
+        else:
+            is_error = False
+    return {"type": "tool_result", "tool_call_id": call["id"], "result": _json_safe(result), "is_error": is_error}
+
+
+def _tool_results_body(results: typing.List[typing.Dict[str, typing.Any]]) -> typing.Dict[str, typing.Any]:
+    return results[0] if len(results) == 1 else {"type": "batch", "results": results}
+
+
+def _raise_unless_posted(response: typing.Any) -> None:
+    """409 means the session finished and resolved the calls itself; the status poll will exit the loop."""
+    if 200 <= response.status_code < 300 or response.status_code == 409:
+        return
+    raise ApiError(status_code=response.status_code, headers=dict(response.headers), body=response.text)
+
+
+def _recover_pending_tool_calls(client: Client, id: str) -> typing.List[typing.Dict[str, typing.Any]]:
+    """A wait that joins mid-stream may start past the advertising event; replay from 0 to find the latest batch."""
+    changes = client.sessions.get_session_changes(id, from_index=0, limit=None, include_events=True, wait_for_seconds=0)
+    return _latest_pending_tool_calls(changes.new_events or [], []) if changes is not None else []
+
+
+async def _async_recover_pending_tool_calls(client: AsyncClient, id: str) -> typing.List[typing.Dict[str, typing.Any]]:
+    changes = await client.sessions.get_session_changes(
+        id, from_index=0, limit=None, include_events=True, wait_for_seconds=0
+    )
+    return _latest_pending_tool_calls(changes.new_events or [], []) if changes is not None else []
+
+
+def _is_transient(status_code: int) -> bool:
+    return status_code in (408, 429) or status_code >= 500
+
+
+def _post_tool_results(client: Client, id: str, results: typing.List[typing.Dict[str, typing.Any]]) -> None:
+    # The shared client would retry 409s; here a 409 is a final answer (session settled), so retry transient codes only.
+    for attempt in range(3):
+        response = client._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{id}/tool_results",
+            method="POST",
+            json=_tool_results_body(results),
+            headers={"content-type": "application/json"},
+            request_options=RequestOptions(max_retries=0),
+        )
+        if not _is_transient(response.status_code) or attempt == 2:
+            break
+        time.sleep(min(0.5 * 2**attempt, 2.0))
+    _raise_unless_posted(response)
+
+
+async def _async_post_tool_results(
+    client: AsyncClient, id: str, results: typing.List[typing.Dict[str, typing.Any]]
+) -> None:
+    for attempt in range(3):
+        response = await client._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{id}/tool_results",
+            method="POST",
+            json=_tool_results_body(results),
+            headers={"content-type": "application/json"},
+            request_options=RequestOptions(max_retries=0),
+        )
+        if not _is_transient(response.status_code) or attempt == 2:
+            break
+        await asyncio.sleep(min(0.5 * 2**attempt, 2.0))
+    _raise_unless_posted(response)
+
+
 def _final_changes(
     client: Client, id: str, last_changes: typing.Optional[TrajectoryChanges], limit: typing.Optional[int]
 ) -> typing.Optional[TrajectoryChanges]:
@@ -159,13 +320,19 @@ def wait_for_session(
     poll_backoff_seconds: float = 0.0,
     max_polls: typing.Optional[int] = None,
     answer_schema: typing.Optional[typing.Type[AnswerT]] = None,
+    tools: typing.Optional[typing.Sequence[ToolInput]] = None,
 ) -> SessionRunResult[AnswerT]:
-    """Poll a session until it reaches a terminal status.
+    """Poll a session until it reaches a terminal status, running custom tools along the way.
 
     Terminal state is read from ``/status`` (authoritative); ``/changes`` only feeds
     events and the final answer, since it 204s whenever no new events exist past
     ``from_index`` -- even after the session has finished.
     """
+    tools_by_name = {t.name: t for t in as_tools(tools)} if tools else {}
+    if tools_by_name and not include_events:
+        raise ValueError("tools require include_events=True: pending calls arrive on the event stream.")
+    answered: typing.Set[str] = set()
+    advertised: typing.List[typing.Dict[str, typing.Any]] = []
     events: typing.List[TrajectoryEvent] = []
     next_from_index = from_index
     last_changes: typing.Optional[TrajectoryChanges] = None
@@ -177,6 +344,7 @@ def wait_for_session(
         if deadline is not None and time.monotonic() >= deadline:
             raise TimeoutError(f"Session {id} did not reach a terminal status within {timeout_seconds}s")
 
+        batch: typing.List[TrajectoryEvent] = []
         if include_events:
             changes = client.sessions.get_session_changes(
                 id,
@@ -204,6 +372,17 @@ def wait_for_session(
                 answer=_parse_answer(raw, status.status, answer_schema),
             )
 
+        if tools_by_name:
+            advertised = _latest_pending_tool_calls(batch, advertised)
+            # Status gate: on a replayed stream the live status decides whether calls are still open.
+            if status.status == "awaiting_tool_results":
+                if not advertised:
+                    advertised = _recover_pending_tool_calls(client, id)
+                calls = [c for c in advertised if c["id"] not in answered]
+                if calls:
+                    _post_tool_results(client, id, [_execute_tool_call(tools_by_name, c) for c in calls])
+                    answered.update(c["id"] for c in calls)
+
         # The long-poll above paces the loop when streaming events; otherwise sleep.
         if not include_events:
             time.sleep(poll_backoff_seconds or wait_for_seconds)
@@ -222,14 +401,18 @@ def run_session(
     poll_backoff_seconds: float = 0.0,
     max_polls: typing.Optional[int] = None,
     answer_schema: typing.Optional[typing.Type[AnswerT]] = None,
+    tools: typing.Optional[typing.Sequence[ToolInput]] = None,
     **create_params: typing_extensions.Unpack[CreateSessionParams],
 ) -> SessionRunResult[AnswerT]:
-    """Create a session, then poll until it completes or fails.
+    """Create a session, then poll until it completes or fails, running custom tools along the way.
 
     ``answer_schema`` binds a pydantic model as the agent's ``answer_format`` and
     validates the final answer back into it: ``result.answer`` is a model instance.
     """
+    normalized_tools = as_tools(tools) if tools else []
     params: typing.Dict[str, typing.Any] = dict(create_params)
+    if normalized_tools:
+        _attach_tool_definitions(params, normalized_tools)
     if answer_schema is not None:
         _attach_answer_schema(params, answer_schema)
     assert_request_under_limit(params)
@@ -243,6 +426,7 @@ def run_session(
         poll_backoff_seconds=poll_backoff_seconds,
         max_polls=max_polls,
         answer_schema=answer_schema,
+        tools=normalized_tools or None,
     )
 
 
@@ -270,8 +454,14 @@ async def async_wait_for_session(
     poll_backoff_seconds: float = 0.0,
     max_polls: typing.Optional[int] = None,
     answer_schema: typing.Optional[typing.Type[AnswerT]] = None,
+    tools: typing.Optional[typing.Sequence[ToolInput]] = None,
 ) -> SessionRunResult[AnswerT]:
     """Async version of ``wait_for_session``."""
+    tools_by_name = {t.name: t for t in as_tools(tools)} if tools else {}
+    if tools_by_name and not include_events:
+        raise ValueError("tools require include_events=True: pending calls arrive on the event stream.")
+    answered: typing.Set[str] = set()
+    advertised: typing.List[typing.Dict[str, typing.Any]] = []
     events: typing.List[TrajectoryEvent] = []
     next_from_index = from_index
     last_changes: typing.Optional[TrajectoryChanges] = None
@@ -283,6 +473,7 @@ async def async_wait_for_session(
         if deadline is not None and time.monotonic() >= deadline:
             raise TimeoutError(f"Session {id} did not reach a terminal status within {timeout_seconds}s")
 
+        batch: typing.List[TrajectoryEvent] = []
         if include_events:
             changes = await client.sessions.get_session_changes(
                 id,
@@ -310,6 +501,18 @@ async def async_wait_for_session(
                 answer=_parse_answer(raw, status.status, answer_schema),
             )
 
+        if tools_by_name:
+            advertised = _latest_pending_tool_calls(batch, advertised)
+            # Status gate: on a replayed stream the live status decides whether calls are still open.
+            if status.status == "awaiting_tool_results":
+                if not advertised:
+                    advertised = await _async_recover_pending_tool_calls(client, id)
+                calls = [c for c in advertised if c["id"] not in answered]
+                if calls:
+                    results = [await _async_execute_tool_call(tools_by_name, c) for c in calls]
+                    await _async_post_tool_results(client, id, results)
+                    answered.update(c["id"] for c in calls)
+
         if not include_events:
             await asyncio.sleep(poll_backoff_seconds or wait_for_seconds)
         elif poll_backoff_seconds > 0:
@@ -327,10 +530,14 @@ async def async_run_session(
     poll_backoff_seconds: float = 0.0,
     max_polls: typing.Optional[int] = None,
     answer_schema: typing.Optional[typing.Type[AnswerT]] = None,
+    tools: typing.Optional[typing.Sequence[ToolInput]] = None,
     **create_params: typing_extensions.Unpack[CreateSessionParams],
 ) -> SessionRunResult[AnswerT]:
     """Async version of ``run_session``."""
+    normalized_tools = as_tools(tools) if tools else []
     params: typing.Dict[str, typing.Any] = dict(create_params)
+    if normalized_tools:
+        _attach_tool_definitions(params, normalized_tools)
     if answer_schema is not None:
         _attach_answer_schema(params, answer_schema)
     assert_request_under_limit(params)
@@ -344,20 +551,23 @@ async def async_run_session(
         poll_backoff_seconds=poll_backoff_seconds,
         max_polls=max_polls,
         answer_schema=answer_schema,
+        tools=normalized_tools or None,
     )
 
 
-class SessionHandle:
+class SessionHandle(typing.Generic[AnswerT]):
     """A created session bound to its client: object-oriented sugar over the polling helpers."""
 
     def __init__(
         self,
         client: Client,
         id: str,
-        answer_schema: typing.Optional[typing.Type[pydantic.BaseModel]] = None,
+        answer_schema: typing.Optional[typing.Type[AnswerT]] = None,
+        tools: typing.Optional[typing.Sequence[ToolInput]] = None,
     ) -> None:
         self._client = client
         self._answer_schema = answer_schema
+        self._tools = as_tools(tools) if tools else None
         self.id = id
 
     def get(self) -> Session:
@@ -384,23 +594,26 @@ class SessionHandle:
     def force_answer(self) -> None:
         self._client.sessions.force_session_answer(self.id)
 
-    def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult:
+    def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
         """Block until the session reaches a terminal status; returns the result and final answer."""
         kwargs.setdefault("answer_schema", self._answer_schema)
+        kwargs.setdefault("tools", self._tools)
         return wait_for_session(self._client, self.id, **kwargs)
 
 
-class AsyncSessionHandle:
+class AsyncSessionHandle(typing.Generic[AnswerT]):
     """Async version of :class:`SessionHandle`."""
 
     def __init__(
         self,
         client: AsyncClient,
         id: str,
-        answer_schema: typing.Optional[typing.Type[pydantic.BaseModel]] = None,
+        answer_schema: typing.Optional[typing.Type[AnswerT]] = None,
+        tools: typing.Optional[typing.Sequence[ToolInput]] = None,
     ) -> None:
         self._client = client
         self._answer_schema = answer_schema
+        self._tools = as_tools(tools) if tools else None
         self.id = id
 
     async def get(self) -> Session:
@@ -427,7 +640,8 @@ class AsyncSessionHandle:
     async def force_answer(self) -> None:
         await self._client.sessions.force_session_answer(self.id)
 
-    async def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult:
+    async def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
         """Block until the session reaches a terminal status; returns the result and final answer."""
         kwargs.setdefault("answer_schema", self._answer_schema)
+        kwargs.setdefault("tools", self._tools)
         return await async_wait_for_session(self._client, self.id, **kwargs)

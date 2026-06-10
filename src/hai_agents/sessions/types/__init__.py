@@ -14,6 +14,11 @@ if typing.TYPE_CHECKING:
         SendSessionMessagesRequestBody_Batch,
         SendSessionMessagesRequestBody_UserMessage,
     )
+    from .send_session_tool_results_request_body import (
+        SendSessionToolResultsRequestBody,
+        SendSessionToolResultsRequestBody_Batch,
+        SendSessionToolResultsRequestBody_ToolResult,
+    )
 _dynamic_imports: typing.Dict[str, str] = {
     "ListSessionEventsRequestSortItem": ".list_session_events_request_sort_item",
     "ListSessionsRequestOwner": ".list_sessions_request_owner",
@@ -21,6 +26,9 @@ _dynamic_imports: typing.Dict[str, str] = {
     "SendSessionMessagesRequestBody": ".send_session_messages_request_body",
     "SendSessionMessagesRequestBody_Batch": ".send_session_messages_request_body",
     "SendSessionMessagesRequestBody_UserMessage": ".send_session_messages_request_body",
+    "SendSessionToolResultsRequestBody": ".send_session_tool_results_request_body",
+    "SendSessionToolResultsRequestBody_Batch": ".send_session_tool_results_request_body",
+    "SendSessionToolResultsRequestBody_ToolResult": ".send_session_tool_results_request_body",
 }
 
 
@@ -52,4 +60,7 @@ __all__ = [
     "SendSessionMessagesRequestBody",
     "SendSessionMessagesRequestBody_Batch",
     "SendSessionMessagesRequestBody_UserMessage",
+    "SendSessionToolResultsRequestBody",
+    "SendSessionToolResultsRequestBody_Batch",
+    "SendSessionToolResultsRequestBody_ToolResult",
 ]

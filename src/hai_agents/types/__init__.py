@@ -37,6 +37,10 @@ if typing.TYPE_CHECKING:
     from .session_summary import SessionSummary
     from .share_link import ShareLink
     from .skill import Skill
+    from .tool_definition import ToolDefinition
+    from .tool_result_batch import ToolResultBatch
+    from .tool_result_event import ToolResultEvent
+    from .tool_result_event_type import ToolResultEventType
     from .trajectory_changes import TrajectoryChanges
     from .trajectory_changes_answer import TrajectoryChangesAnswer
     from .trajectory_event import TrajectoryEvent
@@ -81,6 +85,10 @@ _dynamic_imports: typing.Dict[str, str] = {
     "SessionSummary": ".session_summary",
     "ShareLink": ".share_link",
     "Skill": ".skill",
+    "ToolDefinition": ".tool_definition",
+    "ToolResultBatch": ".tool_result_batch",
+    "ToolResultEvent": ".tool_result_event",
+    "ToolResultEventType": ".tool_result_event_type",
     "TrajectoryChanges": ".trajectory_changes",
     "TrajectoryChangesAnswer": ".trajectory_changes_answer",
     "TrajectoryEvent": ".trajectory_event",
@@ -149,6 +157,10 @@ __all__ = [
     "SessionSummary",
     "ShareLink",
     "Skill",
+    "ToolDefinition",
+    "ToolResultBatch",
+    "ToolResultEvent",
+    "ToolResultEventType",
     "TrajectoryChanges",
     "TrajectoryChangesAnswer",
     "TrajectoryEvent",

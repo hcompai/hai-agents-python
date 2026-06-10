@@ -9,6 +9,7 @@ from ..types.agent_environments_item import AgentEnvironmentsItem
 from ..types.agent_skills_item import AgentSkillsItem
 from ..types.agent_subagents_item import AgentSubagentsItem
 from ..types.page_agent import PageAgent
+from ..types.tool_definition import ToolDefinition
 from .raw_client import AsyncRawAgentsClient, RawAgentsClient
 from .types.list_agents_request_sort_item import ListAgentsRequestSortItem
 
@@ -94,6 +95,7 @@ class AgentsClient:
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -125,6 +127,9 @@ class AgentsClient:
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
+        tools : typing.Optional[typing.Sequence[ToolDefinition]]
+            Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -155,6 +160,7 @@ class AgentsClient:
             subagents=subagents,
             skills=skills,
             answer_format=answer_format,
+            tools=tools,
             request_options=request_options,
         )
         return _response.data
@@ -210,6 +216,7 @@ class AgentsClient:
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -243,6 +250,9 @@ class AgentsClient:
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
+        tools : typing.Optional[typing.Sequence[ToolDefinition]]
+            Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -275,6 +285,7 @@ class AgentsClient:
             subagents=subagents,
             skills=skills,
             answer_format=answer_format,
+            tools=tools,
             request_options=request_options,
         )
         return _response.data
@@ -395,6 +406,7 @@ class AsyncAgentsClient:
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -425,6 +437,9 @@ class AsyncAgentsClient:
 
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
+
+        tools : typing.Optional[typing.Sequence[ToolDefinition]]
+            Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -464,6 +479,7 @@ class AsyncAgentsClient:
             subagents=subagents,
             skills=skills,
             answer_format=answer_format,
+            tools=tools,
             request_options=request_options,
         )
         return _response.data
@@ -527,6 +543,7 @@ class AsyncAgentsClient:
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -559,6 +576,9 @@ class AsyncAgentsClient:
 
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
+
+        tools : typing.Optional[typing.Sequence[ToolDefinition]]
+            Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -600,6 +620,7 @@ class AsyncAgentsClient:
             subagents=subagents,
             skills=skills,
             answer_format=answer_format,
+            tools=tools,
             request_options=request_options,
         )
         return _response.data

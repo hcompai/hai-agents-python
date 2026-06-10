@@ -590,6 +590,73 @@
         }
       }
     },
+    "/api/v2/sessions/{id}/tool_results": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Send Session Tool Results",
+        "description": "Send results for custom tool calls (single or batch).",
+        "operationId": "send_session_tool_results_api_v2_sessions__id__tool_results_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ToolResultEvent"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ToolResultBatch"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "type",
+                  "mapping": {
+                    "tool_result": "#/components/schemas/ToolResultEvent",
+                    "batch": "#/components/schemas/ToolResultBatch"
+                  }
+                },
+                "title": "Input"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/sessions/{id}/pause": {
       "post": {
         "tags": [
@@ -2647,6 +2714,21 @@
             ],
             "title": "Answer Format",
             "description": "JSON Schema the agent's final answer must conform to. Null returns a free-form text answer."
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ToolDefinition"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools",
+            "description": "Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result."
           }
         },
         "type": "object",
@@ -2715,6 +2797,19 @@
             "title": "Page Chars",
             "description": "Characters of page text shown per page in 'text' mode.",
             "default": 20000
+          },
+          "vault_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vault Id",
+            "description": "Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access."
           }
         },
         "type": "object",
@@ -3516,6 +3611,92 @@
         "title": "Skill",
         "description": "A named, reusable instruction an agent can draw on during a session."
       },
+      "ToolDefinition": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Tool name advertised to the model. Format: letters, digits and underscores; must start with a letter or underscore; max 64 chars."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Description",
+            "description": "What the tool does, when to use it, and what it returns. Shown to the model verbatim."
+          },
+          "input_schema": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input Schema",
+            "description": "JSON Schema (object type) describing the tool call arguments."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "ToolDefinition",
+        "description": "Contract for a tool executed by the API client, not by the agent runtime.\n\nThe agent emits a tool call matching ``input_schema``, pauses, and resumes\nonce the client sends back the corresponding tool result."
+      },
+      "ToolResultBatch": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "batch",
+            "title": "Type",
+            "default": "batch"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ToolResultEvent"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Results"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "title": "ToolResultBatch",
+        "description": "Batch of custom tool results."
+      },
+      "ToolResultEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "tool_result",
+            "title": "Type",
+            "default": "tool_result"
+          },
+          "tool_call_id": {
+            "type": "string",
+            "title": "Tool Call Id",
+            "description": "Id of the pending tool call this result answers."
+          },
+          "result": {
+            "title": "Result",
+            "description": "JSON-serializable tool output, shown to the model."
+          },
+          "is_error": {
+            "type": "boolean",
+            "title": "Is Error",
+            "description": "Mark the call as failed; result is treated as the error text.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool_call_id"
+        ],
+        "title": "ToolResultEvent",
+        "description": "The client is sending back the result of a custom tool call."
+      },
       "TrajectoryChanges": {
         "properties": {
           "status": {
@@ -3621,13 +3802,14 @@
           "running",
           "paused",
           "idle",
+          "awaiting_tool_results",
           "completed",
           "failed",
           "timed_out",
           "interrupted"
         ],
         "title": "TrajectoryStatus",
-        "description": "State of a session/trajectory.\n\nLifecycle::\n\n    PENDING \u2192 RUNNING \u2192 {COMPLETED, FAILED, TIMED_OUT, INTERRUPTED}\n       |        \u2191  \u2191\n       |        |  \u2514\u2500\u2500\u2500\u2500\u2500\u2192 IDLE (interactive: agent waiting for next task)\n       |        \u2193\n       \u2514\u2500\u2500\u2500\u2500\u2500\u2192 PAUSED"
+        "description": "State of a session/trajectory.\n\nLifecycle::\n\n    PENDING \u2192 RUNNING \u2192 {COMPLETED, FAILED, TIMED_OUT, INTERRUPTED}\n       |        \u2191  \u2191 \u2191\n       |        |  | \u2514\u2500\u2500\u2500\u2192 IDLE (interactive: agent waiting for next task)\n       |        |  \u2514\u2500\u2500\u2500\u2500\u2500\u2192 AWAITING_TOOL_RESULTS (waiting for custom tool results)\n       |        \u2193\n       \u2514\u2500\u2500\u2500\u2500\u2500\u2192 PAUSED"
       },
       "UserMessageBatch": {
         "properties": {
