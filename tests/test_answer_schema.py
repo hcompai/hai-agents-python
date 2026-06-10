@@ -9,6 +9,7 @@ import pytest
 
 from hai_agents.polling import (
     AnswerValidationError,
+    SessionHandle,
     SessionRunResult,
     _attach_answer_schema,
     run_session,
@@ -114,6 +115,20 @@ class TestAnswerParseBack:
     def test_no_schema_keeps_raw_answer(self) -> None:
         client = _Client(_VALID_ANSWER)
         result = wait_for_session(client, "sess_1")  # type: ignore[arg-type]
+        assert result.answer == _VALID_ANSWER
+
+
+class TestSessionHandle:
+    def test_handle_carries_schema_into_wait_for_completion(self) -> None:
+        client = _Client(_VALID_ANSWER)
+        handle = SessionHandle(client, "sess_1", answer_schema=JobListings)  # type: ignore[arg-type]
+        result = handle.wait_for_completion()
+        assert isinstance(result.answer, JobListings)
+
+    def test_explicit_none_disables_handle_schema(self) -> None:
+        client = _Client(_VALID_ANSWER)
+        handle = SessionHandle(client, "sess_1", answer_schema=JobListings)  # type: ignore[arg-type]
+        result = handle.wait_for_completion(answer_schema=None)
         assert result.answer == _VALID_ANSWER
 
 
