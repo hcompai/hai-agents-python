@@ -48,12 +48,14 @@ def test_attach_definitions_inline_agent_sets_tools():
 
 
 class _FakeHttpx:
-    def __init__(self):
+    def __init__(self, statuses=None):
         self.requests = []
+        self._statuses = list(statuses or [])
 
-    def request(self, path, *, method, json=None, headers=None):
-        self.requests.append({"path": path, "method": method, "json": json})
-        return SimpleNamespace(status_code=202, headers={}, text="")
+    def request(self, path, *, method, json=None, headers=None, request_options=None):
+        self.requests.append({"path": path, "method": method, "json": json, "request_options": request_options})
+        status = self._statuses.pop(0) if self._statuses else 202
+        return SimpleNamespace(status_code=status, headers={}, text="")
 
 
 class _FakeSessions:
@@ -105,6 +107,25 @@ def test_run_session_dispatches_pending_calls_and_posts_results():
         "is_error": False,
     }
     assert result.status == "completed"
+
+
+def test_post_accepts_409_without_retrying():
+    from hai_agents.polling import _post_tool_results
+
+    httpx = _FakeHttpx(statuses=[409])
+    client = SimpleNamespace(_client_wrapper=SimpleNamespace(httpx_client=httpx))
+    _post_tool_results(client, "sess_1", [{"type": "tool_result", "tool_call_id": "c1", "result": "", "is_error": False}])
+    assert len(httpx.requests) == 1
+    assert httpx.requests[0]["request_options"] == {"max_retries": 0}
+
+
+def test_post_retries_transient_errors():
+    from hai_agents.polling import _post_tool_results
+
+    httpx = _FakeHttpx(statuses=[500, 202])
+    client = SimpleNamespace(_client_wrapper=SimpleNamespace(httpx_client=httpx))
+    _post_tool_results(client, "sess_1", [{"type": "tool_result", "tool_call_id": "c1", "result": "", "is_error": False}])
+    assert len(httpx.requests) == 2
 
 
 def test_dispatch_reports_tool_exceptions_as_errors():

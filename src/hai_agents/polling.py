@@ -13,6 +13,7 @@ from dataclasses import dataclass
 import typing_extensions
 
 from .core.api_error import ApiError
+from .core.request_options import RequestOptions
 from .tools import Tool, ToolInput, as_tools
 from .types.session_request_agent import SessionRequestAgent
 from .types.session_request_messages import SessionRequestMessages
@@ -214,25 +215,40 @@ async def _async_recover_pending_tool_calls(client: AsyncClient, id: str) -> typ
     return _latest_pending_tool_calls(changes.new_events or [], []) if changes is not None else []
 
 
+def _is_transient(status_code: int) -> bool:
+    return status_code in (408, 429) or status_code >= 500
+
+
 def _post_tool_results(client: Client, id: str, results: typing.List[typing.Dict[str, typing.Any]]) -> None:
-    response = client._client_wrapper.httpx_client.request(
-        f"api/v2/sessions/{id}/tool_results",
-        method="POST",
-        json=_tool_results_body(results),
-        headers={"content-type": "application/json"},
-    )
+    # The shared client would retry 409s; here a 409 is a final answer (session settled), so retry transient codes only.
+    for attempt in range(3):
+        response = client._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{id}/tool_results",
+            method="POST",
+            json=_tool_results_body(results),
+            headers={"content-type": "application/json"},
+            request_options=RequestOptions(max_retries=0),
+        )
+        if not _is_transient(response.status_code) or attempt == 2:
+            break
+        time.sleep(min(0.5 * 2**attempt, 2.0))
     _raise_unless_posted(response)
 
 
 async def _async_post_tool_results(
     client: AsyncClient, id: str, results: typing.List[typing.Dict[str, typing.Any]]
 ) -> None:
-    response = await client._client_wrapper.httpx_client.request(
-        f"api/v2/sessions/{id}/tool_results",
-        method="POST",
-        json=_tool_results_body(results),
-        headers={"content-type": "application/json"},
-    )
+    for attempt in range(3):
+        response = await client._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{id}/tool_results",
+            method="POST",
+            json=_tool_results_body(results),
+            headers={"content-type": "application/json"},
+            request_options=RequestOptions(max_retries=0),
+        )
+        if not _is_transient(response.status_code) or attempt == 2:
+            break
+        await asyncio.sleep(min(0.5 * 2**attempt, 2.0))
     _raise_unless_posted(response)
 
 
