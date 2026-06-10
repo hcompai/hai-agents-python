@@ -101,18 +101,26 @@ def _attach_tool_definitions(create_params: typing.Dict[str, typing.Any], tools:
         create_params["agent"] = {**dump, "tools": definitions}
 
 
-def _pending_tool_calls(batch: typing.Sequence[TrajectoryEvent]) -> typing.List[typing.Dict[str, typing.Any]]:
-    """Pending custom tool calls advertised by ``ActiveStateChangeEvent``s in an event batch."""
-    calls: typing.Dict[str, typing.Dict[str, typing.Any]] = {}
+def _latest_pending_tool_calls(
+    batch: typing.Sequence[TrajectoryEvent],
+    previous: typing.List[typing.Dict[str, typing.Any]],
+) -> typing.List[typing.Dict[str, typing.Any]]:
+    """Pending custom tool calls per the latest ``ActiveStateChangeEvent``.
+
+    The agent re-publishes the surviving list whenever a call settles, so the
+    latest event is the source of truth; ``previous`` carries it across polls
+    whose batches contain no state change.
+    """
+    calls = previous
     for event in batch:
         if event.type != "ActiveStateChangeEvent":
             continue
         data = event.data if isinstance(event.data, dict) else {}
-        if data.get("state") != "awaiting_tool_results":
-            continue
-        for call in data.get("pending_tool_calls") or []:
-            calls[call["id"]] = call
-    return list(calls.values())
+        if data.get("state") == "awaiting_tool_results":
+            calls = list(data.get("pending_tool_calls") or [])
+        else:
+            calls = []
+    return calls
 
 
 def _json_safe(value: typing.Any) -> typing.Any:
@@ -136,11 +144,17 @@ def _execute_tool_call(
     else:
         try:
             result = local_tool.fn(**(call.get("arguments") or {}))
+            if inspect.isawaitable(result):
+                result = asyncio.run(_await_result(result))
         except Exception as exc:
             result = f"{type(exc).__name__}: {exc}"
         else:
             is_error = False
     return {"type": "tool_result", "tool_call_id": call["id"], "result": _json_safe(result), "is_error": is_error}
+
+
+async def _await_result(value: typing.Awaitable[typing.Any]) -> typing.Any:
+    return await value
 
 
 async def _async_execute_tool_call(
@@ -233,6 +247,7 @@ def wait_for_session(
     if tools_by_name and not include_events:
         raise ValueError("tools require include_events=True: pending calls arrive on the event stream.")
     answered: typing.Set[str] = set()
+    advertised: typing.List[typing.Dict[str, typing.Any]] = []
     events: typing.List[TrajectoryEvent] = []
     next_from_index = from_index
     last_changes: typing.Optional[TrajectoryChanges] = None
@@ -270,10 +285,13 @@ def wait_for_session(
             )
 
         if tools_by_name:
-            calls = [c for c in _pending_tool_calls(batch) if c["id"] not in answered]
-            if calls:
-                _post_tool_results(client, id, [_execute_tool_call(tools_by_name, c) for c in calls])
-                answered.update(c["id"] for c in calls)
+            advertised = _latest_pending_tool_calls(batch, advertised)
+            # Status gate: on a replayed stream the live status decides whether calls are still open.
+            if status.status == "awaiting_tool_results":
+                calls = [c for c in advertised if c["id"] not in answered]
+                if calls:
+                    _post_tool_results(client, id, [_execute_tool_call(tools_by_name, c) for c in calls])
+                    answered.update(c["id"] for c in calls)
 
         # The long-poll above paces the loop when streaming events; otherwise sleep.
         if not include_events:
@@ -344,6 +362,7 @@ async def async_wait_for_session(
     if tools_by_name and not include_events:
         raise ValueError("tools require include_events=True: pending calls arrive on the event stream.")
     answered: typing.Set[str] = set()
+    advertised: typing.List[typing.Dict[str, typing.Any]] = []
     events: typing.List[TrajectoryEvent] = []
     next_from_index = from_index
     last_changes: typing.Optional[TrajectoryChanges] = None
@@ -381,11 +400,14 @@ async def async_wait_for_session(
             )
 
         if tools_by_name:
-            calls = [c for c in _pending_tool_calls(batch) if c["id"] not in answered]
-            if calls:
-                results = [await _async_execute_tool_call(tools_by_name, c) for c in calls]
-                await _async_post_tool_results(client, id, results)
-                answered.update(c["id"] for c in calls)
+            advertised = _latest_pending_tool_calls(batch, advertised)
+            # Status gate: on a replayed stream the live status decides whether calls are still open.
+            if status.status == "awaiting_tool_results":
+                calls = [c for c in advertised if c["id"] not in answered]
+                if calls:
+                    results = [await _async_execute_tool_call(tools_by_name, c) for c in calls]
+                    await _async_post_tool_results(client, id, results)
+                    answered.update(c["id"] for c in calls)
 
         if not include_events:
             await asyncio.sleep(poll_backoff_seconds or wait_for_seconds)

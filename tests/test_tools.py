@@ -83,7 +83,10 @@ def _awaiting_changes(*calls):
 def test_run_session_dispatches_pending_calls_and_posts_results():
     sessions = _FakeSessions(
         polls=[
-            (_awaiting_changes({"id": "c1", "name": "get_weather", "arguments": {"city": "Paris"}}), "running"),
+            (
+                _awaiting_changes({"id": "c1", "name": "get_weather", "arguments": {"city": "Paris"}}),
+                "awaiting_tool_results",
+            ),
             (None, "completed"),
         ]
     )
@@ -110,7 +113,7 @@ def test_dispatch_reports_tool_exceptions_as_errors():
 
     sessions = _FakeSessions(
         polls=[
-            (_awaiting_changes({"id": "c1", "name": "broken", "arguments": {}}), "running"),
+            (_awaiting_changes({"id": "c1", "name": "broken", "arguments": {}}), "awaiting_tool_results"),
             (None, "completed"),
         ]
     )
@@ -125,3 +128,70 @@ def test_dispatch_reports_tool_exceptions_as_errors():
         "result": "RuntimeError: boom",
         "is_error": True,
     }
+
+
+def test_sync_path_awaits_async_tools():
+    @tool(description="async lookup")
+    async def lookup(key: str) -> str:
+        return f"value:{key}"
+
+    sessions = _FakeSessions(
+        polls=[
+            (_awaiting_changes({"id": "c1", "name": "lookup", "arguments": {"key": "k"}}), "awaiting_tool_results"),
+            (None, "completed"),
+        ]
+    )
+    httpx = _FakeHttpx()
+    client = SimpleNamespace(sessions=sessions, _client_wrapper=SimpleNamespace(httpx_client=httpx))
+
+    run_session(client, agent="h/researcher", tools=[lookup])
+
+    assert httpx.requests[0]["json"]["result"] == "value:k"
+    assert httpx.requests[0]["json"]["is_error"] is False
+
+
+def test_settled_and_replayed_calls_are_not_re_executed():
+    stale = SimpleNamespace(
+        type="ActiveStateChangeEvent",
+        data={
+            "state": "awaiting_tool_results",
+            "pending_tool_calls": [
+                {"id": "c1", "name": "get_weather", "arguments": {"city": "Paris"}},
+                {"id": "c2", "name": "get_weather", "arguments": {"city": "Tokyo"}},
+            ],
+        },
+    )
+    refreshed = SimpleNamespace(
+        type="ActiveStateChangeEvent",
+        data={
+            "state": "awaiting_tool_results",
+            "pending_tool_calls": [{"id": "c2", "name": "get_weather", "arguments": {"city": "Tokyo"}}],
+        },
+    )
+    changes = SimpleNamespace(new_events=[stale, refreshed], answer=None)
+    sessions = _FakeSessions(polls=[(changes, "awaiting_tool_results"), (None, "completed")])
+    httpx = _FakeHttpx()
+    client = SimpleNamespace(sessions=sessions, _client_wrapper=SimpleNamespace(httpx_client=httpx))
+
+    run_session(client, agent="h/researcher", tools=[get_weather])
+
+    assert len(httpx.requests) == 1
+    assert httpx.requests[0]["json"]["tool_call_id"] == "c2"
+
+
+def test_no_dispatch_when_status_left_awaiting():
+    resumed = SimpleNamespace(
+        type="ActiveStateChangeEvent",
+        data={
+            "state": "awaiting_tool_results",
+            "pending_tool_calls": [{"id": "c1", "name": "get_weather", "arguments": {"city": "Paris"}}],
+        },
+    )
+    changes = SimpleNamespace(new_events=[resumed], answer=None)
+    sessions = _FakeSessions(polls=[(changes, "running"), (None, "completed")])
+    httpx = _FakeHttpx()
+    client = SimpleNamespace(sessions=sessions, _client_wrapper=SimpleNamespace(httpx_client=httpx))
+
+    run_session(client, agent="h/researcher", tools=[get_weather])
+
+    assert httpx.requests == []
