@@ -3,6 +3,16 @@
 import typing
 
 TrajectoryStatus = typing.Union[
-    typing.Literal["pending", "running", "paused", "idle", "completed", "failed", "timed_out", "interrupted"],
+    typing.Literal[
+        "pending",
+        "running",
+        "paused",
+        "idle",
+        "awaiting_tool_results",
+        "completed",
+        "failed",
+        "timed_out",
+        "interrupted",
+    ],
     typing.Any,
 ]

@@ -17,10 +17,12 @@ from .polling import (
     CreateSessionParams,
     SessionHandle,
     SessionRunResult,
+    _attach_tool_definitions,
     assert_request_under_limit,
 )
 from .polling import async_run_session as _async_run_session
 from .polling import run_session as _run_session
+from .tools import ToolInput, as_tools
 
 
 class Client(BaseClient):
@@ -32,6 +34,7 @@ class Client(BaseClient):
         timeout_seconds: typing.Optional[float] = None,
         poll_backoff_seconds: float = 0.0,
         max_polls: typing.Optional[int] = None,
+        tools: typing.Optional[typing.Sequence[ToolInput]] = None,
         **create_params: typing_extensions.Unpack[CreateSessionParams],
     ) -> SessionRunResult:
         """Create a session and block until it completes, returning the result and final answer."""
@@ -42,16 +45,24 @@ class Client(BaseClient):
             timeout_seconds=timeout_seconds,
             poll_backoff_seconds=poll_backoff_seconds,
             max_polls=max_polls,
+            tools=tools,
             **create_params,
         )
 
     def start_session(
-        self, **create_params: typing_extensions.Unpack[CreateSessionParams]
+        self,
+        *,
+        tools: typing.Optional[typing.Sequence[ToolInput]] = None,
+        **create_params: typing_extensions.Unpack[CreateSessionParams],
     ) -> SessionHandle:
         """Create a session and return a handle to it without waiting."""
-        assert_request_under_limit(dict(create_params))
-        session = self.sessions.create_session(**create_params)
-        return SessionHandle(self, session.id)
+        normalized_tools = as_tools(tools) if tools else None
+        params = dict(create_params)
+        if normalized_tools:
+            _attach_tool_definitions(params, normalized_tools)
+        assert_request_under_limit(params)
+        session = self.sessions.create_session(**params)  # type: ignore[arg-type]
+        return SessionHandle(self, session.id, tools=normalized_tools)
 
     def session(self, id: str) -> SessionHandle:
         """Wrap an existing session id in a handle."""
@@ -67,6 +78,7 @@ class AsyncClient(AsyncBaseClient):
         timeout_seconds: typing.Optional[float] = None,
         poll_backoff_seconds: float = 0.0,
         max_polls: typing.Optional[int] = None,
+        tools: typing.Optional[typing.Sequence[ToolInput]] = None,
         **create_params: typing_extensions.Unpack[CreateSessionParams],
     ) -> SessionRunResult:
         """Create a session and block until it completes, returning the result and final answer."""
@@ -77,16 +89,24 @@ class AsyncClient(AsyncBaseClient):
             timeout_seconds=timeout_seconds,
             poll_backoff_seconds=poll_backoff_seconds,
             max_polls=max_polls,
+            tools=tools,
             **create_params,
         )
 
     async def start_session(
-        self, **create_params: typing_extensions.Unpack[CreateSessionParams]
+        self,
+        *,
+        tools: typing.Optional[typing.Sequence[ToolInput]] = None,
+        **create_params: typing_extensions.Unpack[CreateSessionParams],
     ) -> AsyncSessionHandle:
         """Create a session and return a handle to it without waiting."""
-        assert_request_under_limit(dict(create_params))
-        session = await self.sessions.create_session(**create_params)
-        return AsyncSessionHandle(self, session.id)
+        normalized_tools = as_tools(tools) if tools else None
+        params = dict(create_params)
+        if normalized_tools:
+            _attach_tool_definitions(params, normalized_tools)
+        assert_request_under_limit(params)
+        session = await self.sessions.create_session(**params)  # type: ignore[arg-type]
+        return AsyncSessionHandle(self, session.id, tools=normalized_tools)
 
     def session(self, id: str) -> AsyncSessionHandle:
         """Wrap an existing session id in a handle."""

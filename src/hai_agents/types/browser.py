@@ -49,6 +49,11 @@ class Browser(UniversalBaseModel):
     Characters of page text shown per page in 'text' mode.
     """
 
+    vault_id: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
+    """
+
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
     else:

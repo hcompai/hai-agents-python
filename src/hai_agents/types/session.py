@@ -19,6 +19,11 @@ class Session(UniversalBaseModel):
     id: str
     request: SessionRequest
     status: SessionStatus
+    agent_view_url: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    URL of the session's Agent View page on the H Platform (live view and replay).
+    """
+
     latest_answer: typing.Optional[typing.Any] = pydantic.Field(default=None)
     """
     The agent's most recent final answer: free-form text, or structured data when the agent runs with a custom answer format. Null until the agent first answers. Mirrors the answer streamed from the changes endpoint, surfaced here for non-interactive runs.
