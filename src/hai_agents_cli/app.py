@@ -12,7 +12,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from hai_agents import Client, run_session
+from hai_agents import Client, wait_for_session
 from hai_agents.core.api_error import ApiError
 from hai_agents.sessions import SendSessionMessagesRequestBody_UserMessage
 from hai_agents.types import PageSessionSummary
@@ -168,18 +168,23 @@ def run(
     client = _client(state)
     overrides = _parse_overrides(override or [])
     try:
-        result = run_session(
-            client,
+        session = client.sessions.create_session(
             agent=agent,
             messages=task,
             max_steps=max_steps,
             max_time_s=max_time_s,
-            timeout_seconds=max_time_s + 30.0,
             overrides=overrides or None,
         )
     except Exception as exc:
         _raise_cli_error(exc)
-    _print_run_result(result, state.json_output)
+    agent_view_url = getattr(session, "agent_view_url", None)
+    if agent_view_url and not state.json_output:
+        console.print(f"[bold]Live view:[/bold] [link={agent_view_url}]{agent_view_url}[/link]")
+    try:
+        result = wait_for_session(client, session.id, timeout_seconds=max_time_s + 30.0)
+    except Exception as exc:
+        _raise_cli_error(exc)
+    _print_run_result(result, state.json_output, agent_view_url=agent_view_url)
 
 
 @sessions_app.command("list")
@@ -202,7 +207,9 @@ def list_sessions(
 
     table = Table("ID", "Status", "Agent", "Created")
     for item in result.items:
-        table.add_row(item.id, _status_text(item.status), item.agent or "", item.created_at.isoformat())
+        url = getattr(item, "agent_view_url", None)
+        id_cell = f"[link={url}]{item.id}[/link]" if url else item.id
+        table.add_row(id_cell, _status_text(item.status), item.agent or "", item.created_at.isoformat())
     console.print(table)
 
 
@@ -380,11 +387,12 @@ def _client(state: AppState) -> Client:
         _raise_cli_error(exc)
 
 
-def _print_run_result(result, json_output: bool) -> None:
+def _print_run_result(result, json_output: bool, agent_view_url: str | None = None) -> None:
     payload = {
         "session_id": result.id,
         "status": _status_text(result.status),
         "answer": result.answer,
+        "agent_view_url": agent_view_url,
     }
     if json_output:
         _print_json(payload)
