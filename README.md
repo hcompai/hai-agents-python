@@ -68,12 +68,11 @@ An `AsyncClient` mirrors this API for asyncio.
 
 ## Custom tools
 
-Expose your own Python functions to the agent. Decorate a function with `@tool` (the input schema is derived from its signature), pass it to `run_session`, and the polling loop executes it whenever the agent calls it, posting the result back so the session resumes.
+Expose your own Python functions to the agent: pass them to `run_session` and the polling loop executes them whenever the agent calls one, posting the result back so the session resumes. Any function with typed parameters and a docstring works; the input schema is derived from the signature.
 
 ```python
-from hai_agents import Client, tool
+from hai_agents import Client
 
-@tool
 def get_weather(city: str) -> str:
     """Get the current weather for a city."""
     return f"Sunny in {city}"
@@ -87,7 +86,7 @@ result = client.run_session(
 )
 ```
 
-Tool exceptions are reported to the agent as tool errors rather than crashing the loop. With `AsyncClient`, tools may be `async def`. For manual control, `client.start_session(tools=[...])` returns a handle whose `wait_for_completion()` dispatches the same way, and sessions awaiting results report the `awaiting_tool_results` status with the pending calls.
+Use `@tool(name=..., description=...)` to override what the model sees. Tool exceptions are reported to the agent as tool errors rather than crashing the loop. With `AsyncClient`, tools may be `async def`. For manual control, `client.start_session(tools=[...])` returns a handle whose `wait_for_completion()` dispatches the same way, and sessions awaiting results report the `awaiting_tool_results` status with the pending calls.
 
 ## CLI
 

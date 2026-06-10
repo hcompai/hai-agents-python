@@ -47,6 +47,19 @@ def test_attach_definitions_inline_agent_sets_tools():
     assert params["agent"]["tools"] == [get_weather.definition()]
 
 
+def test_attach_definitions_pydantic_inline_agent():
+    import pydantic
+
+    class AgentModel(pydantic.BaseModel):
+        name: str
+        environments: list = []
+
+    params = {"agent": AgentModel(name="mine")}
+    _attach_tool_definitions(params, [get_weather])
+    assert params["agent"]["name"] == "mine"
+    assert params["agent"]["tools"] == [get_weather.definition()]
+
+
 class _FakeHttpx:
     def __init__(self, statuses=None):
         self.requests = []

@@ -99,7 +99,7 @@ def _attach_tool_definitions(create_params: typing.Dict[str, typing.Any], tools:
     elif isinstance(agent, dict):
         create_params["agent"] = {**agent, "tools": definitions}
     else:
-        dump = agent.dict() if hasattr(agent, "dict") else dict(agent)  # type: ignore[arg-type]
+        dump = agent.model_dump() if hasattr(agent, "model_dump") else dict(agent)  # type: ignore[arg-type]
         create_params["agent"] = {**dump, "tools": definitions}
 
 
