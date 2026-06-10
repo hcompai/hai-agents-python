@@ -97,6 +97,18 @@ def test_state_missing_is_a_programming_error() -> None:
         raise AssertionError("_state should fail when Typer state is missing")
 
 
+def test_run_rejects_oversized_payload_before_sending(monkeypatch) -> None:
+    captured: dict = {}
+    client = _RunClient(capture=captured)
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+
+    result = runner.invoke(app, ["run", "x" * (6 * 1024 * 1024)], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code != 0
+    assert "over the" in _error_text(result)
+    assert not captured  # no HTTP call was attempted
+
+
 def test_run_parses_overrides(monkeypatch) -> None:
     captured: dict = {}
     client = _RunClient(capture=captured)

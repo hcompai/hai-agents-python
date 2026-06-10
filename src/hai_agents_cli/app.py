@@ -12,7 +12,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from hai_agents import Client, wait_for_session
+from hai_agents import Client, assert_request_under_limit, wait_for_session
 from hai_agents.core.api_error import ApiError
 from hai_agents.sessions import SendSessionMessagesRequestBody_UserMessage
 from hai_agents.types import PageSessionSummary
@@ -167,14 +167,16 @@ def run(
     state = _state(ctx)
     client = _client(state)
     overrides = _parse_overrides(override or [])
+    params = {
+        "agent": agent,
+        "messages": task,
+        "max_steps": max_steps,
+        "max_time_s": max_time_s,
+        "overrides": overrides or None,
+    }
     try:
-        session = client.sessions.create_session(
-            agent=agent,
-            messages=task,
-            max_steps=max_steps,
-            max_time_s=max_time_s,
-            overrides=overrides or None,
-        )
+        assert_request_under_limit(params)
+        session = client.sessions.create_session(**params)
     except Exception as exc:
         _raise_cli_error(exc)
     agent_view_url = getattr(session, "agent_view_url", None)
