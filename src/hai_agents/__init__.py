@@ -59,6 +59,7 @@ if typing.TYPE_CHECKING:
     from .environment import HaiAgentsEnvironment
     from .environments import ListEnvironmentsRequestSortItem
     from .polling import (
+        AnswerValidationError,
         AsyncSessionHandle,
         MAX_REQUEST_BYTES,
         SessionHandle,
@@ -86,6 +87,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "AgentSkillsItem": ".types",
     "AgentSubagentsItem": ".types",
     "AsyncClient": ".client",
+    "AnswerValidationError": ".polling",
     "AsyncSessionHandle": ".polling",
     "Browser": ".types",
     "BrowserKind": ".types",
@@ -185,6 +187,7 @@ __all__ = [
     "AgentSkillsItem",
     "AgentSubagentsItem",
     "AsyncClient",
+    "AnswerValidationError",
     "AsyncSessionHandle",
     "Browser",
     "BrowserKind",
