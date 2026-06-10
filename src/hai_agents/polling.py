@@ -81,8 +81,10 @@ class SessionRunResult(typing.Generic[AnswerT]):
             object.__setattr__(self, "answer", self.final_changes.answer)
 
 
-def _attach_answer_schema(params: typing.Dict[str, typing.Any], model: typing.Type[pydantic.BaseModel]) -> None:
+def _attach_answer_schema(params: typing.Dict[str, typing.Any], model: typing.Type[typing.Any]) -> None:
     """Bind the model's JSON schema as the agent's ``answer_format``."""
+    if not (isinstance(model, type) and issubclass(model, pydantic.BaseModel)):
+        raise TypeError(f"answer_schema must be a pydantic.BaseModel subclass, got {model!r}.")
     schema = model.model_json_schema()
     agent = params.get("agent")
     if isinstance(agent, str):
@@ -106,7 +108,7 @@ def _attach_answer_schema(params: typing.Dict[str, typing.Any], model: typing.Ty
 def _parse_answer(
     raw: typing.Any,
     status: typing.Union[TrajectoryStatus, str],
-    model: typing.Optional[typing.Type[pydantic.BaseModel]],
+    model: typing.Optional[typing.Type[typing.Any]],
 ) -> typing.Any:
     """Validate a completed session's answer into ``model``; non-completed answers pass through raw."""
     if model is None or raw is None or getattr(status, "value", status) != "completed":

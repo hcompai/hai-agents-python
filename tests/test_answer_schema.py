@@ -81,6 +81,10 @@ class TestSchemaInjection:
         with pytest.raises(ValueError, match="conflicts"):
             _attach_answer_schema({"agent": "h/web-surfer", "overrides": {"agent.answer_format": {}}}, JobListings)
 
+    def test_non_model_schema_rejected(self) -> None:
+        with pytest.raises(TypeError, match="BaseModel"):
+            _attach_answer_schema({"agent": "h/web-surfer"}, dict)
+
     def test_user_overrides_preserved(self) -> None:
         params: dict = {"agent": "h/web-surfer", "overrides": {"agent.max_steps": 5}}
         _attach_answer_schema(params, JobListings)
