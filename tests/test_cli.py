@@ -33,14 +33,29 @@ def test_missing_api_key_is_clear(monkeypatch, tmp_path) -> None:
 
 
 def test_run_prints_json(monkeypatch) -> None:
-    monkeypatch.setattr(app_module, "_client", lambda state: object())
-    monkeypatch.setattr(app_module, "run_session", _fake_run_session)
+    monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
+    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
 
     result = runner.invoke(app, ["--json", "run", "hello"], env={"HAI_API_KEY": "hk-test"})
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert payload == {"answer": "done", "session_id": "sess_1", "status": "completed"}
+    assert payload == {
+        "answer": "done",
+        "session_id": "sess_1",
+        "status": "completed",
+        "agent_view_url": "https://platform.example.test/agent-view/sess_1",
+    }
+
+
+def test_run_prints_live_view_link(monkeypatch) -> None:
+    monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
+    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
+
+    result = runner.invoke(app, ["run", "hello"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 0, result.output
+    assert "https://platform.example.test/agent-view/sess_1" in result.output
 
 
 def test_share_session_prints_absolute_url(monkeypatch) -> None:
@@ -82,15 +97,24 @@ def test_state_missing_is_a_programming_error() -> None:
         raise AssertionError("_state should fail when Typer state is missing")
 
 
+def test_run_rejects_oversized_payload_before_sending(monkeypatch) -> None:
+    captured: dict = {}
+    client = _RunClient(capture=captured)
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+
+    result = runner.invoke(app, ["run", "x" * (6 * 1024 * 1024)], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code != 0
+    assert "over the" in _error_text(result)
+    assert not captured  # no HTTP call was attempted
+
+
 def test_run_parses_overrides(monkeypatch) -> None:
     captured: dict = {}
+    client = _RunClient(capture=captured)
 
-    def _capture(client, **kwargs):
-        captured.update(kwargs)
-        return SessionRunResult(id="sess_1", status="completed", events=[], next_from_index=0, final_changes=_Answer())
-
-    monkeypatch.setattr(app_module, "_client", lambda state: object())
-    monkeypatch.setattr(app_module, "run_session", _capture)
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
 
     result = runner.invoke(
         app,
@@ -112,10 +136,28 @@ def test_run_parses_overrides(monkeypatch) -> None:
     }
 
 
-def _fake_run_session(client, **kwargs):
-    assert kwargs["messages"] == "hello"
-    assert kwargs["agent"] == "h/web-surfer-holo3-1-35b"
+def _fake_wait_for_session(client, id, **kwargs):
+    assert id == "sess_1"
     return SessionRunResult(id="sess_1", status="completed", events=[], next_from_index=0, final_changes=_Answer())
+
+
+class _RunSessions:
+    def __init__(self, capture: dict | None = None) -> None:
+        self._capture = capture
+
+    def create_session(self, **kwargs):
+        if self._capture is not None:
+            self._capture.update(kwargs)
+        return type(
+            "Session",
+            (),
+            {"id": "sess_1", "agent_view_url": "https://platform.example.test/agent-view/sess_1"},
+        )()
+
+
+class _RunClient:
+    def __init__(self, capture: dict | None = None) -> None:
+        self.sessions = _RunSessions(capture)
 
 
 class _Answer:
