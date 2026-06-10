@@ -98,6 +98,7 @@ class EnvironmentsClient:
         start_url: typing.Optional[str] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
         page_chars: typing.Optional[int] = OMIT,
+        vault_id: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -128,6 +129,9 @@ class EnvironmentsClient:
         page_chars : typing.Optional[int]
             Characters of page text shown per page in 'text' mode.
 
+        vault_id : typing.Optional[str]
+            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -156,6 +160,7 @@ class EnvironmentsClient:
             start_url=start_url,
             mode=mode,
             page_chars=page_chars,
+            vault_id=vault_id,
             request_options=request_options,
         )
         return _response.data
@@ -202,6 +207,7 @@ class EnvironmentsClient:
         start_url: typing.Optional[str] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
         page_chars: typing.Optional[int] = OMIT,
+        vault_id: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -234,6 +240,9 @@ class EnvironmentsClient:
         page_chars : typing.Optional[int]
             Characters of page text shown per page in 'text' mode.
 
+        vault_id : typing.Optional[str]
+            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -264,6 +273,7 @@ class EnvironmentsClient:
             start_url=start_url,
             mode=mode,
             page_chars=page_chars,
+            vault_id=vault_id,
             request_options=request_options,
         )
         return _response.data
@@ -388,6 +398,7 @@ class AsyncEnvironmentsClient:
         start_url: typing.Optional[str] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
         page_chars: typing.Optional[int] = OMIT,
+        vault_id: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -417,6 +428,9 @@ class AsyncEnvironmentsClient:
 
         page_chars : typing.Optional[int]
             Characters of page text shown per page in 'text' mode.
+
+        vault_id : typing.Optional[str]
+            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -454,6 +468,7 @@ class AsyncEnvironmentsClient:
             start_url=start_url,
             mode=mode,
             page_chars=page_chars,
+            vault_id=vault_id,
             request_options=request_options,
         )
         return _response.data
@@ -508,6 +523,7 @@ class AsyncEnvironmentsClient:
         start_url: typing.Optional[str] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
         page_chars: typing.Optional[int] = OMIT,
+        vault_id: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -539,6 +555,9 @@ class AsyncEnvironmentsClient:
 
         page_chars : typing.Optional[int]
             Characters of page text shown per page in 'text' mode.
+
+        vault_id : typing.Optional[str]
+            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -578,6 +597,7 @@ class AsyncEnvironmentsClient:
             start_url=start_url,
             mode=mode,
             page_chars=page_chars,
+            vault_id=vault_id,
             request_options=request_options,
         )
         return _response.data

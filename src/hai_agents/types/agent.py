@@ -8,6 +8,7 @@ import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel, update_forward_refs
 from .agent_environments_item import AgentEnvironmentsItem
 from .agent_skills_item import AgentSkillsItem
+from .tool_definition import ToolDefinition
 
 
 class Agent(UniversalBaseModel):
@@ -53,6 +54,11 @@ class Agent(UniversalBaseModel):
     answer_format: typing.Optional[typing.Dict[str, typing.Any]] = pydantic.Field(default=None)
     """
     JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
+    """
+
+    tools: typing.Optional[typing.List[ToolDefinition]] = pydantic.Field(default=None)
+    """
+    Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
     """
 
     if IS_PYDANTIC_V2:

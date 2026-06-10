@@ -13,6 +13,9 @@ if typing.TYPE_CHECKING:
         SendSessionMessagesRequestBody,
         SendSessionMessagesRequestBody_Batch,
         SendSessionMessagesRequestBody_UserMessage,
+        SendSessionToolResultsRequestBody,
+        SendSessionToolResultsRequestBody_Batch,
+        SendSessionToolResultsRequestBody_ToolResult,
     )
 _dynamic_imports: typing.Dict[str, str] = {
     "ListSessionEventsRequestSortItem": ".types",
@@ -21,6 +24,9 @@ _dynamic_imports: typing.Dict[str, str] = {
     "SendSessionMessagesRequestBody": ".types",
     "SendSessionMessagesRequestBody_Batch": ".types",
     "SendSessionMessagesRequestBody_UserMessage": ".types",
+    "SendSessionToolResultsRequestBody": ".types",
+    "SendSessionToolResultsRequestBody_Batch": ".types",
+    "SendSessionToolResultsRequestBody_ToolResult": ".types",
 }
 
 
@@ -52,4 +58,7 @@ __all__ = [
     "SendSessionMessagesRequestBody",
     "SendSessionMessagesRequestBody_Batch",
     "SendSessionMessagesRequestBody_UserMessage",
+    "SendSessionToolResultsRequestBody",
+    "SendSessionToolResultsRequestBody_Batch",
+    "SendSessionToolResultsRequestBody_ToolResult",
 ]
