@@ -2826,6 +2826,7 @@
         "type": "string",
         "enum": [
           "web",
+          "desktop",
           "code",
           "mcp",
           "memory"
