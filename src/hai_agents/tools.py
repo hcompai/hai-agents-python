@@ -43,12 +43,25 @@ def _schema_from_signature(fn: typing.Callable[..., typing.Any]) -> typing.Dict[
     return schema
 
 
+@typing.overload
+def tool(fn: typing.Callable[..., typing.Any]) -> Tool: ...
+
+
+@typing.overload
+def tool(
+    fn: None = None,
+    *,
+    name: typing.Optional[str] = None,
+    description: typing.Optional[str] = None,
+) -> typing.Callable[[typing.Callable[..., typing.Any]], Tool]: ...
+
+
 def tool(
     fn: typing.Optional[typing.Callable[..., typing.Any]] = None,
     *,
     name: typing.Optional[str] = None,
     description: typing.Optional[str] = None,
-) -> typing.Any:
+) -> typing.Union[Tool, typing.Callable[[typing.Callable[..., typing.Any]], Tool]]:
     """Wrap a function as a custom :class:`Tool` executed in your process; the input schema is derived from its signature."""
 
     def wrap(f: typing.Callable[..., typing.Any]) -> Tool:

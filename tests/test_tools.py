@@ -26,6 +26,19 @@ def test_tool_decorator_derives_schema():
     assert get_weather(city="Paris") == "Sunny in Paris (celsius)"
 
 
+def test_tool_decorator_with_args_returns_tool_and_applies_overrides():
+    # Both call forms must produce a Tool — the @typing.overload pair on tool() pins this contract
+    # for static checkers too (a bare ``-> Any`` return makes every @tool function untyped under
+    # mypy --strict's untyped-decorator rule).
+    @tool(name="weather_lookup", description="Look up the weather.")
+    def whatever(city: str) -> str:
+        return city
+
+    assert isinstance(whatever, Tool)
+    assert whatever.name == "weather_lookup"
+    assert whatever.description == "Look up the weather."
+
+
 def test_tool_without_description_raises():
     with pytest.raises(ValueError, match="needs a description"):
 
@@ -116,7 +129,9 @@ def test_post_accepts_409_without_retrying():
 
     httpx = _FakeHttpx(statuses=[409])
     client = SimpleNamespace(_client_wrapper=SimpleNamespace(httpx_client=httpx))
-    _post_tool_results(client, "sess_1", [{"type": "tool_result", "tool_call_id": "c1", "result": "", "is_error": False}])
+    _post_tool_results(
+        client, "sess_1", [{"type": "tool_result", "tool_call_id": "c1", "result": "", "is_error": False}]
+    )
     assert len(httpx.requests) == 1
     assert httpx.requests[0]["request_options"] == {"max_retries": 0}
 
@@ -126,7 +141,9 @@ def test_post_retries_transient_errors():
 
     httpx = _FakeHttpx(statuses=[500, 202])
     client = SimpleNamespace(_client_wrapper=SimpleNamespace(httpx_client=httpx))
-    _post_tool_results(client, "sess_1", [{"type": "tool_result", "tool_call_id": "c1", "result": "", "is_error": False}])
+    _post_tool_results(
+        client, "sess_1", [{"type": "tool_result", "tool_call_id": "c1", "result": "", "is_error": False}]
+    )
     assert len(httpx.requests) == 2
 
 
