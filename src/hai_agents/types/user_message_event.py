@@ -12,7 +12,7 @@ class UserMessageEvent(UniversalBaseModel):
     The user is sending a message to an active agent.
     """
 
-    type: typing.Optional[UserMessageEventType] = None
+    type: typing.Optional[UserMessageEventType] = "user_message"
     message: str = pydantic.Field()
     """
     Message text sent to the agent.

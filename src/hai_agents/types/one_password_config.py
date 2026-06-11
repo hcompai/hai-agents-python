@@ -12,7 +12,7 @@ class OnePasswordConfig(UniversalBaseModel):
     1Password vault provider config.
     """
 
-    provider: typing.Optional[OnePasswordConfigProvider] = None
+    provider: typing.Optional[OnePasswordConfigProvider] = "onepassword"
     op_vault_id: str
 
     if IS_PYDANTIC_V2:
