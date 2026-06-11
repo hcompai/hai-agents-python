@@ -111,8 +111,14 @@ class TestAnswerParseBack:
         result = wait_for_session(client, "sess_1", answer_schema=JobListings)  # type: ignore[arg-type]
         assert result.answer == "cancelled mid-run"
 
-    def test_none_answer_passes_through(self) -> None:
+    def test_completed_none_answer_raises(self) -> None:
         client = _Client(None)
+        with pytest.raises(AnswerValidationError) as exc_info:
+            wait_for_session(client, "sess_1", answer_schema=JobListings)  # type: ignore[arg-type]
+        assert exc_info.value.raw is None
+
+    def test_non_completed_none_answer_passes_through(self) -> None:
+        client = _Client(None, status="failed")
         result = wait_for_session(client, "sess_1", answer_schema=JobListings)  # type: ignore[arg-type]
         assert result.answer is None
 

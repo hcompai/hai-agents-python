@@ -107,11 +107,11 @@ def _attach_answer_schema(params: typing.Dict[str, typing.Any], model: typing.Ty
 
 def _parse_answer(
     raw: typing.Any,
-    status: typing.Union[TrajectoryStatus, str],
+    status: TrajectoryStatus,
     model: typing.Optional[typing.Type[typing.Any]],
 ) -> typing.Any:
     """Validate a completed session's answer into ``model``; non-completed answers pass through raw."""
-    if model is None or raw is None or getattr(status, "value", status) != "completed":
+    if model is None or status != "completed":
         return raw
     try:
         return model.model_validate(raw)
@@ -119,9 +119,9 @@ def _parse_answer(
         raise AnswerValidationError(raw, model, exc) from exc
 
 
-def is_terminal_session_status(status: typing.Union[TrajectoryStatus, str]) -> bool:
+def is_terminal_session_status(status: TrajectoryStatus) -> bool:
     """Return whether a session status should end a polling loop."""
-    return getattr(status, "value", status) in TERMINAL_SESSION_STATUSES
+    return status in TERMINAL_SESSION_STATUSES
 
 
 def _request_bytes(payload: typing.Any) -> int:
