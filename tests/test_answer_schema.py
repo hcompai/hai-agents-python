@@ -100,6 +100,18 @@ class TestAnswerParseBack:
         assert client.sessions.created_with["overrides"]["agent.answer_format"]["title"] == "JobListings"
         assert result.final_changes.answer == _VALID_ANSWER
 
+    def test_json_string_answer_parses_into_model(self) -> None:
+        client = _Client(JobListings.model_validate(_VALID_ANSWER).model_dump_json())
+        result = wait_for_session(client, "sess_1", answer_schema=JobListings)  # type: ignore[arg-type]
+        assert isinstance(result.answer, JobListings)
+        assert result.answer.jobs[0].title == "RE"
+
+    def test_non_json_string_answer_raises(self) -> None:
+        client = _Client("plain text answer")
+        with pytest.raises(AnswerValidationError) as exc_info:
+            wait_for_session(client, "sess_1", answer_schema=JobListings)  # type: ignore[arg-type]
+        assert exc_info.value.raw == "plain text answer"
+
     def test_nonconforming_answer_raises_with_raw(self) -> None:
         client = _Client({"jobs": "not-a-list"})
         with pytest.raises(AnswerValidationError) as exc_info:

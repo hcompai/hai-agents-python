@@ -114,6 +114,8 @@ def _parse_answer(
     if model is None or status != "completed":
         return raw
     try:
+        if isinstance(raw, str):
+            return model.model_validate_json(raw)
         return model.model_validate(raw)
     except pydantic.ValidationError as exc:
         raise AnswerValidationError(raw, model, exc) from exc
