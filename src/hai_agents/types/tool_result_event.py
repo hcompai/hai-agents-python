@@ -12,7 +12,7 @@ class ToolResultEvent(UniversalBaseModel):
     The client is sending back the result of a custom tool call.
     """
 
-    type: typing.Optional[ToolResultEventType] = None
+    type: typing.Optional[ToolResultEventType] = "tool_result"
     tool_call_id: str = pydantic.Field()
     """
     Id of the pending tool call this result answers.

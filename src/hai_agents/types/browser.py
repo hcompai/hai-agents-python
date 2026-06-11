@@ -18,7 +18,7 @@ class Browser(UniversalBaseModel):
     Catalog identifier for this environment.
     """
 
-    kind: typing.Optional[BrowserKind] = None
+    kind: typing.Optional[BrowserKind] = "web"
     headless: typing.Optional[bool] = pydantic.Field(default=None)
     """
     Run without a visible window.
