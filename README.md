@@ -66,6 +66,35 @@ print(result.answer)
 
 An `AsyncClient` mirrors this API for asyncio.
 
+## Structured output
+
+Pass a pydantic model as `answer_schema` and the agent's final answer comes back as a validated instance. The model's JSON schema is sent as the agent's `answer_format`; the raw wire value stays at `result.final_changes.answer`.
+
+```python
+from pydantic import BaseModel
+from hai_agents import Client, run_session
+
+class Job(BaseModel):
+    title: str
+    company: str
+
+class Jobs(BaseModel):
+    jobs: list[Job]
+
+client = Client()
+result = run_session(
+    client,
+    agent="h/web-surfer-holo3-1-35b",
+    messages="Find 3 open ML engineering roles in Paris.",
+    answer_schema=Jobs,
+)
+
+for job in result.answer.jobs:  # result.answer is a Jobs instance
+    print(job.title, "@", job.company)
+```
+
+A completed answer that does not match the schema raises `AnswerValidationError` (the raw payload is on `.raw`). Sessions that end without completing (cancelled, timed out) return their raw answer untouched.
+
 ## Custom tools
 
 Expose your own Python functions to the agent: pass them to `run_session` and the polling loop executes them whenever the agent calls one, posting the result back so the session resumes. Any function with typed parameters and a docstring works; the input schema is derived from the signature.
