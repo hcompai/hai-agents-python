@@ -64,4 +64,4 @@ def verify_webhook(
     try:
         return WebhookEvent.model_validate(json.loads(raw))
     except (json.JSONDecodeError, pydantic.ValidationError) as e:
-        raise WebhookVerificationError(f"unparseable payload: {e}") from None
+        raise WebhookVerificationError(f"unparsable payload: {e}") from None

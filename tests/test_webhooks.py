@@ -61,7 +61,7 @@ def test_stale_timestamp_rejected():
 
 def test_signed_null_data_rejected():
     body, sig, ts = _delivery({**EVENT, "data": None})
-    with pytest.raises(WebhookVerificationError, match="unparseable payload"):
+    with pytest.raises(WebhookVerificationError, match="unparsable payload"):
         verify_webhook(body, sig, ts, SECRET)
 
 
