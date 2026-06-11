@@ -27,6 +27,7 @@ if typing.TYPE_CHECKING:
     from .page_session_summary import PageSessionSummary
     from .page_skill import PageSkill
     from .page_trajectory_event import PageTrajectoryEvent
+    from .page_webhook_record import PageWebhookRecord
     from .quota_status import QuotaStatus
     from .quota_status_scope import QuotaStatusScope
     from .session import Session
@@ -53,6 +54,8 @@ if typing.TYPE_CHECKING:
     from .vault_config_list import VaultConfigList
     from .vault_config_read import VaultConfigRead
     from .vault_health import VaultHealth
+    from .webhook_record import WebhookRecord
+    from .webhook_with_secret import WebhookWithSecret
 _dynamic_imports: typing.Dict[str, str] = {
     "Agent": ".agent",
     "AgentEnvironmentsItem": ".agent_environments_item",
@@ -75,6 +78,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PageSessionSummary": ".page_session_summary",
     "PageSkill": ".page_skill",
     "PageTrajectoryEvent": ".page_trajectory_event",
+    "PageWebhookRecord": ".page_webhook_record",
     "QuotaStatus": ".quota_status",
     "QuotaStatusScope": ".quota_status_scope",
     "Session": ".session",
@@ -101,6 +105,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "VaultConfigList": ".vault_config_list",
     "VaultConfigRead": ".vault_config_read",
     "VaultHealth": ".vault_health",
+    "WebhookRecord": ".webhook_record",
+    "WebhookWithSecret": ".webhook_with_secret",
 }
 
 
@@ -147,6 +153,7 @@ __all__ = [
     "PageSessionSummary",
     "PageSkill",
     "PageTrajectoryEvent",
+    "PageWebhookRecord",
     "QuotaStatus",
     "QuotaStatusScope",
     "Session",
@@ -173,4 +180,6 @@ __all__ = [
     "VaultConfigList",
     "VaultConfigRead",
     "VaultHealth",
+    "WebhookRecord",
+    "WebhookWithSecret",
 ]

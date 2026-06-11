@@ -2247,6 +2247,291 @@
         }
       }
     },
+    "/api/v2/webhooks": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Create Webhook",
+        "description": "Register a webhook. The signing secret is only returned here; store it securely.",
+        "operationId": "create_webhook_api_v2_webhooks_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWebhook"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookWithSecret"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List Webhooks",
+        "description": "List the organization's webhooks.",
+        "operationId": "list_webhooks_api_v2_webhooks_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number (1-based)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number (1-based)"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Number of items per page",
+              "default": 10,
+              "title": "Size"
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "created_at",
+                      "-created_at"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort by field",
+              "default": [
+                "-created_at"
+              ],
+              "title": "Sort"
+            },
+            "description": "Sort by field"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_WebhookRecord_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/webhooks/{webhook_id}": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Get Webhook",
+        "description": "Fetch a webhook by id.",
+        "operationId": "get_webhook_api_v2_webhooks__webhook_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "webhook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Webhook Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Update Webhook",
+        "description": "Update a webhook; only provided fields change.",
+        "operationId": "update_webhook_api_v2_webhooks__webhook_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "webhook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Webhook Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebhook"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Delete Webhook",
+        "description": "Delete a webhook.",
+        "operationId": "delete_webhook_api_v2_webhooks__webhook_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "webhook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Webhook Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/vaults": {
       "post": {
         "tags": [
@@ -2819,6 +3104,45 @@
         "title": "Browser",
         "description": "A web browser the agent navigates and acts on."
       },
+      "CreateWebhook": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Url"
+          },
+          "enabled_events": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Enabled Events",
+            "description": "Event types delivered to this webhook. '*' subscribes to all current and future types.",
+            "default": [
+              "*"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "CreateWebhook",
+        "description": "Register a webhook for the caller's organization."
+      },
       "Environment": {
         "$ref": "#/components/schemas/Browser"
       },
@@ -3201,6 +3525,32 @@
           "page"
         ],
         "title": "Page[TrajectoryEvent]"
+      },
+      "Page_WebhookRecord_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WebhookRecord"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "title": "Page[WebhookRecord]"
       },
       "QuotaStatus": {
         "properties": {
@@ -3832,6 +4182,63 @@
         "title": "TrajectoryStatus",
         "description": "State of a session/trajectory.\n\nLifecycle::\n\n    PENDING \u2192 RUNNING \u2192 {COMPLETED, FAILED, TIMED_OUT, INTERRUPTED}\n       |        \u2191  \u2191 \u2191\n       |        |  | \u2514\u2500\u2500\u2500\u2192 IDLE (interactive: agent waiting for next task)\n       |        |  \u2514\u2500\u2500\u2500\u2500\u2500\u2192 AWAITING_TOOL_RESULTS (waiting for custom tool results)\n       |        \u2193\n       \u2514\u2500\u2500\u2500\u2500\u2500\u2192 PAUSED"
       },
+      "UpdateWebhook": {
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "enabled_events": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled Events"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "disabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled"
+          }
+        },
+        "type": "object",
+        "title": "UpdateWebhook",
+        "description": "Partial update; only provided fields change."
+      },
       "UserMessageBatch": {
         "properties": {
           "type": {
@@ -4098,6 +4505,125 @@
         "type": "object",
         "title": "VaultUpdateRequest",
         "description": "Partial update; only provided fields are forwarded. Token rotation is separate."
+      },
+      "WebhookRecord": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "enabled_events": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Enabled Events"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "disabled": {
+            "type": "boolean",
+            "title": "Disabled"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "enabled_events",
+          "description",
+          "disabled",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "WebhookRecord",
+        "description": "Webhook as returned by reads; the signing secret is never included."
+      },
+      "WebhookWithSecret": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "enabled_events": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Enabled Events"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "disabled": {
+            "type": "boolean",
+            "title": "Disabled"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "secret": {
+            "type": "string",
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "enabled_events",
+          "description",
+          "disabled",
+          "created_at",
+          "updated_at",
+          "secret"
+        ],
+        "title": "WebhookWithSecret",
+        "description": "Create response: the only time the signing secret is returned."
       }
     },
     "securitySchemes": {

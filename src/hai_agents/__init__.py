@@ -28,6 +28,7 @@ if typing.TYPE_CHECKING:
         PageSessionSummary,
         PageSkill,
         PageTrajectoryEvent,
+        PageWebhookRecord,
         QuotaStatus,
         QuotaStatusScope,
         Session,
@@ -54,9 +55,11 @@ if typing.TYPE_CHECKING:
         VaultConfigList,
         VaultConfigRead,
         VaultHealth,
+        WebhookRecord,
+        WebhookWithSecret,
     )
     from .errors import UnprocessableEntityError
-    from . import agents, environments, sessions, skills, vaults
+    from . import agents, environments, sessions, skills, vaults, webhooks
     from ._default_clients import DefaultAioHttpClient, DefaultAsyncHttpxClient
     from .agents import ListAgentsRequestSortItem
     from .client import AsyncClient, Client
@@ -91,6 +94,8 @@ if typing.TYPE_CHECKING:
     )
     from .skills import ListSkillsRequestSortItem
     from .tools import Tool, as_tools, tool
+    from .webhook_verification import WebhookEvent, WebhookVerificationError, verify_webhook
+    from .webhooks import ListWebhooksRequestSortItem
 _dynamic_imports: typing.Dict[str, str] = {
     "Agent": ".types",
     "AgentEnvironmentsItem": ".types",
@@ -117,6 +122,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ListSessionsRequestOwner": ".sessions",
     "ListSessionsRequestSortItem": ".sessions",
     "ListSkillsRequestSortItem": ".skills",
+    "ListWebhooksRequestSortItem": ".webhooks",
     "MAX_REQUEST_BYTES": ".polling",
     "Metrics": ".types",
     "ModelCost": ".types",
@@ -127,6 +133,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PageSessionSummary": ".types",
     "PageSkill": ".types",
     "PageTrajectoryEvent": ".types",
+    "PageWebhookRecord": ".types",
     "QuotaStatus": ".types",
     "QuotaStatusScope": ".types",
     "SETTLED_SESSION_STATUSES": ".polling",
@@ -165,6 +172,10 @@ _dynamic_imports: typing.Dict[str, str] = {
     "VaultConfigList": ".types",
     "VaultConfigRead": ".types",
     "VaultHealth": ".types",
+    "WebhookEvent": ".webhook_verification",
+    "WebhookRecord": ".types",
+    "WebhookVerificationError": ".webhook_verification",
+    "WebhookWithSecret": ".types",
     "agents": ".agents",
     "as_tools": ".tools",
     "assert_request_under_limit": ".polling",
@@ -178,7 +189,9 @@ _dynamic_imports: typing.Dict[str, str] = {
     "skills": ".skills",
     "tool": ".tools",
     "vaults": ".vaults",
+    "verify_webhook": ".webhook_verification",
     "wait_for_session": ".polling",
+    "webhooks": ".webhooks",
 }
 
 
@@ -229,6 +242,7 @@ __all__ = [
     "ListSessionsRequestOwner",
     "ListSessionsRequestSortItem",
     "ListSkillsRequestSortItem",
+    "ListWebhooksRequestSortItem",
     "MAX_REQUEST_BYTES",
     "Metrics",
     "ModelCost",
@@ -239,6 +253,7 @@ __all__ = [
     "PageSessionSummary",
     "PageSkill",
     "PageTrajectoryEvent",
+    "PageWebhookRecord",
     "QuotaStatus",
     "QuotaStatusScope",
     "SETTLED_SESSION_STATUSES",
@@ -277,6 +292,10 @@ __all__ = [
     "VaultConfigList",
     "VaultConfigRead",
     "VaultHealth",
+    "WebhookEvent",
+    "WebhookRecord",
+    "WebhookVerificationError",
+    "WebhookWithSecret",
     "agents",
     "as_tools",
     "assert_request_under_limit",
@@ -290,5 +309,7 @@ __all__ = [
     "skills",
     "tool",
     "vaults",
+    "verify_webhook",
     "wait_for_session",
+    "webhooks",
 ]
