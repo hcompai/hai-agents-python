@@ -2825,10 +2825,7 @@
       "EnvironmentKind": {
         "type": "string",
         "enum": [
-          "web",
-          "code",
-          "mcp",
-          "memory"
+          "web"
         ],
         "title": "EnvironmentKind",
         "description": "Environment family."
