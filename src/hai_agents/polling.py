@@ -32,6 +32,10 @@ if typing.TYPE_CHECKING:
 
 TERMINAL_SESSION_STATUSES = frozenset({"completed", "failed", "timed_out", "interrupted"})
 
+# Polling also stops on "idle": the agent finished its turn and is waiting for the next
+# user message, which a one-shot wait will never send.
+SETTLED_SESSION_STATUSES = TERMINAL_SESSION_STATUSES | {"idle"}
+
 # Server rejects request bodies above this size; enforced client-side for a clear early error.
 MAX_REQUEST_BYTES = 5 * 1024 * 1024
 
@@ -110,9 +114,15 @@ def _parse_answer(
     status: TrajectoryStatus,
     model: typing.Optional[typing.Type[typing.Any]],
 ) -> typing.Any:
-    """Validate a completed session's answer into ``model``; non-completed answers pass through raw."""
-    if model is None or status != "completed":
+    """Validate a completed or idle session's answer into ``model``; other answers pass through raw.
+
+    An idle session may legitimately have no answer yet, so ``None`` passes through;
+    a completed session without a valid answer raises.
+    """
+    if model is None or status not in ("completed", "idle"):
         return raw
+    if status == "idle" and raw is None:
+        return None
     try:
         if isinstance(raw, str):
             return model.model_validate_json(raw)
@@ -122,8 +132,13 @@ def _parse_answer(
 
 
 def is_terminal_session_status(status: TrajectoryStatus) -> bool:
-    """Return whether a session status should end a polling loop."""
+    """Return whether a session status is terminal."""
     return status in TERMINAL_SESSION_STATUSES
+
+
+def is_settled_session_status(status: TrajectoryStatus) -> bool:
+    """Return whether a session status should end a polling loop."""
+    return status in SETTLED_SESSION_STATUSES
 
 
 def _request_bytes(payload: typing.Any) -> int:
@@ -326,9 +341,9 @@ def wait_for_session(
     answer_schema: typing.Optional[typing.Type[AnswerT]] = None,
     tools: typing.Optional[typing.Sequence[ToolInput]] = None,
 ) -> SessionRunResult[AnswerT]:
-    """Poll a session until it reaches a terminal status, running custom tools along the way.
+    """Poll a session until it settles (terminal, or idle awaiting the next message), running custom tools along the way.
 
-    Terminal state is read from ``/status`` (authoritative); ``/changes`` only feeds
+    Status is read from ``/status`` (authoritative); ``/changes`` only feeds
     events and the final answer, since it 204s whenever no new events exist past
     ``from_index`` -- even after the session has finished.
     """
@@ -346,7 +361,7 @@ def wait_for_session(
     while max_polls is None or polls < max_polls:
         polls += 1
         if deadline is not None and time.monotonic() >= deadline:
-            raise TimeoutError(f"Session {id} did not reach a terminal status within {timeout_seconds}s")
+            raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
 
         batch: typing.List[TrajectoryEvent] = []
         if include_events:
@@ -364,7 +379,7 @@ def wait_for_session(
                 next_from_index += len(batch)
 
         status = client.sessions.get_session_status(id)
-        if is_terminal_session_status(status.status):
+        if is_settled_session_status(status.status):
             changes = _final_changes(client, id, last_changes, limit)
             raw = changes.answer if changes is not None else None
             return SessionRunResult(
@@ -393,7 +408,7 @@ def wait_for_session(
         elif poll_backoff_seconds > 0:
             time.sleep(poll_backoff_seconds)
 
-    raise TimeoutError(f"Session {id} did not reach a terminal status before max_polls={max_polls}")
+    raise TimeoutError(f"Session {id} did not settle before max_polls={max_polls}")
 
 
 def run_session(
@@ -408,7 +423,7 @@ def run_session(
     tools: typing.Optional[typing.Sequence[ToolInput]] = None,
     **create_params: typing_extensions.Unpack[CreateSessionParams],
 ) -> SessionRunResult[AnswerT]:
-    """Create a session, then poll until it completes or fails, running custom tools along the way.
+    """Create a session, then poll until it settles, running custom tools along the way.
 
     ``answer_schema`` binds a pydantic model as the agent's ``answer_format`` and
     validates the final answer back into it: ``result.answer`` is a model instance.
@@ -475,7 +490,7 @@ async def async_wait_for_session(
     while max_polls is None or polls < max_polls:
         polls += 1
         if deadline is not None and time.monotonic() >= deadline:
-            raise TimeoutError(f"Session {id} did not reach a terminal status within {timeout_seconds}s")
+            raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
 
         batch: typing.List[TrajectoryEvent] = []
         if include_events:
@@ -493,7 +508,7 @@ async def async_wait_for_session(
                 next_from_index += len(batch)
 
         status = await client.sessions.get_session_status(id)
-        if is_terminal_session_status(status.status):
+        if is_settled_session_status(status.status):
             changes = await _async_final_changes(client, id, last_changes, limit)
             raw = changes.answer if changes is not None else None
             return SessionRunResult(
@@ -522,7 +537,7 @@ async def async_wait_for_session(
         elif poll_backoff_seconds > 0:
             await asyncio.sleep(poll_backoff_seconds)
 
-    raise TimeoutError(f"Session {id} did not reach a terminal status before max_polls={max_polls}")
+    raise TimeoutError(f"Session {id} did not settle before max_polls={max_polls}")
 
 
 async def async_run_session(
@@ -599,7 +614,7 @@ class SessionHandle(typing.Generic[AnswerT]):
         self._client.sessions.force_session_answer(self.id)
 
     def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
-        """Block until the session reaches a terminal status; returns the result and final answer."""
+        """Block until the session settles (terminal or idle); returns the result and final answer."""
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
         return wait_for_session(self._client, self.id, **kwargs)
@@ -645,7 +660,7 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
         await self._client.sessions.force_session_answer(self.id)
 
     async def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
-        """Block until the session reaches a terminal status; returns the result and final answer."""
+        """Block until the session settles (terminal or idle); returns the result and final answer."""
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
         return await async_wait_for_session(self._client, self.id, **kwargs)
