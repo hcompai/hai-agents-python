@@ -86,11 +86,11 @@ def _attach_answer_schema(params: typing.Dict[str, typing.Any], model: typing.Ty
     if not (isinstance(model, type) and issubclass(model, pydantic.BaseModel)):
         raise TypeError(f"answer_schema must be a pydantic.BaseModel subclass, got {model!r}.")
     schema = model.model_json_schema()
+    if (params.get("overrides") or {}).get("agent.answer_format") is not None:
+        raise ValueError("answer_schema conflicts with overrides['agent.answer_format']; pass only one.")
     agent = params.get("agent")
     if isinstance(agent, str):
         overrides = dict(params.get("overrides") or {})
-        if overrides.get("agent.answer_format") is not None:
-            raise ValueError("answer_schema conflicts with overrides['agent.answer_format']; pass only one.")
         overrides["agent.answer_format"] = schema
         params["overrides"] = overrides
     elif isinstance(agent, dict):
