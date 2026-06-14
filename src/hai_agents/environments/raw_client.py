@@ -10,6 +10,7 @@ from ..core.jsonable_encoder import encode_path_param
 from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
+from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.browser_kind import BrowserKind
 from ..types.browser_mode import BrowserMode
@@ -17,7 +18,9 @@ from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
 from ..types.http_validation_error import HttpValidationError
+from ..types.mcp_server import McpServer
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
+from .types.patch_environment_mode import PatchEnvironmentMode
 from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
@@ -420,6 +423,124 @@ class RawEnvironmentsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
+    def patch_environment(
+        self,
+        id: str,
+        *,
+        headless: typing.Optional[bool] = OMIT,
+        width: typing.Optional[int] = OMIT,
+        height: typing.Optional[int] = OMIT,
+        start_url: typing.Optional[str] = OMIT,
+        session_id: typing.Optional[str] = OMIT,
+        mode: typing.Optional[PatchEnvironmentMode] = OMIT,
+        page_chars: typing.Optional[int] = OMIT,
+        vault_id: typing.Optional[str] = OMIT,
+        pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
+        env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
+        servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
+        namespace: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[Environment]:
+        """
+        Partially update an environment spec; only provided fields change.
+
+        Parameters
+        ----------
+        id : str
+
+        headless : typing.Optional[bool]
+
+        width : typing.Optional[int]
+
+        height : typing.Optional[int]
+
+        start_url : typing.Optional[str]
+
+        session_id : typing.Optional[str]
+
+        mode : typing.Optional[PatchEnvironmentMode]
+
+        page_chars : typing.Optional[int]
+
+        vault_id : typing.Optional[str]
+
+        pip_packages : typing.Optional[typing.Sequence[str]]
+
+        env : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+
+        mcp_servers : typing.Optional[typing.Sequence[McpServer]]
+
+        servers : typing.Optional[typing.Sequence[McpServer]]
+
+        namespace : typing.Optional[str]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[Environment]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/environments/{encode_path_param(id)}",
+            method="PATCH",
+            json={
+                "headless": headless,
+                "width": width,
+                "height": height,
+                "start_url": start_url,
+                "session_id": session_id,
+                "mode": mode,
+                "page_chars": page_chars,
+                "vault_id": vault_id,
+                "pip_packages": pip_packages,
+                "env": env,
+                "mcp_servers": convert_and_respect_annotation_metadata(
+                    object_=mcp_servers, annotation=typing.Optional[typing.Sequence[McpServer]], direction="write"
+                ),
+                "servers": convert_and_respect_annotation_metadata(
+                    object_=servers, annotation=typing.Optional[typing.Sequence[McpServer]], direction="write"
+                ),
+                "namespace": namespace,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    Environment,
+                    parse_obj_as(
+                        type_=Environment,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
 
 class AsyncRawEnvironmentsClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
@@ -797,6 +918,124 @@ class AsyncRawEnvironmentsClient:
         try:
             if 200 <= _response.status_code < 300:
                 return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def patch_environment(
+        self,
+        id: str,
+        *,
+        headless: typing.Optional[bool] = OMIT,
+        width: typing.Optional[int] = OMIT,
+        height: typing.Optional[int] = OMIT,
+        start_url: typing.Optional[str] = OMIT,
+        session_id: typing.Optional[str] = OMIT,
+        mode: typing.Optional[PatchEnvironmentMode] = OMIT,
+        page_chars: typing.Optional[int] = OMIT,
+        vault_id: typing.Optional[str] = OMIT,
+        pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
+        env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
+        servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
+        namespace: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[Environment]:
+        """
+        Partially update an environment spec; only provided fields change.
+
+        Parameters
+        ----------
+        id : str
+
+        headless : typing.Optional[bool]
+
+        width : typing.Optional[int]
+
+        height : typing.Optional[int]
+
+        start_url : typing.Optional[str]
+
+        session_id : typing.Optional[str]
+
+        mode : typing.Optional[PatchEnvironmentMode]
+
+        page_chars : typing.Optional[int]
+
+        vault_id : typing.Optional[str]
+
+        pip_packages : typing.Optional[typing.Sequence[str]]
+
+        env : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+
+        mcp_servers : typing.Optional[typing.Sequence[McpServer]]
+
+        servers : typing.Optional[typing.Sequence[McpServer]]
+
+        namespace : typing.Optional[str]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[Environment]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/environments/{encode_path_param(id)}",
+            method="PATCH",
+            json={
+                "headless": headless,
+                "width": width,
+                "height": height,
+                "start_url": start_url,
+                "session_id": session_id,
+                "mode": mode,
+                "page_chars": page_chars,
+                "vault_id": vault_id,
+                "pip_packages": pip_packages,
+                "env": env,
+                "mcp_servers": convert_and_respect_annotation_metadata(
+                    object_=mcp_servers, annotation=typing.Optional[typing.Sequence[McpServer]], direction="write"
+                ),
+                "servers": convert_and_respect_annotation_metadata(
+                    object_=servers, annotation=typing.Optional[typing.Sequence[McpServer]], direction="write"
+                ),
+                "namespace": namespace,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    Environment,
+                    parse_obj_as(
+                        type_=Environment,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
