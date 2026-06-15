@@ -196,11 +196,21 @@ def _json_safe(value: typing.Any) -> typing.Any:
         return str(value)
 
 
+def _tool_result_payload(
+    call: typing.Dict[str, typing.Any], result: typing.Any, is_error: bool
+) -> typing.Dict[str, typing.Any]:
+    """Shape one settled call as a SendToolResults event: ``error_event`` on failure, else ``tool_result``."""
+    tool_req = {"tool_name": call.get("tool_name", ""), "args": call.get("args") or {}, "id": call.get("id")}
+    if is_error:
+        return {"kind": "error_event", "error": str(result), "origin": "custom_tools", "tool_req": tool_req}
+    return {"kind": "tool_result", "tool_req": tool_req, "result": _json_safe(result)}
+
+
 def _execute_tool_call(
     tools_by_name: typing.Mapping[str, Tool], call: typing.Dict[str, typing.Any]
 ) -> typing.Dict[str, typing.Any]:
     """Run one pending call locally and shape the ``tool_result`` payload."""
-    name = call.get("name", "")
+    name = call.get("tool_name", "")
     local_tool = tools_by_name.get(name)
     result: typing.Any
     is_error = True
@@ -208,14 +218,14 @@ def _execute_tool_call(
         result = f"Tool {name!r} is not registered with this client."
     else:
         try:
-            result = local_tool.fn(**(call.get("arguments") or {}))
+            result = local_tool.fn(**(call.get("args") or {}))
             if inspect.isawaitable(result):
                 result = _run_awaitable(result)
         except Exception as exc:
             result = f"{type(exc).__name__}: {exc}"
         else:
             is_error = False
-    return {"type": "tool_result", "tool_call_id": call["id"], "result": _json_safe(result), "is_error": is_error}
+    return _tool_result_payload(call, result, is_error)
 
 
 async def _await_result(value: typing.Awaitable[typing.Any]) -> typing.Any:
@@ -236,7 +246,7 @@ async def _async_execute_tool_call(
     tools_by_name: typing.Mapping[str, Tool], call: typing.Dict[str, typing.Any]
 ) -> typing.Dict[str, typing.Any]:
     """Async version of ``_execute_tool_call``; awaits coroutine tools."""
-    name = call.get("name", "")
+    name = call.get("tool_name", "")
     local_tool = tools_by_name.get(name)
     result: typing.Any
     is_error = True
@@ -244,14 +254,14 @@ async def _async_execute_tool_call(
         result = f"Tool {name!r} is not registered with this client."
     else:
         try:
-            result = local_tool.fn(**(call.get("arguments") or {}))
+            result = local_tool.fn(**(call.get("args") or {}))
             if inspect.isawaitable(result):
                 result = await result
         except Exception as exc:
             result = f"{type(exc).__name__}: {exc}"
         else:
             is_error = False
-    return {"type": "tool_result", "tool_call_id": call["id"], "result": _json_safe(result), "is_error": is_error}
+    return _tool_result_payload(call, result, is_error)
 
 
 def _tool_results_body(results: typing.List[typing.Dict[str, typing.Any]]) -> typing.Dict[str, typing.Any]:
