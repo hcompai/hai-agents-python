@@ -95,7 +95,6 @@ def test_install_requires_api_key(monkeypatch, tmp_path) -> None:
     from hai_agents_common import credentials
 
     monkeypatch.delenv("HAI_API_KEY", raising=False)
-    monkeypatch.delenv("H_API_KEY", raising=False)
     monkeypatch.setattr(credentials, "LOCAL_ENV_PATH", tmp_path / "local.env")
     monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", tmp_path / "global.env")
 

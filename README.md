@@ -42,7 +42,7 @@ pip install "hai-agents[cli]"
 Requires Python 3.10 or newer. Grab an API key at [portal.hcompany.ai](https://portal.hcompany.ai) and export it:
 
 ```bash
-export H_API_KEY=hk-...
+export HAI_API_KEY=hk-...
 ```
 
 ## Quickstart
@@ -52,7 +52,7 @@ Launch the built-in `h/web-surfer-holo3-1-35b` agent, which ships with its own b
 ```python
 from hai_agents import Client, run_session
 
-client = Client()  # reads H_API_KEY from the environment
+client = Client()  # reads HAI_API_KEY from the environment
 
 result = run_session(
     client,

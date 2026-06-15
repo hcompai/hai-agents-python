@@ -15,8 +15,7 @@ from hai_agents import AsyncClient, Client
 ApiKey = str | Callable[[], str]
 
 API_KEY_VAR = "HAI_API_KEY"
-API_KEY_ENV_VARS = (API_KEY_VAR, "H_API_KEY")
-BASE_URL_ENV_VARS = ("HAI_API_BASE_URL", "HAI_BASE_URL", "H_API_BASE_URL")
+BASE_URL_VAR = "HAI_API_BASE_URL"
 
 PORTAL_BASE = "https://portal.production.hcompany.ai"
 
@@ -31,21 +30,20 @@ def portal_base() -> str:
 
 def current_api_key(explicit: ApiKey | None = None) -> ApiKey | None:
     """Resolved API key, or None if none is configured."""
-    return explicit or _lookup(API_KEY_ENV_VARS)
+    return explicit or _lookup(API_KEY_VAR)
 
 
 def resolve_api_key(explicit: ApiKey | None = None) -> ApiKey:
     """Resolved API key, or raise with guidance if none is configured."""
     key = current_api_key(explicit)
     if not key:
-        env_names = " or ".join(API_KEY_ENV_VARS)
-        raise RuntimeError(f"No API key found. Run `hai login`, set {env_names}, or pass --api-key.")
+        raise RuntimeError(f"No API key found. Run `hai login`, set {API_KEY_VAR}, or pass --api-key.")
     return key
 
 
 def resolve_base_url(explicit: str | None = None) -> str | None:
     """Resolved base URL override, or None to use the SDK default."""
-    return explicit or _lookup(BASE_URL_ENV_VARS)
+    return explicit or _lookup(BASE_URL_VAR)
 
 
 def make_client(api_key: ApiKey | None = None, base_url: str | None = None) -> Client:
@@ -90,11 +88,10 @@ def clear_api_key() -> Path | None:
 
 def source() -> str | None:
     """Where the resolved credential comes from (`environment` or a file path), for `hai whoami`."""
-    for name in API_KEY_ENV_VARS:
-        if os.environ.get(name):
-            return "environment"
+    if os.environ.get(API_KEY_VAR):
+        return "environment"
     for path in _env_paths():
-        if path.exists() and any(dotenv_values(path).get(name) for name in API_KEY_ENV_VARS):
+        if path.exists() and dotenv_values(path).get(API_KEY_VAR):
             return str(path)
     return None
 
@@ -112,15 +109,13 @@ def _env_paths() -> tuple[Path, ...]:
     return (LOCAL_ENV_PATH, GLOBAL_ENV_PATH)
 
 
-def _lookup(names: tuple[str, ...]) -> str | None:
-    for name in names:
-        if os.environ.get(name):
-            return os.environ[name]
+def _lookup(name: str) -> str | None:
+    if os.environ.get(name):
+        return os.environ[name]
     for path in _env_paths():
         if not path.exists():
             continue
-        values = dotenv_values(path)
-        for name in names:
-            if values.get(name):
-                return values[name]
+        value = dotenv_values(path).get(name)
+        if value:
+            return value
     return None
