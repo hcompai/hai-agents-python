@@ -62,9 +62,7 @@ class AppState:
 @app.callback()
 def configure(
     ctx: typer.Context,
-    api_key: str | None = typer.Option(
-        None, "--api-key", help="API key. Defaults to HAI_API_KEY."
-    ),
+    api_key: str | None = typer.Option(None, "--api-key", help="API key. Defaults to HAI_API_KEY."),
     base_url: str | None = typer.Option(None, "--base-url", help="Override the Agent Platform base URL."),
     json_output: bool = typer.Option(False, "--json", help="Print machine-readable JSON."),
 ) -> None:
@@ -341,21 +339,28 @@ def watch(
     from_index = 0
     deadline = time.monotonic() + timeout
     while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            _raise_cli_error(TimeoutError(f"Session {session_id} did not settle within {timeout}s."))
         try:
             changes = client.sessions.get_session_changes(
-                session_id, from_index=from_index, include_events=True, wait_for_seconds=20
+                session_id, from_index=from_index, include_events=True, wait_for_seconds=min(20, int(remaining))
             )
             for event in (changes.new_events if changes else None) or []:
-                console.print(_event_line(from_index, event))
+                if state.json_output:
+                    print(json.dumps(to_jsonable(event), sort_keys=True))
+                else:
+                    console.print(_event_line(from_index, event))
                 from_index += 1
             current = client.sessions.get_session_status(session_id)
         except Exception as exc:
             _raise_cli_error(exc)
         if is_settled_session_status(current.status):
-            console.print(f"[bold]Status:[/bold] {_status_text(current.status)}")
+            if state.json_output:
+                print(json.dumps(to_jsonable(current), sort_keys=True))
+            else:
+                console.print(f"[bold]Status:[/bold] {_status_text(current.status)}")
             return
-        if time.monotonic() >= deadline:
-            _raise_cli_error(TimeoutError(f"Session {session_id} did not settle within {timeout}s."))
 
 
 @agents_app.command("list")
