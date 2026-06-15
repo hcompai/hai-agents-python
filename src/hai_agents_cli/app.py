@@ -63,7 +63,7 @@ class AppState:
 def configure(
     ctx: typer.Context,
     api_key: str | None = typer.Option(
-        None, "--api-key", help="API key. Defaults to HAI_API_KEY (or legacy H_API_KEY)."
+        None, "--api-key", help="API key. Defaults to HAI_API_KEY."
     ),
     base_url: str | None = typer.Option(None, "--base-url", help="Override the Agent Platform base URL."),
     json_output: bool = typer.Option(False, "--json", help="Print machine-readable JSON."),

@@ -22,7 +22,6 @@ def test_help_renders_h_glyph() -> None:
 
 def test_missing_api_key_is_clear(monkeypatch, tmp_path) -> None:
     monkeypatch.delenv("HAI_API_KEY", raising=False)
-    monkeypatch.delenv("H_API_KEY", raising=False)
     monkeypatch.setattr(credentials, "LOCAL_ENV_PATH", tmp_path / "local.env")
     monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", tmp_path / "global.env")
 
