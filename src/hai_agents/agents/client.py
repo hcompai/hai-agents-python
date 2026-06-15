@@ -12,6 +12,9 @@ from ..types.page_agent import PageAgent
 from ..types.tool_definition import ToolDefinition
 from .raw_client import AsyncRawAgentsClient, RawAgentsClient
 from .types.list_agents_request_sort_item import ListAgentsRequestSortItem
+from .types.patch_agent_environments_item import PatchAgentEnvironmentsItem
+from .types.patch_agent_skills_item import PatchAgentSkillsItem
+from .types.patch_agent_subagents_item import PatchAgentSubagentsItem
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -317,6 +320,76 @@ class AgentsClient:
         )
         """
         _response = self._raw_client.delete_agent(agent_name, request_options=request_options)
+        return _response.data
+
+    def patch_agent(
+        self,
+        agent_name: str,
+        *,
+        description: typing.Optional[str] = OMIT,
+        environments: typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]] = OMIT,
+        model: typing.Optional[str] = OMIT,
+        instructions: typing.Optional[str] = OMIT,
+        subagents: typing.Optional[typing.Sequence[PatchAgentSubagentsItem]] = OMIT,
+        skills: typing.Optional[typing.Sequence[PatchAgentSkillsItem]] = OMIT,
+        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Agent:
+        """
+        Partially update an agent spec; only provided fields change.
+
+        Parameters
+        ----------
+        agent_name : str
+
+        description : typing.Optional[str]
+
+        environments : typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]]
+
+        model : typing.Optional[str]
+
+        instructions : typing.Optional[str]
+
+        subagents : typing.Optional[typing.Sequence[PatchAgentSubagentsItem]]
+
+        skills : typing.Optional[typing.Sequence[PatchAgentSkillsItem]]
+
+        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+
+        tools : typing.Optional[typing.Sequence[ToolDefinition]]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        Agent
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.agents.patch_agent(
+            agent_name="agent_name",
+        )
+        """
+        _response = self._raw_client.patch_agent(
+            agent_name,
+            description=description,
+            environments=environments,
+            model=model,
+            instructions=instructions,
+            subagents=subagents,
+            skills=skills,
+            answer_format=answer_format,
+            tools=tools,
+            request_options=request_options,
+        )
         return _response.data
 
 
@@ -660,4 +733,82 @@ class AsyncAgentsClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.delete_agent(agent_name, request_options=request_options)
+        return _response.data
+
+    async def patch_agent(
+        self,
+        agent_name: str,
+        *,
+        description: typing.Optional[str] = OMIT,
+        environments: typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]] = OMIT,
+        model: typing.Optional[str] = OMIT,
+        instructions: typing.Optional[str] = OMIT,
+        subagents: typing.Optional[typing.Sequence[PatchAgentSubagentsItem]] = OMIT,
+        skills: typing.Optional[typing.Sequence[PatchAgentSkillsItem]] = OMIT,
+        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Agent:
+        """
+        Partially update an agent spec; only provided fields change.
+
+        Parameters
+        ----------
+        agent_name : str
+
+        description : typing.Optional[str]
+
+        environments : typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]]
+
+        model : typing.Optional[str]
+
+        instructions : typing.Optional[str]
+
+        subagents : typing.Optional[typing.Sequence[PatchAgentSubagentsItem]]
+
+        skills : typing.Optional[typing.Sequence[PatchAgentSkillsItem]]
+
+        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+
+        tools : typing.Optional[typing.Sequence[ToolDefinition]]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        Agent
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.agents.patch_agent(
+                agent_name="agent_name",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.patch_agent(
+            agent_name,
+            description=description,
+            environments=environments,
+            model=model,
+            instructions=instructions,
+            subagents=subagents,
+            skills=skills,
+            answer_format=answer_format,
+            tools=tools,
+            request_options=request_options,
+        )
         return _response.data

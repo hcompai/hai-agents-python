@@ -9,8 +9,10 @@ from ..types.browser_mode import BrowserMode
 from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
+from ..types.mcp_server import McpServer
 from .raw_client import AsyncRawEnvironmentsClient, RawEnvironmentsClient
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
+from .types.patch_environment_mode import PatchEnvironmentMode
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -305,6 +307,96 @@ class EnvironmentsClient:
         )
         """
         _response = self._raw_client.delete_environment(id, request_options=request_options)
+        return _response.data
+
+    def patch_environment(
+        self,
+        id: str,
+        *,
+        headless: typing.Optional[bool] = OMIT,
+        width: typing.Optional[int] = OMIT,
+        height: typing.Optional[int] = OMIT,
+        start_url: typing.Optional[str] = OMIT,
+        session_id: typing.Optional[str] = OMIT,
+        mode: typing.Optional[PatchEnvironmentMode] = OMIT,
+        page_chars: typing.Optional[int] = OMIT,
+        vault_id: typing.Optional[str] = OMIT,
+        pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
+        env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
+        servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
+        namespace: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Environment:
+        """
+        Partially update an environment spec; only provided fields change.
+
+        Parameters
+        ----------
+        id : str
+
+        headless : typing.Optional[bool]
+
+        width : typing.Optional[int]
+
+        height : typing.Optional[int]
+
+        start_url : typing.Optional[str]
+
+        session_id : typing.Optional[str]
+
+        mode : typing.Optional[PatchEnvironmentMode]
+
+        page_chars : typing.Optional[int]
+
+        vault_id : typing.Optional[str]
+
+        pip_packages : typing.Optional[typing.Sequence[str]]
+
+        env : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+
+        mcp_servers : typing.Optional[typing.Sequence[McpServer]]
+
+        servers : typing.Optional[typing.Sequence[McpServer]]
+
+        namespace : typing.Optional[str]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        Environment
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.environments.patch_environment(
+            id="id",
+        )
+        """
+        _response = self._raw_client.patch_environment(
+            id,
+            headless=headless,
+            width=width,
+            height=height,
+            start_url=start_url,
+            session_id=session_id,
+            mode=mode,
+            page_chars=page_chars,
+            vault_id=vault_id,
+            pip_packages=pip_packages,
+            env=env,
+            mcp_servers=mcp_servers,
+            servers=servers,
+            namespace=namespace,
+            request_options=request_options,
+        )
         return _response.data
 
 
@@ -637,4 +729,102 @@ class AsyncEnvironmentsClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.delete_environment(id, request_options=request_options)
+        return _response.data
+
+    async def patch_environment(
+        self,
+        id: str,
+        *,
+        headless: typing.Optional[bool] = OMIT,
+        width: typing.Optional[int] = OMIT,
+        height: typing.Optional[int] = OMIT,
+        start_url: typing.Optional[str] = OMIT,
+        session_id: typing.Optional[str] = OMIT,
+        mode: typing.Optional[PatchEnvironmentMode] = OMIT,
+        page_chars: typing.Optional[int] = OMIT,
+        vault_id: typing.Optional[str] = OMIT,
+        pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
+        env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
+        servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
+        namespace: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Environment:
+        """
+        Partially update an environment spec; only provided fields change.
+
+        Parameters
+        ----------
+        id : str
+
+        headless : typing.Optional[bool]
+
+        width : typing.Optional[int]
+
+        height : typing.Optional[int]
+
+        start_url : typing.Optional[str]
+
+        session_id : typing.Optional[str]
+
+        mode : typing.Optional[PatchEnvironmentMode]
+
+        page_chars : typing.Optional[int]
+
+        vault_id : typing.Optional[str]
+
+        pip_packages : typing.Optional[typing.Sequence[str]]
+
+        env : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+
+        mcp_servers : typing.Optional[typing.Sequence[McpServer]]
+
+        servers : typing.Optional[typing.Sequence[McpServer]]
+
+        namespace : typing.Optional[str]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        Environment
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.environments.patch_environment(
+                id="id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.patch_environment(
+            id,
+            headless=headless,
+            width=width,
+            height=height,
+            start_url=start_url,
+            session_id=session_id,
+            mode=mode,
+            page_chars=page_chars,
+            vault_id=vault_id,
+            pip_packages=pip_packages,
+            env=env,
+            mcp_servers=mcp_servers,
+            servers=servers,
+            namespace=namespace,
+            request_options=request_options,
+        )
         return _response.data
