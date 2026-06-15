@@ -20,6 +20,9 @@ from ..types.http_validation_error import HttpValidationError
 from ..types.page_agent import PageAgent
 from ..types.tool_definition import ToolDefinition
 from .types.list_agents_request_sort_item import ListAgentsRequestSortItem
+from .types.patch_agent_environments_item import PatchAgentEnvironmentsItem
+from .types.patch_agent_skills_item import PatchAgentSkillsItem
+from .types.patch_agent_subagents_item import PatchAgentSubagentsItem
 from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
@@ -449,6 +452,112 @@ class RawAgentsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
+    def patch_agent(
+        self,
+        agent_name: str,
+        *,
+        description: typing.Optional[str] = OMIT,
+        environments: typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]] = OMIT,
+        model: typing.Optional[str] = OMIT,
+        instructions: typing.Optional[str] = OMIT,
+        subagents: typing.Optional[typing.Sequence[PatchAgentSubagentsItem]] = OMIT,
+        skills: typing.Optional[typing.Sequence[PatchAgentSkillsItem]] = OMIT,
+        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[Agent]:
+        """
+        Partially update an agent spec; only provided fields change.
+
+        Parameters
+        ----------
+        agent_name : str
+
+        description : typing.Optional[str]
+
+        environments : typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]]
+
+        model : typing.Optional[str]
+
+        instructions : typing.Optional[str]
+
+        subagents : typing.Optional[typing.Sequence[PatchAgentSubagentsItem]]
+
+        skills : typing.Optional[typing.Sequence[PatchAgentSkillsItem]]
+
+        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+
+        tools : typing.Optional[typing.Sequence[ToolDefinition]]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[Agent]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/agents/{encode_path_param(agent_name)}",
+            method="PATCH",
+            json={
+                "description": description,
+                "environments": convert_and_respect_annotation_metadata(
+                    object_=environments,
+                    annotation=typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]],
+                    direction="write",
+                ),
+                "model": model,
+                "instructions": instructions,
+                "subagents": convert_and_respect_annotation_metadata(
+                    object_=subagents,
+                    annotation=typing.Optional[typing.Sequence[PatchAgentSubagentsItem]],
+                    direction="write",
+                ),
+                "skills": convert_and_respect_annotation_metadata(
+                    object_=skills, annotation=typing.Optional[typing.Sequence[PatchAgentSkillsItem]], direction="write"
+                ),
+                "answer_format": answer_format,
+                "tools": convert_and_respect_annotation_metadata(
+                    object_=tools, annotation=typing.Optional[typing.Sequence[ToolDefinition]], direction="write"
+                ),
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    Agent,
+                    parse_obj_as(
+                        type_=Agent,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
 
 class AsyncRawAgentsClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
@@ -853,6 +962,112 @@ class AsyncRawAgentsClient:
         try:
             if 200 <= _response.status_code < 300:
                 return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def patch_agent(
+        self,
+        agent_name: str,
+        *,
+        description: typing.Optional[str] = OMIT,
+        environments: typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]] = OMIT,
+        model: typing.Optional[str] = OMIT,
+        instructions: typing.Optional[str] = OMIT,
+        subagents: typing.Optional[typing.Sequence[PatchAgentSubagentsItem]] = OMIT,
+        skills: typing.Optional[typing.Sequence[PatchAgentSkillsItem]] = OMIT,
+        answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
+        tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[Agent]:
+        """
+        Partially update an agent spec; only provided fields change.
+
+        Parameters
+        ----------
+        agent_name : str
+
+        description : typing.Optional[str]
+
+        environments : typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]]
+
+        model : typing.Optional[str]
+
+        instructions : typing.Optional[str]
+
+        subagents : typing.Optional[typing.Sequence[PatchAgentSubagentsItem]]
+
+        skills : typing.Optional[typing.Sequence[PatchAgentSkillsItem]]
+
+        answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+
+        tools : typing.Optional[typing.Sequence[ToolDefinition]]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[Agent]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/agents/{encode_path_param(agent_name)}",
+            method="PATCH",
+            json={
+                "description": description,
+                "environments": convert_and_respect_annotation_metadata(
+                    object_=environments,
+                    annotation=typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]],
+                    direction="write",
+                ),
+                "model": model,
+                "instructions": instructions,
+                "subagents": convert_and_respect_annotation_metadata(
+                    object_=subagents,
+                    annotation=typing.Optional[typing.Sequence[PatchAgentSubagentsItem]],
+                    direction="write",
+                ),
+                "skills": convert_and_respect_annotation_metadata(
+                    object_=skills, annotation=typing.Optional[typing.Sequence[PatchAgentSkillsItem]], direction="write"
+                ),
+                "answer_format": answer_format,
+                "tools": convert_and_respect_annotation_metadata(
+                    object_=tools, annotation=typing.Optional[typing.Sequence[ToolDefinition]], direction="write"
+                ),
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    Agent,
+                    parse_obj_as(
+                        type_=Agent,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),

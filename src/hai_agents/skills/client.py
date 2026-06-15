@@ -266,6 +266,60 @@ class SkillsClient:
         _response = self._raw_client.delete_skill(name, request_options=request_options)
         return _response.data
 
+    def patch_skill(
+        self,
+        name: str,
+        *,
+        description: typing.Optional[str] = OMIT,
+        body: typing.Optional[str] = OMIT,
+        source: typing.Optional[str] = OMIT,
+        url_pattern: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Skill:
+        """
+        Partially update a skill; only provided fields change.
+
+        Parameters
+        ----------
+        name : str
+
+        description : typing.Optional[str]
+
+        body : typing.Optional[str]
+
+        source : typing.Optional[str]
+
+        url_pattern : typing.Optional[str]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        Skill
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.skills.patch_skill(
+            name="name",
+        )
+        """
+        _response = self._raw_client.patch_skill(
+            name,
+            description=description,
+            body=body,
+            source=source,
+            url_pattern=url_pattern,
+            request_options=request_options,
+        )
+        return _response.data
+
 
 class AsyncSkillsClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
@@ -558,4 +612,66 @@ class AsyncSkillsClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.delete_skill(name, request_options=request_options)
+        return _response.data
+
+    async def patch_skill(
+        self,
+        name: str,
+        *,
+        description: typing.Optional[str] = OMIT,
+        body: typing.Optional[str] = OMIT,
+        source: typing.Optional[str] = OMIT,
+        url_pattern: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Skill:
+        """
+        Partially update a skill; only provided fields change.
+
+        Parameters
+        ----------
+        name : str
+
+        description : typing.Optional[str]
+
+        body : typing.Optional[str]
+
+        source : typing.Optional[str]
+
+        url_pattern : typing.Optional[str]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        Skill
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.skills.patch_skill(
+                name="name",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.patch_skill(
+            name,
+            description=description,
+            body=body,
+            source=source,
+            url_pattern=url_pattern,
+            request_options=request_options,
+        )
         return _response.data

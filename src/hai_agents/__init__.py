@@ -19,6 +19,8 @@ if typing.TYPE_CHECKING:
         EnvironmentPage,
         Feedback,
         HttpValidationError,
+        McpServer,
+        McpServerTransport,
         Metrics,
         ModelCost,
         ModelUsage,
@@ -58,10 +60,15 @@ if typing.TYPE_CHECKING:
     from .errors import UnprocessableEntityError
     from . import agents, environments, sessions, skills, vaults
     from ._default_clients import DefaultAioHttpClient, DefaultAsyncHttpxClient
-    from .agents import ListAgentsRequestSortItem
+    from .agents import (
+        ListAgentsRequestSortItem,
+        PatchAgentEnvironmentsItem,
+        PatchAgentSkillsItem,
+        PatchAgentSubagentsItem,
+    )
     from .client import AsyncClient, Client
     from .environment import HaiAgentsEnvironment
-    from .environments import ListEnvironmentsRequestSortItem
+    from .environments import ListEnvironmentsRequestSortItem, PatchEnvironmentMode
     from .polling import (
         AnswerValidationError,
         AsyncSessionHandle,
@@ -118,6 +125,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ListSessionsRequestSortItem": ".sessions",
     "ListSkillsRequestSortItem": ".skills",
     "MAX_REQUEST_BYTES": ".polling",
+    "McpServer": ".types",
+    "McpServerTransport": ".types",
     "Metrics": ".types",
     "ModelCost": ".types",
     "ModelUsage": ".types",
@@ -127,6 +136,10 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PageSessionSummary": ".types",
     "PageSkill": ".types",
     "PageTrajectoryEvent": ".types",
+    "PatchAgentEnvironmentsItem": ".agents",
+    "PatchAgentSkillsItem": ".agents",
+    "PatchAgentSubagentsItem": ".agents",
+    "PatchEnvironmentMode": ".environments",
     "QuotaStatus": ".types",
     "QuotaStatusScope": ".types",
     "SETTLED_SESSION_STATUSES": ".polling",
@@ -230,6 +243,8 @@ __all__ = [
     "ListSessionsRequestSortItem",
     "ListSkillsRequestSortItem",
     "MAX_REQUEST_BYTES",
+    "McpServer",
+    "McpServerTransport",
     "Metrics",
     "ModelCost",
     "ModelUsage",
@@ -239,6 +254,10 @@ __all__ = [
     "PageSessionSummary",
     "PageSkill",
     "PageTrajectoryEvent",
+    "PatchAgentEnvironmentsItem",
+    "PatchAgentSkillsItem",
+    "PatchAgentSubagentsItem",
+    "PatchEnvironmentMode",
     "QuotaStatus",
     "QuotaStatusScope",
     "SETTLED_SESSION_STATUSES",

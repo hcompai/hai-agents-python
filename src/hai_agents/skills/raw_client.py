@@ -370,6 +370,84 @@ class RawSkillsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
+    def patch_skill(
+        self,
+        name: str,
+        *,
+        description: typing.Optional[str] = OMIT,
+        body: typing.Optional[str] = OMIT,
+        source: typing.Optional[str] = OMIT,
+        url_pattern: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[Skill]:
+        """
+        Partially update a skill; only provided fields change.
+
+        Parameters
+        ----------
+        name : str
+
+        description : typing.Optional[str]
+
+        body : typing.Optional[str]
+
+        source : typing.Optional[str]
+
+        url_pattern : typing.Optional[str]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[Skill]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/skills/{encode_path_param(name)}",
+            method="PATCH",
+            json={
+                "description": description,
+                "body": body,
+                "source": source,
+                "url_pattern": url_pattern,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    Skill,
+                    parse_obj_as(
+                        type_=Skill,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
 
 class AsyncRawSkillsClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
@@ -704,6 +782,84 @@ class AsyncRawSkillsClient:
         try:
             if 200 <= _response.status_code < 300:
                 return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def patch_skill(
+        self,
+        name: str,
+        *,
+        description: typing.Optional[str] = OMIT,
+        body: typing.Optional[str] = OMIT,
+        source: typing.Optional[str] = OMIT,
+        url_pattern: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[Skill]:
+        """
+        Partially update a skill; only provided fields change.
+
+        Parameters
+        ----------
+        name : str
+
+        description : typing.Optional[str]
+
+        body : typing.Optional[str]
+
+        source : typing.Optional[str]
+
+        url_pattern : typing.Optional[str]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[Skill]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/skills/{encode_path_param(name)}",
+            method="PATCH",
+            json={
+                "description": description,
+                "body": body,
+                "source": source,
+                "url_pattern": url_pattern,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    Skill,
+                    parse_obj_as(
+                        type_=Skill,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
