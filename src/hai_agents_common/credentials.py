@@ -14,6 +14,7 @@ from hai_agents import AsyncClient, Client
 
 ApiKey = str | Callable[[], str]
 
+# HAI_API_KEY is canonical; H_API_KEY stays accepted as a fallback for older setups.
 API_KEY_VAR = "HAI_API_KEY"
 API_KEY_ENV_VARS = (API_KEY_VAR, "H_API_KEY")
 BASE_URL_ENV_VARS = ("HAI_API_BASE_URL", "HAI_BASE_URL", "H_API_BASE_URL")
@@ -79,12 +80,14 @@ def save_api_key(key: str) -> Path:
 
 
 def clear_api_key() -> Path | None:
-    """Remove the API key from the global `.env` and the process env. Idempotent."""
-    os.environ.pop(API_KEY_VAR, None)
+    """Remove the API key (and legacy aliases) from the global `.env` and the process env. Idempotent."""
+    for name in API_KEY_ENV_VARS:
+        os.environ.pop(name, None)
     if not GLOBAL_ENV_PATH.exists():
         return None
-    with contextlib.suppress(KeyError):
-        unset_key(str(GLOBAL_ENV_PATH), API_KEY_VAR)
+    for name in API_KEY_ENV_VARS:
+        with contextlib.suppress(KeyError):
+            unset_key(str(GLOBAL_ENV_PATH), name)
     return GLOBAL_ENV_PATH
 
 

@@ -35,7 +35,14 @@ def test_local_dotenv_overrides_global():
     assert credentials.source() == str(credentials.LOCAL_ENV_PATH)
 
 
-def test_h_api_key_is_a_fallback(monkeypatch):
+def test_canonical_key_beats_legacy_alias(monkeypatch):
+    monkeypatch.setenv("H_API_KEY", "hk-legacy")
+    monkeypatch.setenv("HAI_API_KEY", "hk-canonical")
+
+    assert credentials.resolve_api_key() == "hk-canonical"
+
+
+def test_legacy_h_api_key_still_accepted(monkeypatch):
     monkeypatch.setenv("H_API_KEY", "hk-legacy")
 
     assert credentials.resolve_api_key() == "hk-legacy"
@@ -52,7 +59,7 @@ def test_save_then_clear_roundtrip(monkeypatch):
     assert path == credentials.GLOBAL_ENV_PATH
     assert "hk-minted" in credentials.GLOBAL_ENV_PATH.read_text()
 
-    monkeypatch.delenv("HAI_API_KEY", raising=False)  # forget the process-env write
+    monkeypatch.delenv(credentials.API_KEY_VAR, raising=False)  # forget the process-env write
     assert credentials.resolve_api_key() == "hk-minted"
 
     credentials.clear_api_key()
