@@ -7,7 +7,15 @@ from importlib import import_module
 
 if typing.TYPE_CHECKING:
     from .list_agents_request_sort_item import ListAgentsRequestSortItem
-_dynamic_imports: typing.Dict[str, str] = {"ListAgentsRequestSortItem": ".list_agents_request_sort_item"}
+    from .patch_agent_environments_item import PatchAgentEnvironmentsItem
+    from .patch_agent_skills_item import PatchAgentSkillsItem
+    from .patch_agent_subagents_item import PatchAgentSubagentsItem
+_dynamic_imports: typing.Dict[str, str] = {
+    "ListAgentsRequestSortItem": ".list_agents_request_sort_item",
+    "PatchAgentEnvironmentsItem": ".patch_agent_environments_item",
+    "PatchAgentSkillsItem": ".patch_agent_skills_item",
+    "PatchAgentSubagentsItem": ".patch_agent_subagents_item",
+}
 
 
 def __getattr__(attr_name: str) -> typing.Any:
@@ -31,4 +39,4 @@ def __dir__():
     return sorted(lazy_attrs)
 
 
-__all__ = ["ListAgentsRequestSortItem"]
+__all__ = ["ListAgentsRequestSortItem", "PatchAgentEnvironmentsItem", "PatchAgentSkillsItem", "PatchAgentSubagentsItem"]

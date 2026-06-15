@@ -18,6 +18,8 @@ if typing.TYPE_CHECKING:
     from .environment_page import EnvironmentPage
     from .feedback import Feedback
     from .http_validation_error import HttpValidationError
+    from .mcp_server import McpServer
+    from .mcp_server_transport import McpServerTransport
     from .metrics import Metrics
     from .model_cost import ModelCost
     from .model_usage import ModelUsage
@@ -66,6 +68,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "EnvironmentPage": ".environment_page",
     "Feedback": ".feedback",
     "HttpValidationError": ".http_validation_error",
+    "McpServer": ".mcp_server",
+    "McpServerTransport": ".mcp_server_transport",
     "Metrics": ".metrics",
     "ModelCost": ".model_cost",
     "ModelUsage": ".model_usage",
@@ -138,6 +142,8 @@ __all__ = [
     "EnvironmentPage",
     "Feedback",
     "HttpValidationError",
+    "McpServer",
+    "McpServerTransport",
     "Metrics",
     "ModelCost",
     "ModelUsage",

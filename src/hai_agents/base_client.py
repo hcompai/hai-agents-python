@@ -70,7 +70,7 @@ class BaseClient:
         *,
         base_url: typing.Optional[str] = None,
         environment: HaiAgentsEnvironment = HaiAgentsEnvironment.EU,
-        api_key: typing.Optional[typing.Union[str, typing.Callable[[], str]]] = os.getenv("H_API_KEY"),
+        api_key: typing.Optional[typing.Union[str, typing.Callable[[], str]]] = os.getenv("HAI_API_KEY"),
         headers: typing.Optional[typing.Dict[str, str]] = None,
         timeout: typing.Optional[float] = None,
         max_retries: typing.Optional[int] = None,
@@ -83,7 +83,7 @@ class BaseClient:
         )
         _defaulted_max_retries = max_retries if max_retries is not None else 2
         if api_key is None:
-            raise ApiError(body="The client must be instantiated be either passing in api_key or setting H_API_KEY")
+            raise ApiError(body="The client must be instantiated be either passing in api_key or setting HAI_API_KEY")
         self._client_wrapper = SyncClientWrapper(
             base_url=_get_base_url(base_url=base_url, environment=environment),
             api_key=api_key,
@@ -216,7 +216,7 @@ class AsyncBaseClient:
         *,
         base_url: typing.Optional[str] = None,
         environment: HaiAgentsEnvironment = HaiAgentsEnvironment.EU,
-        api_key: typing.Optional[typing.Union[str, typing.Callable[[], str]]] = os.getenv("H_API_KEY"),
+        api_key: typing.Optional[typing.Union[str, typing.Callable[[], str]]] = os.getenv("HAI_API_KEY"),
         headers: typing.Optional[typing.Dict[str, str]] = None,
         async_token: typing.Optional[typing.Callable[[], typing.Awaitable[str]]] = None,
         timeout: typing.Optional[float] = None,
@@ -230,7 +230,7 @@ class AsyncBaseClient:
         )
         _defaulted_max_retries = max_retries if max_retries is not None else 2
         if api_key is None:
-            raise ApiError(body="The client must be instantiated be either passing in api_key or setting H_API_KEY")
+            raise ApiError(body="The client must be instantiated be either passing in api_key or setting HAI_API_KEY")
         self._client_wrapper = AsyncClientWrapper(
             base_url=_get_base_url(base_url=base_url, environment=environment),
             api_key=api_key,
