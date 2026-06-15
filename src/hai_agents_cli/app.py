@@ -358,7 +358,7 @@ def watch(
                 final = client.sessions.get_session_changes(
                     session_id, from_index=0, include_events=False, wait_for_seconds=0
                 )
-                _print_watch_result(state, current.status, final)
+                _print_watch_result(state, current, final)
                 return
         except Exception as exc:
             _raise_cli_error(exc)
@@ -579,12 +579,14 @@ def _print_json(value) -> None:
     print(json.dumps(to_jsonable(value), indent=2, sort_keys=True))
 
 
-def _print_watch_result(state: AppState, status, final) -> None:
+def _print_watch_result(state: AppState, status_result, final) -> None:
     if state.json_output:
-        payload = final if final is not None else {"status": _status_text(status)}
-        print(json.dumps(to_jsonable(payload), sort_keys=True))
+        print(json.dumps(to_jsonable(final if final is not None else status_result), sort_keys=True))
         return
-    console.print(f"[bold]Status:[/bold] {_status_text(status)}")
+    console.print(f"[bold]Status:[/bold] {_status_text(status_result.status)}")
+    error = status_result.error or (final.error if final is not None else None)
+    if error:
+        console.print(f"[bold]Error:[/bold] {error}")
     answer = final.answer if final is not None else None
     if answer is not None:
         console.print(answer)
