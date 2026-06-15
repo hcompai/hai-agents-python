@@ -143,7 +143,7 @@ that teaches the model how to drive the server.
 `~/.config/hai/.env`. `hai whoami` shows the resolved endpoint and whether you are
 authenticated; `hai logout` removes the stored key.
 
-Credentials resolve from flags, then `HAI_API_KEY`/`H_API_KEY` in the environment,
+Credentials resolve from flags, then `HAI_API_KEY` in the environment,
 then a local `.env`, then `~/.config/hai/.env`. Use `--base-url` or `HAI_API_BASE_URL`
 to target a specific Agent Platform host.
 
