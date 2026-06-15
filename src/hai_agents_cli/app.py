@@ -353,14 +353,15 @@ def watch(
                     console.print(_event_line(from_index, event))
                 from_index += 1
             current = client.sessions.get_session_status(session_id)
+            if is_settled_session_status(current.status):
+                # The terminal answer lives on /changes, not /status.
+                final = client.sessions.get_session_changes(
+                    session_id, from_index=0, include_events=False, wait_for_seconds=0
+                )
+                _print_watch_result(state, current.status, final)
+                return
         except Exception as exc:
             _raise_cli_error(exc)
-        if is_settled_session_status(current.status):
-            if state.json_output:
-                print(json.dumps(to_jsonable(current), sort_keys=True))
-            else:
-                console.print(f"[bold]Status:[/bold] {_status_text(current.status)}")
-            return
 
 
 @agents_app.command("list")
@@ -576,6 +577,17 @@ def _print_ack(action: str, json_output: bool) -> None:
 def _print_json(value) -> None:
     # Emit raw JSON to stdout; rich's Console would soft-wrap and corrupt long values.
     print(json.dumps(to_jsonable(value), indent=2, sort_keys=True))
+
+
+def _print_watch_result(state: AppState, status, final) -> None:
+    if state.json_output:
+        payload = final if final is not None else {"status": _status_text(status)}
+        print(json.dumps(to_jsonable(payload), sort_keys=True))
+        return
+    console.print(f"[bold]Status:[/bold] {_status_text(status)}")
+    answer = final.answer if final is not None else None
+    if answer is not None:
+        console.print(answer)
 
 
 def _status_text(status) -> str:
