@@ -6,6 +6,7 @@ import typing
 from importlib import import_module
 
 if typing.TYPE_CHECKING:
+    from .local_desktop import LocalDesktopClient, LocalDesktopClientConfig, session_id_from_environment_id
     from .types import (
         Agent,
         AgentEnvironmentsItem,
@@ -99,6 +100,9 @@ if typing.TYPE_CHECKING:
     from .skills import ListSkillsRequestSortItem
     from .tools import Tool, as_tools, tool
 _dynamic_imports: typing.Dict[str, str] = {
+    "LocalDesktopClient": ".local_desktop",
+    "LocalDesktopClientConfig": ".local_desktop",
+    "session_id_from_environment_id": ".local_desktop",
     "Agent": ".types",
     "AgentEnvironmentsItem": ".types",
     "AgentSkillsItem": ".types",
@@ -217,6 +221,9 @@ def __dir__():
 
 
 __all__ = [
+    "LocalDesktopClient",
+    "LocalDesktopClientConfig",
+    "session_id_from_environment_id",
     "Agent",
     "AgentEnvironmentsItem",
     "AgentSkillsItem",
