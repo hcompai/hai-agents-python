@@ -4,17 +4,22 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .tool_result_batch_results_item import ToolResultBatchResultsItem
-from .tool_result_batch_type import ToolResultBatchType
 
 
-class ToolResultBatch(UniversalBaseModel):
+class FlowEvent(UniversalBaseModel):
     """
-    Batch of custom tool results.
+    Run-loop control transition (pause, resume, stop, ...).
     """
 
-    type: typing.Optional[ToolResultBatchType] = "batch"
-    results: typing.List[ToolResultBatchResultsItem]
+    flow: str = pydantic.Field()
+    """
+    Control signal, e.g. "pause", "resume", "force_answer".
+    """
+
+    origin: str = pydantic.Field()
+    """
+    Who triggered the transition.
+    """
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

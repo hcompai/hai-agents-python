@@ -26,7 +26,16 @@ class BaseClientWrapper:
         self._logging = logging
 
     def get_headers(self) -> typing.Dict[str, str]:
+        import platform
+
         headers: typing.Dict[str, str] = {
+            "User-Agent": "hai_agents/0.1.11",
+            "X-HCompany-Client-Name": "hai_agents",
+            "X-HCompany-Client-Version": "0.1.11",
+            "X-HCompany-Client-Type": "sdk",
+            "X-HCompany-Language": "Python",
+            "X-HCompany-Runtime": f"python/{platform.python_version()}",
+            "X-HCompany-Platform": f"{platform.system().lower()}/{platform.release()}",
             **(self.get_custom_headers() or {}),
         }
         headers["Authorization"] = f"Bearer {self._get_api_key()}"
