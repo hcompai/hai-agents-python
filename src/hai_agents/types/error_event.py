@@ -4,17 +4,26 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .tool_result_batch_results_item import ToolResultBatchResultsItem
-from .tool_result_batch_type import ToolResultBatchType
+from .error_event_kind import ErrorEventKind
+from .tool_request import ToolRequest
 
 
-class ToolResultBatch(UniversalBaseModel):
+class ErrorEvent(UniversalBaseModel):
     """
-    Batch of custom tool results.
+    Recoverable error raised while running the agent loop.
     """
 
-    type: typing.Optional[ToolResultBatchType] = "batch"
-    results: typing.List[ToolResultBatchResultsItem]
+    kind: typing.Optional[ErrorEventKind] = "error_event"
+    error: str
+    origin: str = pydantic.Field()
+    """
+    Component that raised the error.
+    """
+
+    tool_req: typing.Optional[ToolRequest] = pydantic.Field(default=None)
+    """
+    Tool request being executed, if any.
+    """
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
