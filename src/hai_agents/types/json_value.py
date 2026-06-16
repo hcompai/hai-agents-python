@@ -2,4 +2,4 @@
 
 import typing
 
-TrajectoryChangesAnswer = typing.Union[str, typing.Dict[str, typing.Any]]
+JsonValue = typing.Any

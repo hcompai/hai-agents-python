@@ -15,15 +15,15 @@ from ..core.request_options import RequestOptions
 from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.http_validation_error import HttpValidationError
+from ..types.page_session_event import PageSessionEvent
 from ..types.page_session_summary import PageSessionSummary
-from ..types.page_trajectory_event import PageTrajectoryEvent
 from ..types.quota_status import QuotaStatus
 from ..types.session import Session
+from ..types.session_changes import SessionChanges
 from ..types.session_request_agent import SessionRequestAgent
 from ..types.session_request_messages import SessionRequestMessages
 from ..types.session_status import SessionStatus
 from ..types.share_link import ShareLink
-from ..types.trajectory_changes import TrajectoryChanges
 from ..types.trajectory_status import TrajectoryStatus
 from .types.list_session_events_request_sort_item import ListSessionEventsRequestSortItem
 from .types.list_sessions_request_owner import ListSessionsRequestOwner
@@ -717,7 +717,7 @@ class RawSessionsClient:
         include_events: typing.Optional[bool] = None,
         wait_for_seconds: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[typing.Optional[TrajectoryChanges]]:
+    ) -> HttpResponse[typing.Optional[SessionChanges]]:
         """
         Long-poll for new events since ``from_index``; 204 if none arrive within ``wait_for_seconds``.
 
@@ -738,7 +738,7 @@ class RawSessionsClient:
 
         Returns
         -------
-        HttpResponse[typing.Optional[TrajectoryChanges]]
+        HttpResponse[typing.Optional[SessionChanges]]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
@@ -757,9 +757,9 @@ class RawSessionsClient:
                 return HttpResponse(response=_response, data=None)
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    typing.Optional[TrajectoryChanges],
+                    typing.Optional[SessionChanges],
                     parse_obj_as(
-                        type_=typing.Optional[TrajectoryChanges],  # type: ignore
+                        type_=typing.Optional[SessionChanges],  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -793,7 +793,7 @@ class RawSessionsClient:
         sort: typing.Optional[typing.Sequence[ListSessionEventsRequestSortItem]] = None,
         type: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[PageTrajectoryEvent]:
+    ) -> HttpResponse[PageSessionEvent]:
         """
         Paginated event history. Use ``/changes`` for live tailing.
 
@@ -814,7 +814,7 @@ class RawSessionsClient:
 
         Returns
         -------
-        HttpResponse[PageTrajectoryEvent]
+        HttpResponse[PageSessionEvent]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
@@ -831,9 +831,9 @@ class RawSessionsClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    PageTrajectoryEvent,
+                    PageSessionEvent,
                     parse_obj_as(
-                        type_=PageTrajectoryEvent,  # type: ignore
+                        type_=PageSessionEvent,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -1822,7 +1822,7 @@ class AsyncRawSessionsClient:
         include_events: typing.Optional[bool] = None,
         wait_for_seconds: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[typing.Optional[TrajectoryChanges]]:
+    ) -> AsyncHttpResponse[typing.Optional[SessionChanges]]:
         """
         Long-poll for new events since ``from_index``; 204 if none arrive within ``wait_for_seconds``.
 
@@ -1843,7 +1843,7 @@ class AsyncRawSessionsClient:
 
         Returns
         -------
-        AsyncHttpResponse[typing.Optional[TrajectoryChanges]]
+        AsyncHttpResponse[typing.Optional[SessionChanges]]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
@@ -1862,9 +1862,9 @@ class AsyncRawSessionsClient:
                 return AsyncHttpResponse(response=_response, data=None)
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    typing.Optional[TrajectoryChanges],
+                    typing.Optional[SessionChanges],
                     parse_obj_as(
-                        type_=typing.Optional[TrajectoryChanges],  # type: ignore
+                        type_=typing.Optional[SessionChanges],  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -1898,7 +1898,7 @@ class AsyncRawSessionsClient:
         sort: typing.Optional[typing.Sequence[ListSessionEventsRequestSortItem]] = None,
         type: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[PageTrajectoryEvent]:
+    ) -> AsyncHttpResponse[PageSessionEvent]:
         """
         Paginated event history. Use ``/changes`` for live tailing.
 
@@ -1919,7 +1919,7 @@ class AsyncRawSessionsClient:
 
         Returns
         -------
-        AsyncHttpResponse[PageTrajectoryEvent]
+        AsyncHttpResponse[PageSessionEvent]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
@@ -1936,9 +1936,9 @@ class AsyncRawSessionsClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    PageTrajectoryEvent,
+                    PageSessionEvent,
                     parse_obj_as(
-                        type_=PageTrajectoryEvent,  # type: ignore
+                        type_=PageSessionEvent,  # type: ignore
                         object_=_response.json(),
                     ),
                 )

@@ -4,21 +4,20 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .json_value import JsonValue
 from .tool_request import ToolRequest
-from .tool_result_event_kind import ToolResultEventKind
 
 
-class ToolResultEvent(UniversalBaseModel):
+class PolicyEvent(UniversalBaseModel):
     """
-    Result of executing one tool request.
+    One policy (LLM) step: the model output plus the tool requests extracted from it.
     """
 
-    kind: typing.Optional[ToolResultEventKind] = "tool_result"
-    tool_req: ToolRequest
-    result: typing.Optional[JsonValue] = pydantic.Field(default=None)
+    reasoning_content: typing.Optional[str] = None
+    content: typing.Optional[str] = None
+    tool_reqs: typing.Optional[typing.List[ToolRequest]] = None
+    validation_errors: typing.Optional[typing.List[str]] = pydantic.Field(default=None)
     """
-    Tool output as opaque JSON; any embedded image is inlined as base64, not a URL.
+    Validation errors raised while parsing the model output.
     """
 
     if IS_PYDANTIC_V2:

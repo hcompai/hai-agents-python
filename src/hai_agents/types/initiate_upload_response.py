@@ -4,17 +4,17 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .tool_result_batch_results_item import ToolResultBatchResultsItem
-from .tool_result_batch_type import ToolResultBatchType
 
 
-class ToolResultBatch(UniversalBaseModel):
+class InitiateUploadResponse(UniversalBaseModel):
     """
-    Batch of custom tool results.
+    Response model for initiating a browser profile upload.
     """
 
-    type: typing.Optional[ToolResultBatchType] = "batch"
-    results: typing.List[ToolResultBatchResultsItem]
+    profile_id: str
+    upload_url: str
+    upload_fields: typing.Dict[str, str]
+    upload_expires_in: int
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
