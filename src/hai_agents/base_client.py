@@ -17,6 +17,7 @@ if typing.TYPE_CHECKING:
     from .sessions.client import AsyncSessionsClient, SessionsClient
     from .skills.client import AsyncSkillsClient, SkillsClient
     from .vaults.client import AsyncVaultsClient, VaultsClient
+    from .webhooks.client import AsyncWebhooksClient, WebhooksClient
 
 
 class BaseClient:
@@ -101,6 +102,7 @@ class BaseClient:
         self._skills: typing.Optional[SkillsClient] = None
         self._environments: typing.Optional[EnvironmentsClient] = None
         self._agents: typing.Optional[AgentsClient] = None
+        self._webhooks: typing.Optional[WebhooksClient] = None
         self._vaults: typing.Optional[VaultsClient] = None
 
     @property
@@ -134,6 +136,14 @@ class BaseClient:
 
             self._agents = AgentsClient(client_wrapper=self._client_wrapper)
         return self._agents
+
+    @property
+    def webhooks(self):
+        if self._webhooks is None:
+            from .webhooks.client import WebhooksClient  # noqa: E402
+
+            self._webhooks = WebhooksClient(client_wrapper=self._client_wrapper)
+        return self._webhooks
 
     @property
     def vaults(self):
@@ -247,6 +257,7 @@ class AsyncBaseClient:
         self._skills: typing.Optional[AsyncSkillsClient] = None
         self._environments: typing.Optional[AsyncEnvironmentsClient] = None
         self._agents: typing.Optional[AsyncAgentsClient] = None
+        self._webhooks: typing.Optional[AsyncWebhooksClient] = None
         self._vaults: typing.Optional[AsyncVaultsClient] = None
 
     @property
@@ -280,6 +291,14 @@ class AsyncBaseClient:
 
             self._agents = AsyncAgentsClient(client_wrapper=self._client_wrapper)
         return self._agents
+
+    @property
+    def webhooks(self):
+        if self._webhooks is None:
+            from .webhooks.client import AsyncWebhooksClient  # noqa: E402
+
+            self._webhooks = AsyncWebhooksClient(client_wrapper=self._client_wrapper)
+        return self._webhooks
 
     @property
     def vaults(self):
