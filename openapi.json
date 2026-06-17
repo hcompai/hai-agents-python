@@ -620,21 +620,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "oneOf": [
+                "anyOf": [
                   {
                     "$ref": "#/components/schemas/ToolResultEvent"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ErrorEvent"
                   },
                   {
                     "$ref": "#/components/schemas/ToolResultBatch"
                   }
                 ],
-                "discriminator": {
-                  "propertyName": "type",
-                  "mapping": {
-                    "tool_result": "#/components/schemas/ToolResultEvent",
-                    "batch": "#/components/schemas/ToolResultBatch"
-                  }
-                },
                 "title": "Input"
               }
             }
@@ -863,7 +859,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TrajectoryChanges"
+                  "$ref": "#/components/schemas/SessionChanges"
                 }
               }
             }
@@ -977,7 +973,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_TrajectoryEvent_"
+                  "$ref": "#/components/schemas/Page_SessionEvent_"
                 }
               }
             }
@@ -2700,6 +2696,253 @@
         }
       }
     },
+    "/api/v2/browser-profiles": {
+      "get": {
+        "tags": [
+          "Browser Profiles"
+        ],
+        "summary": "List Browser Profiles",
+        "description": "List the caller's browser profiles.",
+        "operationId": "list_browser_profiles_api_v2_browser_profiles_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserProfileList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/browser-profiles/initiate-upload": {
+      "post": {
+        "tags": [
+          "Browser Profiles"
+        ],
+        "summary": "Initiate Browser Profile Upload",
+        "description": "Get a presigned S3 POST for uploading a profile zip directly to S3.\n\nThe returned ``upload_url`` and ``upload_fields`` are passed through verbatim;\nthe client uploads to S3 and then calls ``complete-upload``.",
+        "operationId": "initiate_browser_profile_upload_api_v2_browser_profiles_initiate_upload_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitiateUploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v2/browser-profiles/{profile_id}/complete-upload": {
+      "post": {
+        "tags": [
+          "Browser Profiles"
+        ],
+        "summary": "Complete Browser Profile Upload",
+        "description": "Finalize a profile after the zip is uploaded to S3.\n\n``browser_name`` is an unconstrained ``str`` here; env-manager validates it\nagainst its own ``BROWSER_NAMES`` literal and returns 422 on a bad value.",
+        "operationId": "complete_browser_profile_upload_api_v2_browser_profiles__profile_id__complete_upload_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrowserProfileCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserProfileRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/browser-profiles/{profile_id}": {
+      "get": {
+        "tags": [
+          "Browser Profiles"
+        ],
+        "summary": "Get Browser Profile",
+        "description": "Fetch a browser profile by id.",
+        "operationId": "get_browser_profile_api_v2_browser_profiles__profile_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserProfileRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Browser Profiles"
+        ],
+        "summary": "Delete Browser Profile",
+        "description": "Delete a browser profile (record + S3 object).",
+        "operationId": "delete_browser_profile_api_v2_browser_profiles__profile_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/vaults": {
       "post": {
         "tags": [
@@ -3057,6 +3300,65 @@
   },
   "components": {
     "schemas": {
+      "ActiveStateChangeData": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "idle",
+              "awaiting_tool_results"
+            ],
+            "title": "State"
+          },
+          "pending_tool_calls": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ToolRequest"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Tool Calls"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "ActiveStateChangeData"
+      },
+      "ActiveStateChangeEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "ActiveStateChangeEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ActiveStateChangeData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "ActiveStateChangeEvent",
+        "description": "The agent switched between running, idle and awaiting custom tool results."
+      },
       "Agent": {
         "properties": {
           "name": {
@@ -3193,6 +3495,275 @@
         "title": "Agent",
         "description": "Declarative agent definition."
       },
+      "AgentCompletionData": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "finished",
+              "stopped",
+              "timed_out"
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "AgentCompletionData"
+      },
+      "AgentCompletionEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "AgentCompletionEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentCompletionData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "AgentCompletionEvent",
+        "description": "The agent run completed."
+      },
+      "AgentErrorData": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "trace": {
+            "type": "string",
+            "title": "Trace",
+            "default": ""
+          },
+          "info": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Info"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "AgentErrorData"
+      },
+      "AgentErrorEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "AgentErrorEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentErrorData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "AgentErrorEvent",
+        "description": "The agent run failed."
+      },
+      "AgentEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "AgentEvent",
+            "title": "Type"
+          },
+          "data": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PolicyEvent"
+              },
+              {
+                "$ref": "#/components/schemas/ToolResultEvent"
+              },
+              {
+                "$ref": "#/components/schemas/AnswerEvent"
+              },
+              {
+                "$ref": "#/components/schemas/ErrorEvent"
+              },
+              {
+                "$ref": "#/components/schemas/MessageEvent"
+              },
+              {
+                "$ref": "#/components/schemas/ObservationEvent"
+              },
+              {
+                "$ref": "#/components/schemas/FlowEvent"
+              }
+            ],
+            "title": "Data",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "answer_event": "#/components/schemas/AnswerEvent",
+                "error_event": "#/components/schemas/ErrorEvent",
+                "flow_event": "#/components/schemas/FlowEvent",
+                "message_event": "#/components/schemas/MessageEvent",
+                "observation_event": "#/components/schemas/ObservationEvent",
+                "policy_event": "#/components/schemas/PolicyEvent",
+                "tool_result": "#/components/schemas/ToolResultEvent"
+              }
+            }
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "AgentEvent",
+        "description": "Event emitted by the agent loop itself; ``data`` is discriminated by ``kind``."
+      },
+      "AgentRunStatusChangeData": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "paused"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "AgentRunStatusChangeData"
+      },
+      "AgentRunStatusChangeEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "AgentRunStatusChangeEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentRunStatusChangeData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "AgentRunStatusChangeEvent",
+        "description": "The run status changed."
+      },
+      "AgentStartedData": {
+        "properties": {},
+        "additionalProperties": true,
+        "type": "object",
+        "title": "AgentStartedData",
+        "description": "Empty payload."
+      },
+      "AgentStartedEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "AgentStartedEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentStartedData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "AgentStartedEvent",
+        "description": "The agent process started."
+      },
+      "AnswerEvent": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "answer_event",
+            "title": "Kind",
+            "default": "answer_event"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ],
+            "title": "Answer",
+            "description": "Final answer, plain text or structured JSON; any embedded image is inlined as base64, not a URL."
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer"
+        ],
+        "title": "AnswerEvent",
+        "description": "Agent's final answer for the current task."
+      },
       "Browser": {
         "properties": {
           "id": {
@@ -3263,6 +3834,19 @@
             ],
             "title": "Vault Id",
             "description": "Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access."
+          },
+          "browser_profile_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Browser Profile Id",
+            "description": "Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile."
           }
         },
         "type": "object",
@@ -3271,6 +3855,207 @@
         ],
         "title": "Browser",
         "description": "A web browser the agent navigates and acts on."
+      },
+      "BrowserProfileCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "browser_name": {
+            "type": "string",
+            "title": "Browser Name"
+          },
+          "browser_version": {
+            "type": "string",
+            "title": "Browser Version"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "browser_name",
+          "browser_version"
+        ],
+        "title": "BrowserProfileCreate",
+        "description": "Request model for completing a browser profile upload."
+      },
+      "BrowserProfileList": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/BrowserProfileRead"
+            },
+            "type": "array",
+            "title": "Profiles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "limit",
+          "offset",
+          "profiles"
+        ],
+        "title": "BrowserProfileList",
+        "description": "Response model for listing browser profiles."
+      },
+      "BrowserProfileRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Org Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "browser_name": {
+            "type": "string",
+            "title": "Browser Name"
+          },
+          "browser_version": {
+            "type": "string",
+            "title": "Browser Version"
+          },
+          "s3_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "S3 Path"
+          },
+          "file_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Size Bytes"
+          },
+          "checksum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum"
+          },
+          "usage_count": {
+            "type": "integer",
+            "title": "Usage Count",
+            "default": 0
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labels"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "org_id",
+          "name",
+          "browser_name",
+          "browser_version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "BrowserProfileRead",
+        "description": "Response model for a browser profile."
       },
       "CreateWebhook": {
         "properties": {
@@ -3349,6 +4134,43 @@
         "title": "EnvironmentPage",
         "description": "Named page subclass so OpenAPI emits a clean ``EnvironmentPage`` schema name."
       },
+      "ErrorEvent": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "error_event",
+            "title": "Kind",
+            "default": "error_event"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "origin": {
+            "type": "string",
+            "title": "Origin",
+            "description": "Component that raised the error."
+          },
+          "tool_req": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Tool request being executed, if any."
+          }
+        },
+        "type": "object",
+        "required": [
+          "error",
+          "origin"
+        ],
+        "title": "ErrorEvent",
+        "description": "Recoverable error raised while running the agent loop."
+      },
       "Feedback": {
         "properties": {
           "success": {
@@ -3374,6 +4196,33 @@
         "title": "Feedback",
         "description": "Feedback on the semantic success of the trajectory."
       },
+      "FlowEvent": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "flow_event",
+            "title": "Kind",
+            "default": "flow_event"
+          },
+          "flow": {
+            "type": "string",
+            "title": "Flow",
+            "description": "Control signal, e.g. \"pause\", \"resume\", \"force_answer\"."
+          },
+          "origin": {
+            "type": "string",
+            "title": "Origin",
+            "description": "Who triggered the transition."
+          }
+        },
+        "type": "object",
+        "required": [
+          "flow",
+          "origin"
+        ],
+        "title": "FlowEvent",
+        "description": "Run-loop control transition (pause, resume, stop, ...)."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -3386,6 +4235,116 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "ImageContent": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Image location: a fetchable URL or a base64 payload, per ``type``."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "url",
+              "base64"
+            ],
+            "title": "Type"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Type",
+            "description": "MIME type, e.g. \"image/png\"."
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "type"
+        ],
+        "title": "ImageContent",
+        "description": "Image payload: ``url`` for platform-served screenshots, ``base64`` for inline images."
+      },
+      "InitiateUploadResponse": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Profile Id"
+          },
+          "upload_url": {
+            "type": "string",
+            "title": "Upload Url"
+          },
+          "upload_fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Upload Fields"
+          },
+          "upload_expires_in": {
+            "type": "integer",
+            "title": "Upload Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "upload_url",
+          "upload_fields",
+          "upload_expires_in"
+        ],
+        "title": "InitiateUploadResponse",
+        "description": "Response model for initiating a browser profile upload."
+      },
+      "JsonValue": {},
+      "LiveViewUrlData": {
+        "properties": {
+          "live_view_url": {
+            "type": "string",
+            "title": "Live View Url"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "live_view_url"
+        ],
+        "title": "LiveViewUrlData"
+      },
+      "LiveViewUrlEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "LiveViewUrlEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/LiveViewUrlData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "LiveViewUrlEvent",
+        "description": "A live view URL became available."
       },
       "MCPServer": {
         "properties": {
@@ -3463,6 +4422,40 @@
         "title": "MCPServer",
         "description": "An MCP server an environment connects to."
       },
+      "MessageEvent": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "message_event",
+            "title": "Kind",
+            "default": "message_event"
+          },
+          "caller_id": {
+            "type": "string",
+            "title": "Caller Id"
+          },
+          "content": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/components/schemas/ImageContent"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "caller_id"
+        ],
+        "title": "MessageEvent",
+        "description": "Message exchanged with the agent (user, system or subagent)."
+      },
       "Metrics": {
         "properties": {
           "steps": {
@@ -3528,9 +4521,49 @@
             "description": "Total cost in USD; null if any model is unpriced."
           }
         },
+        "additionalProperties": true,
         "type": "object",
         "title": "Metrics",
         "description": "Rolled-up usage and cost for a session."
+      },
+      "MetricsUpdateData": {
+        "properties": {
+          "metrics": {
+            "$ref": "#/components/schemas/Metrics"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "metrics"
+        ],
+        "title": "MetricsUpdateData"
+      },
+      "MetricsUpdateEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "MetricsUpdateEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MetricsUpdateData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "MetricsUpdateEvent",
+        "description": "Rolled-up usage and cost metrics for the session."
       },
       "ModelCost": {
         "properties": {
@@ -3603,6 +4636,7 @@
             "description": "Total cost in USD; null if the model is unpriced."
           }
         },
+        "additionalProperties": true,
         "type": "object",
         "required": [
           "name",
@@ -3645,6 +4679,58 @@
         ],
         "title": "ModelUsage",
         "description": "Per-model token usage."
+      },
+      "ObservationEvent": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "observation_event",
+            "title": "Kind",
+            "default": "observation_event"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type",
+            "description": "Environment that produced the observation, e.g. \"web\"."
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageContent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata",
+            "description": "Environment-specific snapshot, shaped by ``type``."
+          }
+        },
+        "type": "object",
+        "title": "ObservationEvent",
+        "description": "What the agent perceived this step: optional text, screenshot and environment metadata."
       },
       "OnePasswordConfig": {
         "properties": {
@@ -3691,6 +4777,32 @@
           "page"
         ],
         "title": "Page[Agent]"
+      },
+      "Page_SessionEvent_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionEvent"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "title": "Page[SessionEvent]"
       },
       "Page_SessionSummary_": {
         "properties": {
@@ -3743,32 +4855,6 @@
           "page"
         ],
         "title": "Page[Skill]"
-      },
-      "Page_TrajectoryEvent_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/TrajectoryEvent"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total"
-          },
-          "page": {
-            "type": "integer",
-            "title": "Page"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items",
-          "total",
-          "page"
-        ],
-        "title": "Page[TrajectoryEvent]"
       },
       "Page_WebhookRecord_": {
         "properties": {
@@ -4025,6 +5111,18 @@
             ],
             "title": "Vault Id"
           },
+          "browser_profile_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Browser Profile Id"
+          },
           "pip_packages": {
             "anyOf": [
               {
@@ -4154,6 +5252,56 @@
         "title": "PatchSkill",
         "description": "Partial skill update."
       },
+      "PolicyEvent": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "policy_event",
+            "title": "Kind",
+            "default": "policy_event"
+          },
+          "reasoning_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Content"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "tool_reqs": {
+            "items": {
+              "$ref": "#/components/schemas/ToolRequest"
+            },
+            "type": "array",
+            "title": "Tool Reqs"
+          },
+          "validation_errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Validation Errors",
+            "description": "Validation errors raised while parsing the model output."
+          }
+        },
+        "type": "object",
+        "title": "PolicyEvent",
+        "description": "One policy (LLM) step: the model output plus the tool requests extracted from it."
+      },
       "QuotaStatus": {
         "properties": {
           "scope": {
@@ -4186,6 +5334,79 @@
         ],
         "title": "QuotaStatus",
         "description": "Quota status."
+      },
+      "RequestStartData": {
+        "properties": {},
+        "additionalProperties": true,
+        "type": "object",
+        "title": "RequestStartData",
+        "description": "Empty payload."
+      },
+      "RequestStartDispatchedData": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "RequestStartDispatchedData"
+      },
+      "RequestStartDispatchedEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "RequestStartDispatchedEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RequestStartDispatchedData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "RequestStartDispatchedEvent",
+        "description": "The start request was dispatched to a runner."
+      },
+      "RequestStartEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "RequestStartEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RequestStartData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "RequestStartEvent",
+        "description": "The platform requested the agent to start."
       },
       "Session": {
         "properties": {
@@ -4256,6 +5477,136 @@
         ],
         "title": "Session",
         "description": "Full session envelope: original request + live status."
+      },
+      "SessionChanges": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/TrajectoryStatus"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "new_events": {
+            "items": {
+              "$ref": "#/components/schemas/SessionEvent"
+            },
+            "type": "array",
+            "title": "New Events",
+            "default": []
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SessionChanges",
+        "description": "Typed view of ``TrajectoryChanges`` for Agent API session endpoints."
+      },
+      "SessionEvent": {
+        "anyOf": [
+          {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AgentStartedEvent"
+              },
+              {
+                "$ref": "#/components/schemas/AgentCompletionEvent"
+              },
+              {
+                "$ref": "#/components/schemas/AgentErrorEvent"
+              },
+              {
+                "$ref": "#/components/schemas/AgentRunStatusChangeEvent"
+              },
+              {
+                "$ref": "#/components/schemas/ActiveStateChangeEvent"
+              },
+              {
+                "$ref": "#/components/schemas/LiveViewUrlEvent"
+              },
+              {
+                "$ref": "#/components/schemas/RequestStartEvent"
+              },
+              {
+                "$ref": "#/components/schemas/RequestStartDispatchedEvent"
+              },
+              {
+                "$ref": "#/components/schemas/MetricsUpdateEvent"
+              },
+              {
+                "$ref": "#/components/schemas/AgentEvent"
+              }
+            ],
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "ActiveStateChangeEvent": "#/components/schemas/ActiveStateChangeEvent",
+                "AgentCompletionEvent": "#/components/schemas/AgentCompletionEvent",
+                "AgentErrorEvent": "#/components/schemas/AgentErrorEvent",
+                "AgentEvent": "#/components/schemas/AgentEvent",
+                "AgentRunStatusChangeEvent": "#/components/schemas/AgentRunStatusChangeEvent",
+                "AgentStartedEvent": "#/components/schemas/AgentStartedEvent",
+                "LiveViewUrlEvent": "#/components/schemas/LiveViewUrlEvent",
+                "MetricsUpdateEvent": "#/components/schemas/MetricsUpdateEvent",
+                "RequestStartDispatchedEvent": "#/components/schemas/RequestStartDispatchedEvent",
+                "RequestStartEvent": "#/components/schemas/RequestStartEvent"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/TrajectoryEvent"
+          }
+        ]
       },
       "SessionRequest": {
         "properties": {
@@ -4614,6 +5965,37 @@
         "title": "ToolDefinition",
         "description": "Contract for a tool executed by the API client, not by the agent runtime.\n\nThe agent emits a tool call matching ``input_schema``, pauses, and resumes\nonce the client sends back the corresponding tool result."
       },
+      "ToolRequest": {
+        "properties": {
+          "tool_name": {
+            "type": "string",
+            "title": "Tool Name"
+          },
+          "args": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Args"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "Identifier correlating the request with its result."
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool_name"
+        ],
+        "title": "ToolRequest",
+        "description": "Tool invocation proposed by the policy."
+      },
       "ToolResultBatch": {
         "properties": {
           "type": {
@@ -4624,7 +6006,21 @@
           },
           "results": {
             "items": {
-              "$ref": "#/components/schemas/ToolResultEvent"
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ToolResultEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/ErrorEvent"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "error_event": "#/components/schemas/ErrorEvent",
+                  "tool_result": "#/components/schemas/ToolResultEvent"
+                }
+              }
             },
             "type": "array",
             "minItems": 1,
@@ -4641,108 +6037,26 @@
       },
       "ToolResultEvent": {
         "properties": {
-          "type": {
+          "kind": {
             "type": "string",
             "const": "tool_result",
-            "title": "Type",
+            "title": "Kind",
             "default": "tool_result"
           },
-          "tool_call_id": {
-            "type": "string",
-            "title": "Tool Call Id",
-            "description": "Id of the pending tool call this result answers."
+          "tool_req": {
+            "$ref": "#/components/schemas/ToolRequest"
           },
           "result": {
-            "title": "Result",
-            "description": "JSON-serializable tool output, shown to the model."
-          },
-          "is_error": {
-            "type": "boolean",
-            "title": "Is Error",
-            "description": "Mark the call as failed; result is treated as the error text.",
-            "default": false
+            "$ref": "#/components/schemas/JsonValue",
+            "description": "Tool output as opaque JSON; any embedded image is inlined as base64, not a URL."
           }
         },
         "type": "object",
         "required": [
-          "tool_call_id"
+          "tool_req"
         ],
         "title": "ToolResultEvent",
-        "description": "The client is sending back the result of a custom tool call."
-      },
-      "TrajectoryChanges": {
-        "properties": {
-          "status": {
-            "$ref": "#/components/schemas/TrajectoryStatus"
-          },
-          "started_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Started At"
-          },
-          "finished_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Finished At"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
-          },
-          "new_events": {
-            "items": {
-              "$ref": "#/components/schemas/TrajectoryEvent"
-            },
-            "type": "array",
-            "title": "New Events",
-            "default": []
-          },
-          "answer": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Answer"
-          },
-          "metrics": {
-            "$ref": "#/components/schemas/Metrics"
-          }
-        },
-        "type": "object",
-        "required": [
-          "status"
-        ],
-        "title": "TrajectoryChanges",
-        "description": "Changes to a trajectory.\n\nThis represents a batch of updates returned by the polling API\nwhen checking for new events and status changes on a trajectory.\n\nUsed to incrementally fetch new events without\nre-downloading the entire trajectory history.\n\nAttributes:\n    status: Current status of the trajectory\n    started_at: When the trajectory started execution (None if not yet started)\n    finished_at: When the trajectory finished (None if still running)\n    error: Error message if trajectory failed (None if no error)\n    new_events: List of new events since the last poll (empty if no new events)\n    answer: Answer to the trajectory (None if not available)"
+        "description": "Result of executing one tool request."
       },
       "TrajectoryEvent": {
         "properties": {

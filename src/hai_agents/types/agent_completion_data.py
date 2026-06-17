@@ -4,17 +4,11 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .tool_result_batch_results_item import ToolResultBatchResultsItem
-from .tool_result_batch_type import ToolResultBatchType
+from .agent_completion_data_reason import AgentCompletionDataReason
 
 
-class ToolResultBatch(UniversalBaseModel):
-    """
-    Batch of custom tool results.
-    """
-
-    type: typing.Optional[ToolResultBatchType] = "batch"
-    results: typing.List[ToolResultBatchResultsItem]
+class AgentCompletionData(UniversalBaseModel):
+    reason: AgentCompletionDataReason
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
