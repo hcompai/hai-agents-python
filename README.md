@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://github.com/hcompai/hai-agents-python/blob/main/assets/banner-dark.gif?raw=true" />
-    <img src="https://github.com/hcompai/hai-agents-python/blob/main/assets/banner-light.gif?raw=true" alt="H Agent API" width="700" />
+    <img src="https://github.com/hcompai/hai-agents-python/blob/main/assets/banner-light.gif?raw=true" alt="Computer-Use Agents" width="700" />
   </picture>
 </p>
 
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  Python SDK for the <a href="https://hcompany.ai">H Company</a> <a href="https://hub.hcompany.ai/agent-api">Agent API</a>. Launch autonomous agents powered by Holo, stream their progress, and steer them mid-run.
+  Python SDK for <a href="https://hcompany.ai">H Company</a>'s <a href="https://hub.hcompany.ai/agent-api">Computer-Use Agents</a>. Launch autonomous agents powered by Holo, stream their progress, and steer them mid-run.
 </p>
 
 <p align="center">
@@ -115,37 +115,20 @@ result = client.run_session(
 )
 ```
 
-Use `@tool(name=..., description=...)` to override what the model sees. Tool exceptions are reported to the agent as tool errors rather than crashing the loop. With `AsyncClient`, tools may be `async def`. For manual control, `client.start_session(tools=[...])` returns a handle whose `wait_for_completion()` dispatches the same way, and sessions awaiting results report the `awaiting_tool_results` status with the pending calls.
+Tool exceptions come back to the agent as tool errors instead of crashing the run, and with `AsyncClient` tools may be `async def`. See the [documentation](https://hub.hcompany.ai/agent-api) for `@tool` overrides and manual session control.
 
-## CLI
+## Command line
 
-The `hai-agents[cli]` extra installs the `hai` command:
+The `hai-agents[cli]` extra installs the `hai` command for driving agents from your terminal:
 
 ```bash
-hai login                  # browser sign-in; stores a key in ~/.config/hai/.env
-hai run "Summarize the H Agent API quickstart"
-hai --json run "Reply with exactly: hello" --max-steps 3 --max-time 60
+hai login                 # browser sign-in, stores a key in ~/.config/hai/.env
+hai run "What's the top story on Hacker News?"
 hai sessions list
-hai sessions get <session-id>
-hai sessions send <session-id> "continue"
-hai sessions cancel <session-id>
-hai sessions share <session-id>
-hai mcp install            # wire the hai-agents MCP server into every detected editor
-hai mcp install list       # see supported clients (Cursor, VS Code, Claude Code, Windsurf)
+hai mcp install           # add the hai-agents MCP server to Cursor, VS Code, Claude Code, ...
 ```
 
-`hai mcp install` adds the remote `hai-agents` MCP server to your local editors and
-writes your API key into each client config (in plaintext, so keep them private). On
-clients that support agent skills (Cursor, Claude Code) it also symlinks a `SKILL.md`
-that teaches the model how to drive the server.
-
-`hai login` opens your browser, mints a per-machine API key, and writes it to
-`~/.config/hai/.env`. `hai whoami` shows the resolved endpoint and whether you are
-authenticated; `hai logout` removes the stored key.
-
-Credentials resolve from flags, then `HAI_API_KEY` in the environment,
-then a local `.env`, then `~/.config/hai/.env`. Use `--base-url` or `HAI_API_BASE_URL`
-to target a specific Agent Platform host.
+Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`. See the [documentation](https://hub.hcompany.ai/agent-api) for the full command set, MCP setup, and host selection.
 
 ## Documentation
 
