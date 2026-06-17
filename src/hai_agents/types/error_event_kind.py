@@ -2,4 +2,4 @@
 
 import typing
 
-ToolResultEventType = typing.Union[typing.Literal["tool_result"], typing.Any]
+ErrorEventKind = typing.Union[typing.Literal["error_event"], typing.Any]

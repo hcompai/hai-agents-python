@@ -5,15 +5,15 @@ import typing
 
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
+from ..types.page_session_event import PageSessionEvent
 from ..types.page_session_summary import PageSessionSummary
-from ..types.page_trajectory_event import PageTrajectoryEvent
 from ..types.quota_status import QuotaStatus
 from ..types.session import Session
+from ..types.session_changes import SessionChanges
 from ..types.session_request_agent import SessionRequestAgent
 from ..types.session_request_messages import SessionRequestMessages
 from ..types.session_status import SessionStatus
 from ..types.share_link import ShareLink
-from ..types.trajectory_changes import TrajectoryChanges
 from ..types.trajectory_status import TrajectoryStatus
 from .raw_client import AsyncRawSessionsClient, RawSessionsClient
 from .types.list_session_events_request_sort_item import ListSessionEventsRequestSortItem
@@ -394,17 +394,17 @@ class SessionsClient:
 
         Examples
         --------
-        from hai_agents import Client
-        from hai_agents.sessions import SendSessionToolResultsRequestBody_ToolResult
+        from hai_agents import Client, ToolRequest, ToolResultEvent
 
         client = Client(
             api_key="YOUR_API_KEY",
         )
         client.sessions.send_session_tool_results(
             id="id",
-            request=SendSessionToolResultsRequestBody_ToolResult(
-                tool_call_id="tool_call_id",
-                type="tool_result",
+            request=ToolResultEvent(
+                tool_req=ToolRequest(
+                    tool_name="tool_name",
+                ),
             ),
         )
         """
@@ -507,7 +507,7 @@ class SessionsClient:
         include_events: typing.Optional[bool] = None,
         wait_for_seconds: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> typing.Optional[TrajectoryChanges]:
+    ) -> typing.Optional[SessionChanges]:
         """
         Long-poll for new events since ``from_index``; 204 if none arrive within ``wait_for_seconds``.
 
@@ -528,7 +528,7 @@ class SessionsClient:
 
         Returns
         -------
-        typing.Optional[TrajectoryChanges]
+        typing.Optional[SessionChanges]
             Successful Response
 
         Examples
@@ -561,7 +561,7 @@ class SessionsClient:
         sort: typing.Optional[typing.Sequence[ListSessionEventsRequestSortItem]] = None,
         type: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> PageTrajectoryEvent:
+    ) -> PageSessionEvent:
         """
         Paginated event history. Use ``/changes`` for live tailing.
 
@@ -582,7 +582,7 @@ class SessionsClient:
 
         Returns
         -------
-        PageTrajectoryEvent
+        PageSessionEvent
             Successful Response
 
         Examples
@@ -1216,8 +1216,7 @@ class AsyncSessionsClient:
         --------
         import asyncio
 
-        from hai_agents import AsyncClient
-        from hai_agents.sessions import SendSessionToolResultsRequestBody_ToolResult
+        from hai_agents import AsyncClient, ToolRequest, ToolResultEvent
 
         client = AsyncClient(
             api_key="YOUR_API_KEY",
@@ -1227,9 +1226,10 @@ class AsyncSessionsClient:
         async def main() -> None:
             await client.sessions.send_session_tool_results(
                 id="id",
-                request=SendSessionToolResultsRequestBody_ToolResult(
-                    tool_call_id="tool_call_id",
-                    type="tool_result",
+                request=ToolResultEvent(
+                    tool_req=ToolRequest(
+                        tool_name="tool_name",
+                    ),
                 ),
             )
 
@@ -1361,7 +1361,7 @@ class AsyncSessionsClient:
         include_events: typing.Optional[bool] = None,
         wait_for_seconds: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> typing.Optional[TrajectoryChanges]:
+    ) -> typing.Optional[SessionChanges]:
         """
         Long-poll for new events since ``from_index``; 204 if none arrive within ``wait_for_seconds``.
 
@@ -1382,7 +1382,7 @@ class AsyncSessionsClient:
 
         Returns
         -------
-        typing.Optional[TrajectoryChanges]
+        typing.Optional[SessionChanges]
             Successful Response
 
         Examples
@@ -1423,7 +1423,7 @@ class AsyncSessionsClient:
         sort: typing.Optional[typing.Sequence[ListSessionEventsRequestSortItem]] = None,
         type: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> PageTrajectoryEvent:
+    ) -> PageSessionEvent:
         """
         Paginated event history. Use ``/changes`` for live tailing.
 
@@ -1444,7 +1444,7 @@ class AsyncSessionsClient:
 
         Returns
         -------
-        PageTrajectoryEvent
+        PageSessionEvent
             Successful Response
 
         Examples
