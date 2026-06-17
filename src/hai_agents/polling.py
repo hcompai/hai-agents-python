@@ -18,9 +18,9 @@ from .core.request_options import RequestOptions
 from .tools import Tool, ToolInput, as_tools
 from .types.session_request_agent import SessionRequestAgent
 from .types.session_request_messages import SessionRequestMessages
-from .types.trajectory_changes import TrajectoryChanges
-from .types.trajectory_changes_answer import TrajectoryChangesAnswer
-from .types.trajectory_event import TrajectoryEvent
+from .types.session_changes import SessionChanges
+from .types.session_changes_answer import SessionChangesAnswer
+from .types.session_event import SessionEvent
 from .types.trajectory_status import TrajectoryStatus
 
 # Type-only: the client subclasses import from this module, so importing them at
@@ -54,7 +54,7 @@ class CreateSessionParams(typing_extensions.TypedDict, total=False):
     parent_session_id: typing.Optional[str]
 
 
-AnswerT = typing_extensions.TypeVar("AnswerT", default=TrajectoryChangesAnswer)
+AnswerT = typing_extensions.TypeVar("AnswerT", default=SessionChangesAnswer)
 
 
 class AnswerValidationError(ValueError):
@@ -75,9 +75,9 @@ class SessionRunResult(typing.Generic[AnswerT]):
 
     id: str
     status: TrajectoryStatus
-    events: typing.List[TrajectoryEvent]
+    events: typing.List[SessionEvent]
     next_from_index: int
-    final_changes: typing.Optional[TrajectoryChanges] = None
+    final_changes: typing.Optional[SessionChanges] = None
     answer: typing.Optional[AnswerT] = None
 
     def __post_init__(self) -> None:
@@ -167,7 +167,7 @@ def _attach_tool_definitions(create_params: typing.Dict[str, typing.Any], tools:
 
 
 def _latest_pending_tool_calls(
-    batch: typing.Sequence[TrajectoryEvent],
+    batch: typing.Sequence[SessionEvent],
     previous: typing.List[typing.Dict[str, typing.Any]],
 ) -> typing.List[typing.Dict[str, typing.Any]]:
     """Pending custom tool calls per the latest ``ActiveStateChangeEvent``.
@@ -180,9 +180,13 @@ def _latest_pending_tool_calls(
     for event in batch:
         if event.type != "ActiveStateChangeEvent":
             continue
-        data = event.data if isinstance(event.data, dict) else {}
+        data = event.data
+        if hasattr(data, "model_dump"):
+            data = data.model_dump()
+        if not isinstance(data, dict):
+            data = {}
         if data.get("state") == "awaiting_tool_results":
-            calls = list(data.get("pending_tool_calls") or [])
+            calls = [c.model_dump() if hasattr(c, "model_dump") else c for c in data.get("pending_tool_calls") or []]
         else:
             calls = []
     return calls
@@ -196,11 +200,21 @@ def _json_safe(value: typing.Any) -> typing.Any:
         return str(value)
 
 
+def _tool_req(call: typing.Dict[str, typing.Any]) -> typing.Dict[str, typing.Any]:
+    return {"tool_name": call.get("tool_name", ""), "args": call.get("args") or {}, "id": call["id"]}
+
+
+def _tool_result_payload(call: typing.Dict[str, typing.Any], result: typing.Any, is_error: bool) -> typing.Dict[str, typing.Any]:
+    if is_error:
+        return {"kind": "error_event", "error": str(result), "origin": "client", "tool_req": _tool_req(call)}
+    return {"kind": "tool_result", "tool_req": _tool_req(call), "result": _json_safe(result)}
+
+
 def _execute_tool_call(
     tools_by_name: typing.Mapping[str, Tool], call: typing.Dict[str, typing.Any]
 ) -> typing.Dict[str, typing.Any]:
     """Run one pending call locally and shape the ``tool_result`` payload."""
-    name = call.get("name", "")
+    name = call.get("tool_name", "")
     local_tool = tools_by_name.get(name)
     result: typing.Any
     is_error = True
@@ -208,14 +222,14 @@ def _execute_tool_call(
         result = f"Tool {name!r} is not registered with this client."
     else:
         try:
-            result = local_tool.fn(**(call.get("arguments") or {}))
+            result = local_tool.fn(**(call.get("args") or {}))
             if inspect.isawaitable(result):
                 result = _run_awaitable(result)
         except Exception as exc:
             result = f"{type(exc).__name__}: {exc}"
         else:
             is_error = False
-    return {"type": "tool_result", "tool_call_id": call["id"], "result": _json_safe(result), "is_error": is_error}
+    return _tool_result_payload(call, result, is_error)
 
 
 async def _await_result(value: typing.Awaitable[typing.Any]) -> typing.Any:
@@ -236,7 +250,7 @@ async def _async_execute_tool_call(
     tools_by_name: typing.Mapping[str, Tool], call: typing.Dict[str, typing.Any]
 ) -> typing.Dict[str, typing.Any]:
     """Async version of ``_execute_tool_call``; awaits coroutine tools."""
-    name = call.get("name", "")
+    name = call.get("tool_name", "")
     local_tool = tools_by_name.get(name)
     result: typing.Any
     is_error = True
@@ -244,14 +258,14 @@ async def _async_execute_tool_call(
         result = f"Tool {name!r} is not registered with this client."
     else:
         try:
-            result = local_tool.fn(**(call.get("arguments") or {}))
+            result = local_tool.fn(**(call.get("args") or {}))
             if inspect.isawaitable(result):
                 result = await result
         except Exception as exc:
             result = f"{type(exc).__name__}: {exc}"
         else:
             is_error = False
-    return {"type": "tool_result", "tool_call_id": call["id"], "result": _json_safe(result), "is_error": is_error}
+    return _tool_result_payload(call, result, is_error)
 
 
 def _tool_results_body(results: typing.List[typing.Dict[str, typing.Any]]) -> typing.Dict[str, typing.Any]:
@@ -316,8 +330,8 @@ async def _async_post_tool_results(
 
 
 def _final_changes(
-    client: Client, id: str, last_changes: typing.Optional[TrajectoryChanges], limit: typing.Optional[int]
-) -> typing.Optional[TrajectoryChanges]:
+    client: Client, id: str, last_changes: typing.Optional[SessionChanges], limit: typing.Optional[int]
+) -> typing.Optional[SessionChanges]:
     """The terminal answer lives in ``/changes``; fetch it once if streaming didn't surface it."""
     if last_changes is not None and last_changes.answer is not None:
         return last_changes
@@ -352,9 +366,9 @@ def wait_for_session(
         raise ValueError("tools require include_events=True: pending calls arrive on the event stream.")
     answered: typing.Set[str] = set()
     advertised: typing.List[typing.Dict[str, typing.Any]] = []
-    events: typing.List[TrajectoryEvent] = []
+    events: typing.List[SessionEvent] = []
     next_from_index = from_index
-    last_changes: typing.Optional[TrajectoryChanges] = None
+    last_changes: typing.Optional[SessionChanges] = None
     polls = 0
     deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
 
@@ -363,7 +377,7 @@ def wait_for_session(
         if deadline is not None and time.monotonic() >= deadline:
             raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
 
-        batch: typing.List[TrajectoryEvent] = []
+        batch: typing.List[SessionEvent] = []
         if include_events:
             changes = client.sessions.get_session_changes(
                 id,
@@ -450,8 +464,8 @@ def run_session(
 
 
 async def _async_final_changes(
-    client: AsyncClient, id: str, last_changes: typing.Optional[TrajectoryChanges], limit: typing.Optional[int]
-) -> typing.Optional[TrajectoryChanges]:
+    client: AsyncClient, id: str, last_changes: typing.Optional[SessionChanges], limit: typing.Optional[int]
+) -> typing.Optional[SessionChanges]:
     """Async version of ``_final_changes``."""
     if last_changes is not None and last_changes.answer is not None:
         return last_changes
@@ -481,9 +495,9 @@ async def async_wait_for_session(
         raise ValueError("tools require include_events=True: pending calls arrive on the event stream.")
     answered: typing.Set[str] = set()
     advertised: typing.List[typing.Dict[str, typing.Any]] = []
-    events: typing.List[TrajectoryEvent] = []
+    events: typing.List[SessionEvent] = []
     next_from_index = from_index
-    last_changes: typing.Optional[TrajectoryChanges] = None
+    last_changes: typing.Optional[SessionChanges] = None
     polls = 0
     deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
 
@@ -492,7 +506,7 @@ async def async_wait_for_session(
         if deadline is not None and time.monotonic() >= deadline:
             raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
 
-        batch: typing.List[TrajectoryEvent] = []
+        batch: typing.List[SessionEvent] = []
         if include_events:
             changes = await client.sessions.get_session_changes(
                 id,
@@ -595,7 +609,7 @@ class SessionHandle(typing.Generic[AnswerT]):
     def status(self) -> SessionStatus:
         return self._client.sessions.get_session_status(self.id)
 
-    def changes(self, *, from_index: int = 0, **kwargs: typing.Any) -> typing.Optional[TrajectoryChanges]:
+    def changes(self, *, from_index: int = 0, **kwargs: typing.Any) -> typing.Optional[SessionChanges]:
         return self._client.sessions.get_session_changes(self.id, from_index=from_index, **kwargs)
 
     def send_message(self, message: typing.Any) -> None:
@@ -641,7 +655,7 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
     async def status(self) -> SessionStatus:
         return await self._client.sessions.get_session_status(self.id)
 
-    async def changes(self, *, from_index: int = 0, **kwargs: typing.Any) -> typing.Optional[TrajectoryChanges]:
+    async def changes(self, *, from_index: int = 0, **kwargs: typing.Any) -> typing.Optional[SessionChanges]:
         return await self._client.sessions.get_session_changes(self.id, from_index=from_index, **kwargs)
 
     async def send_message(self, message: typing.Any) -> None:

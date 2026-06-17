@@ -6,33 +6,96 @@ import typing
 from importlib import import_module
 
 if typing.TYPE_CHECKING:
+    from .active_state_change_data import ActiveStateChangeData
+    from .active_state_change_data_state import ActiveStateChangeDataState
+    from .active_state_change_event import ActiveStateChangeEvent
     from .agent import Agent
+    from .agent_completion_data import AgentCompletionData
+    from .agent_completion_data_reason import AgentCompletionDataReason
+    from .agent_completion_event import AgentCompletionEvent
     from .agent_environments_item import AgentEnvironmentsItem
+    from .agent_error_data import AgentErrorData
+    from .agent_error_event import AgentErrorEvent
+    from .agent_event import AgentEvent
+    from .agent_event_data import (
+        AgentEventData,
+        AgentEventData_AnswerEvent,
+        AgentEventData_ErrorEvent,
+        AgentEventData_FlowEvent,
+        AgentEventData_MessageEvent,
+        AgentEventData_ObservationEvent,
+        AgentEventData_PolicyEvent,
+        AgentEventData_ToolResult,
+    )
+    from .agent_run_status_change_data import AgentRunStatusChangeData
+    from .agent_run_status_change_data_status import AgentRunStatusChangeDataStatus
+    from .agent_run_status_change_event import AgentRunStatusChangeEvent
     from .agent_skills_item import AgentSkillsItem
+    from .agent_started_data import AgentStartedData
+    from .agent_started_event import AgentStartedEvent
     from .agent_subagents_item import AgentSubagentsItem
+    from .answer_event import AnswerEvent
+    from .answer_event_answer import AnswerEventAnswer
     from .browser import Browser
     from .browser_kind import BrowserKind
     from .browser_mode import BrowserMode
+    from .browser_profile_list import BrowserProfileList
+    from .browser_profile_read import BrowserProfileRead
     from .environment import Environment
     from .environment_kind import EnvironmentKind
     from .environment_page import EnvironmentPage
+    from .error_event import ErrorEvent
+    from .error_event_kind import ErrorEventKind
     from .feedback import Feedback
+    from .flow_event import FlowEvent
     from .http_validation_error import HttpValidationError
+    from .image_content import ImageContent
+    from .image_content_type import ImageContentType
+    from .initiate_upload_response import InitiateUploadResponse
+    from .json_value import JsonValue
+    from .live_view_url_data import LiveViewUrlData
+    from .live_view_url_event import LiveViewUrlEvent
     from .mcp_server import McpServer
     from .mcp_server_transport import McpServerTransport
+    from .message_event import MessageEvent
+    from .message_event_content_item import MessageEventContentItem
     from .metrics import Metrics
+    from .metrics_update_data import MetricsUpdateData
+    from .metrics_update_event import MetricsUpdateEvent
     from .model_cost import ModelCost
     from .model_usage import ModelUsage
+    from .observation_event import ObservationEvent
     from .one_password_config import OnePasswordConfig
     from .one_password_config_provider import OnePasswordConfigProvider
     from .page_agent import PageAgent
+    from .page_session_event import PageSessionEvent
     from .page_session_summary import PageSessionSummary
     from .page_skill import PageSkill
-    from .page_trajectory_event import PageTrajectoryEvent
     from .page_webhook_record import PageWebhookRecord
+    from .policy_event import PolicyEvent
     from .quota_status import QuotaStatus
     from .quota_status_scope import QuotaStatusScope
+    from .request_start_data import RequestStartData
+    from .request_start_dispatched_data import RequestStartDispatchedData
+    from .request_start_dispatched_event import RequestStartDispatchedEvent
+    from .request_start_event import RequestStartEvent
     from .session import Session
+    from .session_changes import SessionChanges
+    from .session_changes_answer import SessionChangesAnswer
+    from .session_event import SessionEvent
+    from .session_event_zero import (
+        SessionEventZero,
+        SessionEventZero_ActiveStateChangeEvent,
+        SessionEventZero_AgentCompletionEvent,
+        SessionEventZero_AgentErrorEvent,
+        SessionEventZero_AgentEvent,
+        SessionEventZero_AgentRunStatusChangeEvent,
+        SessionEventZero_AgentStartedEvent,
+        SessionEventZero_LiveViewUrlEvent,
+        SessionEventZero_MetricsUpdateEvent,
+        SessionEventZero_RequestStartDispatchedEvent,
+        SessionEventZero_RequestStartEvent,
+    )
     from .session_request import SessionRequest
     from .session_request_agent import SessionRequestAgent
     from .session_request_messages import SessionRequestMessages
@@ -41,11 +104,16 @@ if typing.TYPE_CHECKING:
     from .share_link import ShareLink
     from .skill import Skill
     from .tool_definition import ToolDefinition
+    from .tool_request import ToolRequest
     from .tool_result_batch import ToolResultBatch
+    from .tool_result_batch_results_item import (
+        ToolResultBatchResultsItem,
+        ToolResultBatchResultsItem_ErrorEvent,
+        ToolResultBatchResultsItem_ToolResult,
+    )
+    from .tool_result_batch_type import ToolResultBatchType
     from .tool_result_event import ToolResultEvent
-    from .tool_result_event_type import ToolResultEventType
-    from .trajectory_changes import TrajectoryChanges
-    from .trajectory_changes_answer import TrajectoryChangesAnswer
+    from .tool_result_event_kind import ToolResultEventKind
     from .trajectory_event import TrajectoryEvent
     from .trajectory_status import TrajectoryStatus
     from .user_message_batch import UserMessageBatch
@@ -59,33 +127,92 @@ if typing.TYPE_CHECKING:
     from .webhook_record import WebhookRecord
     from .webhook_with_secret import WebhookWithSecret
 _dynamic_imports: typing.Dict[str, str] = {
+    "ActiveStateChangeData": ".active_state_change_data",
+    "ActiveStateChangeDataState": ".active_state_change_data_state",
+    "ActiveStateChangeEvent": ".active_state_change_event",
     "Agent": ".agent",
+    "AgentCompletionData": ".agent_completion_data",
+    "AgentCompletionDataReason": ".agent_completion_data_reason",
+    "AgentCompletionEvent": ".agent_completion_event",
     "AgentEnvironmentsItem": ".agent_environments_item",
+    "AgentErrorData": ".agent_error_data",
+    "AgentErrorEvent": ".agent_error_event",
+    "AgentEvent": ".agent_event",
+    "AgentEventData": ".agent_event_data",
+    "AgentEventData_AnswerEvent": ".agent_event_data",
+    "AgentEventData_ErrorEvent": ".agent_event_data",
+    "AgentEventData_FlowEvent": ".agent_event_data",
+    "AgentEventData_MessageEvent": ".agent_event_data",
+    "AgentEventData_ObservationEvent": ".agent_event_data",
+    "AgentEventData_PolicyEvent": ".agent_event_data",
+    "AgentEventData_ToolResult": ".agent_event_data",
+    "AgentRunStatusChangeData": ".agent_run_status_change_data",
+    "AgentRunStatusChangeDataStatus": ".agent_run_status_change_data_status",
+    "AgentRunStatusChangeEvent": ".agent_run_status_change_event",
     "AgentSkillsItem": ".agent_skills_item",
+    "AgentStartedData": ".agent_started_data",
+    "AgentStartedEvent": ".agent_started_event",
     "AgentSubagentsItem": ".agent_subagents_item",
+    "AnswerEvent": ".answer_event",
+    "AnswerEventAnswer": ".answer_event_answer",
     "Browser": ".browser",
     "BrowserKind": ".browser_kind",
     "BrowserMode": ".browser_mode",
+    "BrowserProfileList": ".browser_profile_list",
+    "BrowserProfileRead": ".browser_profile_read",
     "Environment": ".environment",
     "EnvironmentKind": ".environment_kind",
     "EnvironmentPage": ".environment_page",
+    "ErrorEvent": ".error_event",
+    "ErrorEventKind": ".error_event_kind",
     "Feedback": ".feedback",
+    "FlowEvent": ".flow_event",
     "HttpValidationError": ".http_validation_error",
+    "ImageContent": ".image_content",
+    "ImageContentType": ".image_content_type",
+    "InitiateUploadResponse": ".initiate_upload_response",
+    "JsonValue": ".json_value",
+    "LiveViewUrlData": ".live_view_url_data",
+    "LiveViewUrlEvent": ".live_view_url_event",
     "McpServer": ".mcp_server",
     "McpServerTransport": ".mcp_server_transport",
+    "MessageEvent": ".message_event",
+    "MessageEventContentItem": ".message_event_content_item",
     "Metrics": ".metrics",
+    "MetricsUpdateData": ".metrics_update_data",
+    "MetricsUpdateEvent": ".metrics_update_event",
     "ModelCost": ".model_cost",
     "ModelUsage": ".model_usage",
+    "ObservationEvent": ".observation_event",
     "OnePasswordConfig": ".one_password_config",
     "OnePasswordConfigProvider": ".one_password_config_provider",
     "PageAgent": ".page_agent",
+    "PageSessionEvent": ".page_session_event",
     "PageSessionSummary": ".page_session_summary",
     "PageSkill": ".page_skill",
-    "PageTrajectoryEvent": ".page_trajectory_event",
     "PageWebhookRecord": ".page_webhook_record",
+    "PolicyEvent": ".policy_event",
     "QuotaStatus": ".quota_status",
     "QuotaStatusScope": ".quota_status_scope",
+    "RequestStartData": ".request_start_data",
+    "RequestStartDispatchedData": ".request_start_dispatched_data",
+    "RequestStartDispatchedEvent": ".request_start_dispatched_event",
+    "RequestStartEvent": ".request_start_event",
     "Session": ".session",
+    "SessionChanges": ".session_changes",
+    "SessionChangesAnswer": ".session_changes_answer",
+    "SessionEvent": ".session_event",
+    "SessionEventZero": ".session_event_zero",
+    "SessionEventZero_ActiveStateChangeEvent": ".session_event_zero",
+    "SessionEventZero_AgentCompletionEvent": ".session_event_zero",
+    "SessionEventZero_AgentErrorEvent": ".session_event_zero",
+    "SessionEventZero_AgentEvent": ".session_event_zero",
+    "SessionEventZero_AgentRunStatusChangeEvent": ".session_event_zero",
+    "SessionEventZero_AgentStartedEvent": ".session_event_zero",
+    "SessionEventZero_LiveViewUrlEvent": ".session_event_zero",
+    "SessionEventZero_MetricsUpdateEvent": ".session_event_zero",
+    "SessionEventZero_RequestStartDispatchedEvent": ".session_event_zero",
+    "SessionEventZero_RequestStartEvent": ".session_event_zero",
     "SessionRequest": ".session_request",
     "SessionRequestAgent": ".session_request_agent",
     "SessionRequestMessages": ".session_request_messages",
@@ -94,11 +221,14 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ShareLink": ".share_link",
     "Skill": ".skill",
     "ToolDefinition": ".tool_definition",
+    "ToolRequest": ".tool_request",
     "ToolResultBatch": ".tool_result_batch",
+    "ToolResultBatchResultsItem": ".tool_result_batch_results_item",
+    "ToolResultBatchResultsItem_ErrorEvent": ".tool_result_batch_results_item",
+    "ToolResultBatchResultsItem_ToolResult": ".tool_result_batch_results_item",
+    "ToolResultBatchType": ".tool_result_batch_type",
     "ToolResultEvent": ".tool_result_event",
-    "ToolResultEventType": ".tool_result_event_type",
-    "TrajectoryChanges": ".trajectory_changes",
-    "TrajectoryChangesAnswer": ".trajectory_changes_answer",
+    "ToolResultEventKind": ".tool_result_event_kind",
     "TrajectoryEvent": ".trajectory_event",
     "TrajectoryStatus": ".trajectory_status",
     "UserMessageBatch": ".user_message_batch",
@@ -136,33 +266,92 @@ def __dir__():
 
 
 __all__ = [
+    "ActiveStateChangeData",
+    "ActiveStateChangeDataState",
+    "ActiveStateChangeEvent",
     "Agent",
+    "AgentCompletionData",
+    "AgentCompletionDataReason",
+    "AgentCompletionEvent",
     "AgentEnvironmentsItem",
+    "AgentErrorData",
+    "AgentErrorEvent",
+    "AgentEvent",
+    "AgentEventData",
+    "AgentEventData_AnswerEvent",
+    "AgentEventData_ErrorEvent",
+    "AgentEventData_FlowEvent",
+    "AgentEventData_MessageEvent",
+    "AgentEventData_ObservationEvent",
+    "AgentEventData_PolicyEvent",
+    "AgentEventData_ToolResult",
+    "AgentRunStatusChangeData",
+    "AgentRunStatusChangeDataStatus",
+    "AgentRunStatusChangeEvent",
     "AgentSkillsItem",
+    "AgentStartedData",
+    "AgentStartedEvent",
     "AgentSubagentsItem",
+    "AnswerEvent",
+    "AnswerEventAnswer",
     "Browser",
     "BrowserKind",
     "BrowserMode",
+    "BrowserProfileList",
+    "BrowserProfileRead",
     "Environment",
     "EnvironmentKind",
     "EnvironmentPage",
+    "ErrorEvent",
+    "ErrorEventKind",
     "Feedback",
+    "FlowEvent",
     "HttpValidationError",
+    "ImageContent",
+    "ImageContentType",
+    "InitiateUploadResponse",
+    "JsonValue",
+    "LiveViewUrlData",
+    "LiveViewUrlEvent",
     "McpServer",
     "McpServerTransport",
+    "MessageEvent",
+    "MessageEventContentItem",
     "Metrics",
+    "MetricsUpdateData",
+    "MetricsUpdateEvent",
     "ModelCost",
     "ModelUsage",
+    "ObservationEvent",
     "OnePasswordConfig",
     "OnePasswordConfigProvider",
     "PageAgent",
+    "PageSessionEvent",
     "PageSessionSummary",
     "PageSkill",
-    "PageTrajectoryEvent",
     "PageWebhookRecord",
+    "PolicyEvent",
     "QuotaStatus",
     "QuotaStatusScope",
+    "RequestStartData",
+    "RequestStartDispatchedData",
+    "RequestStartDispatchedEvent",
+    "RequestStartEvent",
     "Session",
+    "SessionChanges",
+    "SessionChangesAnswer",
+    "SessionEvent",
+    "SessionEventZero",
+    "SessionEventZero_ActiveStateChangeEvent",
+    "SessionEventZero_AgentCompletionEvent",
+    "SessionEventZero_AgentErrorEvent",
+    "SessionEventZero_AgentEvent",
+    "SessionEventZero_AgentRunStatusChangeEvent",
+    "SessionEventZero_AgentStartedEvent",
+    "SessionEventZero_LiveViewUrlEvent",
+    "SessionEventZero_MetricsUpdateEvent",
+    "SessionEventZero_RequestStartDispatchedEvent",
+    "SessionEventZero_RequestStartEvent",
     "SessionRequest",
     "SessionRequestAgent",
     "SessionRequestMessages",
@@ -171,11 +360,14 @@ __all__ = [
     "ShareLink",
     "Skill",
     "ToolDefinition",
+    "ToolRequest",
     "ToolResultBatch",
+    "ToolResultBatchResultsItem",
+    "ToolResultBatchResultsItem_ErrorEvent",
+    "ToolResultBatchResultsItem_ToolResult",
+    "ToolResultBatchType",
     "ToolResultEvent",
-    "ToolResultEventType",
-    "TrajectoryChanges",
-    "TrajectoryChangesAnswer",
+    "ToolResultEventKind",
     "TrajectoryEvent",
     "TrajectoryStatus",
     "UserMessageBatch",

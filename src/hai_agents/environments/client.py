@@ -101,6 +101,7 @@ class EnvironmentsClient:
         mode: typing.Optional[BrowserMode] = OMIT,
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
+        browser_profile_id: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -134,6 +135,9 @@ class EnvironmentsClient:
         vault_id : typing.Optional[str]
             Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
 
+        browser_profile_id : typing.Optional[str]
+            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -163,6 +167,7 @@ class EnvironmentsClient:
             mode=mode,
             page_chars=page_chars,
             vault_id=vault_id,
+            browser_profile_id=browser_profile_id,
             request_options=request_options,
         )
         return _response.data
@@ -210,6 +215,7 @@ class EnvironmentsClient:
         mode: typing.Optional[BrowserMode] = OMIT,
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
+        browser_profile_id: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -245,6 +251,9 @@ class EnvironmentsClient:
         vault_id : typing.Optional[str]
             Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
 
+        browser_profile_id : typing.Optional[str]
+            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -276,6 +285,7 @@ class EnvironmentsClient:
             mode=mode,
             page_chars=page_chars,
             vault_id=vault_id,
+            browser_profile_id=browser_profile_id,
             request_options=request_options,
         )
         return _response.data
@@ -321,6 +331,7 @@ class EnvironmentsClient:
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
+        browser_profile_id: typing.Optional[str] = OMIT,
         pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
         env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
         mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
@@ -350,6 +361,8 @@ class EnvironmentsClient:
         page_chars : typing.Optional[int]
 
         vault_id : typing.Optional[str]
+
+        browser_profile_id : typing.Optional[str]
 
         pip_packages : typing.Optional[typing.Sequence[str]]
 
@@ -390,6 +403,7 @@ class EnvironmentsClient:
             mode=mode,
             page_chars=page_chars,
             vault_id=vault_id,
+            browser_profile_id=browser_profile_id,
             pip_packages=pip_packages,
             env=env,
             mcp_servers=mcp_servers,
@@ -491,6 +505,7 @@ class AsyncEnvironmentsClient:
         mode: typing.Optional[BrowserMode] = OMIT,
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
+        browser_profile_id: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -523,6 +538,9 @@ class AsyncEnvironmentsClient:
 
         vault_id : typing.Optional[str]
             Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
+
+        browser_profile_id : typing.Optional[str]
+            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -561,6 +579,7 @@ class AsyncEnvironmentsClient:
             mode=mode,
             page_chars=page_chars,
             vault_id=vault_id,
+            browser_profile_id=browser_profile_id,
             request_options=request_options,
         )
         return _response.data
@@ -616,6 +635,7 @@ class AsyncEnvironmentsClient:
         mode: typing.Optional[BrowserMode] = OMIT,
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
+        browser_profile_id: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -650,6 +670,9 @@ class AsyncEnvironmentsClient:
 
         vault_id : typing.Optional[str]
             Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
+
+        browser_profile_id : typing.Optional[str]
+            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -690,6 +713,7 @@ class AsyncEnvironmentsClient:
             mode=mode,
             page_chars=page_chars,
             vault_id=vault_id,
+            browser_profile_id=browser_profile_id,
             request_options=request_options,
         )
         return _response.data
@@ -743,6 +767,7 @@ class AsyncEnvironmentsClient:
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
+        browser_profile_id: typing.Optional[str] = OMIT,
         pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
         env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
         mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
@@ -772,6 +797,8 @@ class AsyncEnvironmentsClient:
         page_chars : typing.Optional[int]
 
         vault_id : typing.Optional[str]
+
+        browser_profile_id : typing.Optional[str]
 
         pip_packages : typing.Optional[typing.Sequence[str]]
 
@@ -820,6 +847,7 @@ class AsyncEnvironmentsClient:
             mode=mode,
             page_chars=page_chars,
             vault_id=vault_id,
+            browser_profile_id=browser_profile_id,
             pip_packages=pip_packages,
             env=env,
             mcp_servers=mcp_servers,

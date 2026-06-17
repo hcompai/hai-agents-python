@@ -4,13 +4,16 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .trajectory_event import TrajectoryEvent
+from .message_event_content_item import MessageEventContentItem
 
 
-class PageTrajectoryEvent(UniversalBaseModel):
-    items: typing.List[TrajectoryEvent]
-    total: int
-    page: int
+class MessageEvent(UniversalBaseModel):
+    """
+    Message exchanged with the agent (user, system or subagent).
+    """
+
+    caller_id: str
+    content: typing.Optional[typing.List[MessageEventContentItem]] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
