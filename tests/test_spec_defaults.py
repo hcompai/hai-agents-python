@@ -23,16 +23,28 @@ from hai_agents.types import Browser, OnePasswordConfig, ToolResultEvent, UserMe
 
 OPENAPI_PATH = pathlib.Path(__file__).parent.parent / "openapi.json"
 
-# Schemas whose const+default field was dropped ENTIRELY by the generator (not just its default).
-# Their discriminator is carried by the per-endpoint request-body wrapper types instead
-# (e.g. SendSessionToolResultsRequestBody_Batch), so there is no model field to default.
-FIELD_DROPPED_ENTIRELY = {("ToolResultBatch", "type"), ("UserMessageBatch", "type")}
+# Schemas whose const+default field was dropped ENTIRELY from the generated model (not just its
+# default): the field only ever served as a union tag, and the generated union carries that tag
+# elsewhere -- the per-endpoint request-body wrappers (e.g. SendSessionToolResultsRequestBody_Batch)
+# for the batch types, and the AgentEventData_* variants' ``n`` tag for agent events -- so the
+# standalone model has no field left to default. ``test_dropped_fields_are_actually_absent`` keeps
+# this set honest: a regeneration that restores any of these fields must add it back under test.
+FIELD_DROPPED_ENTIRELY = {
+    ("UserMessageBatch", "type"),
+    ("AnswerEvent", "kind"),
+    ("FlowEvent", "kind"),
+    ("MessageEvent", "kind"),
+    ("ObservationEvent", "kind"),
+    ("PolicyEvent", "kind"),
+}
 
 MINIMAL_KWARGS: dict[str, dict[str, typing.Any]] = {
     "Browser": {"id": "browser"},
     "OnePasswordConfig": {"op_vault_id": "vault_1"},
-    "ToolResultEvent": {"tool_call_id": "call_1", "result": "ok"},
+    "ToolResultEvent": {"tool_req": {"tool_name": "click"}, "result": "ok"},
     "UserMessageEvent": {"message": "hi"},
+    "ErrorEvent": {"error": "boom", "origin": "loop"},
+    "ToolResultBatch": {"results": []},
 }
 
 
@@ -52,6 +64,16 @@ def test_spec_declares_the_known_discriminator_defaults():
     assert {("Browser", "kind"), ("OnePasswordConfig", "provider")} <= found
 
 
+def test_dropped_fields_are_actually_absent():
+    """A regeneration that restores a skipped field must force it back under test, not stay skipped."""
+    for schema_name, prop_name in FIELD_DROPPED_ENTIRELY:
+        model = getattr(types_module, schema_name)
+        assert prop_name not in model.model_fields, (
+            f"{schema_name}.{prop_name} is back on the generated model; drop it from "
+            "FIELD_DROPPED_ENTIRELY and add MINIMAL_KWARGS so its default is verified."
+        )
+
+
 @pytest.mark.parametrize("schema_name,prop_name,expected_default", _spec_const_defaults())
 def test_generated_model_honors_spec_default(schema_name, prop_name, expected_default):
     if (schema_name, prop_name) in FIELD_DROPPED_ENTIRELY:
@@ -69,7 +91,7 @@ def test_generated_model_honors_spec_default(schema_name, prop_name, expected_de
     [
         (Browser(id="browser", start_url="https://x.test"), "kind", "web"),
         (OnePasswordConfig(op_vault_id="vault_1"), "provider", "onepassword"),
-        (ToolResultEvent(tool_call_id="call_1", result="ok"), "type", "tool_result"),
+        (ToolResultEvent(tool_req={"tool_name": "click"}, result="ok"), "kind", "tool_result"),
         (UserMessageEvent(message="hi"), "type", "user_message"),
     ],
 )
