@@ -4,17 +4,24 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .tool_result_batch_results_item import ToolResultBatchResultsItem
-from .tool_result_batch_type import ToolResultBatchType
+from .image_content_type import ImageContentType
 
 
-class ToolResultBatch(UniversalBaseModel):
+class ImageContent(UniversalBaseModel):
     """
-    Batch of custom tool results.
+    Image payload: ``url`` for platform-served screenshots, ``base64`` for inline images.
     """
 
-    type: typing.Optional[ToolResultBatchType] = "batch"
-    results: typing.List[ToolResultBatchResultsItem]
+    source: str = pydantic.Field()
+    """
+    Image location: a fetchable URL or a base64 payload, per ``type``.
+    """
+
+    type: ImageContentType
+    media_type: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    MIME type, e.g. "image/png".
+    """
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

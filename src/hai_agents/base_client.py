@@ -13,6 +13,7 @@ from .environment import HaiAgentsEnvironment
 
 if typing.TYPE_CHECKING:
     from .agents.client import AgentsClient, AsyncAgentsClient
+    from .browser_profiles.client import AsyncBrowserProfilesClient, BrowserProfilesClient
     from .environments.client import AsyncEnvironmentsClient, EnvironmentsClient
     from .sessions.client import AsyncSessionsClient, SessionsClient
     from .skills.client import AsyncSkillsClient, SkillsClient
@@ -103,6 +104,7 @@ class BaseClient:
         self._environments: typing.Optional[EnvironmentsClient] = None
         self._agents: typing.Optional[AgentsClient] = None
         self._webhooks: typing.Optional[WebhooksClient] = None
+        self._browser_profiles: typing.Optional[BrowserProfilesClient] = None
         self._vaults: typing.Optional[VaultsClient] = None
 
     @property
@@ -144,6 +146,14 @@ class BaseClient:
 
             self._webhooks = WebhooksClient(client_wrapper=self._client_wrapper)
         return self._webhooks
+
+    @property
+    def browser_profiles(self):
+        if self._browser_profiles is None:
+            from .browser_profiles.client import BrowserProfilesClient  # noqa: E402
+
+            self._browser_profiles = BrowserProfilesClient(client_wrapper=self._client_wrapper)
+        return self._browser_profiles
 
     @property
     def vaults(self):
@@ -258,6 +268,7 @@ class AsyncBaseClient:
         self._environments: typing.Optional[AsyncEnvironmentsClient] = None
         self._agents: typing.Optional[AsyncAgentsClient] = None
         self._webhooks: typing.Optional[AsyncWebhooksClient] = None
+        self._browser_profiles: typing.Optional[AsyncBrowserProfilesClient] = None
         self._vaults: typing.Optional[AsyncVaultsClient] = None
 
     @property
@@ -299,6 +310,14 @@ class AsyncBaseClient:
 
             self._webhooks = AsyncWebhooksClient(client_wrapper=self._client_wrapper)
         return self._webhooks
+
+    @property
+    def browser_profiles(self):
+        if self._browser_profiles is None:
+            from .browser_profiles.client import AsyncBrowserProfilesClient  # noqa: E402
+
+            self._browser_profiles = AsyncBrowserProfilesClient(client_wrapper=self._client_wrapper)
+        return self._browser_profiles
 
     @property
     def vaults(self):

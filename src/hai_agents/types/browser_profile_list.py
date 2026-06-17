@@ -4,17 +4,18 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .tool_result_batch_results_item import ToolResultBatchResultsItem
-from .tool_result_batch_type import ToolResultBatchType
+from .browser_profile_read import BrowserProfileRead
 
 
-class ToolResultBatch(UniversalBaseModel):
+class BrowserProfileList(UniversalBaseModel):
     """
-    Batch of custom tool results.
+    Response model for listing browser profiles.
     """
 
-    type: typing.Optional[ToolResultBatchType] = "batch"
-    results: typing.List[ToolResultBatchResultsItem]
+    total: int
+    limit: int
+    offset: int
+    profiles: typing.List[BrowserProfileRead]
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
