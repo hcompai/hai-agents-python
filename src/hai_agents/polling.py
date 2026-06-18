@@ -596,6 +596,120 @@ async def async_run_session(
     )
 
 
+def stream_session(
+    client: Client,
+    id: str,
+    *,
+    from_index: int = 0,
+    wait_for_seconds: int = 20,
+    limit: typing.Optional[int] = None,
+    until: typing_extensions.Literal["settled", "terminal"] = "settled",
+    timeout_seconds: typing.Optional[float] = None,
+) -> typing.Iterator[SessionEvent]:
+    """Yield a session's events incrementally as they arrive, until it stops.
+
+    Wraps the long-poll loop: each poll yields the events past the cursor, then the
+    loop reads the authoritative status and stops per ``until`` (``"settled"`` =
+    terminal or idle; ``"terminal"`` keeps the stream open across the idle turns of
+    an interactive session). A final non-blocking drain loop flushes any backlog
+    remaining when it stops. Unlike ``wait_for_session``, this does not execute
+    custom tools: it is a read-only view of the event stream.
+
+    Args:
+        client: Client bound to the session.
+        id: Session id to stream.
+        from_index: Event index to start from; 0 replays the whole trajectory.
+        wait_for_seconds: Server long-poll window per request.
+        limit: Optional cap on events returned per poll.
+        until: Stop on ``"settled"`` (terminal or idle) or only on ``"terminal"``.
+        timeout_seconds: Optional overall wall-clock budget.
+
+    Yields:
+        Each new ``SessionEvent`` in order.
+
+    Raises:
+        TimeoutError: If ``timeout_seconds`` elapses before the session stops.
+    """
+    should_stop = is_terminal_session_status if until == "terminal" else is_settled_session_status
+    next_from_index = from_index
+    deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
+
+    while True:
+        if deadline is not None and time.monotonic() >= deadline:
+            raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+
+        changes = client.sessions.get_session_changes(
+            id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=wait_for_seconds
+        )
+        if changes is not None:
+            batch = changes.new_events or []
+            yield from batch
+            next_from_index += len(batch)
+
+        if should_stop(client.sessions.get_session_status(id).status):
+            # Drain to exhaustion: one page may not cover the backlog past the cursor,
+            # since the server caps page size (and honors ``limit``). Keep honoring the
+            # wall-clock budget so a large tail cannot outlive ``timeout_seconds``.
+            while True:
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+                tail = client.sessions.get_session_changes(
+                    id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
+                )
+                batch = tail.new_events or [] if tail is not None else []
+                if not batch:
+                    return
+                yield from batch
+                next_from_index += len(batch)
+
+
+async def async_stream_session(
+    client: AsyncClient,
+    id: str,
+    *,
+    from_index: int = 0,
+    wait_for_seconds: int = 20,
+    limit: typing.Optional[int] = None,
+    until: typing_extensions.Literal["settled", "terminal"] = "settled",
+    timeout_seconds: typing.Optional[float] = None,
+) -> typing.AsyncIterator[SessionEvent]:
+    """Async version of ``stream_session``."""
+    should_stop = is_terminal_session_status if until == "terminal" else is_settled_session_status
+    next_from_index = from_index
+    deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
+
+    while True:
+        if deadline is not None and time.monotonic() >= deadline:
+            raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+
+        changes = await client.sessions.get_session_changes(
+            id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=wait_for_seconds
+        )
+        if changes is not None:
+            batch = changes.new_events or []
+            for event in batch:
+                yield event
+            next_from_index += len(batch)
+
+        status = await client.sessions.get_session_status(id)
+        if should_stop(status.status):
+            # Drain to exhaustion: one page may not cover the backlog past the cursor,
+            # since the server caps page size (and honors ``limit``). Keep honoring the
+            # wall-clock budget so a large tail cannot outlive ``timeout_seconds``.
+            while True:
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+                tail = await client.sessions.get_session_changes(
+                    id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
+                )
+                batch = tail.new_events or [] if tail is not None else []
+                if not batch:
+                    return
+                for event in batch:
+                    yield event
+                next_from_index += len(batch)
+
+
 class SessionHandle(typing.Generic[AnswerT]):
     """A created session bound to its client: object-oriented sugar over the polling helpers."""
 
@@ -640,6 +754,26 @@ class SessionHandle(typing.Generic[AnswerT]):
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
         return wait_for_session(self._client, self.id, **kwargs)
+
+    def stream(
+        self,
+        *,
+        from_index: int = 0,
+        wait_for_seconds: int = 20,
+        limit: typing.Optional[int] = None,
+        until: typing_extensions.Literal["settled", "terminal"] = "settled",
+        timeout_seconds: typing.Optional[float] = None,
+    ) -> typing.Iterator[SessionEvent]:
+        """Yield this session's events live until it settles (terminal or idle)."""
+        return stream_session(
+            self._client,
+            self.id,
+            from_index=from_index,
+            wait_for_seconds=wait_for_seconds,
+            limit=limit,
+            until=until,
+            timeout_seconds=timeout_seconds,
+        )
 
 
 class AsyncSessionHandle(typing.Generic[AnswerT]):
@@ -686,3 +820,23 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
         return await async_wait_for_session(self._client, self.id, **kwargs)
+
+    def stream(
+        self,
+        *,
+        from_index: int = 0,
+        wait_for_seconds: int = 20,
+        limit: typing.Optional[int] = None,
+        until: typing_extensions.Literal["settled", "terminal"] = "settled",
+        timeout_seconds: typing.Optional[float] = None,
+    ) -> typing.AsyncIterator[SessionEvent]:
+        """Yield this session's events live until it settles (terminal or idle)."""
+        return async_stream_session(
+            self._client,
+            self.id,
+            from_index=from_index,
+            wait_for_seconds=wait_for_seconds,
+            limit=limit,
+            until=until,
+            timeout_seconds=timeout_seconds,
+        )
