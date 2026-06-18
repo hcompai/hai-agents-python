@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  Python SDK for <a href="https://hcompany.ai">H Company</a>'s <a href="https://hub.hcompany.ai/agent-api">Computer-Use Agents</a>. Launch autonomous agents powered by Holo, watch them work, and steer them mid-run.
+  Python SDK for <a href="https://hcompany.ai">H Company</a>'s <a href="https://hub.hcompany.ai/agent-api">Computer-Use Agents</a>.
 </p>
 
 <p align="center">
