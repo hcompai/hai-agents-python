@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://github.com/hcompai/hai-agents-python/blob/main/assets/banner-dark.gif?raw=true" />
-    <img src="https://github.com/hcompai/hai-agents-python/blob/main/assets/banner-light.gif?raw=true" alt="H Agent API" width="700" />
+    <img src="https://github.com/hcompai/hai-agents-python/blob/main/assets/banner-light.gif?raw=true" alt="Computer-Use Agents" width="700" />
   </picture>
 </p>
 
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  Python SDK for the <a href="https://hcompany.ai">H Company</a> <a href="https://hub.hcompany.ai/agent-api">Agent API</a>. Launch autonomous agents powered by Holo, stream their progress, and steer them mid-run.
+  Python SDK for <a href="https://hcompany.ai">H Company</a>'s <a href="https://hub.hcompany.ai/agent-api">Computer-Use Agents</a>. Launch autonomous agents powered by Holo, watch them work, and steer them mid-run.
 </p>
 
 <p align="center">
@@ -33,13 +33,13 @@
 pip install hai-agents
 ```
 
-Install the optional command-line entry point when you want local tools:
+Add the optional command-line tools with the `cli` extra:
 
 ```bash
 pip install "hai-agents[cli]"
 ```
 
-Requires Python 3.10 or newer. Grab an API key at [portal.hcompany.ai](https://portal.hcompany.ai) and export it:
+Python 3.10 or newer is required. Get an API key at [portal.hcompany.ai](https://portal.hcompany.ai) and export it:
 
 ```bash
 export HAI_API_KEY=hk-...
@@ -50,12 +50,11 @@ export HAI_API_KEY=hk-...
 Launch the built-in `h/web-surfer-holo3-1-35b` agent, which ships with its own browser, and describe the task in plain language. `run_session` polls until the agent finishes and returns the final answer.
 
 ```python
-from hai_agents import Client, run_session
+from hai_agents import Client
 
 client = Client()  # reads HAI_API_KEY from the environment
 
-result = run_session(
-    client,
+result = client.run_session(
     agent="h/web-surfer-holo3-1-35b",
     messages="What are the top 3 stories on Hacker News right now?",
 )
@@ -64,15 +63,70 @@ print(result.status)  # "completed"
 print(result.answer)
 ```
 
-An `AsyncClient` mirrors this API for asyncio.
+`result` is a `SessionRunResult`: `id`, `status`, `answer`, the accumulated `events`, and `final_changes`.
+
+## How a session works
+
+A session is one run of an agent against a task. It moves through a small set of states: `pending`, `running`, and then a settled state such as `completed`, `idle`, `failed`, `timed_out`, or `interrupted`.
+
+You drive a session two ways. `run_session` creates it and blocks until it settles, which suits one-shot tasks. `start_session` creates it and returns a handle right away, so you can read and steer the agent while it works.
+
+```python
+session = client.start_session(
+    agent="h/web-surfer-holo3-1-35b",
+    messages="Find the top story on Hacker News",
+)
+
+print(session.id)
+result = session.wait_for_completion()
+print(result.status, result.answer)
+```
+
+## Watch and steer a running session
+
+A handle bound to the session `id` exposes the full lifecycle. Read the agent's progress at three levels of detail:
+
+```python
+session.status()               # cheap snapshot: state, step count, token usage
+session.changes(from_index=0)  # new events and the final answer, long-polled
+session.get()                  # the full Session resource
+```
+
+While the session is not in a terminal state, you can intervene:
+
+```python
+session.send_message({"type": "user_message", "message": "Only consider the last 24 hours"})
+session.pause()         # halt with state preserved
+session.resume()        # continue where it left off
+session.force_answer()  # stop exploring and answer from what it has
+session.cancel()        # stop for good; ends in "interrupted"
+```
+
+`send_message` redirects the agent on its next step. Sending a message to an `idle` session also wakes it.
+
+## Multi-turn sessions
+
+By default a session ends as soon as the agent answers. Set `idle_timeout_s` to keep it open: after each answer the session goes `idle` and waits that long for your next message, carrying its full context and browser state across turns.
+
+```python
+session = client.start_session(
+    agent="h/web-surfer-holo3-1-35b",
+    idle_timeout_s=600,
+    messages="Find the top story on Hacker News",
+)
+first = session.wait_for_completion()
+
+session.send_message({"type": "user_message", "message": "Now summarize its comments"})
+second = session.wait_for_completion()
+```
 
 ## Structured output
 
-Pass a pydantic model as `answer_schema` and the agent's final answer comes back as a validated instance. The model's JSON schema is sent as the agent's `answer_format`; the raw wire value stays at `result.final_changes.answer`.
+Pass a pydantic model as `answer_schema` and the agent's final answer comes back as a validated instance. The model's JSON schema is sent as the agent's answer format; the raw wire value stays at `result.final_changes.answer`.
 
 ```python
 from pydantic import BaseModel
-from hai_agents import Client, run_session
+from hai_agents import Client
 
 class Job(BaseModel):
     title: str
@@ -82,8 +136,7 @@ class Jobs(BaseModel):
     jobs: list[Job]
 
 client = Client()
-result = run_session(
-    client,
+result = client.run_session(
     agent="h/web-surfer-holo3-1-35b",
     messages="Find 3 open ML engineering roles in Paris.",
     answer_schema=Jobs,
@@ -93,11 +146,11 @@ for job in result.answer.jobs:  # result.answer is a Jobs instance
     print(job.title, "@", job.company)
 ```
 
-A completed answer that does not match the schema raises `AnswerValidationError` (the raw payload is on `.raw`). Sessions that end without completing (cancelled, timed out) return their raw answer untouched.
+A completed answer that does not match the schema raises `AnswerValidationError`, with the raw payload on `.raw`. Sessions that end without completing return their raw answer untouched.
 
 ## Custom tools
 
-Expose your own Python functions to the agent: pass them to `run_session` and the polling loop executes them whenever the agent calls one, posting the result back so the session resumes. Any function with typed parameters and a docstring works; the input schema is derived from the signature.
+Expose your own Python functions to the agent. Pass them to `run_session` and the polling loop runs each one when the agent calls it, then posts the result back so the session continues. Any function with typed parameters and a docstring works; the input schema is derived from the signature.
 
 ```python
 from hai_agents import Client
@@ -109,47 +162,120 @@ def get_weather(city: str) -> str:
 client = Client()
 
 result = client.run_session(
-    agent="h/researcher",
-    messages="What's the weather in Paris?",
+    agent="h/web-surfer-holo3-1-35b",
+    messages="What should I wear in Paris today?",
     tools=[get_weather],
 )
 ```
 
-Use `@tool(name=..., description=...)` to override what the model sees. Tool exceptions are reported to the agent as tool errors rather than crashing the loop. With `AsyncClient`, tools may be `async def`. For manual control, `client.start_session(tools=[...])` returns a handle whose `wait_for_completion()` dispatches the same way, and sessions awaiting results report the `awaiting_tool_results` status with the pending calls.
+Use the `@tool` decorator to override the name or description:
 
-## CLI
+```python
+from hai_agents import tool
 
-The `hai-agents[cli]` extra installs the `hai` command:
-
-```bash
-hai login                  # browser sign-in; stores a key in ~/.config/hai/.env
-hai run "Summarize the H Agent API quickstart"
-hai --json run "Reply with exactly: hello" --max-steps 3 --max-time 60
-hai sessions list
-hai sessions get <session-id>
-hai sessions send <session-id> "continue"
-hai sessions cancel <session-id>
-hai sessions share <session-id>
-hai mcp install            # wire the hai-agents MCP server into every detected editor
-hai mcp install list       # see supported clients (Cursor, VS Code, Claude Code, Windsurf)
+@tool(name="lookup_order", description="Look up an order by its id.")
+def lookup(order_id: str) -> dict:
+    return {"id": order_id, "status": "shipped"}
 ```
 
-`hai mcp install` adds the remote `hai-agents` MCP server to your local editors and
-writes your API key into each client config (in plaintext, so keep them private). On
-clients that support agent skills (Cursor, Claude Code) it also symlinks a `SKILL.md`
-that teaches the model how to drive the server.
+A tool that raises is reported to the agent as a tool error rather than crashing the run. With `AsyncClient`, tools may be `async def`.
 
-`hai login` opens your browser, mints a per-machine API key, and writes it to
-`~/.config/hai/.env`. `hai whoami` shows the resolved endpoint and whether you are
-authenticated; `hai logout` removes the stored key.
+## Browser profiles and vaults
 
-Credentials resolve from flags, then `HAI_API_KEY` in the environment,
-then a local `.env`, then `~/.config/hai/.env`. Use `--base-url` or `HAI_API_BASE_URL`
-to target a specific Agent Platform host.
+Start a session on a browser that already knows the user. A [browser profile](https://hub.hcompany.ai/agent-api) restores saved cookies and storage from an earlier session, and a [vault](https://hub.hcompany.ai/agent-api) lets the agent sign in to sites with secrets that never enter its context. Bind both through per-run overrides:
+
+```python
+result = client.run_session(
+    agent="h/web-surfer-holo3-1-35b",
+    messages="Open my dashboard and report any new alerts",
+    overrides={
+        "agent.environments[kind=web].browser_profile_id": "<profile-id>",
+        "agent.environments[kind=web].vault_id": "<vault-id>",
+    },
+)
+```
+
+## Async
+
+`AsyncClient` mirrors `Client` for asyncio. Every session method is a coroutine.
+
+```python
+import asyncio
+from hai_agents import AsyncClient
+
+async def main():
+    client = AsyncClient()
+    result = await client.run_session(
+        agent="h/web-surfer-holo3-1-35b",
+        messages="What are the top 3 stories on Hacker News right now?",
+    )
+    print(result.answer)
+
+asyncio.run(main())
+```
+
+## Inspect and share sessions
+
+List past sessions and create a public replay link:
+
+```python
+page = client.sessions.list_sessions(size=10)
+for summary in page.items:
+    print(summary.id, summary.status)
+
+link = client.sessions.share_session("<session-id>")
+print(link.share_url)
+```
+
+## Regions and configuration
+
+The client targets the EU region by default. Point it at the US region or a custom URL, and override the API key in code when you do not want to use the environment variable:
+
+```python
+from hai_agents import Client, HaiAgentsEnvironment
+
+client = Client(environment=HaiAgentsEnvironment.US)
+# or
+client = Client(base_url="https://agp.hcompany.ai", api_key="hk-...")
+```
+
+## Errors
+
+```python
+from hai_agents import AnswerValidationError, UnprocessableEntityError
+from hai_agents.core import ApiError
+```
+
+`ApiError` is the base for HTTP failures and carries `.status_code` and `.body`. `UnprocessableEntityError` is the 422 raised when a request fails validation. `AnswerValidationError` is raised when a completed answer does not match `answer_schema`, with the unparsed value on `.raw`.
+
+## Webhooks
+
+Verify the signature on an incoming webhook before trusting it:
+
+```python
+from hai_agents import verify_webhook, WebhookVerificationError
+
+event = verify_webhook(request_body, signature, timestamp, secret)
+print(event.type, event.data)
+```
+
+## Command line
+
+The `cli` extra installs the `hai` command for driving agents from your terminal:
+
+```bash
+hai login                 # browser sign-in, stores a key in ~/.config/hai/.env
+hai run "What's the top story on Hacker News?"
+hai sessions list
+hai sessions watch <session-id>
+hai mcp install           # add the hai-agents MCP server to Cursor, VS Code, Claude Code, ...
+```
+
+Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`. Run `hai --help` for the full command set.
 
 ## Documentation
 
-Guides, core concepts, and the full API reference live at **[hub.hcompany.ai/agent-api](https://hub.hcompany.ai/agent-api)**, covering streaming progress, steering a live session, regions, structured output, and error handling.
+Guides, core concepts, and the full API reference live at **[hub.hcompany.ai/agent-api](https://hub.hcompany.ai/agent-api)**.
 
 ## License
 
