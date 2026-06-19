@@ -6,6 +6,7 @@ import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .browser_kind import BrowserKind
 from .browser_mode import BrowserMode
+from .browser_network import BrowserNetwork
 
 
 class Browser(UniversalBaseModel):
@@ -57,6 +58,11 @@ class Browser(UniversalBaseModel):
     browser_profile_id: typing.Optional[str] = pydantic.Field(default=None)
     """
     Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
+    """
+
+    network: typing.Optional[BrowserNetwork] = pydantic.Field(default=None)
+    """
+    Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
     """
 
     if IS_PYDANTIC_V2:

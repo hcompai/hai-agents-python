@@ -6,6 +6,7 @@ from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
 from ..types.browser_kind import BrowserKind
 from ..types.browser_mode import BrowserMode
+from ..types.browser_network import BrowserNetwork
 from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
@@ -102,6 +103,7 @@ class EnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -138,6 +140,9 @@ class EnvironmentsClient:
         browser_profile_id : typing.Optional[str]
             Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
 
+        network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -168,6 +173,7 @@ class EnvironmentsClient:
             page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            network=network,
             request_options=request_options,
         )
         return _response.data
@@ -216,6 +222,7 @@ class EnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -254,6 +261,9 @@ class EnvironmentsClient:
         browser_profile_id : typing.Optional[str]
             Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
 
+        network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -286,6 +296,7 @@ class EnvironmentsClient:
             page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            network=network,
             request_options=request_options,
         )
         return _response.data
@@ -332,6 +343,7 @@ class EnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
         env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
         mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
@@ -363,6 +375,8 @@ class EnvironmentsClient:
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
+
+        network : typing.Optional[BrowserNetwork]
 
         pip_packages : typing.Optional[typing.Sequence[str]]
 
@@ -404,6 +418,7 @@ class EnvironmentsClient:
             page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            network=network,
             pip_packages=pip_packages,
             env=env,
             mcp_servers=mcp_servers,
@@ -506,6 +521,7 @@ class AsyncEnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -541,6 +557,9 @@ class AsyncEnvironmentsClient:
 
         browser_profile_id : typing.Optional[str]
             Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
+
+        network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -580,6 +599,7 @@ class AsyncEnvironmentsClient:
             page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            network=network,
             request_options=request_options,
         )
         return _response.data
@@ -636,6 +656,7 @@ class AsyncEnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -673,6 +694,9 @@ class AsyncEnvironmentsClient:
 
         browser_profile_id : typing.Optional[str]
             Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
+
+        network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -714,6 +738,7 @@ class AsyncEnvironmentsClient:
             page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            network=network,
             request_options=request_options,
         )
         return _response.data
@@ -768,6 +793,7 @@ class AsyncEnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
         env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
         mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
@@ -799,6 +825,8 @@ class AsyncEnvironmentsClient:
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
+
+        network : typing.Optional[BrowserNetwork]
 
         pip_packages : typing.Optional[typing.Sequence[str]]
 
@@ -848,6 +876,7 @@ class AsyncEnvironmentsClient:
             page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            network=network,
             pip_packages=pip_packages,
             env=env,
             mcp_servers=mcp_servers,
