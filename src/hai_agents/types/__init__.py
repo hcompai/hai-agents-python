@@ -103,6 +103,7 @@ if typing.TYPE_CHECKING:
     from .session_summary import SessionSummary
     from .share_link import ShareLink
     from .skill import Skill
+    from .token_quota_status import TokenQuotaStatus
     from .tool_definition import ToolDefinition
     from .tool_request import ToolRequest
     from .tool_result_batch import ToolResultBatch
@@ -220,6 +221,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "SessionSummary": ".session_summary",
     "ShareLink": ".share_link",
     "Skill": ".skill",
+    "TokenQuotaStatus": ".token_quota_status",
     "ToolDefinition": ".tool_definition",
     "ToolRequest": ".tool_request",
     "ToolResultBatch": ".tool_result_batch",
@@ -359,6 +361,7 @@ __all__ = [
     "SessionSummary",
     "ShareLink",
     "Skill",
+    "TokenQuotaStatus",
     "ToolDefinition",
     "ToolRequest",
     "ToolResultBatch",
