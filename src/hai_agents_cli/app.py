@@ -108,7 +108,7 @@ def whoami(ctx: typer.Context) -> None:
     data = {
         "base_url": credentials.resolve_base_url(state.base_url),
         "authenticated": authenticated,
-        "source": credentials.source(),
+        "source": credentials.source(state.api_key),
     }
     if state.json_output:
         _print_json(data)
@@ -242,6 +242,13 @@ def cancel(
         typer.confirm(f"Cancel session {session_id}?", abort=True)
     client = _client(state)
     try:
+        current = client.sessions.get_session_status(session_id)
+        if is_settled_session_status(current.status):
+            if state.json_output:
+                _print_json({"ack": False, "action": "cancel", "status": _status_text(current.status)})
+            else:
+                console.print(f"Session already {_status_text(current.status)}; nothing to cancel.")
+            return
         client.sessions.cancel_session(session_id)
     except Exception as exc:
         _raise_cli_error(exc)
@@ -278,6 +285,18 @@ def share(ctx: typer.Context, session_id: str = typer.Argument(...)) -> None:
         _print_json({"share_url": share_url})
     else:
         print(share_url)
+
+
+@sessions_app.command("unshare")
+def unshare(ctx: typer.Context, session_id: str = typer.Argument(...)) -> None:
+    """Revoke a session's public share URL."""
+    state = _state(ctx)
+    client = _client(state)
+    try:
+        client.sessions.unshare_session(session_id)
+    except Exception as exc:
+        _raise_cli_error(exc)
+    _print_ack("unshared", state.json_output)
 
 
 @sessions_app.command("status")
@@ -345,16 +364,24 @@ def watch(
             _raise_cli_error(TimeoutError(f"Session {session_id} did not settle within {timeout}s."))
         try:
             changes = client.sessions.get_session_changes(
-                session_id, from_index=from_index, include_events=True, wait_for_seconds=min(20, int(remaining))
+                session_id,
+                from_index=from_index,
+                include_events=True,
+                wait_for_seconds=max(1, min(20, int(remaining))),
             )
             for event in (changes.new_events if changes else None) or []:
-                if state.json_output:
-                    print(json.dumps(to_jsonable(event), sort_keys=True))
-                else:
-                    console.print(_event_line(from_index, event))
+                _emit_watch_event(state, from_index, event)
                 from_index += 1
             current = client.sessions.get_session_status(session_id)
             if is_settled_session_status(current.status):
+                # /changes is a delta endpoint: drain events that landed between the last poll
+                # and settling, otherwise the tail of the trajectory is silently dropped.
+                tail = client.sessions.get_session_changes(
+                    session_id, from_index=from_index, include_events=True, wait_for_seconds=0
+                )
+                for event in (tail.new_events if tail else None) or []:
+                    _emit_watch_event(state, from_index, event)
+                    from_index += 1
                 # The terminal answer lives on /changes, not /status.
                 final = client.sessions.get_session_changes(
                     session_id, from_index=0, include_events=False, wait_for_seconds=0
@@ -610,10 +637,38 @@ def _event_line(index: int, event) -> str:
     return f"[dim]{index:>4}[/dim] [cyan]{event_type}[/cyan]" + (f"  {detail}" if detail else "")
 
 
+def _emit_watch_event(state: AppState, index: int, event) -> None:
+    if state.json_output:
+        print(json.dumps(to_jsonable(event), sort_keys=True))
+    else:
+        console.print(_event_line(index, event))
+
+
+def _format_api_body(body) -> str:
+    """Human-readable message from an API error body, flattening 422 validation detail."""
+    if isinstance(body, str):
+        return body
+    detail = getattr(body, "detail", None)
+    if detail is None and isinstance(body, dict):
+        detail = body.get("detail")
+    if isinstance(detail, str):
+        return detail
+    if isinstance(detail, list):
+        parts = []
+        for item in detail:
+            loc = getattr(item, "loc", None) if not isinstance(item, dict) else item.get("loc")
+            msg = getattr(item, "msg", None) if not isinstance(item, dict) else item.get("msg")
+            if msg:
+                where = ".".join(str(p) for p in loc) if loc else ""
+                parts.append(f"{where}: {msg}" if where else str(msg))
+        if parts:
+            return "; ".join(parts)
+    return json.dumps(to_jsonable(body), sort_keys=True)
+
+
 def _raise_cli_error(exc: Exception) -> NoReturn:
     if isinstance(exc, ApiError):
-        body = exc.body
-        message = body if isinstance(body, str) else json.dumps(to_jsonable(body), sort_keys=True)
+        message = _format_api_body(exc.body)
         if exc.status_code is not None:
             message = f"API error {exc.status_code}: {message}"
     else:

@@ -189,7 +189,7 @@ def wire_mcp(c: Client, url: str, key: str) -> tuple[Status, str]:
     if c.cli_cmd is not None:
         add = [_render(arg, url, key) for arg in c.cli_cmd]
         removes = [list(rm) for rm in c.cli_remove_cmds]
-        return _install_via_cli(add, removes)
+        return _install_via_cli(add, removes, secret=key)
     assert c.config_path is not None and c.key_path is not None and c.leaf is not None
     return _wire_json(Path(c.config_path).expanduser(), c.key_path, _render(c.leaf, url, key))
 
@@ -205,7 +205,9 @@ def _render(obj: Any, url: str, key: str) -> Any:
     return obj
 
 
-def _install_via_cli(add_cmd: list[str], remove_cmds: list[list[str]] | None = None) -> tuple[Status, str]:
+def _install_via_cli(
+    add_cmd: list[str], remove_cmds: list[list[str]] | None = None, secret: str | None = None
+) -> tuple[Status, str]:
     exe = shutil.which(add_cmd[0])
     if exe is None:
         return Status.ABSENT, f"{add_cmd[0]!r} not on PATH"
@@ -216,7 +218,11 @@ def _install_via_cli(add_cmd: list[str], remove_cmds: list[list[str]] | None = N
     try:
         subprocess.run([exe, *add_cmd[1:]], check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as exc:
-        return Status.FAILED, (exc.stderr or exc.stdout or str(exc)).strip()
+        # The CLI tends to echo the failing invocation (incl. the bearer header) back on stderr.
+        detail = (exc.stderr or exc.stdout or str(exc)).strip()
+        if secret:
+            detail = detail.replace(secret, "***")
+        return Status.FAILED, detail
     return Status.INSTALLED, f"via {add_cmd[0]} CLI"
 
 
