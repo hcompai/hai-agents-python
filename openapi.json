@@ -3296,6 +3296,43 @@
           }
         }
       }
+    },
+    "/api/v2/quota/tokens": {
+      "get": {
+        "tags": [
+          "quota"
+        ],
+        "summary": "Get Token Quota",
+        "description": "Return the current org's token-quota snapshot for the FE meter.",
+        "operationId": "get_token_quota_api_v2_quota_tokens_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenQuotaStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -5934,6 +5971,70 @@
         ],
         "title": "Skill",
         "description": "A named, reusable instruction an agent can draw on during a session."
+      },
+      "TokenQuotaStatus": {
+        "properties": {
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "used": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used"
+          },
+          "remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining"
+          },
+          "window_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window Start"
+          },
+          "window_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "limit",
+          "used",
+          "remaining",
+          "window_start",
+          "window_end"
+        ],
+        "title": "TokenQuotaStatus",
+        "description": "Current per-org token usage snapshot."
       },
       "ToolDefinition": {
         "properties": {
