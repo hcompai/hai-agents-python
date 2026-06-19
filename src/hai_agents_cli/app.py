@@ -170,13 +170,14 @@ def run(
     state = _state(ctx)
     client = _client(state)
     overrides = _parse_overrides(override or [])
-    params = {
+    params: dict[str, Any] = {
         "agent": agent,
         "messages": task,
         "max_steps": max_steps,
         "max_time_s": max_time_s,
-        "overrides": overrides or None,
     }
+    if overrides:
+        params["overrides"] = overrides
     try:
         assert_request_under_limit(params)
         session = client.sessions.create_session(**params)
