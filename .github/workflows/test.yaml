@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install SDK + dev deps
         run: |
@@ -44,7 +44,7 @@ jobs:
       HAI_API_KEY_TEST: ${{ secrets.HAI_API_KEY_TEST }}
       HAI_API_BASE_URL_TEST: "https://agp.eu.hcompany.ai"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install SDK
         run: |
