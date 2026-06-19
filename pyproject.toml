@@ -44,7 +44,7 @@ all = [
 ]
 
 [project.scripts]
-hai = "hai_agents_cli.app:main"
+hai = "hai_agents_cli:main"
 
 [project.urls]
 Homepage = "https://hcompany.ai"

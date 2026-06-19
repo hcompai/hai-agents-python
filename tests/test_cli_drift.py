@@ -49,7 +49,7 @@ def test_project_exposes_cli_extras() -> None:
     pyproject = tomllib.loads(Path("pyproject.toml").read_text())
 
     assert set(pyproject["project"]["optional-dependencies"]) >= {"cli", "all"}
-    assert pyproject["project"]["scripts"]["hai"] == "hai_agents_cli.app:main"
+    assert pyproject["project"]["scripts"]["hai"] == "hai_agents_cli:main"
     assert "hai-mcp" not in pyproject["project"]["scripts"]
 
 
