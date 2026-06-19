@@ -59,7 +59,7 @@ result = client.run_session(
     messages="What are the top 3 stories on Hacker News right now?",
 )
 
-print(result.status)  # "completed"
+print(result.status)  # a settled state: "idle" on EU (the default), "completed" on US
 print(result.answer)
 ```
 
