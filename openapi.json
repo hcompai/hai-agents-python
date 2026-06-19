@@ -3296,6 +3296,43 @@
           }
         }
       }
+    },
+    "/api/v2/quota/tokens": {
+      "get": {
+        "tags": [
+          "quota"
+        ],
+        "summary": "Get Token Quota",
+        "description": "Return the current org's token-quota snapshot for the FE meter.",
+        "operationId": "get_token_quota_api_v2_quota_tokens_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenQuotaStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -3847,6 +3884,17 @@
             ],
             "title": "Browser Profile Id",
             "description": "Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile."
+          },
+          "network": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BrowserNetwork"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set)."
           }
         },
         "type": "object",
@@ -3855,6 +3903,25 @@
         ],
         "title": "Browser",
         "description": "A web browser the agent navigates and acts on."
+      },
+      "BrowserNetwork": {
+        "properties": {
+          "proxy_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Url",
+            "description": "Optional bring-your-own HTTP/HTTPS/SOCKS proxy URL for browser egress (e.g. http://user:pass@proxy.example.com:8080). Applied when provisioning a new remote browser session. Only supported for headful chromium-based runners. Ignored when session_id attaches to an existing session."
+          }
+        },
+        "type": "object",
+        "title": "BrowserNetwork",
+        "description": "Network egress settings for a remote browser session."
       },
       "BrowserProfileCreate": {
         "properties": {
@@ -5123,6 +5190,16 @@
             ],
             "title": "Browser Profile Id"
           },
+          "network": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BrowserNetwork"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "pip_packages": {
             "anyOf": [
               {
@@ -5934,6 +6011,70 @@
         ],
         "title": "Skill",
         "description": "A named, reusable instruction an agent can draw on during a session."
+      },
+      "TokenQuotaStatus": {
+        "properties": {
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "used": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used"
+          },
+          "remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining"
+          },
+          "window_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window Start"
+          },
+          "window_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "limit",
+          "used",
+          "remaining",
+          "window_start",
+          "window_end"
+        ],
+        "title": "TokenQuotaStatus",
+        "description": "Current per-org token usage snapshot."
       },
       "ToolDefinition": {
         "properties": {

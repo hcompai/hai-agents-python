@@ -402,6 +402,19 @@ def wait_for_session(
 
         status = client.sessions.get_session_status(id)
         if is_settled_session_status(status.status):
+            if include_events:
+                while True:
+                    if deadline is not None and time.monotonic() >= deadline:
+                        raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+                    tail = client.sessions.get_session_changes(
+                        id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
+                    )
+                    batch = tail.new_events or [] if tail is not None else []
+                    if not batch:
+                        break
+                    last_changes = tail
+                    events.extend(batch)
+                    next_from_index += len(batch)
             changes = _final_changes(client, id, last_changes, limit)
             raw = changes.answer if changes is not None else None
             return SessionRunResult(
@@ -531,6 +544,19 @@ async def async_wait_for_session(
 
         status = await client.sessions.get_session_status(id)
         if is_settled_session_status(status.status):
+            if include_events:
+                while True:
+                    if deadline is not None and time.monotonic() >= deadline:
+                        raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+                    tail = await client.sessions.get_session_changes(
+                        id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
+                    )
+                    batch = tail.new_events or [] if tail is not None else []
+                    if not batch:
+                        break
+                    last_changes = tail
+                    events.extend(batch)
+                    next_from_index += len(batch)
             changes = await _async_final_changes(client, id, last_changes, limit)
             raw = changes.answer if changes is not None else None
             return SessionRunResult(
