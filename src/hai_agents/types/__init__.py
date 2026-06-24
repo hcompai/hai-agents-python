@@ -39,6 +39,7 @@ if typing.TYPE_CHECKING:
     from .browser import Browser
     from .browser_kind import BrowserKind
     from .browser_mode import BrowserMode
+    from .browser_network import BrowserNetwork
     from .browser_profile_list import BrowserProfileList
     from .browser_profile_read import BrowserProfileRead
     from .environment import Environment
@@ -103,6 +104,7 @@ if typing.TYPE_CHECKING:
     from .session_summary import SessionSummary
     from .share_link import ShareLink
     from .skill import Skill
+    from .token_quota_status import TokenQuotaStatus
     from .tool_definition import ToolDefinition
     from .tool_request import ToolRequest
     from .tool_result_batch import ToolResultBatch
@@ -158,6 +160,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "Browser": ".browser",
     "BrowserKind": ".browser_kind",
     "BrowserMode": ".browser_mode",
+    "BrowserNetwork": ".browser_network",
     "BrowserProfileList": ".browser_profile_list",
     "BrowserProfileRead": ".browser_profile_read",
     "Environment": ".environment",
@@ -220,6 +223,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "SessionSummary": ".session_summary",
     "ShareLink": ".share_link",
     "Skill": ".skill",
+    "TokenQuotaStatus": ".token_quota_status",
     "ToolDefinition": ".tool_definition",
     "ToolRequest": ".tool_request",
     "ToolResultBatch": ".tool_result_batch",
@@ -297,6 +301,7 @@ __all__ = [
     "Browser",
     "BrowserKind",
     "BrowserMode",
+    "BrowserNetwork",
     "BrowserProfileList",
     "BrowserProfileRead",
     "Environment",
@@ -359,6 +364,7 @@ __all__ = [
     "SessionSummary",
     "ShareLink",
     "Skill",
+    "TokenQuotaStatus",
     "ToolDefinition",
     "ToolRequest",
     "ToolResultBatch",
