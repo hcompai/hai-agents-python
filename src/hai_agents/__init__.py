@@ -38,6 +38,7 @@ if typing.TYPE_CHECKING:
         Browser,
         BrowserKind,
         BrowserMode,
+        BrowserNetwork,
         BrowserProfileList,
         BrowserProfileRead,
         Environment,
@@ -100,6 +101,7 @@ if typing.TYPE_CHECKING:
         SessionSummary,
         ShareLink,
         Skill,
+        TokenQuotaStatus,
         ToolDefinition,
         ToolRequest,
         ToolResultBatch,
@@ -122,8 +124,8 @@ if typing.TYPE_CHECKING:
         WebhookRecord,
         WebhookWithSecret,
     )
-    from .errors import UnprocessableEntityError
-    from . import agents, browser_profiles, environments, sessions, skills, vaults, webhooks
+    from .errors import NotFoundError, UnprocessableEntityError
+    from . import agents, browser_profiles, environments, quota, sessions, skills, vaults, webhooks
     from ._default_clients import DefaultAioHttpClient, DefaultAsyncHttpxClient
     from .agents import (
         ListAgentsRequestSortItem,
@@ -200,6 +202,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "Browser": ".types",
     "BrowserKind": ".types",
     "BrowserMode": ".types",
+    "BrowserNetwork": ".types",
     "BrowserProfileList": ".types",
     "BrowserProfileRead": ".types",
     "Client": ".client",
@@ -237,6 +240,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "MetricsUpdateEvent": ".types",
     "ModelCost": ".types",
     "ModelUsage": ".types",
+    "NotFoundError": ".errors",
     "ObservationEvent": ".types",
     "OnePasswordConfig": ".types",
     "OnePasswordConfigProvider": ".types",
@@ -286,6 +290,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ShareLink": ".types",
     "Skill": ".types",
     "TERMINAL_SESSION_STATUSES": ".polling",
+    "TokenQuotaStatus": ".types",
     "Tool": ".tools",
     "ToolDefinition": ".types",
     "ToolRequest": ".types",
@@ -322,6 +327,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "environments": ".environments",
     "is_settled_session_status": ".polling",
     "is_terminal_session_status": ".polling",
+    "quota": ".quota",
     "run_session": ".polling",
     "sessions": ".sessions",
     "skills": ".skills",
@@ -390,6 +396,7 @@ __all__ = [
     "Browser",
     "BrowserKind",
     "BrowserMode",
+    "BrowserNetwork",
     "BrowserProfileList",
     "BrowserProfileRead",
     "Client",
@@ -427,6 +434,7 @@ __all__ = [
     "MetricsUpdateEvent",
     "ModelCost",
     "ModelUsage",
+    "NotFoundError",
     "ObservationEvent",
     "OnePasswordConfig",
     "OnePasswordConfigProvider",
@@ -476,6 +484,7 @@ __all__ = [
     "ShareLink",
     "Skill",
     "TERMINAL_SESSION_STATUSES",
+    "TokenQuotaStatus",
     "Tool",
     "ToolDefinition",
     "ToolRequest",
@@ -512,6 +521,7 @@ __all__ = [
     "environments",
     "is_settled_session_status",
     "is_terminal_session_status",
+    "quota",
     "run_session",
     "sessions",
     "skills",
