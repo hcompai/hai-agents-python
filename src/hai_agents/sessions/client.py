@@ -779,11 +779,12 @@ class SessionsClient:
         client = Client(
             api_key="YOUR_API_KEY",
         )
-        client.sessions.get_session_resource(
+        for _chunk in client.sessions.get_session_resource(
             id="id",
             bucket="bucket",
             key="key",
-        )
+        ):
+            pass
         """
         with self._raw_client.get_session_resource(id, bucket, key, request_options=request_options) as r:
             yield from r.data
@@ -1687,11 +1688,12 @@ class AsyncSessionsClient:
 
 
         async def main() -> None:
-            await client.sessions.get_session_resource(
+            async for _chunk in client.sessions.get_session_resource(
                 id="id",
                 bucket="bucket",
                 key="key",
-            )
+            ):
+                pass
 
 
         asyncio.run(main())
