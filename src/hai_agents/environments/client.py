@@ -6,6 +6,7 @@ from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
 from ..types.browser_kind import BrowserKind
 from ..types.browser_mode import BrowserMode
+from ..types.browser_network import BrowserNetwork
 from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
@@ -94,7 +95,6 @@ class EnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
         width: typing.Optional[int] = OMIT,
         height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
@@ -102,6 +102,7 @@ class EnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -113,9 +114,6 @@ class EnvironmentsClient:
             Catalog identifier for this environment.
 
         kind : typing.Optional[BrowserKind]
-
-        headless : typing.Optional[bool]
-            Run without a visible window.
 
         width : typing.Optional[int]
             Viewport width in pixels.
@@ -137,6 +135,9 @@ class EnvironmentsClient:
 
         browser_profile_id : typing.Optional[str]
             Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
+
+        network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -160,7 +161,6 @@ class EnvironmentsClient:
         _response = self._raw_client.create_environment(
             id=id,
             kind=kind,
-            headless=headless,
             width=width,
             height=height,
             start_url=start_url,
@@ -168,6 +168,7 @@ class EnvironmentsClient:
             page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            network=network,
             request_options=request_options,
         )
         return _response.data
@@ -208,7 +209,6 @@ class EnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
         width: typing.Optional[int] = OMIT,
         height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
@@ -216,6 +216,7 @@ class EnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -229,9 +230,6 @@ class EnvironmentsClient:
             Catalog identifier for this environment.
 
         kind : typing.Optional[BrowserKind]
-
-        headless : typing.Optional[bool]
-            Run without a visible window.
 
         width : typing.Optional[int]
             Viewport width in pixels.
@@ -253,6 +251,9 @@ class EnvironmentsClient:
 
         browser_profile_id : typing.Optional[str]
             Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
+
+        network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -278,7 +279,6 @@ class EnvironmentsClient:
             id_,
             id=id,
             kind=kind,
-            headless=headless,
             width=width,
             height=height,
             start_url=start_url,
@@ -286,6 +286,7 @@ class EnvironmentsClient:
             page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            network=network,
             request_options=request_options,
         )
         return _response.data
@@ -323,7 +324,6 @@ class EnvironmentsClient:
         self,
         id: str,
         *,
-        headless: typing.Optional[bool] = OMIT,
         width: typing.Optional[int] = OMIT,
         height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
@@ -332,6 +332,7 @@ class EnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
         env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
         mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
@@ -345,8 +346,6 @@ class EnvironmentsClient:
         Parameters
         ----------
         id : str
-
-        headless : typing.Optional[bool]
 
         width : typing.Optional[int]
 
@@ -363,6 +362,8 @@ class EnvironmentsClient:
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
+
+        network : typing.Optional[BrowserNetwork]
 
         pip_packages : typing.Optional[typing.Sequence[str]]
 
@@ -395,7 +396,6 @@ class EnvironmentsClient:
         """
         _response = self._raw_client.patch_environment(
             id,
-            headless=headless,
             width=width,
             height=height,
             start_url=start_url,
@@ -404,6 +404,7 @@ class EnvironmentsClient:
             page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            network=network,
             pip_packages=pip_packages,
             env=env,
             mcp_servers=mcp_servers,
@@ -498,7 +499,6 @@ class AsyncEnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
         width: typing.Optional[int] = OMIT,
         height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
@@ -506,6 +506,7 @@ class AsyncEnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -517,9 +518,6 @@ class AsyncEnvironmentsClient:
             Catalog identifier for this environment.
 
         kind : typing.Optional[BrowserKind]
-
-        headless : typing.Optional[bool]
-            Run without a visible window.
 
         width : typing.Optional[int]
             Viewport width in pixels.
@@ -541,6 +539,9 @@ class AsyncEnvironmentsClient:
 
         browser_profile_id : typing.Optional[str]
             Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
+
+        network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -572,7 +573,6 @@ class AsyncEnvironmentsClient:
         _response = await self._raw_client.create_environment(
             id=id,
             kind=kind,
-            headless=headless,
             width=width,
             height=height,
             start_url=start_url,
@@ -580,6 +580,7 @@ class AsyncEnvironmentsClient:
             page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            network=network,
             request_options=request_options,
         )
         return _response.data
@@ -628,7 +629,6 @@ class AsyncEnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
         width: typing.Optional[int] = OMIT,
         height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
@@ -636,6 +636,7 @@ class AsyncEnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -649,9 +650,6 @@ class AsyncEnvironmentsClient:
             Catalog identifier for this environment.
 
         kind : typing.Optional[BrowserKind]
-
-        headless : typing.Optional[bool]
-            Run without a visible window.
 
         width : typing.Optional[int]
             Viewport width in pixels.
@@ -673,6 +671,9 @@ class AsyncEnvironmentsClient:
 
         browser_profile_id : typing.Optional[str]
             Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
+
+        network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -706,7 +707,6 @@ class AsyncEnvironmentsClient:
             id_,
             id=id,
             kind=kind,
-            headless=headless,
             width=width,
             height=height,
             start_url=start_url,
@@ -714,6 +714,7 @@ class AsyncEnvironmentsClient:
             page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            network=network,
             request_options=request_options,
         )
         return _response.data
@@ -759,7 +760,6 @@ class AsyncEnvironmentsClient:
         self,
         id: str,
         *,
-        headless: typing.Optional[bool] = OMIT,
         width: typing.Optional[int] = OMIT,
         height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
@@ -768,6 +768,7 @@ class AsyncEnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
         env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
         mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
@@ -781,8 +782,6 @@ class AsyncEnvironmentsClient:
         Parameters
         ----------
         id : str
-
-        headless : typing.Optional[bool]
 
         width : typing.Optional[int]
 
@@ -799,6 +798,8 @@ class AsyncEnvironmentsClient:
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
+
+        network : typing.Optional[BrowserNetwork]
 
         pip_packages : typing.Optional[typing.Sequence[str]]
 
@@ -839,7 +840,6 @@ class AsyncEnvironmentsClient:
         """
         _response = await self._raw_client.patch_environment(
             id,
-            headless=headless,
             width=width,
             height=height,
             start_url=start_url,
@@ -848,6 +848,7 @@ class AsyncEnvironmentsClient:
             page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            network=network,
             pip_packages=pip_packages,
             env=env,
             mcp_servers=mcp_servers,
