@@ -14,6 +14,7 @@ from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.browser_kind import BrowserKind
 from ..types.browser_mode import BrowserMode
+from ..types.browser_network import BrowserNetwork
 from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
@@ -121,7 +122,6 @@ class RawEnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
         width: typing.Optional[int] = OMIT,
         height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
@@ -129,6 +129,7 @@ class RawEnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Environment]:
         """
@@ -140,9 +141,6 @@ class RawEnvironmentsClient:
             Catalog identifier for this environment.
 
         kind : typing.Optional[BrowserKind]
-
-        headless : typing.Optional[bool]
-            Run without a visible window.
 
         width : typing.Optional[int]
             Viewport width in pixels.
@@ -165,6 +163,9 @@ class RawEnvironmentsClient:
         browser_profile_id : typing.Optional[str]
             Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
 
+        network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -179,7 +180,6 @@ class RawEnvironmentsClient:
             json={
                 "id": id,
                 "kind": kind,
-                "headless": headless,
                 "width": width,
                 "height": height,
                 "start_url": start_url,
@@ -187,6 +187,9 @@ class RawEnvironmentsClient:
                 "page_chars": page_chars,
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
+                "network": convert_and_respect_annotation_metadata(
+                    object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
@@ -283,7 +286,6 @@ class RawEnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
         width: typing.Optional[int] = OMIT,
         height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
@@ -291,6 +293,7 @@ class RawEnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Environment]:
         """
@@ -304,9 +307,6 @@ class RawEnvironmentsClient:
             Catalog identifier for this environment.
 
         kind : typing.Optional[BrowserKind]
-
-        headless : typing.Optional[bool]
-            Run without a visible window.
 
         width : typing.Optional[int]
             Viewport width in pixels.
@@ -329,6 +329,9 @@ class RawEnvironmentsClient:
         browser_profile_id : typing.Optional[str]
             Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
 
+        network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -343,7 +346,6 @@ class RawEnvironmentsClient:
             json={
                 "id": id,
                 "kind": kind,
-                "headless": headless,
                 "width": width,
                 "height": height,
                 "start_url": start_url,
@@ -351,6 +353,9 @@ class RawEnvironmentsClient:
                 "page_chars": page_chars,
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
+                "network": convert_and_respect_annotation_metadata(
+                    object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
@@ -437,7 +442,6 @@ class RawEnvironmentsClient:
         self,
         id: str,
         *,
-        headless: typing.Optional[bool] = OMIT,
         width: typing.Optional[int] = OMIT,
         height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
@@ -446,6 +450,7 @@ class RawEnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
         env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
         mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
@@ -459,8 +464,6 @@ class RawEnvironmentsClient:
         Parameters
         ----------
         id : str
-
-        headless : typing.Optional[bool]
 
         width : typing.Optional[int]
 
@@ -477,6 +480,8 @@ class RawEnvironmentsClient:
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
+
+        network : typing.Optional[BrowserNetwork]
 
         pip_packages : typing.Optional[typing.Sequence[str]]
 
@@ -500,7 +505,6 @@ class RawEnvironmentsClient:
             f"api/v2/environments/{encode_path_param(id)}",
             method="PATCH",
             json={
-                "headless": headless,
                 "width": width,
                 "height": height,
                 "start_url": start_url,
@@ -509,6 +513,9 @@ class RawEnvironmentsClient:
                 "page_chars": page_chars,
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
+                "network": convert_and_respect_annotation_metadata(
+                    object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
+                ),
                 "pip_packages": pip_packages,
                 "env": env,
                 "mcp_servers": convert_and_respect_annotation_metadata(
@@ -650,7 +657,6 @@ class AsyncRawEnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
         width: typing.Optional[int] = OMIT,
         height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
@@ -658,6 +664,7 @@ class AsyncRawEnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Environment]:
         """
@@ -669,9 +676,6 @@ class AsyncRawEnvironmentsClient:
             Catalog identifier for this environment.
 
         kind : typing.Optional[BrowserKind]
-
-        headless : typing.Optional[bool]
-            Run without a visible window.
 
         width : typing.Optional[int]
             Viewport width in pixels.
@@ -694,6 +698,9 @@ class AsyncRawEnvironmentsClient:
         browser_profile_id : typing.Optional[str]
             Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
 
+        network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -708,7 +715,6 @@ class AsyncRawEnvironmentsClient:
             json={
                 "id": id,
                 "kind": kind,
-                "headless": headless,
                 "width": width,
                 "height": height,
                 "start_url": start_url,
@@ -716,6 +722,9 @@ class AsyncRawEnvironmentsClient:
                 "page_chars": page_chars,
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
+                "network": convert_and_respect_annotation_metadata(
+                    object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
@@ -812,7 +821,6 @@ class AsyncRawEnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
         width: typing.Optional[int] = OMIT,
         height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
@@ -820,6 +828,7 @@ class AsyncRawEnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Environment]:
         """
@@ -833,9 +842,6 @@ class AsyncRawEnvironmentsClient:
             Catalog identifier for this environment.
 
         kind : typing.Optional[BrowserKind]
-
-        headless : typing.Optional[bool]
-            Run without a visible window.
 
         width : typing.Optional[int]
             Viewport width in pixels.
@@ -858,6 +864,9 @@ class AsyncRawEnvironmentsClient:
         browser_profile_id : typing.Optional[str]
             Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
 
+        network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -872,7 +881,6 @@ class AsyncRawEnvironmentsClient:
             json={
                 "id": id,
                 "kind": kind,
-                "headless": headless,
                 "width": width,
                 "height": height,
                 "start_url": start_url,
@@ -880,6 +888,9 @@ class AsyncRawEnvironmentsClient:
                 "page_chars": page_chars,
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
+                "network": convert_and_respect_annotation_metadata(
+                    object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
@@ -966,7 +977,6 @@ class AsyncRawEnvironmentsClient:
         self,
         id: str,
         *,
-        headless: typing.Optional[bool] = OMIT,
         width: typing.Optional[int] = OMIT,
         height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
@@ -975,6 +985,7 @@ class AsyncRawEnvironmentsClient:
         page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        network: typing.Optional[BrowserNetwork] = OMIT,
         pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
         env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
         mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
@@ -988,8 +999,6 @@ class AsyncRawEnvironmentsClient:
         Parameters
         ----------
         id : str
-
-        headless : typing.Optional[bool]
 
         width : typing.Optional[int]
 
@@ -1006,6 +1015,8 @@ class AsyncRawEnvironmentsClient:
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
+
+        network : typing.Optional[BrowserNetwork]
 
         pip_packages : typing.Optional[typing.Sequence[str]]
 
@@ -1029,7 +1040,6 @@ class AsyncRawEnvironmentsClient:
             f"api/v2/environments/{encode_path_param(id)}",
             method="PATCH",
             json={
-                "headless": headless,
                 "width": width,
                 "height": height,
                 "start_url": start_url,
@@ -1038,6 +1048,9 @@ class AsyncRawEnvironmentsClient:
                 "page_chars": page_chars,
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
+                "network": convert_and_respect_annotation_metadata(
+                    object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
+                ),
                 "pip_packages": pip_packages,
                 "env": env,
                 "mcp_servers": convert_and_respect_annotation_metadata(

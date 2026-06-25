@@ -752,7 +752,7 @@ class SessionsClient:
 
     def get_session_resource(
         self, id: str, bucket: str, key: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> None:
+    ) -> typing.Iterator[bytes]:
         """
         Redirect to a presigned S3 URL for a session-owned resource.
 
@@ -765,11 +765,12 @@ class SessionsClient:
         key : str
 
         request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
+            Request-specific configuration. You can pass in configuration such as `chunk_size`, and more to customize the request and response.
 
         Returns
         -------
-        None
+        typing.Iterator[bytes]
+            Resource bytes. The API redirects to a presigned S3 URL; SDK clients follow the redirect and receive the raw object (e.g. screenshot image bytes).
 
         Examples
         --------
@@ -778,14 +779,15 @@ class SessionsClient:
         client = Client(
             api_key="YOUR_API_KEY",
         )
-        client.sessions.get_session_resource(
+        for _chunk in client.sessions.get_session_resource(
             id="id",
             bucket="bucket",
             key="key",
-        )
+        ):
+            pass
         """
-        _response = self._raw_client.get_session_resource(id, bucket, key, request_options=request_options)
-        return _response.data
+        with self._raw_client.get_session_resource(id, bucket, key, request_options=request_options) as r:
+            yield from r.data
 
 
 class AsyncSessionsClient:
@@ -1654,7 +1656,7 @@ class AsyncSessionsClient:
 
     async def get_session_resource(
         self, id: str, bucket: str, key: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> None:
+    ) -> typing.AsyncIterator[bytes]:
         """
         Redirect to a presigned S3 URL for a session-owned resource.
 
@@ -1667,11 +1669,12 @@ class AsyncSessionsClient:
         key : str
 
         request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
+            Request-specific configuration. You can pass in configuration such as `chunk_size`, and more to customize the request and response.
 
         Returns
         -------
-        None
+        typing.AsyncIterator[bytes]
+            Resource bytes. The API redirects to a presigned S3 URL; SDK clients follow the redirect and receive the raw object (e.g. screenshot image bytes).
 
         Examples
         --------
@@ -1685,14 +1688,16 @@ class AsyncSessionsClient:
 
 
         async def main() -> None:
-            await client.sessions.get_session_resource(
+            async for _chunk in client.sessions.get_session_resource(
                 id="id",
                 bucket="bucket",
                 key="key",
-            )
+            ):
+                pass
 
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.get_session_resource(id, bucket, key, request_options=request_options)
-        return _response.data
+        async with self._raw_client.get_session_resource(id, bucket, key, request_options=request_options) as r:
+            async for _chunk in r.data:
+                yield _chunk

@@ -15,6 +15,7 @@ if typing.TYPE_CHECKING:
     from .agents.client import AgentsClient, AsyncAgentsClient
     from .browser_profiles.client import AsyncBrowserProfilesClient, BrowserProfilesClient
     from .environments.client import AsyncEnvironmentsClient, EnvironmentsClient
+    from .quota.client import AsyncQuotaClient, QuotaClient
     from .sessions.client import AsyncSessionsClient, SessionsClient
     from .skills.client import AsyncSkillsClient, SkillsClient
     from .vaults.client import AsyncVaultsClient, VaultsClient
@@ -72,7 +73,7 @@ class BaseClient:
         *,
         base_url: typing.Optional[str] = None,
         environment: HaiAgentsEnvironment = HaiAgentsEnvironment.EU,
-        api_key: typing.Optional[typing.Union[str, typing.Callable[[], str]]] = os.getenv("HAI_API_KEY"),
+        api_key: typing.Optional[typing.Union[str, typing.Callable[[], str]]] = None,
         headers: typing.Optional[typing.Dict[str, str]] = None,
         timeout: typing.Optional[float] = None,
         max_retries: typing.Optional[int] = None,
@@ -84,6 +85,8 @@ class BaseClient:
             timeout if timeout is not None else 60 if httpx_client is None else httpx_client.timeout.read
         )
         _defaulted_max_retries = max_retries if max_retries is not None else 2
+        if api_key is None:
+            api_key = os.getenv("HAI_API_KEY")
         if api_key is None:
             raise ApiError(body="The client must be instantiated be either passing in api_key or setting HAI_API_KEY")
         self._client_wrapper = SyncClientWrapper(
@@ -106,6 +109,7 @@ class BaseClient:
         self._webhooks: typing.Optional[WebhooksClient] = None
         self._browser_profiles: typing.Optional[BrowserProfilesClient] = None
         self._vaults: typing.Optional[VaultsClient] = None
+        self._quota: typing.Optional[QuotaClient] = None
 
     @property
     def sessions(self):
@@ -162,6 +166,14 @@ class BaseClient:
 
             self._vaults = VaultsClient(client_wrapper=self._client_wrapper)
         return self._vaults
+
+    @property
+    def quota(self):
+        if self._quota is None:
+            from .quota.client import QuotaClient  # noqa: E402
+
+            self._quota = QuotaClient(client_wrapper=self._client_wrapper)
+        return self._quota
 
 
 def _make_default_async_client(
@@ -236,7 +248,7 @@ class AsyncBaseClient:
         *,
         base_url: typing.Optional[str] = None,
         environment: HaiAgentsEnvironment = HaiAgentsEnvironment.EU,
-        api_key: typing.Optional[typing.Union[str, typing.Callable[[], str]]] = os.getenv("HAI_API_KEY"),
+        api_key: typing.Optional[typing.Union[str, typing.Callable[[], str]]] = None,
         headers: typing.Optional[typing.Dict[str, str]] = None,
         async_token: typing.Optional[typing.Callable[[], typing.Awaitable[str]]] = None,
         timeout: typing.Optional[float] = None,
@@ -249,6 +261,8 @@ class AsyncBaseClient:
             timeout if timeout is not None else 60 if httpx_client is None else httpx_client.timeout.read
         )
         _defaulted_max_retries = max_retries if max_retries is not None else 2
+        if api_key is None:
+            api_key = os.getenv("HAI_API_KEY")
         if api_key is None:
             raise ApiError(body="The client must be instantiated be either passing in api_key or setting HAI_API_KEY")
         self._client_wrapper = AsyncClientWrapper(
@@ -270,6 +284,7 @@ class AsyncBaseClient:
         self._webhooks: typing.Optional[AsyncWebhooksClient] = None
         self._browser_profiles: typing.Optional[AsyncBrowserProfilesClient] = None
         self._vaults: typing.Optional[AsyncVaultsClient] = None
+        self._quota: typing.Optional[AsyncQuotaClient] = None
 
     @property
     def sessions(self):
@@ -326,6 +341,14 @@ class AsyncBaseClient:
 
             self._vaults = AsyncVaultsClient(client_wrapper=self._client_wrapper)
         return self._vaults
+
+    @property
+    def quota(self):
+        if self._quota is None:
+            from .quota.client import AsyncQuotaClient  # noqa: E402
+
+            self._quota = AsyncQuotaClient(client_wrapper=self._client_wrapper)
+        return self._quota
 
 
 def _get_base_url(*, base_url: typing.Optional[str] = None, environment: HaiAgentsEnvironment) -> str:
