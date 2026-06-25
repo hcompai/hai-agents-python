@@ -42,4 +42,4 @@ User: *"is the H Company Agent API quickstart still showing the curl example"*
 
     run_agent
       agent: h/web-surfer-holo3-1-35b
-      task: Open https://hub.hcompany.ai/agent-api and confirm whether the quickstart page still shows a curl example. Return yes or no and quote the first line of the example if present.
+      task: Open https://hub.hcompany.ai/computer-use-agents/quickstart and confirm whether the quickstart page still shows a curl example. Return yes or no and quote the first line of the example if present.
