@@ -15,6 +15,7 @@ import typing_extensions
 
 from .core.api_error import ApiError
 from .core.request_options import RequestOptions
+from .sessions import SendSessionMessagesRequestBody_UserMessage
 from .tools import Tool, ToolInput, as_tools
 from .types.session_request_agent import SessionRequestAgent
 from .types.session_request_messages import SessionRequestMessages
@@ -402,6 +403,20 @@ def wait_for_session(
 
         status = client.sessions.get_session_status(id)
         if is_settled_session_status(status.status):
+            if include_events:
+                while True:
+                    if deadline is not None and time.monotonic() >= deadline:
+                        raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+                    tail = client.sessions.get_session_changes(
+                        id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
+                    )
+                    batch = tail.new_events or [] if tail is not None else []
+                    if not batch:
+                        break
+                    if tail.answer is not None:
+                        last_changes = tail
+                    events.extend(batch)
+                    next_from_index += len(batch)
             changes = _final_changes(client, id, last_changes, limit)
             raw = changes.answer if changes is not None else None
             return SessionRunResult(
@@ -531,6 +546,20 @@ async def async_wait_for_session(
 
         status = await client.sessions.get_session_status(id)
         if is_settled_session_status(status.status):
+            if include_events:
+                while True:
+                    if deadline is not None and time.monotonic() >= deadline:
+                        raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+                    tail = await client.sessions.get_session_changes(
+                        id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
+                    )
+                    batch = tail.new_events or [] if tail is not None else []
+                    if not batch:
+                        break
+                    if tail.answer is not None:
+                        last_changes = tail
+                    events.extend(batch)
+                    next_from_index += len(batch)
             changes = await _async_final_changes(client, id, last_changes, limit)
             raw = changes.answer if changes is not None else None
             return SessionRunResult(
@@ -735,6 +764,8 @@ class SessionHandle(typing.Generic[AnswerT]):
         return self._client.sessions.get_session_changes(self.id, from_index=from_index, **kwargs)
 
     def send_message(self, message: typing.Any) -> None:
+        if isinstance(message, str):
+            message = SendSessionMessagesRequestBody_UserMessage(message=message)
         self._client.sessions.send_session_messages(self.id, request=message)
 
     def pause(self) -> None:
@@ -801,6 +832,8 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
         return await self._client.sessions.get_session_changes(self.id, from_index=from_index, **kwargs)
 
     async def send_message(self, message: typing.Any) -> None:
+        if isinstance(message, str):
+            message = SendSessionMessagesRequestBody_UserMessage(message=message)
         await self._client.sessions.send_session_messages(self.id, request=message)
 
     async def pause(self) -> None:
