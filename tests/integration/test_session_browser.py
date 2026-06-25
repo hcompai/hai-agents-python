@@ -5,9 +5,8 @@ and asked for Paris weather without being told which engine to use. Exercises
 local_browser provisioning, the agent using whatever page it lands on, and
 end-to-end answer extraction.
 
-Bing is used because headless browsers can read it without CAPTCHA. The engine
-lives in the env spec, not the prompt -- mirroring how a product injects a start
-URL via config.
+Bing is used because it can be read without a CAPTCHA. The engine lives in the
+env spec, not the prompt -- mirroring how a product injects a start URL via config.
 
 Marked ``slow`` (~60-120s, more tokens than the code-env test). Skipped by
 default; opt in with ``pytest -m "integration and slow"`` or RUN_SLOW_SDK_TESTS=1.
@@ -64,7 +63,6 @@ def test_browser_session_finds_paris_weather(client: Client, run_id: str, create
                 {
                     "id": "browser",
                     "kind": "local_browser",
-                    "headless": True,
                     "width": 1280,
                     "height": 800,
                     "start_url": SEARCH_ENGINE_START_URL,
