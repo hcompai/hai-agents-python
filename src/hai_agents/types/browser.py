@@ -20,16 +20,6 @@ class Browser(UniversalBaseModel):
     """
 
     kind: typing.Optional[BrowserKind] = "web"
-    width: typing.Optional[int] = pydantic.Field(default=None)
-    """
-    Viewport width in pixels.
-    """
-
-    height: typing.Optional[int] = pydantic.Field(default=None)
-    """
-    Viewport height in pixels.
-    """
-
     start_url: typing.Optional[str] = pydantic.Field(default=None)
     """
     Initial URL to open.
@@ -37,12 +27,7 @@ class Browser(UniversalBaseModel):
 
     mode: typing.Optional[BrowserMode] = pydantic.Field(default=None)
     """
-    How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
-    """
-
-    page_chars: typing.Optional[int] = pydantic.Field(default=None)
-    """
-    Characters of page text shown per page in 'text' mode.
+    How the agent perceives and drives the browser.
     """
 
     vault_id: typing.Optional[str] = pydantic.Field(default=None)

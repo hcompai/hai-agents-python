@@ -2,4 +2,7 @@
 
 import typing
 
-PatchEnvironmentMode = typing.Union[typing.Literal["visual", "text", "multimodal"], typing.Any]
+from ...types.browser_text_mode import BrowserTextMode
+from ...types.browser_visual_mode import BrowserVisualMode
+
+PatchEnvironmentMode = typing.Union[BrowserVisualMode, BrowserTextMode]
