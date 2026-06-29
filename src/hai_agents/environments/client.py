@@ -95,11 +95,8 @@ class EnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        width: typing.Optional[int] = OMIT,
-        height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
-        page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
@@ -115,20 +112,11 @@ class EnvironmentsClient:
 
         kind : typing.Optional[BrowserKind]
 
-        width : typing.Optional[int]
-            Viewport width in pixels.
-
-        height : typing.Optional[int]
-            Viewport height in pixels.
-
         start_url : typing.Optional[str]
             Initial URL to open.
 
         mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
-
-        page_chars : typing.Optional[int]
-            Characters of page text shown per page in 'text' mode.
+            How the agent perceives and drives the browser.
 
         vault_id : typing.Optional[str]
             Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
@@ -161,11 +149,8 @@ class EnvironmentsClient:
         _response = self._raw_client.create_environment(
             id=id,
             kind=kind,
-            width=width,
-            height=height,
             start_url=start_url,
             mode=mode,
-            page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
             network=network,
@@ -209,11 +194,8 @@ class EnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        width: typing.Optional[int] = OMIT,
-        height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
-        page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
@@ -231,20 +213,11 @@ class EnvironmentsClient:
 
         kind : typing.Optional[BrowserKind]
 
-        width : typing.Optional[int]
-            Viewport width in pixels.
-
-        height : typing.Optional[int]
-            Viewport height in pixels.
-
         start_url : typing.Optional[str]
             Initial URL to open.
 
         mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
-
-        page_chars : typing.Optional[int]
-            Characters of page text shown per page in 'text' mode.
+            How the agent perceives and drives the browser.
 
         vault_id : typing.Optional[str]
             Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
@@ -279,11 +252,8 @@ class EnvironmentsClient:
             id_,
             id=id,
             kind=kind,
-            width=width,
-            height=height,
             start_url=start_url,
             mode=mode,
-            page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
             network=network,
@@ -324,12 +294,9 @@ class EnvironmentsClient:
         self,
         id: str,
         *,
-        width: typing.Optional[int] = OMIT,
-        height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
-        page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
@@ -347,17 +314,11 @@ class EnvironmentsClient:
         ----------
         id : str
 
-        width : typing.Optional[int]
-
-        height : typing.Optional[int]
-
         start_url : typing.Optional[str]
 
         session_id : typing.Optional[str]
 
         mode : typing.Optional[PatchEnvironmentMode]
-
-        page_chars : typing.Optional[int]
 
         vault_id : typing.Optional[str]
 
@@ -396,12 +357,9 @@ class EnvironmentsClient:
         """
         _response = self._raw_client.patch_environment(
             id,
-            width=width,
-            height=height,
             start_url=start_url,
             session_id=session_id,
             mode=mode,
-            page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
             network=network,
@@ -499,11 +457,8 @@ class AsyncEnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        width: typing.Optional[int] = OMIT,
-        height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
-        page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
@@ -519,20 +474,11 @@ class AsyncEnvironmentsClient:
 
         kind : typing.Optional[BrowserKind]
 
-        width : typing.Optional[int]
-            Viewport width in pixels.
-
-        height : typing.Optional[int]
-            Viewport height in pixels.
-
         start_url : typing.Optional[str]
             Initial URL to open.
 
         mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
-
-        page_chars : typing.Optional[int]
-            Characters of page text shown per page in 'text' mode.
+            How the agent perceives and drives the browser.
 
         vault_id : typing.Optional[str]
             Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
@@ -573,11 +519,8 @@ class AsyncEnvironmentsClient:
         _response = await self._raw_client.create_environment(
             id=id,
             kind=kind,
-            width=width,
-            height=height,
             start_url=start_url,
             mode=mode,
-            page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
             network=network,
@@ -629,11 +572,8 @@ class AsyncEnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        width: typing.Optional[int] = OMIT,
-        height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
-        page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
@@ -651,20 +591,11 @@ class AsyncEnvironmentsClient:
 
         kind : typing.Optional[BrowserKind]
 
-        width : typing.Optional[int]
-            Viewport width in pixels.
-
-        height : typing.Optional[int]
-            Viewport height in pixels.
-
         start_url : typing.Optional[str]
             Initial URL to open.
 
         mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
-
-        page_chars : typing.Optional[int]
-            Characters of page text shown per page in 'text' mode.
+            How the agent perceives and drives the browser.
 
         vault_id : typing.Optional[str]
             Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
@@ -707,11 +638,8 @@ class AsyncEnvironmentsClient:
             id_,
             id=id,
             kind=kind,
-            width=width,
-            height=height,
             start_url=start_url,
             mode=mode,
-            page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
             network=network,
@@ -760,12 +688,9 @@ class AsyncEnvironmentsClient:
         self,
         id: str,
         *,
-        width: typing.Optional[int] = OMIT,
-        height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
-        page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
@@ -783,17 +708,11 @@ class AsyncEnvironmentsClient:
         ----------
         id : str
 
-        width : typing.Optional[int]
-
-        height : typing.Optional[int]
-
         start_url : typing.Optional[str]
 
         session_id : typing.Optional[str]
 
         mode : typing.Optional[PatchEnvironmentMode]
-
-        page_chars : typing.Optional[int]
 
         vault_id : typing.Optional[str]
 
@@ -840,12 +759,9 @@ class AsyncEnvironmentsClient:
         """
         _response = await self._raw_client.patch_environment(
             id,
-            width=width,
-            height=height,
             start_url=start_url,
             session_id=session_id,
             mode=mode,
-            page_chars=page_chars,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
             network=network,

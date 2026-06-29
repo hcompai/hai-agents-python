@@ -122,11 +122,8 @@ class RawEnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        width: typing.Optional[int] = OMIT,
-        height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
-        page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
@@ -142,20 +139,11 @@ class RawEnvironmentsClient:
 
         kind : typing.Optional[BrowserKind]
 
-        width : typing.Optional[int]
-            Viewport width in pixels.
-
-        height : typing.Optional[int]
-            Viewport height in pixels.
-
         start_url : typing.Optional[str]
             Initial URL to open.
 
         mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
-
-        page_chars : typing.Optional[int]
-            Characters of page text shown per page in 'text' mode.
+            How the agent perceives and drives the browser.
 
         vault_id : typing.Optional[str]
             Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
@@ -180,11 +168,10 @@ class RawEnvironmentsClient:
             json={
                 "id": id,
                 "kind": kind,
-                "width": width,
-                "height": height,
                 "start_url": start_url,
-                "mode": mode,
-                "page_chars": page_chars,
+                "mode": convert_and_respect_annotation_metadata(
+                    object_=mode, annotation=BrowserMode, direction="write"
+                ),
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
                 "network": convert_and_respect_annotation_metadata(
@@ -286,11 +273,8 @@ class RawEnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        width: typing.Optional[int] = OMIT,
-        height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
-        page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
@@ -308,20 +292,11 @@ class RawEnvironmentsClient:
 
         kind : typing.Optional[BrowserKind]
 
-        width : typing.Optional[int]
-            Viewport width in pixels.
-
-        height : typing.Optional[int]
-            Viewport height in pixels.
-
         start_url : typing.Optional[str]
             Initial URL to open.
 
         mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
-
-        page_chars : typing.Optional[int]
-            Characters of page text shown per page in 'text' mode.
+            How the agent perceives and drives the browser.
 
         vault_id : typing.Optional[str]
             Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
@@ -346,11 +321,10 @@ class RawEnvironmentsClient:
             json={
                 "id": id,
                 "kind": kind,
-                "width": width,
-                "height": height,
                 "start_url": start_url,
-                "mode": mode,
-                "page_chars": page_chars,
+                "mode": convert_and_respect_annotation_metadata(
+                    object_=mode, annotation=BrowserMode, direction="write"
+                ),
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
                 "network": convert_and_respect_annotation_metadata(
@@ -442,12 +416,9 @@ class RawEnvironmentsClient:
         self,
         id: str,
         *,
-        width: typing.Optional[int] = OMIT,
-        height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
-        page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
@@ -465,17 +436,11 @@ class RawEnvironmentsClient:
         ----------
         id : str
 
-        width : typing.Optional[int]
-
-        height : typing.Optional[int]
-
         start_url : typing.Optional[str]
 
         session_id : typing.Optional[str]
 
         mode : typing.Optional[PatchEnvironmentMode]
-
-        page_chars : typing.Optional[int]
 
         vault_id : typing.Optional[str]
 
@@ -505,12 +470,11 @@ class RawEnvironmentsClient:
             f"api/v2/environments/{encode_path_param(id)}",
             method="PATCH",
             json={
-                "width": width,
-                "height": height,
                 "start_url": start_url,
                 "session_id": session_id,
-                "mode": mode,
-                "page_chars": page_chars,
+                "mode": convert_and_respect_annotation_metadata(
+                    object_=mode, annotation=typing.Optional[PatchEnvironmentMode], direction="write"
+                ),
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
                 "network": convert_and_respect_annotation_metadata(
@@ -657,11 +621,8 @@ class AsyncRawEnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        width: typing.Optional[int] = OMIT,
-        height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
-        page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
@@ -677,20 +638,11 @@ class AsyncRawEnvironmentsClient:
 
         kind : typing.Optional[BrowserKind]
 
-        width : typing.Optional[int]
-            Viewport width in pixels.
-
-        height : typing.Optional[int]
-            Viewport height in pixels.
-
         start_url : typing.Optional[str]
             Initial URL to open.
 
         mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
-
-        page_chars : typing.Optional[int]
-            Characters of page text shown per page in 'text' mode.
+            How the agent perceives and drives the browser.
 
         vault_id : typing.Optional[str]
             Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
@@ -715,11 +667,10 @@ class AsyncRawEnvironmentsClient:
             json={
                 "id": id,
                 "kind": kind,
-                "width": width,
-                "height": height,
                 "start_url": start_url,
-                "mode": mode,
-                "page_chars": page_chars,
+                "mode": convert_and_respect_annotation_metadata(
+                    object_=mode, annotation=BrowserMode, direction="write"
+                ),
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
                 "network": convert_and_respect_annotation_metadata(
@@ -821,11 +772,8 @@ class AsyncRawEnvironmentsClient:
         *,
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
-        width: typing.Optional[int] = OMIT,
-        height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
-        page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
@@ -843,20 +791,11 @@ class AsyncRawEnvironmentsClient:
 
         kind : typing.Optional[BrowserKind]
 
-        width : typing.Optional[int]
-            Viewport width in pixels.
-
-        height : typing.Optional[int]
-            Viewport height in pixels.
-
         start_url : typing.Optional[str]
             Initial URL to open.
 
         mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.
-
-        page_chars : typing.Optional[int]
-            Characters of page text shown per page in 'text' mode.
+            How the agent perceives and drives the browser.
 
         vault_id : typing.Optional[str]
             Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
@@ -881,11 +820,10 @@ class AsyncRawEnvironmentsClient:
             json={
                 "id": id,
                 "kind": kind,
-                "width": width,
-                "height": height,
                 "start_url": start_url,
-                "mode": mode,
-                "page_chars": page_chars,
+                "mode": convert_and_respect_annotation_metadata(
+                    object_=mode, annotation=BrowserMode, direction="write"
+                ),
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
                 "network": convert_and_respect_annotation_metadata(
@@ -977,12 +915,9 @@ class AsyncRawEnvironmentsClient:
         self,
         id: str,
         *,
-        width: typing.Optional[int] = OMIT,
-        height: typing.Optional[int] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
-        page_chars: typing.Optional[int] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
@@ -1000,17 +935,11 @@ class AsyncRawEnvironmentsClient:
         ----------
         id : str
 
-        width : typing.Optional[int]
-
-        height : typing.Optional[int]
-
         start_url : typing.Optional[str]
 
         session_id : typing.Optional[str]
 
         mode : typing.Optional[PatchEnvironmentMode]
-
-        page_chars : typing.Optional[int]
 
         vault_id : typing.Optional[str]
 
@@ -1040,12 +969,11 @@ class AsyncRawEnvironmentsClient:
             f"api/v2/environments/{encode_path_param(id)}",
             method="PATCH",
             json={
-                "width": width,
-                "height": height,
                 "start_url": start_url,
                 "session_id": session_id,
-                "mode": mode,
-                "page_chars": page_chars,
+                "mode": convert_and_respect_annotation_metadata(
+                    object_=mode, annotation=typing.Optional[PatchEnvironmentMode], direction="write"
+                ),
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
                 "network": convert_and_respect_annotation_metadata(

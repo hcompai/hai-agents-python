@@ -38,10 +38,12 @@ if typing.TYPE_CHECKING:
     from .answer_event_answer import AnswerEventAnswer
     from .browser import Browser
     from .browser_kind import BrowserKind
-    from .browser_mode import BrowserMode
+    from .browser_mode import BrowserMode, BrowserMode_Text, BrowserMode_Visual
     from .browser_network import BrowserNetwork
     from .browser_profile_list import BrowserProfileList
     from .browser_profile_read import BrowserProfileRead
+    from .browser_text_mode import BrowserTextMode
+    from .browser_visual_mode import BrowserVisualMode
     from .environment import Environment
     from .environment_kind import EnvironmentKind
     from .environment_page import EnvironmentPage
@@ -160,9 +162,13 @@ _dynamic_imports: typing.Dict[str, str] = {
     "Browser": ".browser",
     "BrowserKind": ".browser_kind",
     "BrowserMode": ".browser_mode",
+    "BrowserMode_Text": ".browser_mode",
+    "BrowserMode_Visual": ".browser_mode",
     "BrowserNetwork": ".browser_network",
     "BrowserProfileList": ".browser_profile_list",
     "BrowserProfileRead": ".browser_profile_read",
+    "BrowserTextMode": ".browser_text_mode",
+    "BrowserVisualMode": ".browser_visual_mode",
     "Environment": ".environment",
     "EnvironmentKind": ".environment_kind",
     "EnvironmentPage": ".environment_page",
@@ -301,9 +307,13 @@ __all__ = [
     "Browser",
     "BrowserKind",
     "BrowserMode",
+    "BrowserMode_Text",
+    "BrowserMode_Visual",
     "BrowserNetwork",
     "BrowserProfileList",
     "BrowserProfileRead",
+    "BrowserTextMode",
+    "BrowserVisualMode",
     "Environment",
     "EnvironmentKind",
     "EnvironmentPage",
