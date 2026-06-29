@@ -6,10 +6,17 @@ import typing
 from importlib import import_module
 
 if typing.TYPE_CHECKING:
-    from .types import ListEnvironmentsRequestSortItem, PatchEnvironmentMode
+    from .types import (
+        ListEnvironmentsRequestSortItem,
+        PatchEnvironmentMode,
+        PatchEnvironmentMode_Text,
+        PatchEnvironmentMode_Visual,
+    )
 _dynamic_imports: typing.Dict[str, str] = {
     "ListEnvironmentsRequestSortItem": ".types",
     "PatchEnvironmentMode": ".types",
+    "PatchEnvironmentMode_Text": ".types",
+    "PatchEnvironmentMode_Visual": ".types",
 }
 
 
@@ -34,4 +41,9 @@ def __dir__():
     return sorted(lazy_attrs)
 
 
-__all__ = ["ListEnvironmentsRequestSortItem", "PatchEnvironmentMode"]
+__all__ = [
+    "ListEnvironmentsRequestSortItem",
+    "PatchEnvironmentMode",
+    "PatchEnvironmentMode_Text",
+    "PatchEnvironmentMode_Visual",
+]

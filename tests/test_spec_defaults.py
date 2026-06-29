@@ -23,12 +23,6 @@ from hai_agents.types import Browser, OnePasswordConfig, ToolResultEvent, UserMe
 
 OPENAPI_PATH = pathlib.Path(__file__).parent.parent / "openapi.json"
 
-# Schemas whose const+default field was dropped ENTIRELY from the generated model (not just its
-# default): the field only ever served as a union tag, and the generated union carries that tag
-# elsewhere -- the per-endpoint request-body wrappers (e.g. SendSessionToolResultsRequestBody_Batch)
-# for the batch types, and the AgentEventData_* variants' ``n`` tag for agent events -- so the
-# standalone model has no field left to default. ``test_dropped_fields_are_actually_absent`` keeps
-# this set honest: a regeneration that restores any of these fields must add it back under test.
 FIELD_DROPPED_ENTIRELY = {
     ("UserMessageBatch", "type"),
     ("AnswerEvent", "kind"),
@@ -36,6 +30,8 @@ FIELD_DROPPED_ENTIRELY = {
     ("MessageEvent", "kind"),
     ("ObservationEvent", "kind"),
     ("PolicyEvent", "kind"),
+    ("BrowserVisualMode", "type"),
+    ("BrowserTextMode", "type"),
 }
 
 MINIMAL_KWARGS: dict[str, dict[str, typing.Any]] = {

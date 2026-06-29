@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Agent API",
+    "title": "Computer-Use Agents",
     "version": "1.0.0"
   },
   "servers": [
@@ -3817,20 +3817,6 @@
             "title": "Kind",
             "default": "web"
           },
-          "width": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
-            "title": "Width",
-            "description": "Viewport width in pixels.",
-            "default": 1200
-          },
-          "height": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
-            "title": "Height",
-            "description": "Viewport height in pixels.",
-            "default": 1200
-          },
           "start_url": {
             "type": "string",
             "title": "Start Url",
@@ -3838,22 +3824,23 @@
             "default": "https://www.bing.com"
           },
           "mode": {
-            "type": "string",
-            "enum": [
-              "visual",
-              "text",
-              "multimodal"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BrowserVisualMode"
+              },
+              {
+                "$ref": "#/components/schemas/BrowserTextMode"
+              }
             ],
             "title": "Mode",
-            "description": "How the agent perceives and drives the browser. 'visual': act on screenshots by viewport coordinates. 'multimodal': the same, with the page also included as markdown text alongside each screenshot. 'text': read-only markdown with URL navigation, no screenshots.",
-            "default": "visual"
-          },
-          "page_chars": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
-            "title": "Page Chars",
-            "description": "Characters of page text shown per page in 'text' mode.",
-            "default": 20000
+            "description": "How the agent perceives and drives the browser.",
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "text": "#/components/schemas/BrowserTextMode",
+                "visual": "#/components/schemas/BrowserVisualMode"
+              }
+            }
           },
           "vault_id": {
             "anyOf": [
@@ -4119,6 +4106,59 @@
         ],
         "title": "BrowserProfileRead",
         "description": "Response model for a browser profile."
+      },
+      "BrowserTextMode": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "text",
+            "title": "Type",
+            "default": "text"
+          },
+          "chunk_size": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Chunk Size",
+            "description": "Characters of page text shown per page.",
+            "default": 20000
+          }
+        },
+        "type": "object",
+        "title": "BrowserTextMode",
+        "description": "Read-only markdown with URL navigation, no screenshots."
+      },
+      "BrowserVisualMode": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "visual",
+            "title": "Type",
+            "default": "visual"
+          },
+          "width": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Width",
+            "description": "Viewport width in pixels.",
+            "default": 1200
+          },
+          "height": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Height",
+            "description": "Viewport height in pixels.",
+            "default": 1200
+          },
+          "markdown": {
+            "type": "boolean",
+            "title": "Markdown",
+            "description": "Also include the viewport's text as markdown alongside each screenshot.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "BrowserVisualMode",
+        "description": "Act on screenshots by viewport coordinates."
       },
       "CreateWebhook": {
         "properties": {
@@ -5077,30 +5117,6 @@
       },
       "PatchEnvironment": {
         "properties": {
-          "width": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Width"
-          },
-          "height": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Height"
-          },
           "start_url": {
             "anyOf": [
               {
@@ -5126,30 +5142,27 @@
           "mode": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "visual",
-                  "text",
-                  "multimodal"
-                ]
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BrowserVisualMode"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BrowserTextMode"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "type",
+                  "mapping": {
+                    "text": "#/components/schemas/BrowserTextMode",
+                    "visual": "#/components/schemas/BrowserVisualMode"
+                  }
+                }
               },
               {
                 "type": "null"
               }
             ],
             "title": "Mode"
-          },
-          "page_chars": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Page Chars"
           },
           "vault_id": {
             "anyOf": [
