@@ -169,7 +169,6 @@ def run(
     """Run an agent task and print the final answer."""
     state = _state(ctx)
     client = _client(state)
-    agent = agent or _select_agent(state, client)
     overrides = _parse_overrides(override or [])
     params: dict[str, Any] = {
         "agent": agent,
@@ -181,6 +180,10 @@ def run(
         params["overrides"] = overrides
     try:
         assert_request_under_limit(params)
+    except Exception as exc:
+        _raise_cli_error(exc)
+    params["agent"] = agent or _select_agent(state, client)
+    try:
         session = client.sessions.create_session(**params)
     except Exception as exc:
         _raise_cli_error(exc)
