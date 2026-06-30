@@ -33,8 +33,6 @@ H_GLYPH = "\n".join(
     )
 )
 
-DEFAULT_AGENT = "h/web-surfer-holo3-1-35b"
-
 console = Console()
 err_console = Console(stderr=True)
 
@@ -153,7 +151,9 @@ def _parse_overrides(items: list[str]) -> dict[str, Any]:
 def run(
     ctx: typer.Context,
     task: str = typer.Argument(..., help="Task to run."),
-    agent: str = typer.Option(DEFAULT_AGENT, "--agent", "-a", help="Registered agent name."),
+    agent: str | None = typer.Option(
+        None, "--agent", "-a", help="Registered agent name. Omit to pick from a list (see `hai agents list`)."
+    ),
     max_steps: int = typer.Option(20, "--max-steps", min=1, max=200, help="Maximum reasoning steps."),
     max_time_s: float = typer.Option(180.0, "--max-time", min=1.0, max=1800.0, help="Maximum run seconds."),
     override: list[str] = typer.Option(
@@ -169,6 +169,7 @@ def run(
     """Run an agent task and print the final answer."""
     state = _state(ctx)
     client = _client(state)
+    agent = agent or _select_agent(state, client)
     overrides = _parse_overrides(override or [])
     params: dict[str, Any] = {
         "agent": agent,
@@ -577,6 +578,29 @@ def _client(state: AppState) -> Client:
         return make_client(api_key=state.api_key, base_url=state.base_url)
     except RuntimeError as exc:
         _raise_cli_error(exc)
+
+
+def _select_agent(state: AppState, client: Client) -> str:
+    """Pick an agent from the live catalog; require --agent when non-interactive."""
+    if state.json_output or not (sys.stdin.isatty() and sys.stdout.isatty()):
+        _raise_cli_error(RuntimeError("No agent specified. Pass --agent (see `hai agents list`)."))
+    try:
+        agents = client.agents.list_agents(page=1, size=100).items
+    except Exception as exc:
+        _raise_cli_error(exc)
+    if not agents:
+        _raise_cli_error(RuntimeError("No agents available. Create one, then pass --agent."))
+    console.print("Select an agent:")
+    for i, item in enumerate(agents, 1):
+        desc = " ".join((item.description or "").split())
+        if len(desc) > 80:
+            desc = desc[:77] + "..."
+        line = f"  [bold]{i}[/bold]. {item.name}"
+        console.print(f"{line}  [dim]{desc}[/dim]" if desc else line)
+    choice = typer.prompt("Agent number", type=int)
+    if not 1 <= choice <= len(agents):
+        _raise_cli_error(RuntimeError(f"Choice must be between 1 and {len(agents)}."))
+    return agents[choice - 1].name
 
 
 def _print_run_result(result, json_output: bool, agent_view_url: str | None = None) -> None:

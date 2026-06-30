@@ -47,7 +47,7 @@ export HAI_API_KEY=hk-...
 
 ## Quickstart
 
-Launch the built-in `h/web-surfer-holo3-1-35b` agent, which ships with its own browser, and describe the task in plain language. `run_session` polls until the agent finishes and returns the final answer.
+Launch the built-in `h/web-surfer-pro` agent, which ships with its own browser, and describe the task in plain language. `run_session` polls until the agent finishes and returns the final answer.
 
 ```python
 from hai_agents import Client
@@ -55,7 +55,7 @@ from hai_agents import Client
 client = Client()  # reads HAI_API_KEY from the environment
 
 result = client.run_session(
-    agent="h/web-surfer-holo3-1-35b",
+    agent="h/web-surfer-pro",
     messages="What are the top 3 stories on Hacker News right now?",
 )
 
@@ -73,7 +73,7 @@ You drive a session two ways. `run_session` creates it and blocks until it settl
 
 ```python
 session = client.start_session(
-    agent="h/web-surfer-holo3-1-35b",
+    agent="h/web-surfer-pro",
     messages="Find the top story on Hacker News",
 )
 
@@ -110,7 +110,7 @@ By default a session ends as soon as the agent answers. Set `idle_timeout_s` to 
 
 ```python
 session = client.start_session(
-    agent="h/web-surfer-holo3-1-35b",
+    agent="h/web-surfer-pro",
     idle_timeout_s=600,
     messages="Find the top story on Hacker News",
 )
@@ -137,7 +137,7 @@ class Jobs(BaseModel):
 
 client = Client()
 result = client.run_session(
-    agent="h/web-surfer-holo3-1-35b",
+    agent="h/web-surfer-pro",
     messages="Find 3 open ML engineering roles in Paris.",
     answer_schema=Jobs,
 )
@@ -162,7 +162,7 @@ def get_weather(city: str) -> str:
 client = Client()
 
 result = client.run_session(
-    agent="h/web-surfer-holo3-1-35b",
+    agent="h/web-surfer-pro",
     messages="What should I wear in Paris today?",
     tools=[get_weather],
 )
@@ -186,7 +186,7 @@ Start a session on a browser that already knows the user. A [browser profile](ht
 
 ```python
 result = client.run_session(
-    agent="h/web-surfer-holo3-1-35b",
+    agent="h/web-surfer-pro",
     messages="Open my dashboard and report any new alerts",
     overrides={
         "agent.environments[kind=web].browser_profile_id": "<profile-id>",
@@ -206,7 +206,7 @@ from hai_agents import AsyncClient
 async def main():
     client = AsyncClient()
     result = await client.run_session(
-        agent="h/web-surfer-holo3-1-35b",
+        agent="h/web-surfer-pro",
         messages="What are the top 3 stories on Hacker News right now?",
     )
     print(result.answer)
