@@ -36,7 +36,7 @@ class RawSkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[PageSkill]:
         """
-        List reserved + caller's org skills, optionally filtered by name or text search.
+        List reserved + caller's org skills. Unauthenticated callers see reserved ``h/`` skills only.
 
         Parameters
         ----------
@@ -464,7 +464,7 @@ class AsyncRawSkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[PageSkill]:
         """
-        List reserved + caller's org skills, optionally filtered by name or text search.
+        List reserved + caller's org skills. Unauthenticated callers see reserved ``h/`` skills only.
 
         Parameters
         ----------

@@ -1306,7 +1306,7 @@
           "Skills"
         ],
         "summary": "List Skills",
-        "description": "List reserved + caller's org skills, optionally filtered by name or text search.",
+        "description": "List reserved + caller's org skills. Unauthenticated callers see reserved ``h/`` skills only.",
         "operationId": "list_skills_api_v2_skills_get",
         "security": [
           {
@@ -1682,7 +1682,7 @@
           "Environments"
         ],
         "summary": "List Environments",
-        "description": "List reserved + caller's org environments.",
+        "description": "List reserved + caller's org environments. Unauthenticated callers see reserved ``h/`` environments only.",
         "operationId": "list_environments_api_v2_environments_get",
         "security": [
           {
@@ -2076,7 +2076,7 @@
           "Agents"
         ],
         "summary": "List Agents",
-        "description": "List reserved + caller's org agents.",
+        "description": "List reserved + caller's org agents. Unauthenticated callers see reserved ``h/`` agents only.",
         "operationId": "list_agents_api_v2_agents_get",
         "security": [
           {

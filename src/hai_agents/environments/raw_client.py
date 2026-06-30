@@ -44,7 +44,7 @@ class RawEnvironmentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[EnvironmentPage]:
         """
-        List reserved + caller's org environments.
+        List reserved + caller's org environments. Unauthenticated callers see reserved ``h/`` environments only.
 
         Parameters
         ----------
@@ -543,7 +543,7 @@ class AsyncRawEnvironmentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[EnvironmentPage]:
         """
-        List reserved + caller's org environments.
+        List reserved + caller's org environments. Unauthenticated callers see reserved ``h/`` environments only.
 
         Parameters
         ----------

@@ -46,7 +46,7 @@ class EnvironmentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> EnvironmentPage:
         """
-        List reserved + caller's org environments.
+        List reserved + caller's org environments. Unauthenticated callers see reserved ``h/`` environments only.
 
         Parameters
         ----------
@@ -400,7 +400,7 @@ class AsyncEnvironmentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> EnvironmentPage:
         """
-        List reserved + caller's org environments.
+        List reserved + caller's org environments. Unauthenticated callers see reserved ``h/`` environments only.
 
         Parameters
         ----------
