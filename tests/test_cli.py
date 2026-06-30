@@ -35,7 +35,7 @@ def test_run_prints_json(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
     monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
 
-    result = runner.invoke(app, ["--json", "run", "hello"], env={"HAI_API_KEY": "hk-test"})
+    result = runner.invoke(app, ["--json", "run", "hello", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
@@ -51,10 +51,19 @@ def test_run_prints_live_view_link(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
     monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
 
-    result = runner.invoke(app, ["run", "hello"], env={"HAI_API_KEY": "hk-test"})
+    result = runner.invoke(app, ["run", "hello", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
 
     assert result.exit_code == 0, result.output
     assert "https://platform.example.test/agent-view/sess_1" in result.output
+
+
+def test_run_without_agent_requires_selection(monkeypatch) -> None:
+    monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
+
+    result = runner.invoke(app, ["run", "hello"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code != 0
+    assert "--agent" in _error_text(result)
 
 
 def test_share_session_prints_absolute_url(monkeypatch) -> None:
@@ -101,7 +110,7 @@ def test_run_rejects_oversized_payload_before_sending(monkeypatch) -> None:
     client = _RunClient(capture=captured)
     monkeypatch.setattr(app_module, "_client", lambda state: client)
 
-    result = runner.invoke(app, ["run", "x" * (6 * 1024 * 1024)], env={"HAI_API_KEY": "hk-test"})
+    result = runner.invoke(app, ["run", "x" * (6 * 1024 * 1024), "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
 
     assert result.exit_code != 0
     assert "over the" in _error_text(result)
@@ -120,6 +129,8 @@ def test_run_parses_overrides(monkeypatch) -> None:
         [
             "run",
             "hello",
+            "-a",
+            "h/test-agent",
             "-o",
             "agent.environments[kind=web].start_url=https://bing.com",
             "-o",
