@@ -39,7 +39,7 @@ class SkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageSkill:
         """
-        List reserved + caller's org skills, optionally filtered by name or text search.
+        List reserved + caller's org skills. Unauthenticated callers see reserved ``h/`` skills only.
 
         Parameters
         ----------
@@ -347,7 +347,7 @@ class AsyncSkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageSkill:
         """
-        List reserved + caller's org skills, optionally filtered by name or text search.
+        List reserved + caller's org skills. Unauthenticated callers see reserved ``h/`` skills only.
 
         Parameters
         ----------
