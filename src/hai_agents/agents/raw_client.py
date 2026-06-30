@@ -44,7 +44,7 @@ class RawAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[PageAgent]:
         """
-        List reserved + caller's org agents.
+        List reserved + caller's org agents. Unauthenticated callers see reserved ``h/`` agents only.
 
         Parameters
         ----------
@@ -574,7 +574,7 @@ class AsyncRawAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[PageAgent]:
         """
-        List reserved + caller's org agents.
+        List reserved + caller's org agents. Unauthenticated callers see reserved ``h/`` agents only.
 
         Parameters
         ----------
