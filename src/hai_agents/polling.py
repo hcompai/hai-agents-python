@@ -45,6 +45,7 @@ class CreateSessionParams(typing_extensions.TypedDict, total=False):
     """Typed ``create_session`` kwargs; mirror new ``SessionRequest`` fields here to keep autocomplete."""
 
     agent: typing_extensions.Required[SessionRequestAgent]
+    agent_artifact: typing.Optional[str]
     idempotency_key: typing.Optional[str]
     messages: typing.Optional[SessionRequestMessages]
     overrides: typing.Optional[typing.Dict[str, typing.Any]]
