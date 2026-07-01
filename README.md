@@ -18,7 +18,7 @@
 <p align="center">
   <b><a href="https://hub.hcompany.ai/computer-use-agents">Documentation</a></b>
   &nbsp;·&nbsp;
-  <a href="https://portal.hcompany.ai">Get an API key</a>
+  <a href="https://platform.hcompany.ai/settings/api-keys">Get an API key</a>
   &nbsp;·&nbsp;
   <a href="https://pypi.org/project/hai-agents/">PyPI</a>
   &nbsp;·&nbsp;
@@ -39,7 +39,7 @@ Add the optional command-line tools with the `cli` extra:
 pip install "hai-agents[cli]"
 ```
 
-Python 3.10 or newer is required. Get an API key at [portal.hcompany.ai](https://portal.hcompany.ai) and export it:
+Python 3.10 or newer is required. Get an API key at [platform.hcompany.ai/settings/api-keys](https://platform.hcompany.ai/settings/api-keys) and export it:
 
 ```bash
 export HAI_API_KEY=hk-...
@@ -271,7 +271,7 @@ hai sessions watch <session-id>
 hai mcp install           # add the hai-agents MCP server to Cursor, VS Code, Claude Code, ...
 ```
 
-Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`. Run `hai --help` for the full command set.
+Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`, then `~/.config/hai/.env`. Run `hai --help` for the full command set.
 
 ## Documentation
 

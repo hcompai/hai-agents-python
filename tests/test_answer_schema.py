@@ -71,7 +71,7 @@ class TestSchemaInjection:
         assert "JobListing" in schema["$defs"]
 
     def test_catalog_agent_injected_via_overrides(self) -> None:
-        params: dict = {"agent": "h/web-surfer"}
+        params: dict = {"agent": "h/web-surfer-pro"}
         _attach_answer_schema(params, JobListings)
         assert params["overrides"]["agent.answer_format"]["title"] == "JobListings"
 
@@ -79,7 +79,7 @@ class TestSchemaInjection:
         with pytest.raises(ValueError, match="conflicts"):
             _attach_answer_schema({"agent": {"answer_format": {"type": "object"}}}, JobListings)
         with pytest.raises(ValueError, match="conflicts"):
-            _attach_answer_schema({"agent": "h/web-surfer", "overrides": {"agent.answer_format": {}}}, JobListings)
+            _attach_answer_schema({"agent": "h/web-surfer-pro", "overrides": {"agent.answer_format": {}}}, JobListings)
 
     def test_inline_agent_with_answer_format_override_conflicts(self) -> None:
         with pytest.raises(ValueError, match="conflicts"):
@@ -87,10 +87,10 @@ class TestSchemaInjection:
 
     def test_non_model_schema_rejected(self) -> None:
         with pytest.raises(TypeError, match="BaseModel"):
-            _attach_answer_schema({"agent": "h/web-surfer"}, dict)
+            _attach_answer_schema({"agent": "h/web-surfer-pro"}, dict)
 
     def test_user_overrides_preserved(self) -> None:
-        params: dict = {"agent": "h/web-surfer", "overrides": {"agent.max_steps": 5}}
+        params: dict = {"agent": "h/web-surfer-pro", "overrides": {"agent.max_steps": 5}}
         _attach_answer_schema(params, JobListings)
         assert params["overrides"]["agent.max_steps"] == 5
 
@@ -98,7 +98,7 @@ class TestSchemaInjection:
 class TestAnswerParseBack:
     def test_completed_answer_validates_into_model(self) -> None:
         client = _Client(_VALID_ANSWER)
-        result = run_session(client, agent="h/web-surfer", messages="find jobs", answer_schema=JobListings)  # type: ignore[arg-type]
+        result = run_session(client, agent="h/web-surfer-pro", messages="find jobs", answer_schema=JobListings)  # type: ignore[arg-type]
         assert isinstance(result.answer, JobListings)
         assert result.answer.jobs[1].title == "SWE"
         assert client.sessions.created_with["overrides"]["agent.answer_format"]["title"] == "JobListings"
@@ -152,7 +152,7 @@ class TestComposesWithTools:
 
         client = _Client(_VALID_ANSWER)
         result = run_session(  # type: ignore[arg-type]
-            client, agent="h/web-surfer", messages="go", answer_schema=JobListings, tools=[get_weather]
+            client, agent="h/web-surfer-pro", messages="go", answer_schema=JobListings, tools=[get_weather]
         )
         overrides = client.sessions.created_with["overrides"]
         assert overrides["agent.answer_format"]["title"] == "JobListings"

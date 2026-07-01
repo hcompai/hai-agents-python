@@ -2,7 +2,7 @@
 
 The agent is dropped on a search-engine start URL (set on the environment spec)
 and asked for Paris weather without being told which engine to use. Exercises
-local_browser provisioning, the agent using whatever page it lands on, and
+web browser provisioning, the agent using whatever page it lands on, and
 end-to-end answer extraction.
 
 Bing is used because it can be read without a CAPTCHA. The engine lives in the
@@ -40,8 +40,7 @@ def _poll_until_terminal(client: Client, session_id: str, timeout_s: float = 420
             return s
         if time.time() - start > timeout_s:
             pytest.fail(
-                f"session {session_id} did not finish in {timeout_s}s "
-                f"(last status: {s.status}, steps: {s.steps})"
+                f"session {session_id} did not finish in {timeout_s}s (last status: {s.status}, steps: {s.steps})"
             )
         time.sleep(3)
 
@@ -62,9 +61,8 @@ def test_browser_session_finds_paris_weather(client: Client, run_id: str, create
             "environments": [
                 {
                     "id": "browser",
-                    "kind": "local_browser",
-                    "width": 1280,
-                    "height": 800,
+                    "kind": "web",
+                    "mode": {"type": "visual", "width": 1280, "height": 800},
                     "start_url": SEARCH_ENGINE_START_URL,
                 }
             ],
