@@ -3823,6 +3823,12 @@
             "description": "Initial URL to open.",
             "default": "https://www.bing.com"
           },
+          "headless": {
+            "type": "boolean",
+            "title": "Headless",
+            "description": "Run the browser without a visible window.",
+            "default": false
+          },
           "mode": {
             "oneOf": [
               {
@@ -4449,82 +4455,6 @@
         "title": "LiveViewUrlEvent",
         "description": "A live view URL became available."
       },
-      "MCPServer": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9_.-]+$",
-            "title": "Name",
-            "description": "Unique name for this server."
-          },
-          "transport": {
-            "type": "string",
-            "enum": [
-              "stdio",
-              "streamable_http",
-              "sse"
-            ],
-            "title": "Transport",
-            "description": "Transport used to reach the server."
-          },
-          "command": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Command",
-            "description": "Executable to launch, for the stdio transport."
-          },
-          "args": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Args",
-            "description": "Command-line arguments, for the stdio transport."
-          },
-          "env": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object",
-            "title": "Env",
-            "description": "Subprocess environment variables, for the stdio transport."
-          },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Url",
-            "description": "Server endpoint URL, for the HTTP transports."
-          },
-          "headers": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object",
-            "title": "Headers",
-            "description": "Request headers, for the HTTP transports."
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "transport"
-        ],
-        "title": "MCPServer",
-        "description": "An MCP server an environment connects to."
-      },
       "MessageEvent": {
         "properties": {
           "kind": {
@@ -5128,16 +5058,16 @@
             ],
             "title": "Start Url"
           },
-          "session_id": {
+          "headless": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "boolean"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Session Id"
+            "title": "Headless"
           },
           "mode": {
             "anyOf": [
@@ -5197,75 +5127,6 @@
                 "type": "null"
               }
             ]
-          },
-          "pip_packages": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pip Packages"
-          },
-          "env": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "type": "string"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Env"
-          },
-          "mcp_servers": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/MCPServer"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Mcp Servers"
-          },
-          "servers": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/MCPServer"
-                },
-                "type": "array",
-                "minItems": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Servers"
-          },
-          "namespace": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Namespace"
           }
         },
         "type": "object",
