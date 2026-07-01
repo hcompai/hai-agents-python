@@ -10,7 +10,6 @@ from ..types.browser_network import BrowserNetwork
 from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
-from ..types.mcp_server import McpServer
 from .raw_client import AsyncRawEnvironmentsClient, RawEnvironmentsClient
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
 from .types.patch_environment_mode import PatchEnvironmentMode
@@ -96,6 +95,7 @@ class EnvironmentsClient:
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
         start_url: typing.Optional[str] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
@@ -114,6 +114,9 @@ class EnvironmentsClient:
 
         start_url : typing.Optional[str]
             Initial URL to open.
+
+        headless : typing.Optional[bool]
+            Run the browser without a visible window.
 
         mode : typing.Optional[BrowserMode]
             How the agent perceives and drives the browser.
@@ -150,6 +153,7 @@ class EnvironmentsClient:
             id=id,
             kind=kind,
             start_url=start_url,
+            headless=headless,
             mode=mode,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
@@ -195,6 +199,7 @@ class EnvironmentsClient:
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
         start_url: typing.Optional[str] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
@@ -215,6 +220,9 @@ class EnvironmentsClient:
 
         start_url : typing.Optional[str]
             Initial URL to open.
+
+        headless : typing.Optional[bool]
+            Run the browser without a visible window.
 
         mode : typing.Optional[BrowserMode]
             How the agent perceives and drives the browser.
@@ -253,6 +261,7 @@ class EnvironmentsClient:
             id=id,
             kind=kind,
             start_url=start_url,
+            headless=headless,
             mode=mode,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
@@ -295,16 +304,11 @@ class EnvironmentsClient:
         id: str,
         *,
         start_url: typing.Optional[str] = OMIT,
-        session_id: typing.Optional[str] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
-        pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
-        env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
-        mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
-        servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
-        namespace: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -316,7 +320,7 @@ class EnvironmentsClient:
 
         start_url : typing.Optional[str]
 
-        session_id : typing.Optional[str]
+        headless : typing.Optional[bool]
 
         mode : typing.Optional[PatchEnvironmentMode]
 
@@ -325,16 +329,6 @@ class EnvironmentsClient:
         browser_profile_id : typing.Optional[str]
 
         network : typing.Optional[BrowserNetwork]
-
-        pip_packages : typing.Optional[typing.Sequence[str]]
-
-        env : typing.Optional[typing.Dict[str, typing.Optional[str]]]
-
-        mcp_servers : typing.Optional[typing.Sequence[McpServer]]
-
-        servers : typing.Optional[typing.Sequence[McpServer]]
-
-        namespace : typing.Optional[str]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -358,16 +352,11 @@ class EnvironmentsClient:
         _response = self._raw_client.patch_environment(
             id,
             start_url=start_url,
-            session_id=session_id,
+            headless=headless,
             mode=mode,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
             network=network,
-            pip_packages=pip_packages,
-            env=env,
-            mcp_servers=mcp_servers,
-            servers=servers,
-            namespace=namespace,
             request_options=request_options,
         )
         return _response.data
@@ -458,6 +447,7 @@ class AsyncEnvironmentsClient:
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
         start_url: typing.Optional[str] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
@@ -476,6 +466,9 @@ class AsyncEnvironmentsClient:
 
         start_url : typing.Optional[str]
             Initial URL to open.
+
+        headless : typing.Optional[bool]
+            Run the browser without a visible window.
 
         mode : typing.Optional[BrowserMode]
             How the agent perceives and drives the browser.
@@ -520,6 +513,7 @@ class AsyncEnvironmentsClient:
             id=id,
             kind=kind,
             start_url=start_url,
+            headless=headless,
             mode=mode,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
@@ -573,6 +567,7 @@ class AsyncEnvironmentsClient:
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
         start_url: typing.Optional[str] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
@@ -593,6 +588,9 @@ class AsyncEnvironmentsClient:
 
         start_url : typing.Optional[str]
             Initial URL to open.
+
+        headless : typing.Optional[bool]
+            Run the browser without a visible window.
 
         mode : typing.Optional[BrowserMode]
             How the agent perceives and drives the browser.
@@ -639,6 +637,7 @@ class AsyncEnvironmentsClient:
             id=id,
             kind=kind,
             start_url=start_url,
+            headless=headless,
             mode=mode,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
@@ -689,16 +688,11 @@ class AsyncEnvironmentsClient:
         id: str,
         *,
         start_url: typing.Optional[str] = OMIT,
-        session_id: typing.Optional[str] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
-        pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
-        env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
-        mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
-        servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
-        namespace: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -710,7 +704,7 @@ class AsyncEnvironmentsClient:
 
         start_url : typing.Optional[str]
 
-        session_id : typing.Optional[str]
+        headless : typing.Optional[bool]
 
         mode : typing.Optional[PatchEnvironmentMode]
 
@@ -719,16 +713,6 @@ class AsyncEnvironmentsClient:
         browser_profile_id : typing.Optional[str]
 
         network : typing.Optional[BrowserNetwork]
-
-        pip_packages : typing.Optional[typing.Sequence[str]]
-
-        env : typing.Optional[typing.Dict[str, typing.Optional[str]]]
-
-        mcp_servers : typing.Optional[typing.Sequence[McpServer]]
-
-        servers : typing.Optional[typing.Sequence[McpServer]]
-
-        namespace : typing.Optional[str]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -760,16 +744,11 @@ class AsyncEnvironmentsClient:
         _response = await self._raw_client.patch_environment(
             id,
             start_url=start_url,
-            session_id=session_id,
+            headless=headless,
             mode=mode,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
             network=network,
-            pip_packages=pip_packages,
-            env=env,
-            mcp_servers=mcp_servers,
-            servers=servers,
-            namespace=namespace,
             request_options=request_options,
         )
         return _response.data

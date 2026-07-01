@@ -25,6 +25,11 @@ class Browser(UniversalBaseModel):
     Initial URL to open.
     """
 
+    headless: typing.Optional[bool] = pydantic.Field(default=None)
+    """
+    Run the browser without a visible window.
+    """
+
     mode: typing.Optional[BrowserMode] = pydantic.Field(default=None)
     """
     How the agent perceives and drives the browser.
