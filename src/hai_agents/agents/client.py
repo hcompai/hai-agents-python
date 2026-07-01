@@ -46,7 +46,7 @@ class AgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageAgent:
         """
-        List reserved + caller's org agents.
+        List reserved + caller's org agents. Unauthenticated callers see reserved ``h/`` agents only.
 
         Parameters
         ----------
@@ -419,7 +419,7 @@ class AsyncAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageAgent:
         """
-        List reserved + caller's org agents.
+        List reserved + caller's org agents. Unauthenticated callers see reserved ``h/`` agents only.
 
         Parameters
         ----------
