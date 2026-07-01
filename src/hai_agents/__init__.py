@@ -123,6 +123,7 @@ if typing.TYPE_CHECKING:
         VaultConfigList,
         VaultConfigRead,
         VaultHealth,
+        WebhookEventTypeDefinition,
         WebhookRecord,
         WebhookWithSecret,
     )
@@ -325,6 +326,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "VaultHealth": ".types",
     "WebhookEvent": ".webhook_verification",
     "WebhookEventData": ".webhook_verification",
+    "WebhookEventTypeDefinition": ".types",
     "WebhookRecord": ".types",
     "WebhookVerificationError": ".webhook_verification",
     "WebhookWithSecret": ".types",
@@ -523,6 +525,7 @@ __all__ = [
     "VaultHealth",
     "WebhookEvent",
     "WebhookEventData",
+    "WebhookEventTypeDefinition",
     "WebhookRecord",
     "WebhookVerificationError",
     "WebhookWithSecret",

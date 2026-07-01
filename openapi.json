@@ -2552,6 +2552,47 @@
         }
       }
     },
+    "/api/v2/webhooks/events": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List Webhook Events",
+        "description": "List concrete webhook event types clients can subscribe to.",
+        "operationId": "list_webhook_events_api_v2_webhooks_events_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WebhookEventTypeDefinition"
+                  },
+                  "type": "array",
+                  "title": "Response List Webhook Events Api V2 Webhooks Events Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v2/webhooks/{webhook_id}": {
       "get": {
         "tags": [
@@ -6421,6 +6462,25 @@
         "type": "object",
         "title": "VaultUpdateRequest",
         "description": "Partial update; only provided fields are forwarded. Token rotation is separate."
+      },
+      "WebhookEventTypeDefinition": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "description"
+        ],
+        "title": "WebhookEventTypeDefinition",
+        "description": "A webhook event type clients can subscribe to."
       },
       "WebhookRecord": {
         "properties": {
