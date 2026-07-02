@@ -32,6 +32,9 @@ _VALID_ANSWER = {"jobs": [{"title": "RE", "company": "H"}, {"title": "SWE", "com
 class _Status:
     def __init__(self, status: str) -> None:
         self.status = status
+        self.outcome: typing.Optional[str] = None
+        self.error: typing.Optional[str] = None
+        self.error_code: typing.Optional[str] = None
 
 
 class _Changes:

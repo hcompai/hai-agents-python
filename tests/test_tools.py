@@ -87,7 +87,7 @@ class _FakeSessions:
 
     def get_session_status(self, id):
         changes, status = self._polls.pop(0)
-        return SimpleNamespace(status=status)
+        return SimpleNamespace(status=status, outcome=None, error=None, error_code=None)
 
 
 def _pending(id, tool_name, args=None):
@@ -255,7 +255,7 @@ def test_wait_joining_past_advertisement_recovers_pending():
             return None
 
         def get_session_status(self, id):
-            return SimpleNamespace(status=self._statuses.pop(0))
+            return SimpleNamespace(status=self._statuses.pop(0), outcome=None, error=None, error_code=None)
 
     httpx = _FakeHttpx()
     client = SimpleNamespace(sessions=_MidStreamSessions(), _client_wrapper=SimpleNamespace(httpx_client=httpx))
