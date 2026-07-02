@@ -126,6 +126,8 @@ if typing.TYPE_CHECKING:
     from .vault_config_list import VaultConfigList
     from .vault_config_read import VaultConfigRead
     from .vault_health import VaultHealth
+    from .webhook_event_type_definition import WebhookEventTypeDefinition
+    from .webhook_ping_result import WebhookPingResult
     from .webhook_record import WebhookRecord
     from .webhook_with_secret import WebhookWithSecret
 _dynamic_imports: typing.Dict[str, str] = {
@@ -245,6 +247,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "VaultConfigList": ".vault_config_list",
     "VaultConfigRead": ".vault_config_read",
     "VaultHealth": ".vault_health",
+    "WebhookEventTypeDefinition": ".webhook_event_type_definition",
+    "WebhookPingResult": ".webhook_ping_result",
     "WebhookRecord": ".webhook_record",
     "WebhookWithSecret": ".webhook_with_secret",
 }
@@ -388,6 +392,8 @@ __all__ = [
     "VaultConfigList",
     "VaultConfigRead",
     "VaultHealth",
+    "WebhookEventTypeDefinition",
+    "WebhookPingResult",
     "WebhookRecord",
     "WebhookWithSecret",
 ]

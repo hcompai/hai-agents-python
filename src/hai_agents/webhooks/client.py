@@ -5,6 +5,8 @@ import typing
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
 from ..types.page_webhook_record import PageWebhookRecord
+from ..types.webhook_event_type_definition import WebhookEventTypeDefinition
+from ..types.webhook_ping_result import WebhookPingResult
 from ..types.webhook_record import WebhookRecord
 from ..types.webhook_with_secret import WebhookWithSecret
 from .raw_client import AsyncRawWebhooksClient, RawWebhooksClient
@@ -87,7 +89,7 @@ class WebhooksClient:
         url : str
 
         enabled_events : typing.Optional[typing.Sequence[str]]
-            Event types delivered to this webhook. '*' subscribes to all current and future types.
+            Event types delivered to this webhook. '*' subscribes to the session.status_updated firehose; granular session.* types are delivered only when listed explicitly.
 
         description : typing.Optional[str]
 
@@ -113,6 +115,34 @@ class WebhooksClient:
         _response = self._raw_client.create_webhook(
             url=url, enabled_events=enabled_events, description=description, request_options=request_options
         )
+        return _response.data
+
+    def list_webhook_events(
+        self, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> typing.List[WebhookEventTypeDefinition]:
+        """
+        List concrete webhook event types clients can subscribe to.
+
+        Parameters
+        ----------
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        typing.List[WebhookEventTypeDefinition]
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.webhooks.list_webhook_events()
+        """
+        _response = self._raw_client.list_webhook_events(request_options=request_options)
         return _response.data
 
     def get_webhook(self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None) -> WebhookRecord:
@@ -228,6 +258,70 @@ class WebhooksClient:
         )
         return _response.data
 
+    def rotate_webhook_secret(
+        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> WebhookWithSecret:
+        """
+        Replace the signing secret. Only returned here; make your receiver accept both secrets before rotating.
+
+        Parameters
+        ----------
+        webhook_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        WebhookWithSecret
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.webhooks.rotate_webhook_secret(
+            webhook_id="webhook_id",
+        )
+        """
+        _response = self._raw_client.rotate_webhook_secret(webhook_id, request_options=request_options)
+        return _response.data
+
+    def ping_webhook(
+        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> WebhookPingResult:
+        """
+        Send a signed ping event to the webhook and report the receiver's HTTP response.
+
+        Parameters
+        ----------
+        webhook_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        WebhookPingResult
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.webhooks.ping_webhook(
+            webhook_id="webhook_id",
+        )
+        """
+        _response = self._raw_client.ping_webhook(webhook_id, request_options=request_options)
+        return _response.data
+
 
 class AsyncWebhooksClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
@@ -312,7 +406,7 @@ class AsyncWebhooksClient:
         url : str
 
         enabled_events : typing.Optional[typing.Sequence[str]]
-            Event types delivered to this webhook. '*' subscribes to all current and future types.
+            Event types delivered to this webhook. '*' subscribes to the session.status_updated firehose; granular session.* types are delivered only when listed explicitly.
 
         description : typing.Optional[str]
 
@@ -346,6 +440,42 @@ class AsyncWebhooksClient:
         _response = await self._raw_client.create_webhook(
             url=url, enabled_events=enabled_events, description=description, request_options=request_options
         )
+        return _response.data
+
+    async def list_webhook_events(
+        self, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> typing.List[WebhookEventTypeDefinition]:
+        """
+        List concrete webhook event types clients can subscribe to.
+
+        Parameters
+        ----------
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        typing.List[WebhookEventTypeDefinition]
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.webhooks.list_webhook_events()
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.list_webhook_events(request_options=request_options)
         return _response.data
 
     async def get_webhook(
@@ -485,4 +615,84 @@ class AsyncWebhooksClient:
             disabled=disabled,
             request_options=request_options,
         )
+        return _response.data
+
+    async def rotate_webhook_secret(
+        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> WebhookWithSecret:
+        """
+        Replace the signing secret. Only returned here; make your receiver accept both secrets before rotating.
+
+        Parameters
+        ----------
+        webhook_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        WebhookWithSecret
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.webhooks.rotate_webhook_secret(
+                webhook_id="webhook_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.rotate_webhook_secret(webhook_id, request_options=request_options)
+        return _response.data
+
+    async def ping_webhook(
+        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> WebhookPingResult:
+        """
+        Send a signed ping event to the webhook and report the receiver's HTTP response.
+
+        Parameters
+        ----------
+        webhook_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        WebhookPingResult
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.webhooks.ping_webhook(
+                webhook_id="webhook_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.ping_webhook(webhook_id, request_options=request_options)
         return _response.data
