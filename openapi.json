@@ -287,7 +287,7 @@
             "required": false,
             "schema": {
               "type": "integer",
-              "maximum": 1000,
+              "maximum": 100,
               "minimum": 1,
               "description": "Number of items per page",
               "default": 10,
@@ -2552,6 +2552,47 @@
         }
       }
     },
+    "/api/v2/webhooks/events": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List Webhook Events",
+        "description": "List concrete webhook event types clients can subscribe to.",
+        "operationId": "list_webhook_events_api_v2_webhooks_events_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WebhookEventTypeDefinition"
+                  },
+                  "type": "array",
+                  "title": "Response List Webhook Events Api V2 Webhooks Events Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v2/webhooks/{webhook_id}": {
       "get": {
         "tags": [
@@ -2684,6 +2725,55 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/webhooks/{webhook_id}/ping": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Ping Webhook",
+        "description": "Send a signed ping event to the webhook and report the receiver's HTTP response.",
+        "operationId": "ping_webhook_api_v2_webhooks__webhook_id__ping_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "webhook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Webhook Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookPingResult"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -4180,7 +4270,7 @@
             },
             "type": "array",
             "title": "Enabled Events",
-            "description": "Event types delivered to this webhook. '*' subscribes to all current and future types.",
+            "description": "Event types delivered to this webhook. '*' subscribes to the session.status_updated firehose; granular session.* types are delivered only when listed explicitly.",
             "default": [
               "*"
             ]
@@ -6421,6 +6511,40 @@
         "type": "object",
         "title": "VaultUpdateRequest",
         "description": "Partial update; only provided fields are forwarded. Token rotation is separate."
+      },
+      "WebhookEventTypeDefinition": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "description"
+        ],
+        "title": "WebhookEventTypeDefinition",
+        "description": "A webhook event type clients can subscribe to."
+      },
+      "WebhookPingResult": {
+        "properties": {
+          "response_status": {
+            "type": "integer",
+            "title": "Response Status",
+            "description": "HTTP status code returned by the receiving endpoint."
+          }
+        },
+        "type": "object",
+        "required": [
+          "response_status"
+        ],
+        "title": "WebhookPingResult",
+        "description": "Outcome of a test delivery to a webhook endpoint."
       },
       "WebhookRecord": {
         "properties": {
