@@ -16,7 +16,7 @@ class _Sessions:
         return SimpleNamespace(new_events=[], answer=self._answer)
 
     def get_session_status(self, id):
-        return SimpleNamespace(status=self._statuses.pop(0))
+        return SimpleNamespace(status=self._statuses.pop(0), outcome=None, error=None, error_code=None)
 
 
 def test_wait_stops_on_idle_and_returns_answer():
