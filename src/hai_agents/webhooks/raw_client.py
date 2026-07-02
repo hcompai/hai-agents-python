@@ -13,6 +13,8 @@ from ..core.request_options import RequestOptions
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.http_validation_error import HttpValidationError
 from ..types.page_webhook_record import PageWebhookRecord
+from ..types.webhook_event_type_definition import WebhookEventTypeDefinition
+from ..types.webhook_ping_result import WebhookPingResult
 from ..types.webhook_record import WebhookRecord
 from ..types.webhook_with_secret import WebhookWithSecret
 from .types.list_webhooks_request_sort_item import ListWebhooksRequestSortItem
@@ -112,7 +114,7 @@ class RawWebhooksClient:
         url : str
 
         enabled_events : typing.Optional[typing.Sequence[str]]
-            Event types delivered to this webhook. '*' subscribes to all current and future types.
+            Event types delivered to this webhook. '*' subscribes to the session.status_updated firehose; granular session.* types are delivered only when listed explicitly.
 
         description : typing.Optional[str]
 
@@ -144,6 +146,57 @@ class RawWebhooksClient:
                     WebhookWithSecret,
                     parse_obj_as(
                         type_=WebhookWithSecret,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def list_webhook_events(
+        self, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[typing.List[WebhookEventTypeDefinition]]:
+        """
+        List concrete webhook event types clients can subscribe to.
+
+        Parameters
+        ----------
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[typing.List[WebhookEventTypeDefinition]]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            "api/v2/webhooks/events",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    typing.List[WebhookEventTypeDefinition],
+                    parse_obj_as(
+                        type_=typing.List[WebhookEventTypeDefinition],  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -344,6 +397,59 @@ class RawWebhooksClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
+    def ping_webhook(
+        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[WebhookPingResult]:
+        """
+        Send a signed ping event to the webhook and report the receiver's HTTP response.
+
+        Parameters
+        ----------
+        webhook_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[WebhookPingResult]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/webhooks/{encode_path_param(webhook_id)}/ping",
+            method="POST",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    WebhookPingResult,
+                    parse_obj_as(
+                        type_=WebhookPingResult,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
 
 class AsyncRawWebhooksClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
@@ -435,7 +541,7 @@ class AsyncRawWebhooksClient:
         url : str
 
         enabled_events : typing.Optional[typing.Sequence[str]]
-            Event types delivered to this webhook. '*' subscribes to all current and future types.
+            Event types delivered to this webhook. '*' subscribes to the session.status_updated firehose; granular session.* types are delivered only when listed explicitly.
 
         description : typing.Optional[str]
 
@@ -467,6 +573,57 @@ class AsyncRawWebhooksClient:
                     WebhookWithSecret,
                     parse_obj_as(
                         type_=WebhookWithSecret,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def list_webhook_events(
+        self, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[typing.List[WebhookEventTypeDefinition]]:
+        """
+        List concrete webhook event types clients can subscribe to.
+
+        Parameters
+        ----------
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[typing.List[WebhookEventTypeDefinition]]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            "api/v2/webhooks/events",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    typing.List[WebhookEventTypeDefinition],
+                    parse_obj_as(
+                        type_=typing.List[WebhookEventTypeDefinition],  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -643,6 +800,59 @@ class AsyncRawWebhooksClient:
                     WebhookRecord,
                     parse_obj_as(
                         type_=WebhookRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def ping_webhook(
+        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[WebhookPingResult]:
+        """
+        Send a signed ping event to the webhook and report the receiver's HTTP response.
+
+        Parameters
+        ----------
+        webhook_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[WebhookPingResult]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/webhooks/{encode_path_param(webhook_id)}/ping",
+            method="POST",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    WebhookPingResult,
+                    parse_obj_as(
+                        type_=WebhookPingResult,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
