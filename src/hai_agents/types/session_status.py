@@ -4,7 +4,9 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .answer_outcome import AnswerOutcome
 from .model_usage import ModelUsage
+from .session_error_code import SessionErrorCode
 from .trajectory_status import TrajectoryStatus
 
 
@@ -21,6 +23,16 @@ class SessionStatus(UniversalBaseModel):
     error: typing.Optional[str] = pydantic.Field(default=None)
     """
     Error message if the session failed; null otherwise.
+    """
+
+    error_code: typing.Optional[SessionErrorCode] = pydantic.Field(default=None)
+    """
+    Machine-readable failure category if the session failed or timed out; null otherwise.
+    """
+
+    outcome: typing.Optional[AnswerOutcome] = pydantic.Field(default=None)
+    """
+    Agent's self-assessed task outcome, set with the final answer; null until then.
     """
 
     steps: typing.Optional[int] = pydantic.Field(default=None)
