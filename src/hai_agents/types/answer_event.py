@@ -5,6 +5,7 @@ import typing
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .answer_event_answer import AnswerEventAnswer
+from .answer_outcome import AnswerOutcome
 
 
 class AnswerEvent(UniversalBaseModel):
@@ -15,6 +16,11 @@ class AnswerEvent(UniversalBaseModel):
     answer: AnswerEventAnswer = pydantic.Field()
     """
     Final answer, plain text or structured JSON; any embedded image is inlined as base64, not a URL.
+    """
+
+    outcome: typing.Optional[AnswerOutcome] = pydantic.Field(default=None)
+    """
+    Agent's self-assessment of the task outcome; null when the agent did not report one.
     """
 
     if IS_PYDANTIC_V2:

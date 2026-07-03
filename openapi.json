@@ -287,7 +287,7 @@
             "required": false,
             "schema": {
               "type": "integer",
-              "maximum": 1000,
+              "maximum": 100,
               "minimum": 1,
               "description": "Number of items per page",
               "default": 10,
@@ -2552,6 +2552,47 @@
         }
       }
     },
+    "/api/v2/webhooks/events": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List Webhook Events",
+        "description": "List concrete webhook event types clients can subscribe to.",
+        "operationId": "list_webhook_events_api_v2_webhooks_events_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WebhookEventTypeDefinition"
+                  },
+                  "type": "array",
+                  "title": "Response List Webhook Events Api V2 Webhooks Events Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v2/webhooks/{webhook_id}": {
       "get": {
         "tags": [
@@ -2684,6 +2725,104 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/webhooks/{webhook_id}/rotate": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Rotate Webhook Secret",
+        "description": "Replace the signing secret. Only returned here; make your receiver accept both secrets before rotating.",
+        "operationId": "rotate_webhook_secret_api_v2_webhooks__webhook_id__rotate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "webhook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Webhook Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookWithSecret"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/webhooks/{webhook_id}/ping": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Ping Webhook",
+        "description": "Send a signed ping event to the webhook and report the receiver's HTTP response.",
+        "operationId": "ping_webhook_api_v2_webhooks__webhook_id__ping_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "webhook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Webhook Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookPingResult"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -3794,6 +3933,17 @@
             ],
             "title": "Answer",
             "description": "Final answer, plain text or structured JSON; any embedded image is inlined as base64, not a URL."
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Agent's self-assessment of the task outcome; null when the agent did not report one."
           }
         },
         "type": "object",
@@ -3802,6 +3952,17 @@
         ],
         "title": "AnswerEvent",
         "description": "Agent's final answer for the current task."
+      },
+      "AnswerOutcome": {
+        "type": "string",
+        "enum": [
+          "success",
+          "partial",
+          "infeasible",
+          "blocked"
+        ],
+        "title": "AnswerOutcome",
+        "description": "Agent's self-assessment of how the task concluded, reported with the final answer."
       },
       "Browser": {
         "properties": {
@@ -4180,7 +4341,7 @@
             },
             "type": "array",
             "title": "Enabled Events",
-            "description": "Event types delivered to this webhook. '*' subscribes to all current and future types.",
+            "description": "Event types delivered to this webhook. '*' subscribes to the session.status_updated firehose; granular session.* types are delivered only when listed explicitly.",
             "default": [
               "*"
             ]
@@ -5454,6 +5615,16 @@
             ],
             "title": "Error"
           },
+          "error_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionErrorCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "new_events": {
             "items": {
               "$ref": "#/components/schemas/SessionEvent"
@@ -5477,6 +5648,16 @@
             ],
             "title": "Answer"
           },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "metrics": {
             "$ref": "#/components/schemas/Metrics"
           }
@@ -5487,6 +5668,18 @@
         ],
         "title": "SessionChanges",
         "description": "Typed view of ``TrajectoryChanges`` for Agent API session endpoints."
+      },
+      "SessionErrorCode": {
+        "type": "string",
+        "enum": [
+          "environment_error",
+          "no_answer",
+          "answer_validation",
+          "timeout",
+          "internal"
+        ],
+        "title": "SessionErrorCode",
+        "description": "Machine-readable category of a terminal session failure."
       },
       "SessionEvent": {
         "anyOf": [
@@ -5618,6 +5811,12 @@
             "title": "Idle Timeout S",
             "description": "Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers."
           },
+          "queue": {
+            "type": "boolean",
+            "title": "Queue",
+            "description": "When the organization is at its concurrent-session limit, accept this session into a queue (status 'queued') instead of rejecting it with 429. Queued sessions start automatically, oldest first, as running sessions finish. Set to false to get an immediate 429 when no slot is available.",
+            "default": true
+          },
           "group_id": {
             "anyOf": [
               {
@@ -5641,18 +5840,6 @@
             ],
             "title": "Parent Session Id",
             "description": "Id of the parent session, when this is a child run."
-          },
-          "agent_artifact": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Agent Artifact",
-            "description": "Target version of the agent artifact to use."
           },
           "overrides": {
             "additionalProperties": true,
@@ -5685,6 +5872,28 @@
             ],
             "title": "Error",
             "description": "Error message if the session failed; null otherwise."
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionErrorCode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Machine-readable failure category if the session failed or timed out; null otherwise."
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Agent's self-assessed task outcome, set with the final answer; null until then."
           },
           "steps": {
             "type": "integer",
@@ -6085,6 +6294,7 @@
       "TrajectoryStatus": {
         "type": "string",
         "enum": [
+          "queued",
           "pending",
           "running",
           "paused",
@@ -6096,7 +6306,7 @@
           "interrupted"
         ],
         "title": "TrajectoryStatus",
-        "description": "State of a session/trajectory.\n\nLifecycle::\n\n    PENDING \u2192 RUNNING \u2192 {COMPLETED, FAILED, TIMED_OUT, INTERRUPTED}\n       |        \u2191  \u2191 \u2191\n       |        |  | \u2514\u2500\u2500\u2500\u2192 IDLE (interactive: agent waiting for next task)\n       |        |  \u2514\u2500\u2500\u2500\u2500\u2500\u2192 AWAITING_TOOL_RESULTS (waiting for custom tool results)\n       |        \u2193\n       \u2514\u2500\u2500\u2500\u2500\u2500\u2192 PAUSED"
+        "description": "State of a session/trajectory.\n\nLifecycle::\n\n    QUEUED \u2192 PENDING \u2192 RUNNING \u2192 {COMPLETED, FAILED, TIMED_OUT, INTERRUPTED}\n       |        |        \u2191  \u2191 \u2191\n       |        |        |  | \u2514\u2500\u2500\u2500\u2192 IDLE (interactive: agent waiting for next task)\n       |        |        |  \u2514\u2500\u2500\u2500\u2500\u2500\u2192 AWAITING_TOOL_RESULTS (waiting for custom tool results)\n       |        |        \u2193\n       |        \u2514\u2500\u2500\u2500\u2500\u2500\u2192 PAUSED\n       \u2514\u2500\u2500\u2500\u2500\u2192 INTERRUPTED (cancelled before launch)\n\nQUEUED sessions were accepted above the org's concurrency quota and wait,\nunprovisioned, until a running session finishes."
       },
       "UpdateWebhook": {
         "properties": {
@@ -6421,6 +6631,40 @@
         "type": "object",
         "title": "VaultUpdateRequest",
         "description": "Partial update; only provided fields are forwarded. Token rotation is separate."
+      },
+      "WebhookEventTypeDefinition": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "description"
+        ],
+        "title": "WebhookEventTypeDefinition",
+        "description": "A webhook event type clients can subscribe to."
+      },
+      "WebhookPingResult": {
+        "properties": {
+          "response_status": {
+            "type": "integer",
+            "title": "Response Status",
+            "description": "HTTP status code returned by the receiving endpoint."
+          }
+        },
+        "type": "object",
+        "required": [
+          "response_status"
+        ],
+        "title": "WebhookPingResult",
+        "description": "Outcome of a test delivery to a webhook endpoint."
       },
       "WebhookRecord": {
         "properties": {

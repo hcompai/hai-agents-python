@@ -8,6 +8,7 @@ import pydantic
 import typing_extensions
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .answer_event_answer import AnswerEventAnswer
+from .answer_outcome import AnswerOutcome
 from .image_content import ImageContent
 from .json_value import JsonValue
 from .message_event_content_item import MessageEventContentItem
@@ -17,6 +18,7 @@ from .tool_request import ToolRequest
 class AgentEventData_AnswerEvent(UniversalBaseModel):
     kind: typing.Literal["answer_event"] = "answer_event"
     answer: AnswerEventAnswer
+    outcome: typing.Optional[AnswerOutcome] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

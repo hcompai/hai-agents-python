@@ -36,6 +36,7 @@ if typing.TYPE_CHECKING:
     from .agent_subagents_item import AgentSubagentsItem
     from .answer_event import AnswerEvent
     from .answer_event_answer import AnswerEventAnswer
+    from .answer_outcome import AnswerOutcome
     from .browser import Browser
     from .browser_kind import BrowserKind
     from .browser_mode import BrowserMode, BrowserMode_Text, BrowserMode_Visual
@@ -83,6 +84,7 @@ if typing.TYPE_CHECKING:
     from .session import Session
     from .session_changes import SessionChanges
     from .session_changes_answer import SessionChangesAnswer
+    from .session_error_code import SessionErrorCode
     from .session_event import SessionEvent
     from .session_event_zero import (
         SessionEventZero,
@@ -126,6 +128,8 @@ if typing.TYPE_CHECKING:
     from .vault_config_list import VaultConfigList
     from .vault_config_read import VaultConfigRead
     from .vault_health import VaultHealth
+    from .webhook_event_type_definition import WebhookEventTypeDefinition
+    from .webhook_ping_result import WebhookPingResult
     from .webhook_record import WebhookRecord
     from .webhook_with_secret import WebhookWithSecret
 _dynamic_imports: typing.Dict[str, str] = {
@@ -157,6 +161,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "AgentSubagentsItem": ".agent_subagents_item",
     "AnswerEvent": ".answer_event",
     "AnswerEventAnswer": ".answer_event_answer",
+    "AnswerOutcome": ".answer_outcome",
     "Browser": ".browser",
     "BrowserKind": ".browser_kind",
     "BrowserMode": ".browser_mode",
@@ -206,6 +211,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "Session": ".session",
     "SessionChanges": ".session_changes",
     "SessionChangesAnswer": ".session_changes_answer",
+    "SessionErrorCode": ".session_error_code",
     "SessionEvent": ".session_event",
     "SessionEventZero": ".session_event_zero",
     "SessionEventZero_ActiveStateChangeEvent": ".session_event_zero",
@@ -245,6 +251,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "VaultConfigList": ".vault_config_list",
     "VaultConfigRead": ".vault_config_read",
     "VaultHealth": ".vault_health",
+    "WebhookEventTypeDefinition": ".webhook_event_type_definition",
+    "WebhookPingResult": ".webhook_ping_result",
     "WebhookRecord": ".webhook_record",
     "WebhookWithSecret": ".webhook_with_secret",
 }
@@ -300,6 +308,7 @@ __all__ = [
     "AgentSubagentsItem",
     "AnswerEvent",
     "AnswerEventAnswer",
+    "AnswerOutcome",
     "Browser",
     "BrowserKind",
     "BrowserMode",
@@ -349,6 +358,7 @@ __all__ = [
     "Session",
     "SessionChanges",
     "SessionChangesAnswer",
+    "SessionErrorCode",
     "SessionEvent",
     "SessionEventZero",
     "SessionEventZero_ActiveStateChangeEvent",
@@ -388,6 +398,8 @@ __all__ = [
     "VaultConfigList",
     "VaultConfigRead",
     "VaultHealth",
+    "WebhookEventTypeDefinition",
+    "WebhookPingResult",
     "WebhookRecord",
     "WebhookWithSecret",
 ]
