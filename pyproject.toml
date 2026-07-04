@@ -37,6 +37,10 @@ cli = [
   "rich>=13,<16",
   "typer>=0.12,<1",
 ]
+# Local mode is stdlib + the core httpx dep today; the empty extra keeps
+# `pip install "hai-agents[local]"` valid documentation and lets a real
+# dependency land later without a breaking install-instruction change.
+local = []
 all = [
   "python-dotenv>=1.2.2,<2",
   "rich>=13,<16",
