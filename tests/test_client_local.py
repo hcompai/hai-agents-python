@@ -8,7 +8,6 @@ import sys
 import pytest
 
 from hai_agents import AsyncClient, Client
-
 from tests.conftest import free_port
 
 pytestmark = pytest.mark.skipif(
