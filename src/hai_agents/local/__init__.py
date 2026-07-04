@@ -12,11 +12,13 @@ from .errors import (
     RuntimeStartTimeoutError,
     RuntimeUnhealthyError,
 )
+from .runtime import LocalRuntime
 
 __all__ = [
     "BinaryIncompatibleError",
     "BinaryNotFoundError",
     "DownloadVerificationError",
+    "LocalRuntime",
     "LocalRuntimeError",
     "RuntimeStartTimeoutError",
     "RuntimeUnhealthyError",
