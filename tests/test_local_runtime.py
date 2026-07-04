@@ -170,3 +170,155 @@ def test_manifest_pins_the_cdn_and_never_a_placeholder_digest() -> None:
         assert artifact.url.startswith(f"{manifest.RUNTIME_CDN_BASE}/{manifest.PINNED_RUNTIME_VERSION}/"), key
         assert artifact.sha256 != manifest.PLACEHOLDER_SHA256, key
         assert len(artifact.sha256) == 64, key
+
+
+from tests.conftest import free_port
+
+
+def test_ensure_started_spawns_health_checks_and_shuts_down(fake_binary, tmp_path) -> None:
+    from hai_agents.local import state
+    from hai_agents.local.process import probe_health
+    from hai_agents.local.runtime import LocalRuntime
+
+    cache = tmp_path / "cache"
+    port = free_port()
+    runtime = LocalRuntime.ensure_started(binary_path=fake_binary, cache_dir=cache, port=port, timeout_s=20.0)
+    token_path = state.token_file_path(port, cache_dir=cache)
+    pid_path = state.pid_file_path(port, cache_dir=cache)
+    try:
+        assert runtime.owned is True
+        assert runtime.base_url == f"http://127.0.0.1:{port}"
+        assert runtime.pid is not None
+        assert runtime.version == "0.0.0-fake"
+        assert runtime.health()["status"] == "ok"
+        # Discovery state is published, owner-only.
+        assert state.read_state_file(token_path) == runtime.api_key
+        assert state.read_pid(port, cache_dir=cache) == runtime.pid
+        for path in (token_path, pid_path):
+            assert stat.S_IMODE(path.stat().st_mode) == 0o600
+        # stderr goes to a log file the caller can read (TCC triage needs this).
+        assert runtime.log_path is not None
+        assert runtime.log_path.exists()
+    finally:
+        runtime.shutdown()
+
+    assert not token_path.exists()
+    assert not pid_path.exists()
+    assert probe_health(runtime.base_url) is None
+
+
+def test_local_bearer_is_generated_never_the_cloud_key(fake_binary, tmp_path, monkeypatch) -> None:
+    from hai_agents.local.runtime import LocalRuntime
+
+    monkeypatch.setenv("HAI_API_KEY", "hk-cloud-key")
+    runtime = LocalRuntime.ensure_started(
+        binary_path=fake_binary, cache_dir=tmp_path / "cache", port=free_port(), timeout_s=20.0
+    )
+    try:
+        assert runtime.api_key != "hk-cloud-key"
+        assert len(runtime.api_key) >= 32  # secrets.token_urlsafe(32) output
+    finally:
+        runtime.shutdown()
+
+
+def test_spawn_env_forwards_caller_flags(fake_binary, tmp_path) -> None:
+    from hai_agents.local.runtime import LocalRuntime
+
+    port = free_port()
+    runtime = LocalRuntime.ensure_started(
+        binary_path=fake_binary,
+        cache_dir=tmp_path / "cache",
+        port=port,
+        spawn_env={"HAI_AGENT_RUNTIME_FAKE": "1", "HAI_AGENT_RUNTIME_FAST": "1"},
+        timeout_s=20.0,
+    )
+    # The fake starts iff PORT and TOKEN arrived; spawn_env must not clobber them.
+    try:
+        assert runtime.health()["status"] == "ok"
+    finally:
+        runtime.shutdown()
+
+
+def test_inherit_env_false_uses_spawn_env_verbatim(fake_binary, tmp_path, monkeypatch) -> None:
+    """inherit_env=False makes spawn_env the complete child environment.
+
+    This is the plan-003 contract: HoloDesktop builds the full child env itself so it can
+    *remove* HAI_API_KEY for self-hosted base URLs — a removal an overlay cannot express.
+    The fake runtime echoes its environment in /health, so we can assert the inherited
+    marker never reached the child while PORT/TOKEN still did.
+    """
+    from hai_agents.local.runtime import LocalRuntime
+
+    monkeypatch.setenv("HAI_LOCAL_TEST_MARKER", "must-not-inherit")
+    verbatim_env = {"PATH": os.environ["PATH"], "HAI_AGENT_RUNTIME_FAKE": "1"}
+    runtime = LocalRuntime.ensure_started(
+        binary_path=fake_binary,
+        cache_dir=tmp_path / "cache",
+        port=free_port(),
+        spawn_env=verbatim_env,
+        inherit_env=False,
+        timeout_s=20.0,
+    )
+    try:
+        child_env = runtime.health()["env"]
+        assert "HAI_LOCAL_TEST_MARKER" not in child_env
+        assert child_env["HAI_AGENT_RUNTIME_FAKE"] == "1"
+    finally:
+        runtime.shutdown()
+
+
+def test_ensure_started_attaches_to_an_already_running_runtime(fake_binary, tmp_path) -> None:
+    from hai_agents.local.runtime import LocalRuntime
+
+    cache = tmp_path / "cache"
+    port = free_port()
+    first = LocalRuntime.ensure_started(binary_path=fake_binary, cache_dir=cache, port=port, timeout_s=20.0)
+    try:
+        second = LocalRuntime.ensure_started(binary_path=fake_binary, cache_dir=cache, port=port, timeout_s=20.0)
+        assert second.owned is False
+        assert second.api_key == first.api_key  # read from the published token file
+        assert second.pid == first.pid
+    finally:
+        first.shutdown()
+
+
+def test_never_healthy_binary_times_out_and_cleans_up(tmp_path) -> None:
+    from hai_agents.local import state
+    from hai_agents.local.errors import RuntimeStartTimeoutError
+    from hai_agents.local.runtime import LocalRuntime
+
+    stuck = tmp_path / "hai-agent-runtime"
+    stuck.write_text("#!/usr/bin/env python3\nimport time\ntime.sleep(600)\n")
+    stuck.chmod(0o755)
+    cache = tmp_path / "cache"
+    port = free_port()
+
+    with pytest.raises(RuntimeStartTimeoutError):
+        LocalRuntime.ensure_started(binary_path=stuck, cache_dir=cache, port=port, timeout_s=1.5)
+
+    # The failed spawn must not leak its token file (and the child was reaped).
+    assert state.read_state_file(state.token_file_path(port, cache_dir=cache)) is None
+
+
+def test_crashing_binary_surfaces_its_stderr_tail(tmp_path) -> None:
+    from hai_agents.local.errors import RuntimeUnhealthyError
+    from hai_agents.local.runtime import LocalRuntime
+
+    crash = tmp_path / "hai-agent-runtime"
+    crash.write_text('#!/usr/bin/env python3\nimport sys\nprint("boom: cannot start", file=sys.stderr)\nsys.exit(3)\n')
+    crash.chmod(0o755)
+
+    with pytest.raises(RuntimeUnhealthyError, match="boom: cannot start"):
+        LocalRuntime.ensure_started(
+            binary_path=crash, cache_dir=tmp_path / "cache", port=free_port(), timeout_s=20.0
+        )
+
+
+def test_missing_binary_path_raises_binary_not_found(tmp_path) -> None:
+    from hai_agents.local.errors import BinaryNotFoundError
+    from hai_agents.local.runtime import LocalRuntime
+
+    with pytest.raises(BinaryNotFoundError):
+        LocalRuntime.ensure_started(
+            binary_path=tmp_path / "does-not-exist", cache_dir=tmp_path / "cache", port=free_port()
+        )
