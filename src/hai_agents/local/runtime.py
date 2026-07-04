@@ -19,7 +19,15 @@ from .errors import (
 )
 from .install import DOWNLOAD_SHA256_ENV, DOWNLOAD_URL_ENV, install_runtime, installed_binary, pinned_artifact
 from .manifest import PINNED_RUNTIME_VERSION
-from .process import LOOPBACK_HOST, SPAWN_TIMEOUT_S, probe_health, spawn, terminate, wait_healthy
+from .process import (
+    LOOPBACK_HOST,
+    SPAWN_TIMEOUT_S,
+    kill_process_group,
+    probe_health,
+    spawn,
+    terminate,
+    wait_healthy,
+)
 from .state import (
     DEFAULT_PORT,
     pid_file_path,
@@ -278,6 +286,41 @@ class LocalRuntime:
             )
         terminate(self._proc)
         self._cleanup_state_files()
+
+    # Statuses that mean the runtime still holds live session state a shutdown would destroy.
+    # ("idle" sessions await user input but keep runtime state.)
+    ACTIVE_SESSION_STATUSES: typing.ClassVar[typing.Tuple[str, ...]] = (
+        "pending",
+        "running",
+        "paused",
+        "idle",
+        "awaiting_tool_results",
+    )
+
+    def shutdown_if_idle(self) -> bool:
+        """Stop the owned runtime only when it hosts no active sessions; True when it was stopped."""
+        from ..client import Client  # runtime-time import: client.py imports this module lazily too
+
+        client = Client(base_url=self.base_url, api_key=self.api_key)
+        page = client.sessions.list_sessions(status=list(self.ACTIVE_SESSION_STATUSES), size=1)
+        if page.items:
+            return False
+        self.shutdown()
+        return True
+
+    def force_kill(self) -> None:
+        """SIGKILL the runtime's process group via the persisted pid; works from any process.
+
+        This is what backs ``holo stop --force``: it needs only the pid file, not the
+        Popen handle, so an attached manager (or a brand-new process) can use it.
+        """
+        pid = self.pid if self.pid is not None else read_pid(self._port, cache_dir=self._cache_dir)
+        if pid is None:
+            raise LocalRuntimeError(f"no pid recorded for the runtime on port {self._port}; nothing to kill")
+        if not kill_process_group(pid):
+            logger.info("hai-agent-runtime pid %d was already gone", pid)
+        pid_file_path(self._port, cache_dir=self._cache_dir).unlink(missing_ok=True)
+        unlink_if_content(token_file_path(self._port, cache_dir=self._cache_dir), self.api_key)
 
     def _cleanup_state_files(self) -> None:
         if self._token_file is not None:

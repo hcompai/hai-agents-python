@@ -322,3 +322,65 @@ def test_missing_binary_path_raises_binary_not_found(tmp_path) -> None:
         LocalRuntime.ensure_started(
             binary_path=tmp_path / "does-not-exist", cache_dir=tmp_path / "cache", port=free_port()
         )
+
+
+import time
+
+
+def test_attach_returns_none_when_nothing_runs(tmp_path) -> None:
+    from hai_agents.local.runtime import LocalRuntime
+
+    assert LocalRuntime.attach(port=free_port(), cache_dir=tmp_path) is None
+
+
+def test_attach_finds_a_runtime_started_by_another_manager(fake_binary, tmp_path) -> None:
+    from hai_agents.local.runtime import LocalRuntime
+
+    cache = tmp_path / "cache"
+    port = free_port()
+    owner = LocalRuntime.ensure_started(binary_path=fake_binary, cache_dir=cache, port=port, timeout_s=20.0)
+    try:
+        attached = LocalRuntime.attach(port=port, cache_dir=cache)
+        assert attached is not None
+        assert attached.owned is False
+        assert attached.api_key == owner.api_key
+        assert attached.pid == owner.pid
+        assert attached.health()["status"] == "ok"
+        with pytest.raises(Exception, match="force_kill"):
+            attached.shutdown()  # attachers must not gracefully stop what they do not own
+    finally:
+        owner.shutdown()
+
+
+def test_shutdown_if_idle_stops_a_runtime_with_no_active_sessions(fake_binary, tmp_path) -> None:
+    from hai_agents.local.process import probe_health
+    from hai_agents.local.runtime import LocalRuntime
+
+    runtime = LocalRuntime.ensure_started(
+        binary_path=fake_binary, cache_dir=tmp_path / "cache", port=free_port(), timeout_s=20.0
+    )
+
+    assert runtime.shutdown_if_idle() is True  # fake reports zero sessions
+    assert probe_health(runtime.base_url) is None
+
+
+def test_force_kill_via_persisted_pid_from_an_attached_manager(fake_binary, tmp_path) -> None:
+    from hai_agents.local import state
+    from hai_agents.local.process import probe_health
+    from hai_agents.local.runtime import LocalRuntime
+
+    cache = tmp_path / "cache"
+    port = free_port()
+    owner = LocalRuntime.ensure_started(binary_path=fake_binary, cache_dir=cache, port=port, timeout_s=20.0)
+    attached = LocalRuntime.attach(port=port, cache_dir=cache)
+    assert attached is not None
+
+    attached.force_kill()
+
+    owner._proc.wait(timeout=10)  # reap; SIGKILL hit the whole process group
+    deadline = time.monotonic() + 10
+    while probe_health(owner.base_url) is not None and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert probe_health(owner.base_url) is None
+    assert not state.pid_file_path(port, cache_dir=cache).exists()
+    assert state.read_state_file(state.token_file_path(port, cache_dir=cache)) is None
