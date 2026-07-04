@@ -79,3 +79,94 @@ def test_unlink_if_content_never_removes_a_replaced_token(tmp_path) -> None:
     assert path.exists()
     state.unlink_if_content(path, "mine")
     assert not path.exists()
+
+
+import contextlib
+import functools
+import hashlib
+import http.server
+import pathlib
+import threading
+import zipfile
+
+
+@contextlib.contextmanager
+def _serving(directory: pathlib.Path):
+    """Serve `directory` on an ephemeral loopback port (http-on-loopback is allowed by the URL policy)."""
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(directory))
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}"
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+def _fake_zip(tmp_path: pathlib.Path) -> tuple[pathlib.Path, str]:
+    payload = tmp_path / "hai-agent-runtime"
+    payload.write_text("#!/bin/sh\nexit 0\n")
+    archive = tmp_path / "artifact.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.write(payload, arcname="hai-agent-runtime")
+    return archive, hashlib.sha256(archive.read_bytes()).hexdigest()
+
+
+def test_env_override_download_verifies_and_installs_atomically(tmp_path, monkeypatch) -> None:
+    from hai_agents.local import install
+
+    _, digest = _fake_zip(tmp_path)
+    cache = tmp_path / "cache"
+    with _serving(tmp_path) as base:
+        monkeypatch.setenv(install.DOWNLOAD_URL_ENV, f"{base}/artifact.zip")
+        monkeypatch.setenv(install.DOWNLOAD_SHA256_ENV, digest)
+        artifact = install.pinned_artifact()
+        binary = install.install_runtime(artifact, version="0.0.0-test", cache_dir=cache)
+
+    assert binary == cache / "bin" / "0.0.0-test" / "hai-agent-runtime"
+    assert os.access(binary, os.X_OK)  # zipfile drops the exec bit; install must restore it
+    assert install.installed_binary("0.0.0-test", cache_dir=cache) == binary
+
+
+def test_sha256_mismatch_raises_and_installs_nothing(tmp_path) -> None:
+    from hai_agents.local import install
+    from hai_agents.local.errors import DownloadVerificationError
+
+    _fake_zip(tmp_path)
+    cache = tmp_path / "cache"
+    with _serving(tmp_path) as base:
+        artifact = install.RuntimeArtifact(url=f"{base}/artifact.zip", sha256="ab" * 32)
+        with pytest.raises(DownloadVerificationError):
+            install.install_runtime(artifact, version="0.0.0-test", cache_dir=cache)
+
+    assert install.installed_binary("0.0.0-test", cache_dir=cache) is None
+
+
+def test_download_url_env_without_sha_is_refused(monkeypatch) -> None:
+    from hai_agents.local import install
+    from hai_agents.local.errors import DownloadVerificationError
+
+    monkeypatch.setenv(install.DOWNLOAD_URL_ENV, "https://example.test/runtime.zip")
+    monkeypatch.delenv(install.DOWNLOAD_SHA256_ENV, raising=False)
+    with pytest.raises(DownloadVerificationError, match="unverified"):
+        install.pinned_artifact()
+
+
+def test_non_loopback_plain_http_is_refused(tmp_path) -> None:
+    from hai_agents.local import install
+    from hai_agents.local.errors import LocalRuntimeError
+
+    artifact = install.RuntimeArtifact(url="http://evil.example/runtime.zip", sha256="00" * 32)
+    with pytest.raises(LocalRuntimeError, match="https"):
+        install.install_runtime(artifact, version="0.0.0-test", cache_dir=tmp_path / "cache")
+
+
+def test_manifest_pins_the_cdn_and_never_a_placeholder_digest() -> None:
+    from hai_agents.local import manifest
+
+    assert manifest.RUNTIME_CDN_BASE == "https://assets.hcompanyprod.fr/hai-agent-runtime"
+    for key, artifact in manifest.MANIFEST.items():
+        assert artifact.url.startswith(f"{manifest.RUNTIME_CDN_BASE}/{manifest.PINNED_RUNTIME_VERSION}/"), key
+        assert artifact.sha256 != manifest.PLACEHOLDER_SHA256, key
+        assert len(artifact.sha256) == 64, key
