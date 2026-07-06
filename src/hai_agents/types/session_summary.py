@@ -26,6 +26,10 @@ class SessionSummary(UniversalBaseModel):
     created_at: dt.datetime
     started_at: typing.Optional[dt.datetime] = None
     finished_at: typing.Optional[dt.datetime] = None
+    anonymized_at: typing.Optional[dt.datetime] = pydantic.Field(default=None)
+    """
+    When the session's PII text and screenshots were irreversibly anonymized. Null if not anonymized.
+    """
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

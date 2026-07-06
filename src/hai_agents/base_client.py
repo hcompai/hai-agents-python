@@ -16,6 +16,7 @@ if typing.TYPE_CHECKING:
     from .browser_profiles.client import AsyncBrowserProfilesClient, BrowserProfilesClient
     from .environments.client import AsyncEnvironmentsClient, EnvironmentsClient
     from .quota.client import AsyncQuotaClient, QuotaClient
+    from .schedules.client import AsyncSchedulesClient, SchedulesClient
     from .sessions.client import AsyncSessionsClient, SessionsClient
     from .skills.client import AsyncSkillsClient, SkillsClient
     from .vaults.client import AsyncVaultsClient, VaultsClient
@@ -107,6 +108,7 @@ class BaseClient:
         self._environments: typing.Optional[EnvironmentsClient] = None
         self._agents: typing.Optional[AgentsClient] = None
         self._webhooks: typing.Optional[WebhooksClient] = None
+        self._schedules: typing.Optional[SchedulesClient] = None
         self._browser_profiles: typing.Optional[BrowserProfilesClient] = None
         self._vaults: typing.Optional[VaultsClient] = None
         self._quota: typing.Optional[QuotaClient] = None
@@ -150,6 +152,14 @@ class BaseClient:
 
             self._webhooks = WebhooksClient(client_wrapper=self._client_wrapper)
         return self._webhooks
+
+    @property
+    def schedules(self):
+        if self._schedules is None:
+            from .schedules.client import SchedulesClient  # noqa: E402
+
+            self._schedules = SchedulesClient(client_wrapper=self._client_wrapper)
+        return self._schedules
 
     @property
     def browser_profiles(self):
@@ -282,6 +292,7 @@ class AsyncBaseClient:
         self._environments: typing.Optional[AsyncEnvironmentsClient] = None
         self._agents: typing.Optional[AsyncAgentsClient] = None
         self._webhooks: typing.Optional[AsyncWebhooksClient] = None
+        self._schedules: typing.Optional[AsyncSchedulesClient] = None
         self._browser_profiles: typing.Optional[AsyncBrowserProfilesClient] = None
         self._vaults: typing.Optional[AsyncVaultsClient] = None
         self._quota: typing.Optional[AsyncQuotaClient] = None
@@ -325,6 +336,14 @@ class AsyncBaseClient:
 
             self._webhooks = AsyncWebhooksClient(client_wrapper=self._client_wrapper)
         return self._webhooks
+
+    @property
+    def schedules(self):
+        if self._schedules is None:
+            from .schedules.client import AsyncSchedulesClient  # noqa: E402
+
+            self._schedules = AsyncSchedulesClient(client_wrapper=self._client_wrapper)
+        return self._schedules
 
     @property
     def browser_profiles(self):
