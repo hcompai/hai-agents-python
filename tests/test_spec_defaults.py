@@ -41,6 +41,7 @@ MINIMAL_KWARGS: dict[str, dict[str, typing.Any]] = {
     "UserMessageEvent": {"message": "hi"},
     "ErrorEvent": {"error": "boom", "origin": "loop"},
     "ToolResultBatch": {"results": []},
+    "CronTiming": {"expression": "0 9 * * *", "timezone": "Europe/Paris"},
 }
 
 
