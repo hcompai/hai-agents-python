@@ -210,10 +210,14 @@ def _call_key(call: typing.Dict[str, typing.Any]) -> str:
     cid = call.get("id")
     if cid is not None:
         return str(cid)
-    return json.dumps({"tool_name": call.get("tool_name", ""), "args": call.get("args") or {}}, sort_keys=True, default=str)
+    return json.dumps(
+        {"tool_name": call.get("tool_name", ""), "args": call.get("args") or {}}, sort_keys=True, default=str
+    )
 
 
-def _tool_result_payload(call: typing.Dict[str, typing.Any], result: typing.Any, is_error: bool) -> typing.Dict[str, typing.Any]:
+def _tool_result_payload(
+    call: typing.Dict[str, typing.Any], result: typing.Any, is_error: bool
+) -> typing.Dict[str, typing.Any]:
     if is_error:
         return {"kind": "error_event", "error": str(result), "origin": "client", "tool_req": _tool_req(call)}
     return {"kind": "tool_result", "tool_req": _tool_req(call), "result": _json_safe(result)}

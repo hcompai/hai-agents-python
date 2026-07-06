@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import socket
 import sys
@@ -50,6 +51,11 @@ sessions_app = typer.Typer(no_args_is_help=True, help="Inspect and steer session
 agents_app = typer.Typer(no_args_is_help=True, help="Browse available agents.")
 skills_app = typer.Typer(no_args_is_help=True, help="Browse available skills.")
 mcp_app = typer.Typer(no_args_is_help=True, help="Manage the hai-agents MCP server.")
+local_app = typer.Typer(
+    no_args_is_help=True,
+    help="Manually run the local browser/desktop bridge. Only needed when sessions are launched "
+    "from another machine (e.g. the web app); `hai run` and the SDK start it automatically.",
+)
 
 
 @dataclass(frozen=True)
@@ -556,10 +562,74 @@ def _print_mcp_results(results: list[dict], server_url: str, json_output: bool) 
     console.print("[yellow]Your API key was written into these configs in plaintext. Keep them private.[/yellow]")
 
 
+@local_app.command("browser")
+def local_browser(
+    ctx: typer.Context,
+    env_id: str = typer.Option(..., "--env-id", help="Environment id to bind this machine to."),
+    debug_port: int = typer.Option(9222, "--debug-port", help="Chrome remote-debugging port to attach to."),
+) -> None:
+    """Serve browser commands on this machine through Chrome on --debug-port."""
+    from hai_agents.local import BrowserBridge
+
+    _run_bridge(_state(ctx), BrowserBridge, env_id, debugging_port=debug_port)
+
+
+@local_app.command("desktop")
+def local_desktop(
+    ctx: typer.Context,
+    env_id: str = typer.Option(..., "--env-id", help="Environment id to bind this machine to."),
+) -> None:
+    """Serve desktop commands on this machine's mouse, keyboard, and screen."""
+    from hai_agents.local import DesktopBridge
+
+    _run_bridge(_state(ctx), DesktopBridge, env_id)
+
+
+def _run_bridge(state: AppState, bridge_type: type, env_id: str, **options: Any) -> None:
+    import logging
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    try:
+        key = credentials.resolve_api_key(state.api_key)
+        base_url = credentials.resolve_base_url(state.base_url)
+        bridge = bridge_type(
+            env_id,
+            api_key=key() if callable(key) else key,
+            **({"base_url": base_url} if base_url else {}),
+            **options,
+        )
+    except (RuntimeError, ValueError) as exc:
+        _raise_cli_error(exc)
+
+    console.print(
+        f"[bold]Local {bridge.capability} bridge[/bold] bound to [cyan]{env_id}[/cyan]. Press Ctrl-C to stop."
+    )
+    console.print(f"[dim]Command channel session id: {bridge.session_id}[/dim]")
+    try:
+        asyncio.run(_serve_bridge(bridge))
+    except KeyboardInterrupt:
+        console.print("Stopped.")
+    except Exception as exc:
+        _raise_cli_error(exc)
+
+
+async def _serve_bridge(bridge: Any) -> None:
+    import signal
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, bridge.request_stop)
+        except (NotImplementedError, RuntimeError, ValueError):
+            pass
+    await bridge.run()
+
+
 app.add_typer(sessions_app, name="sessions")
 app.add_typer(agents_app, name="agents")
 app.add_typer(skills_app, name="skills")
 app.add_typer(mcp_app, name="mcp")
+app.add_typer(local_app, name="local")
 
 
 def main() -> None:

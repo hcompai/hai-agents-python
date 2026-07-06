@@ -40,8 +40,7 @@ def _poll_until_terminal(client: Client, session_id: str, timeout_s: float = 420
             return s
         if time.time() - start > timeout_s:
             pytest.fail(
-                f"session {session_id} did not finish in {timeout_s}s "
-                f"(last status: {s.status}, steps: {s.steps})"
+                f"session {session_id} did not finish in {timeout_s}s (last status: {s.status}, steps: {s.steps})"
             )
         time.sleep(3)
 
