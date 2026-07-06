@@ -50,6 +50,7 @@ class RawSessionsClient:
         agent: typing.Optional[typing.Sequence[str]] = None,
         group_id: typing.Optional[str] = None,
         parent_session_id: typing.Optional[str] = None,
+        schedule_id: typing.Optional[str] = None,
         search: typing.Optional[str] = None,
         created_before: typing.Optional[dt.datetime] = None,
         created_after: typing.Optional[dt.datetime] = None,
@@ -74,6 +75,9 @@ class RawSessionsClient:
         group_id : typing.Optional[str]
 
         parent_session_id : typing.Optional[str]
+
+        schedule_id : typing.Optional[str]
+            Only sessions created by this schedule.
 
         search : typing.Optional[str]
             Case-insensitive match on the session's first message or answer.
@@ -112,6 +116,7 @@ class RawSessionsClient:
                 "agent": agent,
                 "group_id": group_id,
                 "parent_session_id": parent_session_id,
+                "schedule_id": schedule_id,
                 "search": search,
                 "created_before": serialize_datetime(created_before) if created_before is not None else None,
                 "created_after": serialize_datetime(created_after) if created_after is not None else None,
@@ -1162,6 +1167,7 @@ class AsyncRawSessionsClient:
         agent: typing.Optional[typing.Sequence[str]] = None,
         group_id: typing.Optional[str] = None,
         parent_session_id: typing.Optional[str] = None,
+        schedule_id: typing.Optional[str] = None,
         search: typing.Optional[str] = None,
         created_before: typing.Optional[dt.datetime] = None,
         created_after: typing.Optional[dt.datetime] = None,
@@ -1186,6 +1192,9 @@ class AsyncRawSessionsClient:
         group_id : typing.Optional[str]
 
         parent_session_id : typing.Optional[str]
+
+        schedule_id : typing.Optional[str]
+            Only sessions created by this schedule.
 
         search : typing.Optional[str]
             Case-insensitive match on the session's first message or answer.
@@ -1224,6 +1233,7 @@ class AsyncRawSessionsClient:
                 "agent": agent,
                 "group_id": group_id,
                 "parent_session_id": parent_session_id,
+                "schedule_id": schedule_id,
                 "search": search,
                 "created_before": serialize_datetime(created_before) if created_before is not None else None,
                 "created_after": serialize_datetime(created_after) if created_after is not None else None,

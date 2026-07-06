@@ -49,6 +49,7 @@ class SessionsClient:
         agent: typing.Optional[typing.Sequence[str]] = None,
         group_id: typing.Optional[str] = None,
         parent_session_id: typing.Optional[str] = None,
+        schedule_id: typing.Optional[str] = None,
         search: typing.Optional[str] = None,
         created_before: typing.Optional[dt.datetime] = None,
         created_after: typing.Optional[dt.datetime] = None,
@@ -73,6 +74,9 @@ class SessionsClient:
         group_id : typing.Optional[str]
 
         parent_session_id : typing.Optional[str]
+
+        schedule_id : typing.Optional[str]
+            Only sessions created by this schedule.
 
         search : typing.Optional[str]
             Case-insensitive match on the session's first message or answer.
@@ -117,6 +121,7 @@ class SessionsClient:
             agent=agent,
             group_id=group_id,
             parent_session_id=parent_session_id,
+            schedule_id=schedule_id,
             search=search,
             created_before=created_before,
             created_after=created_after,
@@ -813,6 +818,7 @@ class AsyncSessionsClient:
         agent: typing.Optional[typing.Sequence[str]] = None,
         group_id: typing.Optional[str] = None,
         parent_session_id: typing.Optional[str] = None,
+        schedule_id: typing.Optional[str] = None,
         search: typing.Optional[str] = None,
         created_before: typing.Optional[dt.datetime] = None,
         created_after: typing.Optional[dt.datetime] = None,
@@ -837,6 +843,9 @@ class AsyncSessionsClient:
         group_id : typing.Optional[str]
 
         parent_session_id : typing.Optional[str]
+
+        schedule_id : typing.Optional[str]
+            Only sessions created by this schedule.
 
         search : typing.Optional[str]
             Case-insensitive match on the session's first message or answer.
@@ -889,6 +898,7 @@ class AsyncSessionsClient:
             agent=agent,
             group_id=group_id,
             parent_session_id=parent_session_id,
+            schedule_id=schedule_id,
             search=search,
             created_before=created_before,
             created_after=created_after,
