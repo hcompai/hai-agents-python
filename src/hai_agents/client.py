@@ -15,8 +15,8 @@ import typing_extensions
 
 from .agents.client import AgentsClient, AsyncAgentsClient
 from .base_client import AsyncBaseClient, BaseClient
+from .local.localize import AgentLocalizer
 from .local.manager import auto_bridges_enabled, ensure_bridges
-from .local.wiring import bridges_for_agent, localize_agent, localize_environments, localize_subagents
 from .polling import (
     AnswerT,
     AsyncSessionHandle,
@@ -33,31 +33,24 @@ from .sessions.client import AsyncSessionsClient, SessionsClient
 from .tools import ToolInput, as_tools
 
 
-def _wire_agent_fields(kwargs: typing.Dict[str, typing.Any], get_api_key: typing.Callable[[], str]) -> None:
-    if kwargs.get("environments"):
-        kwargs["environments"] = localize_environments(kwargs["environments"], get_api_key)
-    if kwargs.get("subagents"):
-        kwargs["subagents"] = localize_subagents(kwargs["subagents"], get_api_key)
-
-
-def _start_local_bridges(agent: typing.Any, client_wrapper: typing.Any) -> None:
-    ensure_bridges(bridges_for_agent(agent, client_wrapper._get_api_key(), client_wrapper.get_base_url()))
+def _localizer(client_wrapper: typing.Any) -> AgentLocalizer:
+    return AgentLocalizer(client_wrapper._get_api_key, client_wrapper.get_base_url())
 
 
 class _LocalAgentsClient(AgentsClient):
     @functools.wraps(AgentsClient.create_agent)
     def create_agent(self, **kwargs: typing.Any) -> typing.Any:
-        _wire_agent_fields(kwargs, self._raw_client._client_wrapper._get_api_key)
+        _localizer(self._raw_client._client_wrapper).localize_agent_kwargs(kwargs)
         return super().create_agent(**kwargs)
 
     @functools.wraps(AgentsClient.update_agent)
     def update_agent(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        _wire_agent_fields(kwargs, self._raw_client._client_wrapper._get_api_key)
+        _localizer(self._raw_client._client_wrapper).localize_agent_kwargs(kwargs)
         return super().update_agent(*args, **kwargs)
 
     @functools.wraps(AgentsClient.patch_agent)
     def patch_agent(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        _wire_agent_fields(kwargs, self._raw_client._client_wrapper._get_api_key)
+        _localizer(self._raw_client._client_wrapper).localize_agent_kwargs(kwargs)
         return super().patch_agent(*args, **kwargs)
 
 
@@ -66,29 +59,30 @@ class _LocalSessionsClient(SessionsClient):
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
         if "agent" in kwargs:
             wrapper = self._raw_client._client_wrapper
-            kwargs["agent"] = localize_agent(kwargs["agent"], wrapper._get_api_key)
+            localizer = _localizer(wrapper)
+            kwargs["agent"] = localizer.localize_agent(kwargs["agent"])
             agent = kwargs["agent"]
             if auto_bridges_enabled():
                 if isinstance(agent, str):
                     agent = AgentsClient(client_wrapper=wrapper).get_agent(agent, resolve=True)
-                _start_local_bridges(agent, wrapper)
+                ensure_bridges(localizer.bridges_for_agent(agent))
         return super().create_session(**kwargs)
 
 
 class _LocalAsyncAgentsClient(AsyncAgentsClient):
     @functools.wraps(AsyncAgentsClient.create_agent)
     async def create_agent(self, **kwargs: typing.Any) -> typing.Any:
-        _wire_agent_fields(kwargs, self._raw_client._client_wrapper._get_api_key)
+        _localizer(self._raw_client._client_wrapper).localize_agent_kwargs(kwargs)
         return await super().create_agent(**kwargs)
 
     @functools.wraps(AsyncAgentsClient.update_agent)
     async def update_agent(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        _wire_agent_fields(kwargs, self._raw_client._client_wrapper._get_api_key)
+        _localizer(self._raw_client._client_wrapper).localize_agent_kwargs(kwargs)
         return await super().update_agent(*args, **kwargs)
 
     @functools.wraps(AsyncAgentsClient.patch_agent)
     async def patch_agent(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        _wire_agent_fields(kwargs, self._raw_client._client_wrapper._get_api_key)
+        _localizer(self._raw_client._client_wrapper).localize_agent_kwargs(kwargs)
         return await super().patch_agent(*args, **kwargs)
 
 
@@ -97,12 +91,13 @@ class _LocalAsyncSessionsClient(AsyncSessionsClient):
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:
         if "agent" in kwargs:
             wrapper = self._raw_client._client_wrapper
-            kwargs["agent"] = localize_agent(kwargs["agent"], wrapper._get_api_key)
+            localizer = _localizer(wrapper)
+            kwargs["agent"] = localizer.localize_agent(kwargs["agent"])
             agent = kwargs["agent"]
             if auto_bridges_enabled():
                 if isinstance(agent, str):
                     agent = await AsyncAgentsClient(client_wrapper=wrapper).get_agent(agent, resolve=True)
-                await asyncio.to_thread(_start_local_bridges, agent, wrapper)
+                await asyncio.to_thread(lambda: ensure_bridges(localizer.bridges_for_agent(agent)))
         return await super().create_session(**kwargs)
 
 

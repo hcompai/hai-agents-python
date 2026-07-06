@@ -569,9 +569,9 @@ def local_browser(
     debug_port: int = typer.Option(9222, "--debug-port", help="Chrome remote-debugging port to attach to."),
 ) -> None:
     """Serve browser commands on this machine through Chrome on --debug-port."""
-    from hai_agents.local import BrowserBridge
+    from hai_agents.local import SeleniumBrowserBridge
 
-    _run_bridge(_state(ctx), BrowserBridge, env_id, debugging_port=debug_port)
+    _run_bridge(_state(ctx), SeleniumBrowserBridge, env_id, debugging_port=debug_port)
 
 
 @local_app.command("desktop")
@@ -580,9 +580,9 @@ def local_desktop(
     env_id: str = typer.Option(..., "--env-id", help="Environment id to bind this machine to."),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""
-    from hai_agents.local import DesktopBridge
+    from hai_agents.local import PyautoguiDesktopBridge
 
-    _run_bridge(_state(ctx), DesktopBridge, env_id)
+    _run_bridge(_state(ctx), PyautoguiDesktopBridge, env_id)
 
 
 def _run_bridge(state: AppState, bridge_type: type, env_id: str, **options: Any) -> None:
@@ -602,7 +602,7 @@ def _run_bridge(state: AppState, bridge_type: type, env_id: str, **options: Any)
         _raise_cli_error(exc)
 
     console.print(
-        f"[bold]Local {bridge.capability} bridge[/bold] bound to [cyan]{env_id}[/cyan]. Press Ctrl-C to stop."
+        f"[bold]Local {bridge.environment_kind} bridge[/bold] bound to [cyan]{env_id}[/cyan]. Press Ctrl-C to stop."
     )
     console.print(f"[dim]Command channel session id: {bridge.session_id}[/dim]")
     try:

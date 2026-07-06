@@ -5,10 +5,10 @@ from typing import Any
 from .bridge import LocalBridge
 
 
-class DesktopBridge(LocalBridge):
-    """Serves desktop commands (mouse, keyboard, screen, files, shell) on this machine."""
+class PyautoguiDesktopBridge(LocalBridge):
+    """Serves desktop environments (mouse, keyboard, screen, files, shell) on this machine via pyautogui."""
 
-    capability = "desktop"
+    environment_kind = "desktop"
 
     def create_driver(self) -> Any:
         try:

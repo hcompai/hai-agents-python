@@ -44,8 +44,8 @@ MIN_RATE_LIMIT_BACKOFF_S = 1.0
 RESULT_CACHE_SIZE = 512
 
 
-def session_id_from_environment_id(environment_id: str, api_key: str, capability: str) -> str:
-    return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{api_key}.{environment_id}.{capability}"))
+def session_id_from_environment_id(environment_id: str, api_key: str, environment_kind: str) -> str:
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{api_key}.{environment_id}.{environment_kind}"))
 
 
 class BridgeBusyError(RuntimeError):
@@ -53,13 +53,13 @@ class BridgeBusyError(RuntimeError):
 
 
 class _MachineLease:
-    """One lock file per capability, holding the owner's session_id, so the
-    one-bridge-per-capability rule applies across processes."""
+    """One lock file per environment kind, holding the owner's session_id, so the
+    one-bridge-per-kind rule applies across processes."""
 
-    def __init__(self, capability: str, session_id: str) -> None:
-        self._capability = capability
+    def __init__(self, environment_kind: str, session_id: str) -> None:
+        self._environment_kind = environment_kind
         self._session_id = session_id
-        self._path = LEASE_DIR / f"bridge-{capability}.lock"
+        self._path = LEASE_DIR / f"bridge-{environment_kind}.lock"
         self._handle: Any = None
 
     def acquire(self) -> None:
@@ -72,7 +72,7 @@ class _MachineLease:
             if self._read_holder() == self._session_id:
                 raise BridgeBusyError(f"another bridge already serves session {self._session_id}") from exc
             raise RuntimeError(
-                f"another process already serves a local {self._capability} environment on this machine"
+                f"another process already serves a local {self._environment_kind} environment on this machine"
             ) from exc
         handle.seek(0)
         handle.truncate()
@@ -138,11 +138,11 @@ def _call(method: Callable[..., Any], args: dict[str, Any]) -> Any:
 
 
 class LocalBridge(ABC):
-    """Serves one capability's commands on this machine: polls the platform's
+    """Serves one environment kind on this machine: polls the platform's
     command channel for ``session_id`` and dispatches each command to a local
     hai-drivers driver."""
 
-    capability: ClassVar[str]
+    environment_kind: ClassVar[str]
 
     def __init__(
         self,
@@ -157,10 +157,10 @@ class LocalBridge(ABC):
         if not self.api_key:
             raise ValueError(f"api_key is required (pass api_key= or set {API_KEY_ENV_VAR})")
         self.base_url = base_url or os.getenv(BASE_URL_ENV_VAR) or DEFAULT_BASE_URL
-        self.session_id = session_id or session_id_from_environment_id(environment_id, self.api_key, self.capability)
+        self.session_id = session_id or session_id_from_environment_id(environment_id, self.api_key, self.environment_kind)
         self.ready = threading.Event()
         self._driver: Any = None
-        self._lease = _MachineLease(self.capability, self.session_id)
+        self._lease = _MachineLease(self.environment_kind, self.session_id)
         self._stop_event = asyncio.Event()
         self._results: OrderedDict[str, tuple[Any, str | None]] = OrderedDict()
 
@@ -284,7 +284,7 @@ class LocalBridge(ABC):
 
     def _dispatch(self, name: str, args: dict[str, Any]) -> tuple[Any, str | None]:
         if name not in self.commands:
-            return None, f"command {name!r} is not supported by this {self.capability} bridge"
+            return None, f"command {name!r} is not supported by this {self.environment_kind} bridge"
         attr = getattr(self._driver, name)
         started = time.monotonic()
         try:

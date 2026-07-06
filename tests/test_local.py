@@ -10,22 +10,20 @@ from hai_agents.agents.client import AgentsClient
 from hai_agents.local import (
     BridgeBusyError,
     BridgeManager,
-    BrowserBridge,
-    DesktopBridge,
     LocalBridge,
+    PyautoguiDesktopBridge,
+    SeleniumBrowserBridge,
     session_id_from_environment_id,
 )
 from hai_agents.local.bridge import _MachineLease
+from hai_agents.local.localize import AgentLocalizer
 from hai_agents.local.manager import AUTO_BRIDGE_ENV_VAR
 from hai_agents.local.transport import AuthError, serialize_result
-from hai_agents.local.wiring import localize_agent, localize_environments
 from hai_agents.sessions.client import SessionsClient
 
 API_KEY = "test-key"
 
-
-def _key() -> str:
-    return API_KEY
+LOCALIZER = AgentLocalizer(lambda: API_KEY)
 
 
 @pytest.fixture(autouse=True)
@@ -34,59 +32,57 @@ def _lease_dir(monkeypatch, tmp_path):
 
 
 class TestRoutingKey:
-    def test_deterministic_and_capability_scoped(self):
+    def test_deterministic_and_kind_scoped(self):
         a = session_id_from_environment_id("m", "k", "desktop")
         assert a == session_id_from_environment_id("m", "k", "desktop")
-        assert a != session_id_from_environment_id("m", "k", "browser")
+        assert a != session_id_from_environment_id("m", "k", "web")
         assert a != session_id_from_environment_id("m", "other", "desktop")
 
     def test_bridge_defaults_api_key_from_env_and_derives_session(self, monkeypatch):
         monkeypatch.setenv("HAI_API_KEY", "envkey")
-        bridge = DesktopBridge("m")
+        bridge = PyautoguiDesktopBridge("m")
         assert bridge.api_key == "envkey"
         assert bridge.session_id == session_id_from_environment_id("m", "envkey", "desktop")
 
     def test_bridge_without_api_key_raises(self, monkeypatch):
         monkeypatch.delenv("HAI_API_KEY", raising=False)
         with pytest.raises(ValueError, match="api_key is required"):
-            DesktopBridge("m")
+            PyautoguiDesktopBridge("m")
 
 
-class TestWiring:
+class TestLocalizer:
     def test_user_device_envs_get_session_ids(self):
-        web, desktop, default = localize_environments(
+        web, desktop, default = LOCALIZER.localize_environments(
             [
                 {"id": "laptop", "kind": "web", "host": "user_device"},
                 {"id": "box", "kind": "desktop", "host": "user_device"},
                 {"id": "nokind", "host": "user_device"},
-            ],
-            _key,
+            ]
         )
-        assert web["session_id"] == session_id_from_environment_id("laptop", API_KEY, "browser")
+        assert web["session_id"] == session_id_from_environment_id("laptop", API_KEY, "web")
         assert desktop["session_id"] == session_id_from_environment_id("box", API_KEY, "desktop")
-        assert default["session_id"] == session_id_from_environment_id("nokind", API_KEY, "browser")
+        assert default["session_id"] == session_id_from_environment_id("nokind", API_KEY, "web")
 
     def test_remote_and_explicit_session_left_alone(self):
-        envs = localize_environments(
+        envs = LOCALIZER.localize_environments(
             [
                 {"id": "remote", "kind": "web"},
                 {"id": "pinned", "kind": "web", "host": "user_device", "session_id": "keep"},
                 "agent-name-ref",
-            ],
-            _key,
+            ]
         )
         assert "session_id" not in envs[0]
         assert envs[1]["session_id"] == "keep"
         assert envs[2] == "agent-name-ref"
-        assert localize_agent("named-agent", _key) == "named-agent"
+        assert LOCALIZER.localize_agent("named-agent") == "named-agent"
 
     def test_pydantic_env_model_autowires(self):
         from hai_agents.types.browser import Browser
 
-        [env] = localize_environments([Browser(id="laptop", kind="web", host="user_device")], _key)
-        assert getattr(env, "session_id") == session_id_from_environment_id("laptop", API_KEY, "browser")
+        [env] = LOCALIZER.localize_environments([Browser(id="laptop", kind="web", host="user_device")])
+        assert getattr(env, "session_id") == session_id_from_environment_id("laptop", API_KEY, "web")
 
-        [remote] = localize_environments([Browser(id="cloud", kind="web")], _key)
+        [remote] = LOCALIZER.localize_environments([Browser(id="cloud", kind="web")])
         assert getattr(remote, "session_id", None) is None
 
     def test_client_create_agent_autowires(self, monkeypatch):
@@ -97,7 +93,7 @@ class TestWiring:
             description="d",
             environments=[{"id": "laptop", "kind": "web", "host": "user_device"}],
         )
-        assert captured["environments"][0]["session_id"] == session_id_from_environment_id("laptop", API_KEY, "browser")
+        assert captured["environments"][0]["session_id"] == session_id_from_environment_id("laptop", API_KEY, "web")
 
     def test_client_create_agent_wires_subagents(self, monkeypatch):
         captured: dict = {}
@@ -137,8 +133,8 @@ class TestAutoStart:
             },
             messages="hi",
         )
-        assert [(b.capability, b.environment_id) for b in started] == [("desktop", "box"), ("browser", "laptop")]
-        assert isinstance(started[0], DesktopBridge) and isinstance(started[1], BrowserBridge)
+        assert [(b.environment_kind, b.environment_id) for b in started] == [("desktop", "box"), ("web", "laptop")]
+        assert isinstance(started[0], PyautoguiDesktopBridge) and isinstance(started[1], SeleniumBrowserBridge)
         assert started[0].session_id == session_id_from_environment_id("box", API_KEY, "desktop")
 
     def test_named_agent_fetches_resolved_definition_for_bridges(self, monkeypatch):
@@ -159,7 +155,7 @@ class TestAutoStart:
         monkeypatch.setattr(AgentsClient, "get_agent", get_agent)
         Client(api_key=API_KEY).sessions.create_session(agent="my-agent", messages="hi")
         assert calls["resolve"] is True
-        assert [(b.capability, b.environment_id, b.session_id) for b in started] == [("desktop", "box", sid)]
+        assert [(b.environment_kind, b.environment_id, b.session_id) for b in started] == [("desktop", "box", sid)]
 
     def test_named_agent_without_session_id_raises(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
@@ -213,7 +209,7 @@ class FakeDriver:
 
 
 class FakeBridge(LocalBridge):
-    capability = "desktop"
+    environment_kind = "desktop"
 
     def create_driver(self) -> Any:
         return FakeDriver()
@@ -283,7 +279,7 @@ class TestBridgeProtocol:
         assert driver.clicks == 1
         assert [p["command_uid"] for p in exchange.posts] == ["u1", "u1"]
 
-    def test_capability_lease_is_machine_wide(self):
+    def test_kind_lease_is_machine_wide(self):
         first = _MachineLease("desktop", "sid-1")
         first.acquire()
         try:
@@ -304,13 +300,13 @@ class TestBridgeProtocol:
 class TestDriverInterfaces:
     def test_browser_commands_match_hai_drivers_interface(self):
         pytest.importorskip("hai_drivers.web.interface")
-        commands = BrowserBridge("m", api_key="k").commands
+        commands = SeleniumBrowserBridge("m", api_key="k").commands
         assert {"goto", "click_at", "press_key", "screenshot_b64", "get_tabs"} <= commands
         assert not any(name.startswith("_") for name in commands)
 
     def test_desktop_commands_match_hai_drivers_interface(self):
         pytest.importorskip("hai_drivers.desktop.interface")
-        commands = DesktopBridge("m", api_key="k").commands
+        commands = PyautoguiDesktopBridge("m", api_key="k").commands
         assert {"click", "write", "run_command", "read_file", "screenshot_b64"} <= commands
         assert not any(name.startswith("_") for name in commands)
 
@@ -331,7 +327,7 @@ class ServingBridge(FakeBridge):
 
 
 class BrowserServingBridge(ServingBridge):
-    capability = "browser"
+    environment_kind = "web"
 
 
 class TestManager:
@@ -373,7 +369,7 @@ class TestManager:
         session_id = ServingBridge("laptop", api_key="k").session_id
         assert manager._runners[session_id].thread.is_alive()
 
-    def test_second_environment_on_same_capability_raises(self, manager):
+    def test_second_environment_on_same_kind_raises(self, manager):
         manager.ensure(
             [
                 ServingBridge("laptop", api_key="k"),

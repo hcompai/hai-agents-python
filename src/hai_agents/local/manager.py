@@ -25,7 +25,7 @@ def auto_bridges_enabled() -> bool:
 
 
 class BridgeManager:
-    """Runs each bridge on a daemon thread; at most one bridge per capability per process."""
+    """Runs each bridge on a daemon thread; at most one bridge per environment kind per process."""
 
     def __init__(self) -> None:
         self._runners: dict[str, _Runner] = {}
@@ -50,25 +50,25 @@ class BridgeManager:
             started = runner is None or not runner.thread.is_alive()
             if started:
                 if any(
-                    other.bridge.capability == bridge.capability and other.thread.is_alive()
+                    other.bridge.environment_kind == bridge.environment_kind and other.thread.is_alive()
                     for other in self._runners.values()
                 ):
                     raise RuntimeError(
-                        f"this machine already serves a local {bridge.capability} environment; "
+                        f"this machine already serves a local {bridge.environment_kind} environment; "
                         f"cannot also serve {bridge.environment_id!r}"
                     )
-                logger.info("starting local %s bridge for environment %r", bridge.capability, bridge.environment_id)
+                logger.info("starting local %s bridge for environment %r", bridge.environment_kind, bridge.environment_id)
                 runner = _Runner(bridge)
                 self._runners[bridge.session_id] = runner
         try:
             if not runner.bridge.ready.wait(READY_TIMEOUT_S):
                 raise RuntimeError(
-                    f"local {bridge.capability} bridge for environment {bridge.environment_id!r} "
+                    f"local {bridge.environment_kind} bridge for environment {bridge.environment_id!r} "
                     f"was not ready after {READY_TIMEOUT_S:.0f}s"
                 )
             if runner.error is not None:
                 raise RuntimeError(
-                    f"local {bridge.capability} bridge for environment {bridge.environment_id!r} failed to start"
+                    f"local {bridge.environment_kind} bridge for environment {bridge.environment_id!r} failed to start"
                 ) from runner.error
         except BaseException:
             if started:
@@ -92,7 +92,7 @@ class _Runner:
         self.bridge = bridge
         self.error: BaseException | None = None
         self.loop = asyncio.new_event_loop()
-        self.thread = threading.Thread(target=self._serve, daemon=True, name=f"hai-bridge-{bridge.capability}")
+        self.thread = threading.Thread(target=self._serve, daemon=True, name=f"hai-bridge-{bridge.environment_kind}")
         self.thread.start()
 
     def _serve(self) -> None:
@@ -106,7 +106,7 @@ class _Runner:
         except Exception as exc:
             self.error = exc
             if not sys.is_finalizing() and threading.main_thread().is_alive():
-                logger.exception("local %s bridge crashed", self.bridge.capability)
+                logger.exception("local %s bridge crashed", self.bridge.environment_kind)
         finally:
             self.bridge.ready.set()
             self.loop.close()
