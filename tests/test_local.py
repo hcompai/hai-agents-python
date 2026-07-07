@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-import hai_agents.local.bridge as bridge_module
+import hai_agents.local.lease as lease_module
 from hai_agents import Client
 from hai_agents.agents.client import AgentsClient
 from hai_agents.local import (
@@ -16,20 +16,21 @@ from hai_agents.local import (
     SeleniumBrowserBridge,
     session_id_from_environment_id,
 )
-from hai_agents.local.bridge import _MachineLease
-from hai_agents.local.localize import AgentLocalizer
-from hai_agents.local.manager import AUTO_BRIDGE_ENV_VAR
-from hai_agents.local.transport import AuthError, serialize_result
+from hai_agents.local.config import AUTO_BRIDGE_ENV_VAR
+from hai_agents.local.errors import AuthError
+from hai_agents.local.lease import MachineLease
+from hai_agents.local.routing import SessionRouter
+from hai_agents.local.transport import serialize_result
 from hai_agents.sessions.client import SessionsClient
 
 API_KEY = "test-key"
 
-LOCALIZER = AgentLocalizer(lambda: API_KEY)
+ROUTER = SessionRouter(lambda: API_KEY)
 
 
 @pytest.fixture(autouse=True)
 def _lease_dir(monkeypatch, tmp_path):
-    monkeypatch.setattr(bridge_module, "LEASE_DIR", tmp_path / "leases")
+    monkeypatch.setattr(lease_module, "LEASE_DIR", tmp_path / "leases")
 
 
 class TestRoutingKey:
@@ -51,9 +52,9 @@ class TestRoutingKey:
             PyautoguiDesktopBridge("m")
 
 
-class TestLocalizer:
+class TestRouter:
     def test_user_device_envs_get_session_ids(self):
-        web, desktop, default = LOCALIZER.localize_environments(
+        web, desktop, default = ROUTER.stamp_environments(
             [
                 {"id": "laptop", "kind": "web", "host": "user_device"},
                 {"id": "box", "kind": "desktop", "host": "user_device"},
@@ -65,7 +66,7 @@ class TestLocalizer:
         assert default["session_id"] == session_id_from_environment_id("nokind", API_KEY, "web")
 
     def test_remote_and_explicit_session_left_alone(self):
-        envs = LOCALIZER.localize_environments(
+        envs = ROUTER.stamp_environments(
             [
                 {"id": "remote", "kind": "web"},
                 {"id": "pinned", "kind": "web", "host": "user_device", "session_id": "keep"},
@@ -75,13 +76,13 @@ class TestLocalizer:
         assert "session_id" not in envs[0]
         assert envs[1]["session_id"] == "keep"
         assert envs[2] == "agent-name-ref"
-        assert LOCALIZER.localize_agent("named-agent") == "named-agent"
+        assert ROUTER.stamp_agent("named-agent") == "named-agent"
 
     def test_malformed_user_device_env_raises(self):
         with pytest.raises(ValueError, match="need an id"):
-            LOCALIZER.localize_environments([{"kind": "web", "host": "user_device"}])
+            ROUTER.stamp_environments([{"kind": "web", "host": "user_device"}])
         with pytest.raises(ValueError, match="supported kinds"):
-            LOCALIZER.localize_environments([{"id": "phone", "kind": "mobile", "host": "user_device"}])
+            ROUTER.stamp_environments([{"id": "phone", "kind": "mobile", "host": "user_device"}])
 
     def test_unsupported_user_device_env_type_raises(self):
         class WeirdEnv:
@@ -90,15 +91,15 @@ class TestLocalizer:
             id = "laptop"
 
         with pytest.raises(TypeError, match="session_id"):
-            LOCALIZER.localize_environments([WeirdEnv()])
+            ROUTER.stamp_environments([WeirdEnv()])
 
     def test_pydantic_env_model_autowires(self):
         from hai_agents.types.browser import Browser
 
-        [env] = LOCALIZER.localize_environments([Browser(id="laptop", kind="web", host="user_device")])
+        [env] = ROUTER.stamp_environments([Browser(id="laptop", kind="web", host="user_device")])
         assert getattr(env, "session_id") == session_id_from_environment_id("laptop", API_KEY, "web")
 
-        [remote] = LOCALIZER.localize_environments([Browser(id="cloud", kind="web")])
+        [remote] = ROUTER.stamp_environments([Browser(id="cloud", kind="web")])
         assert getattr(remote, "session_id", None) is None
 
     def test_client_create_agent_autowires(self, monkeypatch):
@@ -331,18 +332,18 @@ class TestBridgeProtocol:
         assert [p["command_uid"] for p in exchange.posts] == ["u1", "u1"]
 
     def test_kind_lease_is_machine_wide(self):
-        first = _MachineLease("desktop", "sid-1")
+        first = MachineLease("desktop", "sid-1")
         first.acquire()
         try:
             with pytest.raises(BridgeBusyError):
-                _MachineLease("desktop", "sid-1").acquire()
+                MachineLease("desktop", "sid-1").acquire()
             with pytest.raises(RuntimeError, match="already serves"):
-                _MachineLease("desktop", "sid-2").acquire()
+                MachineLease("desktop", "sid-2").acquire()
         finally:
             first.release()
 
     def test_released_lease_leaves_no_stale_holder(self):
-        lease = _MachineLease("desktop", "sid-1")
+        lease = MachineLease("desktop", "sid-1")
         lease.acquire()
         lease.release()
         assert lease._path.read_text() == ""
@@ -424,7 +425,7 @@ class TestManager:
                     self._lease.release()
 
         bridge = LeasedServingBridge("laptop", api_key="k")
-        holder = _MachineLease("desktop", bridge.session_id)
+        holder = MachineLease("desktop", bridge.session_id)
         holder.acquire()
         try:
             assert manager.ensure([bridge]) == [bridge.session_id]

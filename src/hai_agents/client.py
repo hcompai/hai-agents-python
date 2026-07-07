@@ -17,8 +17,9 @@ import typing_extensions
 
 from .agents.client import AgentsClient, AsyncAgentsClient
 from .base_client import AsyncBaseClient, BaseClient
-from .local.localize import AgentLocalizer, subagent_names
-from .local.manager import auto_bridges_enabled, ensure_bridges, stop_bridges
+from .local.config import auto_bridges_enabled
+from .local.manager import ensure_bridges, stop_bridges
+from .local.routing import SessionRouter, subagent_names
 from .polling import (
     AnswerT,
     AsyncSessionHandle,
@@ -37,8 +38,8 @@ from .tools import ToolInput, as_tools
 logger = logging.getLogger(__name__)
 
 
-def _localizer(client_wrapper: typing.Any) -> AgentLocalizer:
-    return AgentLocalizer(client_wrapper._get_api_key, client_wrapper.get_base_url())
+def _router(client_wrapper: typing.Any) -> SessionRouter:
+    return SessionRouter(client_wrapper._get_api_key, client_wrapper.get_base_url())
 
 
 def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) -> None:
@@ -53,17 +54,17 @@ def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) 
 class _LocalAgentsClient(AgentsClient):
     @functools.wraps(AgentsClient.create_agent)
     def create_agent(self, **kwargs: typing.Any) -> typing.Any:
-        _localizer(self._raw_client._client_wrapper).localize_agent_kwargs(kwargs)
+        _router(self._raw_client._client_wrapper).stamp_agent_kwargs(kwargs)
         return super().create_agent(**kwargs)
 
     @functools.wraps(AgentsClient.update_agent)
     def update_agent(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        _localizer(self._raw_client._client_wrapper).localize_agent_kwargs(kwargs)
+        _router(self._raw_client._client_wrapper).stamp_agent_kwargs(kwargs)
         return super().update_agent(*args, **kwargs)
 
     @functools.wraps(AgentsClient.patch_agent)
     def patch_agent(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        _localizer(self._raw_client._client_wrapper).localize_agent_kwargs(kwargs)
+        _router(self._raw_client._client_wrapper).stamp_agent_kwargs(kwargs)
         return super().patch_agent(*args, **kwargs)
 
 
@@ -73,8 +74,8 @@ class _LocalSessionsClient(SessionsClient):
         started: typing.List[str] = []
         if "agent" in kwargs:
             wrapper = self._raw_client._client_wrapper
-            localizer = _localizer(wrapper)
-            kwargs["agent"] = localizer.localize_agent(kwargs["agent"])
+            router = _router(wrapper)
+            kwargs["agent"] = router.stamp_agent(kwargs["agent"])
             agent = kwargs["agent"]
             if auto_bridges_enabled():
                 _warn_if_overrides_target_user_device(kwargs)
@@ -88,7 +89,7 @@ class _LocalSessionsClient(SessionsClient):
                     if name not in resolved:
                         resolved[name] = agents.get_agent(name, resolve=True)
                         pending.extend(subagent_names(resolved[name]))
-                started = ensure_bridges(localizer.bridges_for_agent(agent, resolved.get))
+                started = ensure_bridges(router.bridges_for_agent(agent, resolved.get))
         try:
             return super().create_session(**kwargs)
         except BaseException:
@@ -99,17 +100,17 @@ class _LocalSessionsClient(SessionsClient):
 class _LocalAsyncAgentsClient(AsyncAgentsClient):
     @functools.wraps(AsyncAgentsClient.create_agent)
     async def create_agent(self, **kwargs: typing.Any) -> typing.Any:
-        _localizer(self._raw_client._client_wrapper).localize_agent_kwargs(kwargs)
+        _router(self._raw_client._client_wrapper).stamp_agent_kwargs(kwargs)
         return await super().create_agent(**kwargs)
 
     @functools.wraps(AsyncAgentsClient.update_agent)
     async def update_agent(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        _localizer(self._raw_client._client_wrapper).localize_agent_kwargs(kwargs)
+        _router(self._raw_client._client_wrapper).stamp_agent_kwargs(kwargs)
         return await super().update_agent(*args, **kwargs)
 
     @functools.wraps(AsyncAgentsClient.patch_agent)
     async def patch_agent(self, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        _localizer(self._raw_client._client_wrapper).localize_agent_kwargs(kwargs)
+        _router(self._raw_client._client_wrapper).stamp_agent_kwargs(kwargs)
         return await super().patch_agent(*args, **kwargs)
 
 
@@ -119,8 +120,8 @@ class _LocalAsyncSessionsClient(AsyncSessionsClient):
         started: typing.List[str] = []
         if "agent" in kwargs:
             wrapper = self._raw_client._client_wrapper
-            localizer = _localizer(wrapper)
-            kwargs["agent"] = localizer.localize_agent(kwargs["agent"])
+            router = _router(wrapper)
+            kwargs["agent"] = router.stamp_agent(kwargs["agent"])
             agent = kwargs["agent"]
             if auto_bridges_enabled():
                 _warn_if_overrides_target_user_device(kwargs)
@@ -134,9 +135,7 @@ class _LocalAsyncSessionsClient(AsyncSessionsClient):
                     if name not in resolved:
                         resolved[name] = await agents.get_agent(name, resolve=True)
                         pending.extend(subagent_names(resolved[name]))
-                started = await asyncio.to_thread(
-                    lambda: ensure_bridges(localizer.bridges_for_agent(agent, resolved.get))
-                )
+                started = await asyncio.to_thread(lambda: ensure_bridges(router.bridges_for_agent(agent, resolved.get)))
         try:
             return await super().create_session(**kwargs)
         except BaseException:

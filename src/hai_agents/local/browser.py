@@ -1,3 +1,11 @@
+"""Local web bridge: Selenium attached to a Chrome remote-debugging port.
+
+Chrome bootstrap lives here rather than in hai-drivers on purpose:
+``SeleniumWebDriver`` only *attaches* to an already-listening debugging port,
+while finding/launching a host browser is machine setup that belongs to the
+SDK side of the bridge.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -7,11 +15,14 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 import httpx
 
 from .bridge import LocalBridge
+
+if TYPE_CHECKING:
+    from hai_drivers.web.selenium import SeleniumWebDriver
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +32,8 @@ CHROME_PROFILE_DIR = Path.home() / ".hai" / "chrome-profile"
 
 _launch_lock = threading.Lock()
 
+# Fixed install locations per OS; on Linux, Chrome/Chromium are found on PATH
+# via _CHROME_COMMANDS instead.
 _CHROME_CANDIDATES = {
     "Darwin": (
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -34,8 +47,13 @@ _CHROME_CANDIDATES = {
 _CHROME_COMMANDS = ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome")
 
 
-class SeleniumBrowserBridge(LocalBridge):
-    """Serves web environments by attaching Selenium to a Chrome debugging port on this machine."""
+class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
+    """Serves web environments by attaching Selenium to a Chrome debugging port on this machine.
+
+    Chrome (or Chromium) is required: the hai-drivers web driver speaks CDP.
+    This only affects agents whose web environment is host=user_device; other
+    sessions never touch the local browser.
+    """
 
     environment_kind = "web"
 
@@ -51,7 +69,9 @@ class SeleniumBrowserBridge(LocalBridge):
         super().__init__(environment_id, api_key=api_key, base_url=base_url, session_id=session_id)
         self.debugging_port = debugging_port
 
-    def create_driver(self) -> Any:
+    def create_driver(self) -> SeleniumWebDriver:
+        # Runtime import: hai-drivers is an optional extra, absent unless
+        # installed with hai-agents[browser].
         try:
             from hai_drivers.web.selenium import SeleniumWebDriver
         except ImportError as exc:
@@ -100,6 +120,8 @@ class SeleniumBrowserBridge(LocalBridge):
                 if _debugger_listening(port):
                     return
                 if process.poll() is not None:
+                    # Only reachable for the Chrome we just launched ourselves;
+                    # a browser the user started is found by the probe above.
                     raise RuntimeError(
                         f"Chrome exited with code {process.returncode} before opening debugging port {port}"
                     )

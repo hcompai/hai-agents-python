@@ -1,32 +1,35 @@
+"""HTTP transport for the platform's command channel.
+
+The channel is a deliberately dynamic RPC: the platform delivers command
+objects ``{"id": str, "command_uid": str, "name": str, "args": dict}`` where
+``name`` is a method of the hai-drivers driver interface and ``args`` are its
+keyword arguments as JSON. The bridge posts back ``{"result": Json,
+"error": str | None, "command_uid": str}``. Values that cannot cross JSON
+are bridged here: ``bytes`` travel base64-encoded (``write_file.content``,
+screenshot results), ``run_command.cwd`` travels as a string path, and
+pydantic models are dumped to plain JSON.
+"""
+
 from __future__ import annotations
 
 import base64
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Union
 
 import httpx
 from pydantic import BaseModel
+
+from .errors import AuthError, RateLimitedError, SessionNotFoundError
+
+Json = Union[None, bool, int, float, str, List["Json"], Dict[str, "Json"]]
 
 TRANSIENT_STATUS_CODES = frozenset({502, 503, 504})
 DEFAULT_RETRY_AFTER_S = 5.0
 
 
-class AuthError(Exception):
-    pass
-
-
-class SessionNotFoundError(Exception):
-    pass
-
-
-class RateLimitedError(Exception):
-    def __init__(self, retry_after: float) -> None:
-        super().__init__(f"rate limited; retry after {retry_after:.0f}s")
-        self.retry_after = retry_after
-
-
-def serialize_result(value: Any) -> Any:
+def serialize_result(value: object) -> Json:
+    """Make a driver return value JSON-safe; see the module docstring for the wire shape."""
     if isinstance(value, bytes):
         return base64.b64encode(value).decode("ascii")
     if isinstance(value, BaseModel):
@@ -35,10 +38,11 @@ def serialize_result(value: Any) -> Any:
         return {k: serialize_result(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [serialize_result(v) for v in value]
-    return value
+    return value  # type: ignore[return-value]
 
 
 def deserialize_args(name: str, args: dict[str, Any]) -> dict[str, Any]:
+    """Undo the JSON encodings the driver signatures cannot accept directly."""
     if name == "write_file" and isinstance(args.get("content"), str):
         args = {**args, "content": base64.b64decode(args["content"])}
     if name == "run_command" and args.get("cwd") is not None:
@@ -101,7 +105,7 @@ class CommandExchange:
         return None
 
     async def post_result(
-        self, command_id: str, *, command_uid: str, result: Any, error: str | None, timeout: float
+        self, command_id: str, *, command_uid: str, result: Json, error: str | None, timeout: float
     ) -> bool:
         url = f"{self._base}/api/v1/commands/{command_id}/result"
         body = {"result": result, "error": error, "command_uid": command_uid}

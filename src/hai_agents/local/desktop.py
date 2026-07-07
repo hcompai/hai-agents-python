@@ -1,16 +1,21 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from .bridge import LocalBridge
 
+if TYPE_CHECKING:
+    from hai_drivers.desktop.local import LocalDesktopDriver
 
-class PyautoguiDesktopBridge(LocalBridge):
+
+class PyautoguiDesktopBridge(LocalBridge["LocalDesktopDriver"]):
     """Serves desktop environments (mouse, keyboard, screen, files, shell) on this machine via pyautogui."""
 
     environment_kind = "desktop"
 
-    def create_driver(self) -> Any:
+    def create_driver(self) -> LocalDesktopDriver:
+        # Runtime import: hai-drivers is an optional extra, absent unless
+        # installed with hai-agents[desktop].
         try:
             from hai_drivers.desktop.local import LocalDesktopDriver
         except ImportError as exc:

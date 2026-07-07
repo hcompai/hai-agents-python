@@ -1,12 +1,26 @@
+"""Routing of user_device environments to bridges on this machine.
+
+The platform routes commands by ``session_id``; stamping a deterministic id
+onto each user_device environment is what lets any process with the same API
+key serve it.
+"""
+
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence, Union
 
 from pydantic import BaseModel
 
-from .bridge import LocalBridge, session_id_from_environment_id
+from .bridge import LocalBridge
 from .browser import SeleniumBrowserBridge
 from .desktop import PyautoguiDesktopBridge
+from .utils import session_id_from_environment_id
+
+if TYPE_CHECKING:
+    from ..types.agent import Agent
+
+AgentLike = Union[str, "Agent", Mapping[str, Any]]
+EnvironmentLike = Union[str, BaseModel, Mapping[str, Any]]
 
 BRIDGE_TYPES: dict[str, type[LocalBridge]] = {
     SeleniumBrowserBridge.environment_kind: SeleniumBrowserBridge,
@@ -14,44 +28,50 @@ BRIDGE_TYPES: dict[str, type[LocalBridge]] = {
 }
 
 
-class AgentLocalizer:
+class SessionRouter:
     """Stamps user_device environments with deterministic session ids and builds their local bridges."""
 
     def __init__(self, get_api_key: Callable[[], str], base_url: str | None = None) -> None:
         self._get_api_key = get_api_key
         self._base_url = base_url
 
-    def localize_agent(self, agent: Any) -> Any:
+    def stamp_agent(self, agent: AgentLike) -> AgentLike:
+        if isinstance(agent, str):
+            return agent
         changes: dict[str, Any] = {}
         environments = _read(agent, "environments")
         if environments:
-            localized = self.localize_environments(environments)
-            if _any_replaced(localized, environments):
-                changes["environments"] = localized
+            stamped = self.stamp_environments(environments)
+            if _any_replaced(stamped, environments):
+                changes["environments"] = stamped
         subagents = _read(agent, "subagents")
         if subagents:
-            localized = self.localize_subagents(subagents)
-            if _any_replaced(localized, subagents):
-                changes["subagents"] = localized
+            stamped = self.stamp_subagents(subagents)
+            if _any_replaced(stamped, subagents):
+                changes["subagents"] = stamped
         return _replace(agent, **changes) if changes else agent
 
-    def localize_environments(self, environments: Any) -> Any:
+    def stamp_environments(self, environments: Sequence[EnvironmentLike]) -> Sequence[EnvironmentLike]:
         if not isinstance(environments, (list, tuple)):
             return environments
-        return [self._localize_environment(env) for env in environments]
+        return [self._stamp_environment(env) for env in environments]
 
-    def localize_subagents(self, subagents: Any) -> Any:
+    def stamp_subagents(self, subagents: Sequence[AgentLike]) -> Sequence[AgentLike]:
         if not isinstance(subagents, (list, tuple)):
             return subagents
-        return [self.localize_agent(sub) for sub in subagents]
+        return [self.stamp_agent(sub) for sub in subagents]
 
-    def localize_agent_kwargs(self, kwargs: dict[str, Any]) -> None:
+    def stamp_agent_kwargs(self, kwargs: dict[str, Any]) -> None:
         if kwargs.get("environments"):
-            kwargs["environments"] = self.localize_environments(kwargs["environments"])
+            kwargs["environments"] = self.stamp_environments(kwargs["environments"])
         if kwargs.get("subagents"):
-            kwargs["subagents"] = self.localize_subagents(kwargs["subagents"])
+            kwargs["subagents"] = self.stamp_subagents(kwargs["subagents"])
 
-    def bridges_for_agent(self, agent: Any, fetch_agent: Callable[[str], Any] | None = None) -> list[LocalBridge]:
+    def bridges_for_agent(
+        self, agent: AgentLike, fetch_agent: Callable[[str], AgentLike | None] | None = None
+    ) -> list[LocalBridge]:
+        """Bridges for every user_device environment in the agent tree; string subagents
+        are resolved through ``fetch_agent`` when provided, otherwise skipped."""
         bridges: list[LocalBridge] = []
         for env in _read(agent, "environments") or ():
             target = _local_target(env)
@@ -69,13 +89,14 @@ class AgentLocalizer:
             )
         for sub in _read(agent, "subagents") or ():
             if isinstance(sub, str):
-                sub = fetch_agent(sub) if fetch_agent is not None else None
-                if sub is None:
+                resolved = fetch_agent(sub) if fetch_agent is not None else None
+                if resolved is None:
                     continue
+                sub = resolved
             bridges.extend(self.bridges_for_agent(sub, fetch_agent))
         return bridges
 
-    def _localize_environment(self, env: Any) -> Any:
+    def _stamp_environment(self, env: EnvironmentLike) -> EnvironmentLike:
         target = _local_target(env)
         if target is None or _read(env, "session_id"):
             return env
@@ -83,7 +104,7 @@ class AgentLocalizer:
         return _replace(env, session_id=session_id_from_environment_id(env_id, self._get_api_key(), kind))
 
 
-def subagent_names(agent: Any) -> list[str]:
+def subagent_names(agent: AgentLike) -> list[str]:
     """Names of subagents referenced by registration rather than defined inline, at any depth."""
     names: list[str] = []
     for sub in _read(agent, "subagents") or ():
@@ -94,13 +115,13 @@ def subagent_names(agent: Any) -> list[str]:
     return names
 
 
-def _any_replaced(localized: Any, original: Any) -> bool:
-    if localized is original:
+def _any_replaced(stamped: Any, original: Any) -> bool:
+    if stamped is original:
         return False
-    return any(new is not old for new, old in zip(localized, original))
+    return any(new is not old for new, old in zip(stamped, original))
 
 
-def _local_target(env: Any) -> tuple[str, str] | None:
+def _local_target(env: EnvironmentLike) -> tuple[str, str] | None:
     if _read(env, "host") != "user_device":
         return None
     kind = _read(env, "kind") or "web"

@@ -1,6 +1,6 @@
 import pytest
 
-from hai_agents.local.manager import AUTO_BRIDGE_ENV_VAR
+from hai_agents.local.config import AUTO_BRIDGE_ENV_VAR
 
 
 @pytest.fixture(autouse=True)

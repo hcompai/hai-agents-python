@@ -5,33 +5,22 @@ import contextlib
 import functools
 import inspect
 import logging
-import os
 import threading
 import time
-import uuid
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from pathlib import Path
-from typing import Any, Callable, ClassVar
+from collections.abc import Callable
+from typing import Any, ClassVar, Generic, TypeVar
 
 import httpx
 
-from ..environment import HaiAgentsEnvironment
-from .transport import (
-    AuthError,
-    CommandExchange,
-    RateLimitedError,
-    SessionNotFoundError,
-    deserialize_args,
-    serialize_result,
-)
+from .config import API_KEY_ENV_VAR, LocalSettings
+from .errors import AuthError, BridgeBusyError, RateLimitedError, SessionNotFoundError
+from .lease import MachineLease
+from .transport import CommandExchange, Json, deserialize_args, serialize_result
+from .utils import session_id_from_environment_id
 
 logger = logging.getLogger(__name__)
-
-API_KEY_ENV_VAR = "HAI_API_KEY"
-BASE_URL_ENV_VAR = "HAI_API_BASE_URL"
-DEFAULT_BASE_URL = HaiAgentsEnvironment.EU.value
-LEASE_DIR = Path.home() / ".hai"
 
 LONG_POLL_SECONDS = 20
 LONG_POLL_READ_TIMEOUT_S = 21.0
@@ -45,104 +34,13 @@ RESULT_CACHE_SIZE = 512
 LEASE_GRACE_S = 10.0
 LEASE_RETRY_S = 0.5
 
-
-def session_id_from_environment_id(environment_id: str, api_key: str, environment_kind: str) -> str:
-    return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{api_key}.{environment_id}.{environment_kind}"))
+DriverT = TypeVar("DriverT")
 
 
-class BridgeBusyError(RuntimeError):
-    pass
-
-
-class _MachineLease:
-    """One lock file per environment kind, holding the owner's session_id, so the
-    one-bridge-per-kind rule applies across processes."""
-
-    def __init__(self, environment_kind: str, session_id: str) -> None:
-        self._environment_kind = environment_kind
-        self._session_id = session_id
-        self._path = LEASE_DIR / f"bridge-{environment_kind}.lock"
-        self._handle: Any = None
-
-    def acquire(self) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        handle = open(self._path, "a+")
-        try:
-            self._lock(handle)
-        except OSError as exc:
-            handle.close()
-            if self._read_holder() == self._session_id:
-                raise BridgeBusyError(f"another bridge already serves session {self._session_id}") from exc
-            raise RuntimeError(
-                f"another process already serves a local {self._environment_kind} environment on this machine"
-            ) from exc
-        handle.seek(0)
-        handle.truncate()
-        handle.write(self._session_id)
-        handle.flush()
-        self._handle = handle
-
-    def _read_holder(self) -> str | None:
-        try:
-            return self._path.read_text().strip()
-        except OSError:
-            return None
-
-    def release(self) -> None:
-        if self._handle is not None:
-            try:
-                self._handle.seek(0)
-                self._handle.truncate()
-                self._handle.flush()
-                self._unlock(self._handle)
-            finally:
-                self._handle.close()
-                self._handle = None
-
-    @staticmethod
-    def _lock(handle: Any) -> None:
-        try:
-            import fcntl
-
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except ImportError:
-            import msvcrt
-
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-
-    @staticmethod
-    def _unlock(handle: Any) -> None:
-        try:
-            import fcntl
-
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-        except ImportError:
-            import msvcrt
-
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-
-
-def _call(method: Callable[..., Any], args: dict[str, Any]) -> Any:
-    """Invoke method with proxy-serialized args, splatting a var-positional tuple bound under its param name."""
-    try:
-        params = list(inspect.signature(method).parameters.values())
-    except (TypeError, ValueError):
-        return method(**args)
-    star_idx = next((i for i, p in enumerate(params) if p.kind is inspect.Parameter.VAR_POSITIONAL), None)
-    if star_idx is None or params[star_idx].name not in args:
-        return method(**args)
-    kwargs = dict(args)
-    leading = [kwargs.pop(p.name) for p in params[:star_idx] if p.name in kwargs]
-    variadic = kwargs.pop(params[star_idx].name)
-    return method(*leading, *variadic, **kwargs)
-
-
-class LocalBridge(ABC):
+class LocalBridge(ABC, Generic[DriverT]):
     """Serves one environment kind on this machine: polls the platform's
     command channel for ``session_id`` and dispatches each command to a local
-    hai-drivers driver."""
+    hai-drivers driver (see ``transport`` for the wire protocol)."""
 
     environment_kind: ClassVar[str]
 
@@ -154,22 +52,24 @@ class LocalBridge(ABC):
         base_url: str | None = None,
         session_id: str | None = None,
     ) -> None:
-        self.environment_id = environment_id
-        self.api_key = api_key or os.getenv(API_KEY_ENV_VAR) or ""
-        if not self.api_key:
+        settings = LocalSettings.from_env()
+        resolved_key = api_key or settings.api_key
+        if not resolved_key:
             raise ValueError(f"api_key is required (pass api_key= or set {API_KEY_ENV_VAR})")
-        self.base_url = base_url or os.getenv(BASE_URL_ENV_VAR) or DEFAULT_BASE_URL
+        self.environment_id = environment_id
+        self.api_key = resolved_key
+        self.base_url = base_url or settings.base_url
         self.session_id = session_id or session_id_from_environment_id(
             environment_id, self.api_key, self.environment_kind
         )
         self.ready = threading.Event()
-        self._driver: Any = None
-        self._lease = _MachineLease(self.environment_kind, self.session_id)
+        self._driver: DriverT | None = None
+        self._lease = MachineLease(self.environment_kind, self.session_id)
         self._stop_event = asyncio.Event()
-        self._results: OrderedDict[str, tuple[Any, str | None]] = OrderedDict()
+        self._results: OrderedDict[str, tuple[Json, str | None]] = OrderedDict()
 
     @abstractmethod
-    def create_driver(self) -> Any:
+    def create_driver(self) -> DriverT:
         """Build the hai-drivers driver this bridge dispatches commands to."""
 
     @abstractmethod
@@ -232,11 +132,15 @@ class LocalBridge(ABC):
                 elif time.monotonic() - started < MIN_POLL_INTERVAL_S and await self._interruptible_sleep(
                     MIN_POLL_INTERVAL_S
                 ):
+                    # An empty poll that returned instantly: pace requests so a
+                    # misbehaving server cannot turn long-polling into a busy loop.
                     break
             except AuthError as exc:
+                # Not recoverable by waiting: a bad key stays bad.
                 logger.error("auth error, stopping: %s", exc)
                 break
             except SessionNotFoundError:
+                # The channel was garbage-collected server-side; recreate and resume.
                 logger.warning("channel %s missing; recreating", self.session_id)
                 try:
                     await exchange.ensure_channel(self.session_id)
@@ -252,12 +156,14 @@ class LocalBridge(ABC):
                 if await self._interruptible_sleep(backoff):
                     break
             except httpx.HTTPError as exc:
+                # Network blips: exponential backoff, keep serving when connectivity returns.
                 logger.warning("connection error: %s; retrying in %.0fs", exc, retry_delay)
                 if await self._interruptible_sleep(retry_delay):
                     break
                 retry_delay = min(retry_delay * 2, MAX_RECONNECT_DELAY_S)
 
     async def _fetch_until_stop(self, exchange: CommandExchange) -> list[dict[str, Any]] | None:
+        """Long-poll for commands, returning early (with None) when a stop is requested."""
         fetch_task = asyncio.ensure_future(
             exchange.fetch_commands(
                 self.session_id,
@@ -276,8 +182,12 @@ class LocalBridge(ABC):
                     await stop_task
         if stop_task in done and not fetch_task.done():
             fetch_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError, Exception):
+            try:
                 await fetch_task
+            except asyncio.CancelledError:
+                pass
+            except Exception as exc:
+                logger.debug("in-flight fetch failed during stop: %s", exc)
             return None
         return fetch_task.result()
 
@@ -291,6 +201,8 @@ class LocalBridge(ABC):
                 continue
             cmd_uid = str(cmd_uid)
             if cmd_uid in self._results:
+                # Redelivered command: repost the cached result instead of re-executing,
+                # so retries after a lost response stay idempotent.
                 self._results.move_to_end(cmd_uid)
                 result, error = self._results[cmd_uid]
             else:
@@ -300,13 +212,13 @@ class LocalBridge(ABC):
                     self._results.popitem(last=False)
             await self._deliver(exchange, str(cmd_id), cmd_uid, result, error)
 
-    def _dispatch(self, name: str, args: dict[str, Any]) -> tuple[Any, str | None]:
+    def _dispatch(self, name: str, args: dict[str, Any]) -> tuple[Json, str | None]:
         if name not in self.commands:
             return None, f"command {name!r} is not supported by this {self.environment_kind} bridge"
         attr = getattr(self._driver, name)
         started = time.monotonic()
         try:
-            result = _call(attr, deserialize_args(name, args)) if callable(attr) else attr
+            result = self._call_driver_method(attr, deserialize_args(name, args)) if callable(attr) else attr
             logger.info("command %s dispatched in %.2fs", name, time.monotonic() - started)
             return serialize_result(result), None
         except NotImplementedError:
@@ -315,8 +227,26 @@ class LocalBridge(ABC):
             logger.warning("command %s raised: %s", name, exc)
             return None, str(exc)
 
+    @staticmethod
+    def _call_driver_method(method: Callable[..., Any], args: dict[str, Any]) -> Any:
+        """Invoke a driver method with wire args, splatting a var-positional tuple bound
+        under its parameter name: ``execute_script(script, *args, n_unsafe_attempts=2)``
+        arrives as ``{"script": "...", "args": [1, "two"], "n_unsafe_attempts": 3}`` and
+        must be called as ``execute_script("...", 1, "two", n_unsafe_attempts=3)``."""
+        try:
+            params = list(inspect.signature(method).parameters.values())
+        except (TypeError, ValueError):
+            return method(**args)
+        star_idx = next((i for i, p in enumerate(params) if p.kind is inspect.Parameter.VAR_POSITIONAL), None)
+        if star_idx is None or params[star_idx].name not in args:
+            return method(**args)
+        kwargs = dict(args)
+        leading = [kwargs.pop(p.name) for p in params[:star_idx] if p.name in kwargs]
+        variadic = kwargs.pop(params[star_idx].name)
+        return method(*leading, *variadic, **kwargs)
+
     async def _deliver(
-        self, exchange: CommandExchange, command_id: str, command_uid: str, result: Any, error: str | None
+        self, exchange: CommandExchange, command_id: str, command_uid: str, result: Json, error: str | None
     ) -> None:
         for attempt in range(POST_RESULT_RETRIES + 1):
             try:
@@ -331,6 +261,7 @@ class LocalBridge(ABC):
         logger.error("failed to deliver result for command %s", command_id)
 
     async def _interruptible_sleep(self, seconds: float) -> bool:
+        """Sleep up to ``seconds``; True when woken by a stop request."""
         try:
             await asyncio.wait_for(self._stop_event.wait(), timeout=seconds)
         except (TimeoutError, asyncio.TimeoutError):

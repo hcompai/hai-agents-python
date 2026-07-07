@@ -4,33 +4,37 @@ import asyncio
 import atexit
 import contextlib
 import logging
-import os
 import sys
 import threading
 from typing import Sequence
 
-from .bridge import BridgeBusyError, LocalBridge
+from .bridge import LocalBridge
+from .errors import BridgeBusyError
 
 logger = logging.getLogger(__name__)
-
-AUTO_BRIDGE_ENV_VAR = "HAI_AUTO_BRIDGE"
 
 STOP_JOIN_TIMEOUT_S = 5.0
 READY_TIMEOUT_S = 60.0
 TAKEOVER_POLL_S = 2.0
 
 
-def auto_bridges_enabled() -> bool:
-    """Read at each session creation; local bridges auto-start unless set to 0/false/no."""
-    return os.getenv(AUTO_BRIDGE_ENV_VAR, "1").strip().lower() not in {"0", "false", "no"}
-
-
 class BridgeManager:
-    """Runs each bridge on a daemon thread; at most one bridge per environment kind per process."""
+    """Runs each bridge on a daemon thread; at most one bridge per environment kind per process.
+
+    Registers its own interpreter-exit cleanup; can also be used as a context manager
+    when a scoped lifetime is preferred.
+    """
 
     def __init__(self) -> None:
         self._runners: dict[str, _Runner] = {}
         self._lock = threading.Lock()
+        atexit.register(self.stop_all)
+
+    def __enter__(self) -> BridgeManager:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.stop_all()
 
     def ensure(self, bridges: Sequence[LocalBridge]) -> list[str]:
         """Start any bridges not already running; returns the session ids of newly started ones."""
@@ -139,18 +143,25 @@ class _Runner:
         self.thread.join(timeout=STOP_JOIN_TIMEOUT_S)
 
 
-_default_manager = BridgeManager()
+_default_manager: BridgeManager | None = None
+_default_manager_lock = threading.Lock()
+
+
+def default_manager() -> BridgeManager:
+    """Process-wide manager behind ensure_bridges/stop_bridges, created on first use."""
+    global _default_manager
+    with _default_manager_lock:
+        if _default_manager is None:
+            _default_manager = BridgeManager()
+        return _default_manager
 
 
 def ensure_bridges(bridges: Sequence[LocalBridge]) -> list[str]:
-    return _default_manager.ensure(bridges)
+    return default_manager().ensure(bridges)
 
 
 def stop_bridges(session_ids: Sequence[str] | None = None) -> None:
     if session_ids is None:
-        _default_manager.stop_all()
+        default_manager().stop_all()
     else:
-        _default_manager.stop(session_ids)
-
-
-atexit.register(stop_bridges)
+        default_manager().stop(session_ids)
