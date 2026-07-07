@@ -1,5 +1,6 @@
 import asyncio
 import threading
+import time
 from typing import Any
 
 import pytest
@@ -394,15 +395,32 @@ class TestManager:
             manager.ensure([NeverReadyBridge("laptop", api_key="k")])
         assert manager._runners == {}
 
-    def test_busy_bridge_retries_after_owner_exits(self, manager):
-        class BusyBridge(ServingBridge):
-            async def run(self):
-                raise BridgeBusyError("owned by another process")
+    def test_busy_bridge_stands_by_then_takes_over(self, manager, monkeypatch):
+        import hai_agents.local.manager as manager_module
 
-        manager.ensure([BusyBridge("laptop", api_key="k")])
-        manager.ensure([ServingBridge("laptop", api_key="k")])
-        session_id = ServingBridge("laptop", api_key="k").session_id
-        assert manager._runners[session_id].thread.is_alive()
+        monkeypatch.setattr(manager_module, "TAKEOVER_POLL_S", 0.02)
+
+        class LeasedServingBridge(ServingBridge):
+            async def run(self):
+                self._lease.acquire()
+                try:
+                    await super().run()
+                finally:
+                    self._lease.release()
+
+        bridge = LeasedServingBridge("laptop", api_key="k")
+        holder = _MachineLease("desktop", bridge.session_id)
+        holder.acquire()
+        try:
+            assert manager.ensure([bridge]) == [bridge.session_id]
+            assert bridge._serving is None
+            assert manager._runners[bridge.session_id].thread.is_alive()
+        finally:
+            holder.release()
+        deadline = time.time() + 5
+        while bridge._serving is None and time.time() < deadline:
+            time.sleep(0.01)
+        assert bridge._serving is not None
 
     def test_second_environment_on_same_kind_raises(self, manager):
         manager.ensure(

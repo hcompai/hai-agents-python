@@ -17,6 +17,7 @@ AUTO_BRIDGE_ENV_VAR = "HAI_AUTO_BRIDGE"
 
 STOP_JOIN_TIMEOUT_S = 5.0
 READY_TIMEOUT_S = 60.0
+TAKEOVER_POLL_S = 2.0
 
 
 def auto_bridges_enabled() -> bool:
@@ -105,11 +106,7 @@ class _Runner:
     def _serve(self) -> None:
         asyncio.set_event_loop(self.loop)
         try:
-            self.loop.run_until_complete(self.bridge.run())
-        except BridgeBusyError:
-            logger.info(
-                "a bridge for environment %r already runs on this machine; reusing it", self.bridge.environment_id
-            )
+            self.loop.run_until_complete(self._serve_or_stand_by())
         except Exception as exc:
             self.error = exc
             if not sys.is_finalizing() and threading.main_thread().is_alive():
@@ -117,6 +114,24 @@ class _Runner:
         finally:
             self.bridge.ready.set()
             self.loop.close()
+
+    async def _serve_or_stand_by(self) -> None:
+        """Serve the bridge; while another live process holds its lease, stand by and take over when it exits."""
+        standing_by = False
+        while True:
+            try:
+                await self.bridge.run()
+                return
+            except BridgeBusyError:
+                if not standing_by:
+                    standing_by = True
+                    logger.info(
+                        "a bridge for environment %r already runs on this machine; standing by to take over",
+                        self.bridge.environment_id,
+                    )
+                self.bridge.ready.set()
+            if await self.bridge._interruptible_sleep(TAKEOVER_POLL_S):
+                return
 
     def stop(self) -> None:
         with contextlib.suppress(RuntimeError):
