@@ -42,6 +42,8 @@ FETCH_TRANSIENT_RETRIES = 2
 MAX_RECONNECT_DELAY_S = 60.0
 MIN_RATE_LIMIT_BACKOFF_S = 1.0
 RESULT_CACHE_SIZE = 512
+LEASE_GRACE_S = 10.0
+LEASE_RETRY_S = 0.5
 
 
 def session_id_from_environment_id(environment_id: str, api_key: str, environment_kind: str) -> str:
@@ -184,7 +186,7 @@ class LocalBridge(ABC):
 
     async def run(self) -> None:
         """Serve commands until stopped; raises AuthError or BridgeBusyError when it cannot start."""
-        self._lease.acquire()
+        await self._acquire_lease()
         self._stop_event.clear()
         headers = {"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"}
         try:
@@ -203,6 +205,20 @@ class LocalBridge(ABC):
                 except Exception:
                     logger.warning("driver teardown failed", exc_info=True)
             self._lease.release()
+
+    async def _acquire_lease(self) -> None:
+        """A stopping bridge may hold the kind lease until its in-flight command finishes,
+        so retry briefly before declaring a conflict with another environment."""
+        deadline = time.monotonic() + LEASE_GRACE_S
+        while True:
+            try:
+                self._lease.acquire()
+                return
+            except BridgeBusyError:
+                raise
+            except RuntimeError:
+                if time.monotonic() >= deadline or await self._interruptible_sleep(LEASE_RETRY_S):
+                    raise
 
     async def _poll_loop(self, exchange: CommandExchange) -> None:
         retry_delay = 1.0

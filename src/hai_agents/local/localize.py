@@ -25,10 +25,14 @@ class AgentLocalizer:
         changes: dict[str, Any] = {}
         environments = _read(agent, "environments")
         if environments:
-            changes["environments"] = self.localize_environments(environments)
+            localized = self.localize_environments(environments)
+            if _any_replaced(localized, environments):
+                changes["environments"] = localized
         subagents = _read(agent, "subagents")
         if subagents:
-            changes["subagents"] = self.localize_subagents(subagents)
+            localized = self.localize_subagents(subagents)
+            if _any_replaced(localized, subagents):
+                changes["subagents"] = localized
         return _replace(agent, **changes) if changes else agent
 
     def localize_environments(self, environments: Any) -> Any:
@@ -90,6 +94,12 @@ def subagent_names(agent: Any) -> list[str]:
     return names
 
 
+def _any_replaced(localized: Any, original: Any) -> bool:
+    if localized is original:
+        return False
+    return any(new is not old for new, old in zip(localized, original))
+
+
 def _local_target(env: Any) -> tuple[str, str] | None:
     if _read(env, "host") != "user_device":
         return None
@@ -109,4 +119,7 @@ def _replace(obj: Any, **changes: Any) -> Any:
         return obj.model_copy(update=changes)
     if isinstance(obj, dict):
         return {**obj, **changes}
-    return obj
+    raise TypeError(
+        f"cannot set {sorted(changes)} on {type(obj).__name__}; "
+        "pass user_device agents and environments as dicts or generated models"
+    )

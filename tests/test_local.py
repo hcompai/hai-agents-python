@@ -77,6 +77,15 @@ class TestLocalizer:
         assert envs[2] == "agent-name-ref"
         assert LOCALIZER.localize_agent("named-agent") == "named-agent"
 
+    def test_unsupported_user_device_env_type_raises(self):
+        class WeirdEnv:
+            host = "user_device"
+            kind = "web"
+            id = "laptop"
+
+        with pytest.raises(TypeError, match="session_id"):
+            LOCALIZER.localize_environments([WeirdEnv()])
+
     def test_pydantic_env_model_autowires(self):
         from hai_agents.types.browser import Browser
 
