@@ -31,18 +31,17 @@ class BridgeManager:
         self._runners: dict[str, _Runner] = {}
         self._lock = threading.Lock()
 
-    def ensure(self, bridges: Sequence[LocalBridge]) -> None:
+    def ensure(self, bridges: Sequence[LocalBridge]) -> list[str]:
+        """Start any bridges not already running; returns the session ids of newly started ones."""
         started: list[str] = []
         try:
             for bridge in bridges:
                 if self._ensure_one(bridge):
                     started.append(bridge.session_id)
         except BaseException:
-            with self._lock:
-                rollback = [self._runners.pop(session_id) for session_id in started if session_id in self._runners]
-            for runner in rollback:
-                runner.stop()
+            self.stop(started)
             raise
+        return started
 
     def _ensure_one(self, bridge: LocalBridge) -> bool:
         with self._lock:
@@ -80,6 +79,12 @@ class BridgeManager:
                 runner.stop()
             raise
         return started
+
+    def stop(self, session_ids: Sequence[str]) -> None:
+        with self._lock:
+            stopping = [self._runners.pop(sid) for sid in session_ids if sid in self._runners]
+        for runner in stopping:
+            runner.stop()
 
     def stop_all(self) -> None:
         with self._lock:
@@ -122,12 +127,15 @@ class _Runner:
 _default_manager = BridgeManager()
 
 
-def ensure_bridges(bridges: Sequence[LocalBridge]) -> None:
-    _default_manager.ensure(bridges)
+def ensure_bridges(bridges: Sequence[LocalBridge]) -> list[str]:
+    return _default_manager.ensure(bridges)
 
 
-def stop_bridges() -> None:
-    _default_manager.stop_all()
+def stop_bridges(session_ids: Sequence[str] | None = None) -> None:
+    if session_ids is None:
+        _default_manager.stop_all()
+    else:
+        _default_manager.stop(session_ids)
 
 
 atexit.register(stop_bridges)

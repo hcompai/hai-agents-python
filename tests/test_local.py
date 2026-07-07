@@ -180,6 +180,41 @@ class TestAutoStart:
         with pytest.raises(RuntimeError, match="boom"):
             Client(api_key=API_KEY).sessions.create_session(agent="ghost", messages="hi")
 
+    def test_string_subagents_resolved_for_bridges(self, monkeypatch):
+        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        started: list = []
+        monkeypatch.setattr("hai_agents.client.ensure_bridges", started.extend)
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: None)
+        sid = session_id_from_environment_id("laptop", API_KEY, "web")
+        monkeypatch.setattr(
+            AgentsClient,
+            "get_agent",
+            lambda self, name, *, resolve=None: {
+                "name": name,
+                "environments": [{"id": "laptop", "kind": "web", "host": "user_device", "session_id": sid}],
+            },
+        )
+        Client(api_key=API_KEY).sessions.create_session(
+            agent={"name": "orchestrator", "subagents": ["helper"]},
+            messages="hi",
+        )
+        assert [(b.environment_kind, b.environment_id, b.session_id) for b in started] == [("web", "laptop", sid)]
+
+    def test_create_session_failure_stops_newly_started_bridges(self, monkeypatch):
+        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        stopped: list = []
+        monkeypatch.setattr("hai_agents.client.ensure_bridges", lambda bridges: ["new-sid"])
+        monkeypatch.setattr("hai_agents.client.stop_bridges", stopped.extend)
+        monkeypatch.setattr(
+            SessionsClient, "create_session", lambda self, **kw: (_ for _ in ()).throw(RuntimeError("api down"))
+        )
+        with pytest.raises(RuntimeError, match="api down"):
+            Client(api_key=API_KEY).sessions.create_session(
+                agent={"name": "x", "environments": [{"id": "box", "kind": "desktop", "host": "user_device"}]},
+                messages="hi",
+            )
+        assert stopped == ["new-sid"]
+
     def test_no_bridges_when_disabled(self, monkeypatch):
         started: list = []
         monkeypatch.setattr("hai_agents.client.ensure_bridges", started.extend)
@@ -379,6 +414,14 @@ class TestManager:
         )
         with pytest.raises(RuntimeError, match="already serves"):
             manager.ensure([ServingBridge("other-laptop", api_key="k")])
+
+    def test_ensure_reports_new_bridges_and_stop_is_targeted(self, manager):
+        bridge = ServingBridge("laptop", api_key="k")
+        ids = manager.ensure([bridge])
+        assert ids == [bridge.session_id]
+        assert manager.ensure([ServingBridge("laptop", api_key="k")]) == []
+        manager.stop(ids)
+        assert manager._runners == {}
 
     def test_partial_start_is_rolled_back(self, manager):
         with pytest.raises(RuntimeError, match="already serves"):

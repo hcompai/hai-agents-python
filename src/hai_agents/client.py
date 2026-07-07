@@ -9,14 +9,16 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import json
+import logging
 import typing
 
 import typing_extensions
 
 from .agents.client import AgentsClient, AsyncAgentsClient
 from .base_client import AsyncBaseClient, BaseClient
-from .local.localize import AgentLocalizer
-from .local.manager import auto_bridges_enabled, ensure_bridges
+from .local.localize import AgentLocalizer, subagent_names
+from .local.manager import auto_bridges_enabled, ensure_bridges, stop_bridges
 from .polling import (
     AnswerT,
     AsyncSessionHandle,
@@ -32,9 +34,20 @@ from .polling import run_session as _run_session
 from .sessions.client import AsyncSessionsClient, SessionsClient
 from .tools import ToolInput, as_tools
 
+logger = logging.getLogger(__name__)
+
 
 def _localizer(client_wrapper: typing.Any) -> AgentLocalizer:
     return AgentLocalizer(client_wrapper._get_api_key, client_wrapper.get_base_url())
+
+
+def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) -> None:
+    overrides = kwargs.get("overrides")
+    if overrides and "user_device" in json.dumps(overrides, default=str):
+        logger.warning(
+            "session overrides mention user_device, but auto-started bridges are derived from the agent "
+            "spec only; serve override-injected environments manually with `hai local browser|desktop`"
+        )
 
 
 class _LocalAgentsClient(AgentsClient):
@@ -57,16 +70,30 @@ class _LocalAgentsClient(AgentsClient):
 class _LocalSessionsClient(SessionsClient):
     @functools.wraps(SessionsClient.create_session)
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
+        started: typing.List[str] = []
         if "agent" in kwargs:
             wrapper = self._raw_client._client_wrapper
             localizer = _localizer(wrapper)
             kwargs["agent"] = localizer.localize_agent(kwargs["agent"])
             agent = kwargs["agent"]
             if auto_bridges_enabled():
+                _warn_if_overrides_target_user_device(kwargs)
+                agents = AgentsClient(client_wrapper=wrapper)
                 if isinstance(agent, str):
-                    agent = AgentsClient(client_wrapper=wrapper).get_agent(agent, resolve=True)
-                ensure_bridges(localizer.bridges_for_agent(agent))
-        return super().create_session(**kwargs)
+                    agent = agents.get_agent(agent, resolve=True)
+                resolved: typing.Dict[str, typing.Any] = {}
+                pending = subagent_names(agent)
+                while pending:
+                    name = pending.pop()
+                    if name not in resolved:
+                        resolved[name] = agents.get_agent(name, resolve=True)
+                        pending.extend(subagent_names(resolved[name]))
+                started = ensure_bridges(localizer.bridges_for_agent(agent, resolved.get))
+        try:
+            return super().create_session(**kwargs)
+        except BaseException:
+            stop_bridges(started)
+            raise
 
 
 class _LocalAsyncAgentsClient(AsyncAgentsClient):
@@ -89,16 +116,32 @@ class _LocalAsyncAgentsClient(AsyncAgentsClient):
 class _LocalAsyncSessionsClient(AsyncSessionsClient):
     @functools.wraps(AsyncSessionsClient.create_session)
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:
+        started: typing.List[str] = []
         if "agent" in kwargs:
             wrapper = self._raw_client._client_wrapper
             localizer = _localizer(wrapper)
             kwargs["agent"] = localizer.localize_agent(kwargs["agent"])
             agent = kwargs["agent"]
             if auto_bridges_enabled():
+                _warn_if_overrides_target_user_device(kwargs)
+                agents = AsyncAgentsClient(client_wrapper=wrapper)
                 if isinstance(agent, str):
-                    agent = await AsyncAgentsClient(client_wrapper=wrapper).get_agent(agent, resolve=True)
-                await asyncio.to_thread(lambda: ensure_bridges(localizer.bridges_for_agent(agent)))
-        return await super().create_session(**kwargs)
+                    agent = await agents.get_agent(agent, resolve=True)
+                resolved: typing.Dict[str, typing.Any] = {}
+                pending = subagent_names(agent)
+                while pending:
+                    name = pending.pop()
+                    if name not in resolved:
+                        resolved[name] = await agents.get_agent(name, resolve=True)
+                        pending.extend(subagent_names(resolved[name]))
+                started = await asyncio.to_thread(
+                    lambda: ensure_bridges(localizer.bridges_for_agent(agent, resolved.get))
+                )
+        try:
+            return await super().create_session(**kwargs)
+        except BaseException:
+            await asyncio.to_thread(stop_bridges, started)
+            raise
 
 
 class Client(BaseClient):

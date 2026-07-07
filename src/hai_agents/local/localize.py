@@ -47,7 +47,7 @@ class AgentLocalizer:
         if kwargs.get("subagents"):
             kwargs["subagents"] = self.localize_subagents(kwargs["subagents"])
 
-    def bridges_for_agent(self, agent: Any) -> list[LocalBridge]:
+    def bridges_for_agent(self, agent: Any, fetch_agent: Callable[[str], Any] | None = None) -> list[LocalBridge]:
         bridges: list[LocalBridge] = []
         for env in _read(agent, "environments") or ():
             target = _local_target(env)
@@ -64,7 +64,11 @@ class AgentLocalizer:
                 BRIDGE_TYPES[kind](env_id, api_key=self._get_api_key(), base_url=self._base_url, session_id=session_id)
             )
         for sub in _read(agent, "subagents") or ():
-            bridges.extend(self.bridges_for_agent(sub))
+            if isinstance(sub, str):
+                sub = fetch_agent(sub) if fetch_agent is not None else None
+                if sub is None:
+                    continue
+            bridges.extend(self.bridges_for_agent(sub, fetch_agent))
         return bridges
 
     def _localize_environment(self, env: Any) -> Any:
@@ -73,6 +77,17 @@ class AgentLocalizer:
             return env
         kind, env_id = target
         return _replace(env, session_id=session_id_from_environment_id(env_id, self._get_api_key(), kind))
+
+
+def subagent_names(agent: Any) -> list[str]:
+    """Names of subagents referenced by registration rather than defined inline, at any depth."""
+    names: list[str] = []
+    for sub in _read(agent, "subagents") or ():
+        if isinstance(sub, str):
+            names.append(sub)
+        else:
+            names.extend(subagent_names(sub))
+    return names
 
 
 def _local_target(env: Any) -> tuple[str, str] | None:
