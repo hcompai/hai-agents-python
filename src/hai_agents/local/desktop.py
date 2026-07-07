@@ -14,8 +14,7 @@ class PyautoguiDesktopBridge(LocalBridge["LocalDesktopDriver"]):
     environment_kind = "desktop"
 
     def create_driver(self) -> LocalDesktopDriver:
-        # Runtime import: hai-drivers is an optional extra, absent unless
-        # installed with hai-agents[desktop].
+        # Runtime import: hai-drivers is absent unless installed with hai-agents[desktop].
         try:
             from hai_drivers.desktop.local import LocalDesktopDriver
         except ImportError as exc:

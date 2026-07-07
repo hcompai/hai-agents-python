@@ -38,9 +38,7 @@ DriverT = TypeVar("DriverT")
 
 
 class LocalBridge(ABC, Generic[DriverT]):
-    """Serves one environment kind on this machine: polls the platform's
-    command channel for ``session_id`` and dispatches each command to a local
-    hai-drivers driver (see ``transport`` for the wire protocol)."""
+    """Polls the command channel for session_id and dispatches each command to a local hai-drivers driver."""
 
     environment_kind: ClassVar[str]
 
@@ -107,8 +105,7 @@ class LocalBridge(ABC, Generic[DriverT]):
             self._lease.release()
 
     async def _acquire_lease(self) -> None:
-        """A stopping bridge may hold the kind lease until its in-flight command finishes,
-        so retry briefly before declaring a conflict with another environment."""
+        """Retry briefly: a stopping bridge may hold the kind lease until its in-flight command finishes."""
         deadline = time.monotonic() + LEASE_GRACE_S
         while True:
             try:
@@ -132,15 +129,14 @@ class LocalBridge(ABC, Generic[DriverT]):
                 elif time.monotonic() - started < MIN_POLL_INTERVAL_S and await self._interruptible_sleep(
                     MIN_POLL_INTERVAL_S
                 ):
-                    # An empty poll that returned instantly: pace requests so a
-                    # misbehaving server cannot turn long-polling into a busy loop.
+                    # Instant empty polls are paced so a misbehaving server cannot cause a busy loop.
                     break
             except AuthError as exc:
                 # Not recoverable by waiting: a bad key stays bad.
                 logger.error("auth error, stopping: %s", exc)
                 break
             except SessionNotFoundError:
-                # The channel was garbage-collected server-side; recreate and resume.
+                # Channel was garbage-collected server-side; recreate and resume.
                 logger.warning("channel %s missing; recreating", self.session_id)
                 try:
                     await exchange.ensure_channel(self.session_id)
@@ -201,8 +197,7 @@ class LocalBridge(ABC, Generic[DriverT]):
                 continue
             cmd_uid = str(cmd_uid)
             if cmd_uid in self._results:
-                # Redelivered command: repost the cached result instead of re-executing,
-                # so retries after a lost response stay idempotent.
+                # Redelivered command: repost the cached result instead of re-executing.
                 self._results.move_to_end(cmd_uid)
                 result, error = self._results[cmd_uid]
             else:
@@ -229,10 +224,7 @@ class LocalBridge(ABC, Generic[DriverT]):
 
     @staticmethod
     def _call_driver_method(method: Callable[..., Any], args: dict[str, Any]) -> Any:
-        """Invoke a driver method with wire args, splatting a var-positional tuple bound
-        under its parameter name: ``execute_script(script, *args, n_unsafe_attempts=2)``
-        arrives as ``{"script": "...", "args": [1, "two"], "n_unsafe_attempts": 3}`` and
-        must be called as ``execute_script("...", 1, "two", n_unsafe_attempts=3)``."""
+        """Call with wire kwargs, splatting a list bound to a var-positional param (execute_script's args)."""
         try:
             params = list(inspect.signature(method).parameters.values())
         except (TypeError, ValueError):

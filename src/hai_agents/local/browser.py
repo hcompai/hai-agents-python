@@ -26,8 +26,7 @@ CHROME_PROFILE_DIR = Path.home() / ".hai" / "chrome-profile"
 
 _launch_lock = threading.Lock()
 
-# Fixed install locations per OS; on Linux, Chrome/Chromium are found on PATH
-# via _CHROME_COMMANDS instead.
+# Fixed install locations per OS; on Linux, Chrome/Chromium are found on PATH via _CHROME_COMMANDS.
 _CHROME_CANDIDATES = {
     "Darwin": (
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -42,12 +41,7 @@ _CHROME_COMMANDS = ("google-chrome", "google-chrome-stable", "chromium", "chromi
 
 
 class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
-    """Serves web environments by attaching Selenium to a Chrome debugging port on this machine.
-
-    Chrome (or Chromium) is required: the hai-drivers web driver speaks CDP and only
-    attaches to an already-listening port, so launching a host browser is SDK-side
-    bootstrap. Only agents whose web environment is host=user_device are affected.
-    """
+    """Serves web environments by attaching Selenium to a Chrome debugging port on this machine."""
 
     environment_kind = "web"
 
@@ -64,8 +58,7 @@ class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
         self.debugging_port = debugging_port
 
     def create_driver(self) -> SeleniumWebDriver:
-        # Runtime import: hai-drivers is an optional extra, absent unless
-        # installed with hai-agents[browser].
+        # Runtime import: hai-drivers is absent unless installed with hai-agents[browser].
         try:
             from hai_drivers.web.selenium import SeleniumWebDriver
         except ImportError as exc:
@@ -114,8 +107,7 @@ class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
                 if _debugger_listening(port):
                     return
                 if process.poll() is not None:
-                    # Only reachable for the Chrome we just launched ourselves;
-                    # a browser the user started is found by the probe above.
+                    # Only reachable for the Chrome launched here; a user-started browser is found by the probe above.
                     raise RuntimeError(
                         f"Chrome exited with code {process.returncode} before opening debugging port {port}"
                     )

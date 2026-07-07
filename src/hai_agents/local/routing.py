@@ -65,8 +65,7 @@ class SessionRouter:
     def bridges_for_agent(
         self, agent: AgentLike, fetch_agent: Callable[[str], AgentLike | None] | None = None
     ) -> list[LocalBridge]:
-        """Bridges for every user_device environment in the agent tree; string subagents
-        are resolved through ``fetch_agent`` when provided, otherwise skipped."""
+        """Bridges for every user_device environment in the tree; fetch_agent resolves string subagents."""
         bridges: list[LocalBridge] = []
         for env in _read(agent, "environments") or ():
             target = _local_target(env)

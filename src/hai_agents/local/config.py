@@ -20,11 +20,7 @@ _FLAG_FALSE = {"0", "false", "no"}
 
 
 class LocalSettings(BaseModel):
-    """Environment variables read by the local bridge stack.
-
-    Blank or whitespace-only values fall back to the field default, so an
-    empty ``HAI_API_KEY`` never masquerades as a configured key.
-    """
+    """Environment variables read by the local bridge stack; blank values fall back to the defaults."""
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 

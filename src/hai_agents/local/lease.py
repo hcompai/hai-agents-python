@@ -22,22 +22,22 @@ class MachineLease:
     def __init__(self, environment_kind: str, session_id: str) -> None:
         self._environment_kind = environment_kind
         self._session_id = session_id
+        self._path = LEASE_DIR / f"bridge-{environment_kind}.lock"
         self._handle: IO[str] | None = None
 
-    @property
-    def _path(self) -> Path:
-        return LEASE_DIR / f"bridge-{self._environment_kind}.lock"
-
     def acquire(self) -> None:
-        """Take the kind lock; raises BridgeBusyError when the holder serves the same
-        session (benign, another process covers it) and RuntimeError otherwise."""
+        """BridgeBusyError when the holder serves the same session (benign); RuntimeError otherwise."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
         handle = open(self._path, "a+")
         try:
             _lock(handle)
         except OSError as exc:
             handle.close()
-            if self._read_holder() == self._session_id:
+            try:
+                holder = self._path.read_text().strip()
+            except OSError:
+                holder = None
+            if holder == self._session_id:
                 raise BridgeBusyError(f"another bridge already serves session {self._session_id}") from exc
             raise RuntimeError(
                 f"another process already serves a local {self._environment_kind} environment on this machine"
@@ -58,12 +58,6 @@ class MachineLease:
             finally:
                 self._handle.close()
                 self._handle = None
-
-    def _read_holder(self) -> str | None:
-        try:
-            return self._path.read_text().strip()
-        except OSError:
-            return None
 
 
 if sys.platform == "win32":

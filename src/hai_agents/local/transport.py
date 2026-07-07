@@ -19,7 +19,7 @@ DEFAULT_RETRY_AFTER_S = 5.0
 
 
 def serialize_result(value: object) -> Json:
-    """Make a driver return value JSON-safe; see the module docstring for the wire shape."""
+    """Make a driver return value JSON-safe: bytes to base64, pydantic models dumped, containers recursed."""
     if isinstance(value, bytes):
         return base64.b64encode(value).decode("ascii")
     if isinstance(value, BaseModel):
@@ -41,10 +41,7 @@ def deserialize_args(name: str, args: dict[str, Any]) -> dict[str, Any]:
 
 
 class CommandExchange:
-    """Dynamic RPC channel: commands arrive as ``{"id", "command_uid", "name", "args"}``
-    where ``name`` is a driver interface method and ``args`` its kwargs as JSON; the
-    bridge posts back ``{"result", "error", "command_uid"}``. Non-JSON values are
-    bridged by serialize_result/deserialize_args (bytes as base64, cwd as string path)."""
+    """Delivers {id, command_uid, name, args} commands (driver method + JSON kwargs) and posts back results."""
 
     def __init__(self, client: httpx.AsyncClient, base_url: str) -> None:
         self._client = client

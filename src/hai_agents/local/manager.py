@@ -19,11 +19,7 @@ TAKEOVER_POLL_S = 2.0
 
 
 class BridgeManager:
-    """Runs each bridge on a daemon thread; at most one bridge per environment kind per process.
-
-    Registers its own interpreter-exit cleanup; can also be used as a context manager
-    when a scoped lifetime is preferred.
-    """
+    """Runs each bridge on a daemon thread, at most one per environment kind; cleans up at interpreter exit."""
 
     def __init__(self) -> None:
         self._runners: dict[str, _Runner] = {}
