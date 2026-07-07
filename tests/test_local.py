@@ -331,6 +331,16 @@ class TestBridgeProtocol:
         assert driver.clicks == 1
         assert [p["command_uid"] for p in exchange.posts] == ["u1", "u1"]
 
+    async def test_auth_error_mid_poll_propagates(self):
+        bridge = _bridge(FakeDriver())
+
+        class AuthFailingExchange:
+            async def fetch_commands(self, *args: Any, **kwargs: Any) -> None:
+                raise AuthError("key revoked")
+
+        with pytest.raises(AuthError):
+            await bridge._poll_loop(AuthFailingExchange())
+
     def test_kind_lease_is_machine_wide(self):
         first = MachineLease("desktop", "sid-1")
         first.acquire()

@@ -15,7 +15,7 @@ from typing import Any, ClassVar, Generic, TypeVar
 import httpx
 
 from .config import API_KEY_ENV_VAR, LocalSettings
-from .errors import AuthError, BridgeBusyError, RateLimitedError, SessionNotFoundError
+from .errors import BridgeBusyError, RateLimitedError, SessionNotFoundError
 from .lease import MachineLease
 from .transport import CommandExchange, Json, deserialize_args, serialize_result
 from .utils import session_id_from_environment_id
@@ -83,7 +83,7 @@ class LocalBridge(ABC, Generic[DriverT]):
         self._stop_event.set()
 
     async def run(self) -> None:
-        """Serve commands until stopped; raises AuthError or BridgeBusyError when it cannot start."""
+        """Serve commands until stopped; raises BridgeBusyError when the lease is held, AuthError on a bad key."""
         await self._acquire_lease()
         self._stop_event.clear()
         headers = {"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"}
@@ -131,18 +131,10 @@ class LocalBridge(ABC, Generic[DriverT]):
                 ):
                     # Instant empty polls are paced so a misbehaving server cannot cause a busy loop.
                     break
-            except AuthError as exc:
-                # Not recoverable by waiting: a bad key stays bad.
-                logger.error("auth error, stopping: %s", exc)
-                break
             except SessionNotFoundError:
                 # Channel was garbage-collected server-side; recreate and resume.
                 logger.warning("channel %s missing; recreating", self.session_id)
-                try:
-                    await exchange.ensure_channel(self.session_id)
-                except AuthError as exc:
-                    logger.error("auth error recreating channel, stopping: %s", exc)
-                    break
+                await exchange.ensure_channel(self.session_id)
                 if await self._interruptible_sleep(retry_delay):
                     break
                 retry_delay = min(retry_delay * 2, MAX_RECONNECT_DELAY_S)
