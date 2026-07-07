@@ -77,6 +77,12 @@ class TestLocalizer:
         assert envs[2] == "agent-name-ref"
         assert LOCALIZER.localize_agent("named-agent") == "named-agent"
 
+    def test_malformed_user_device_env_raises(self):
+        with pytest.raises(ValueError, match="need an id"):
+            LOCALIZER.localize_environments([{"kind": "web", "host": "user_device"}])
+        with pytest.raises(ValueError, match="supported kinds"):
+            LOCALIZER.localize_environments([{"id": "phone", "kind": "mobile", "host": "user_device"}])
+
     def test_unsupported_user_device_env_type_raises(self):
         class WeirdEnv:
             host = "user_device"

@@ -105,7 +105,14 @@ def _local_target(env: Any) -> tuple[str, str] | None:
         return None
     kind = _read(env, "kind") or "web"
     env_id = _read(env, "id")
-    return (kind, env_id) if kind in BRIDGE_TYPES and env_id else None
+    if kind not in BRIDGE_TYPES:
+        raise ValueError(
+            f"user_device environment {env_id!r} has kind {kind!r}, which cannot be served by a local "
+            f"bridge; supported kinds: {sorted(BRIDGE_TYPES)}"
+        )
+    if not env_id:
+        raise ValueError("user_device environments need an id to derive their local session")
+    return kind, env_id
 
 
 def _read(obj: Any, key: str) -> Any:
