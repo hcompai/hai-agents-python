@@ -66,6 +66,11 @@ class SessionRouter:
         self, agent: AgentLike, fetch_agent: Callable[[str], AgentLike | None] | None = None
     ) -> list[LocalBridge]:
         """Bridges for every user_device environment in the tree; fetch_agent resolves string subagents."""
+        return self._collect_bridges(agent, fetch_agent, seen=set())
+
+    def _collect_bridges(
+        self, agent: AgentLike, fetch_agent: Callable[[str], AgentLike | None] | None, seen: set[str]
+    ) -> list[LocalBridge]:
         bridges: list[LocalBridge] = []
         for env in _read(agent, "environments") or ():
             target = _local_target(env)
@@ -83,11 +88,15 @@ class SessionRouter:
             )
         for sub in _read(agent, "subagents") or ():
             if isinstance(sub, str):
+                # Dedupe by name; the platform already rejects cyclic or overly deep subagent graphs at resolve time.
+                if sub in seen:
+                    continue
+                seen.add(sub)
                 resolved = fetch_agent(sub) if fetch_agent is not None else None
                 if resolved is None:
                     continue
                 sub = resolved
-            bridges.extend(self.bridges_for_agent(sub, fetch_agent))
+            bridges.extend(self._collect_bridges(sub, fetch_agent, seen))
         return bridges
 
     def _stamp_environment(self, env: EnvironmentLike) -> EnvironmentLike:

@@ -218,6 +218,24 @@ class TestAutoStart:
         )
         assert [(b.environment_kind, b.environment_id, b.session_id) for b in started] == [("web", "laptop", sid)]
 
+    def test_circular_string_subagents_terminate(self, monkeypatch):
+        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        started: list = []
+        monkeypatch.setattr("hai_agents.client.ensure_bridges", started.extend)
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: None)
+        sid = session_id_from_environment_id("laptop", API_KEY, "web")
+        specs = {
+            "a": {"name": "a", "subagents": ["b"]},
+            "b": {
+                "name": "b",
+                "subagents": ["a"],
+                "environments": [{"id": "laptop", "kind": "web", "host": "user_device", "session_id": sid}],
+            },
+        }
+        monkeypatch.setattr(AgentsClient, "get_agent", lambda self, name, *, resolve=None: specs[name])
+        Client(api_key=API_KEY).sessions.create_session(agent={"name": "root", "subagents": ["a"]}, messages="hi")
+        assert [(b.environment_kind, b.environment_id) for b in started] == [("web", "laptop")]
+
     def test_create_session_failure_stops_newly_started_bridges(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
         stopped: list = []
