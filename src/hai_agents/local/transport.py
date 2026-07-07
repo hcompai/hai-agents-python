@@ -112,6 +112,8 @@ class CommandExchange:
         url = f"{self._base}/api/v1/commands/{command_id}/result"
         body = {"result": result, "error": error, "command_uid": command_uid}
         resp = await self._client.post(url, json=body, timeout=timeout)
+        if resp.status_code in {HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN}:
+            raise AuthError(f"auth error posting result ({resp.status_code})")
         if resp.status_code == HTTPStatus.CONFLICT:
             return True
         return resp.is_success

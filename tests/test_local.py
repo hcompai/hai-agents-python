@@ -3,6 +3,7 @@ import threading
 import time
 from typing import Any
 
+import httpx
 import pytest
 
 import hai_agents.local.lease as lease_module
@@ -340,6 +341,30 @@ class TestBridgeProtocol:
 
         with pytest.raises(AuthError):
             await bridge._poll_loop(AuthFailingExchange())
+
+    async def test_permanent_4xx_in_poll_loop_propagates(self):
+        bridge = _bridge(FakeDriver())
+
+        class BadRequestExchange:
+            async def fetch_commands(self, *args: Any, **kwargs: Any) -> None:
+                request = httpx.Request("GET", "http://test")
+                raise httpx.HTTPStatusError(
+                    "bad request", request=request, response=httpx.Response(400, request=request)
+                )
+
+        with pytest.raises(httpx.HTTPStatusError):
+            await bridge._poll_loop(BadRequestExchange())
+
+    async def test_post_result_auth_failure_propagates(self):
+        bridge = _bridge(FakeDriver())
+
+        class AuthPostExchange:
+            async def post_result(self, *args: Any, **kwargs: Any) -> bool:
+                raise AuthError("key revoked")
+
+        cmd = {"id": "c1", "command_uid": "u1", "name": "click", "args": {"x": 0, "y": 0}}
+        with pytest.raises(AuthError):
+            await bridge._process_commands(AuthPostExchange(), [cmd])
 
     def test_kind_lease_is_machine_wide(self):
         first = MachineLease("desktop", "sid-1")

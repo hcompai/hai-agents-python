@@ -144,7 +144,10 @@ class LocalBridge(ABC, Generic[DriverT]):
                 if await self._interruptible_sleep(backoff):
                     break
             except httpx.HTTPError as exc:
-                # Network blips: exponential backoff, keep serving when connectivity returns.
+                if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500:
+                    # A 4xx will not heal by waiting; surface it instead of retrying forever.
+                    raise
+                # Network blips and 5xx: exponential backoff, keep serving when the platform returns.
                 logger.warning("connection error: %s; retrying in %.0fs", exc, retry_delay)
                 if await self._interruptible_sleep(retry_delay):
                     break
