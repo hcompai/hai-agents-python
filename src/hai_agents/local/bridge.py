@@ -17,7 +17,7 @@ import httpx
 from .config import API_KEY_ENV_VAR, LocalSettings
 from .errors import BridgeBusyError, RateLimitedError, SessionNotFoundError
 from .lease import MachineLease
-from .transport import CommandExchange, Json, deserialize_args, serialize_result
+from .transport import Command, CommandExchange, Json, deserialize_args, serialize_result
 from .utils import session_id_from_environment_id
 
 logger = logging.getLogger(__name__)
@@ -150,7 +150,7 @@ class LocalBridge(ABC, Generic[DriverT]):
                     break
                 retry_delay = min(retry_delay * 2, MAX_RECONNECT_DELAY_S)
 
-    async def _fetch_until_stop(self, exchange: CommandExchange) -> list[dict[str, Any]] | None:
+    async def _fetch_until_stop(self, exchange: CommandExchange) -> list[Command] | None:
         """Long-poll for commands, returning early (with None) when a stop is requested."""
         fetch_task = asyncio.ensure_future(
             exchange.fetch_commands(
@@ -179,7 +179,7 @@ class LocalBridge(ABC, Generic[DriverT]):
             return None
         return fetch_task.result()
 
-    async def _process_commands(self, exchange: CommandExchange, commands: list[dict[str, Any]]) -> None:
+    async def _process_commands(self, exchange: CommandExchange, commands: list[Command]) -> None:
         for cmd in commands:
             if self._stop_event.is_set():
                 break

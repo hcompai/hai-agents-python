@@ -131,12 +131,14 @@ def _local_target(env: EnvironmentLike) -> tuple[str, str] | None:
 
 
 def _read(obj: Any, key: str) -> Any:
+    """The public API accepts agents/environments as dicts or generated models; read either shape."""
     if isinstance(obj, dict):
         return obj.get(key)
     return getattr(obj, key, None)
 
 
 def _replace(obj: Any, **changes: Any) -> Any:
+    """Copy-with-changes across both accepted shapes; anything else cannot carry a session_id."""
     if isinstance(obj, BaseModel):
         return obj.model_copy(update=changes)
     if isinstance(obj, dict):

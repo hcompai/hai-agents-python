@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, TypedDict, Union
 
 import httpx
 from pydantic import BaseModel
@@ -13,6 +13,16 @@ from pydantic import BaseModel
 from .errors import AuthError, RateLimitedError, SessionNotFoundError
 
 Json = Union[None, bool, int, float, str, List["Json"], Dict[str, "Json"]]
+
+
+class Command(TypedDict, total=False):
+    """One command from the channel: ``name`` is a driver interface method, ``args`` its kwargs as JSON."""
+
+    id: str
+    command_uid: str
+    name: str
+    args: dict[str, Any]
+
 
 TRANSIENT_STATUS_CODES = frozenset({502, 503, 504})
 DEFAULT_RETRY_AFTER_S = 5.0
@@ -41,7 +51,7 @@ def deserialize_args(name: str, args: dict[str, Any]) -> dict[str, Any]:
 
 
 class CommandExchange:
-    """Delivers {id, command_uid, name, args} commands (driver method + JSON kwargs) and posts back results."""
+    """Fetches Command batches from the platform and posts back their results."""
 
     def __init__(self, client: httpx.AsyncClient, base_url: str) -> None:
         self._client = client
@@ -70,7 +80,7 @@ class CommandExchange:
         wait_for_seconds: int,
         read_timeout: float,
         max_retries: int,
-    ) -> list[dict[str, Any]] | None:
+    ) -> list[Command] | None:
         url = f"{self._base}/api/v1/commands/{session_id}/commands"
         for attempt in range(max_retries + 1):
             resp = await self._client.get(url, params={"wait_for_seconds": wait_for_seconds}, timeout=read_timeout)

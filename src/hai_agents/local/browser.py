@@ -69,6 +69,7 @@ class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
         return SeleniumWebDriver(debugging_port=self.debugging_port)
 
     def driver_interface(self) -> type:
+        # Runtime import: hai-drivers is absent unless installed with hai-agents[browser].
         from hai_drivers.web.interface import WebDriverInterface
 
         return WebDriverInterface

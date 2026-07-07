@@ -24,6 +24,7 @@ class PyautoguiDesktopBridge(LocalBridge["LocalDesktopDriver"]):
         return LocalDesktopDriver()
 
     def driver_interface(self) -> type:
+        # Runtime import: hai-drivers is absent unless installed with hai-agents[desktop].
         from hai_drivers.desktop.interface import DesktopDriverInterface
 
         return DesktopDriverInterface
