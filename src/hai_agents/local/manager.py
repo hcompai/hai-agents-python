@@ -57,7 +57,9 @@ class BridgeManager:
                         f"this machine already serves a local {bridge.environment_kind} environment; "
                         f"cannot also serve {bridge.environment_id!r}"
                     )
-                logger.info("starting local %s bridge for environment %r", bridge.environment_kind, bridge.environment_id)
+                logger.info(
+                    "starting local %s bridge for environment %r", bridge.environment_kind, bridge.environment_id
+                )
                 runner = _Runner(bridge)
                 self._runners[bridge.session_id] = runner
         try:

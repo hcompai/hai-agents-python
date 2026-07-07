@@ -157,7 +157,9 @@ class LocalBridge(ABC):
         if not self.api_key:
             raise ValueError(f"api_key is required (pass api_key= or set {API_KEY_ENV_VAR})")
         self.base_url = base_url or os.getenv(BASE_URL_ENV_VAR) or DEFAULT_BASE_URL
-        self.session_id = session_id or session_id_from_environment_id(environment_id, self.api_key, self.environment_kind)
+        self.session_id = session_id or session_id_from_environment_id(
+            environment_id, self.api_key, self.environment_kind
+        )
         self.ready = threading.Event()
         self._driver: Any = None
         self._lease = _MachineLease(self.environment_kind, self.session_id)

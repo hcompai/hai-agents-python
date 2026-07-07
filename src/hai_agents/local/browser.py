@@ -72,9 +72,9 @@ class SeleniumBrowserBridge(LocalBridge):
         with _launch_lock:
             if _debugger_listening(port):
                 return
-            binary = next(
-                (p for p in _CHROME_CANDIDATES.get(platform.system(), ()) if Path(p).exists()), None
-            ) or next((found for command in _CHROME_COMMANDS if (found := shutil.which(command))), None)
+            binary = next((p for p in _CHROME_CANDIDATES.get(platform.system(), ()) if Path(p).exists()), None) or next(
+                (found for command in _CHROME_COMMANDS if (found := shutil.which(command))), None
+            )
             if binary is None:
                 raise RuntimeError(
                     "Google Chrome was not found. Install Chrome, or start a browser yourself with "
