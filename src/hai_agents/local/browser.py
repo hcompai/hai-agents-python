@@ -44,9 +44,9 @@ _CHROME_COMMANDS = ("google-chrome", "google-chrome-stable", "chromium", "chromi
 class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
     """Serves web environments by attaching Selenium to a Chrome debugging port on this machine.
 
-    Chrome (or Chromium) is required: the hai-drivers web driver speaks CDP.
-    This only affects agents whose web environment is host=user_device; other
-    sessions never touch the local browser.
+    Chrome (or Chromium) is required: the hai-drivers web driver speaks CDP and only
+    attaches to an already-listening port, so launching a host browser is SDK-side
+    bootstrap. Only agents whose web environment is host=user_device are affected.
     """
 
     environment_kind = "web"
