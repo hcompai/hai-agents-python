@@ -1,10 +1,4 @@
-"""Local web bridge: Selenium attached to a Chrome remote-debugging port.
-
-Chrome bootstrap lives here rather than in hai-drivers on purpose:
-``SeleniumWebDriver`` only *attaches* to an already-listening debugging port,
-while finding/launching a host browser is machine setup that belongs to the
-SDK side of the bridge.
-"""
+"""Local web bridge: Selenium attached to a Chrome remote-debugging port."""
 
 from __future__ import annotations
 

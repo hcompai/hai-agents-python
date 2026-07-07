@@ -1,10 +1,4 @@
-"""Cross-process machine lease backed by an OS file lock.
-
-One lock file per environment kind under ``~/.hai`` enforces the
-one-bridge-per-kind rule across every process on the machine. The lock is
-advisory and released by the OS if the holder dies, so a stale file never
-blocks a new bridge.
-"""
+"""Per-environment-kind machine lease backed by an OS file lock, released by the OS if the holder dies."""
 
 from __future__ import annotations
 

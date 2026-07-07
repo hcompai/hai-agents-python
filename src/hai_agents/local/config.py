@@ -1,9 +1,4 @@
-"""Environment configuration for ``hai_agents.local``.
-
-Every environment variable the local bridge stack reads lives here as one
-validated model, so there are no scattered ``os.environ`` reads. Explicit
-constructor arguments always take precedence over the environment.
-"""
+"""Every environment variable read by hai_agents.local, as one validated model."""
 
 from __future__ import annotations
 

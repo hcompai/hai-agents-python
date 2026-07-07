@@ -1,14 +1,4 @@
-"""HTTP transport for the platform's command channel.
-
-The channel is a deliberately dynamic RPC: the platform delivers command
-objects ``{"id": str, "command_uid": str, "name": str, "args": dict}`` where
-``name`` is a method of the hai-drivers driver interface and ``args`` are its
-keyword arguments as JSON. The bridge posts back ``{"result": Json,
-"error": str | None, "command_uid": str}``. Values that cannot cross JSON
-are bridged here: ``bytes`` travel base64-encoded (``write_file.content``,
-screenshot results), ``run_command.cwd`` travels as a string path, and
-pydantic models are dumped to plain JSON.
-"""
+"""HTTP transport for the platform's command channel."""
 
 from __future__ import annotations
 
@@ -51,6 +41,11 @@ def deserialize_args(name: str, args: dict[str, Any]) -> dict[str, Any]:
 
 
 class CommandExchange:
+    """Dynamic RPC channel: commands arrive as ``{"id", "command_uid", "name", "args"}``
+    where ``name`` is a driver interface method and ``args`` its kwargs as JSON; the
+    bridge posts back ``{"result", "error", "command_uid"}``. Non-JSON values are
+    bridged by serialize_result/deserialize_args (bytes as base64, cwd as string path)."""
+
     def __init__(self, client: httpx.AsyncClient, base_url: str) -> None:
         self._client = client
         self._base = base_url.rstrip("/")

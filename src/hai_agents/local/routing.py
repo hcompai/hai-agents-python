@@ -1,9 +1,4 @@
-"""Routing of user_device environments to bridges on this machine.
-
-The platform routes commands by ``session_id``; stamping a deterministic id
-onto each user_device environment is what lets any process with the same API
-key serve it.
-"""
+"""Routes user_device environments to local bridges by stamping deterministic session ids."""
 
 from __future__ import annotations
 
