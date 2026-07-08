@@ -41,16 +41,19 @@ class BridgeManager:
         return started
 
     def _ensure_one(self, bridge: LocalBridge) -> bool:
+        displaced: list[_Runner] = []
         with self._lock:
             runner = self._runners.get(bridge.session_id)
             started = runner is None or not runner.thread.is_alive()
             if started:
-                self._displace_kind_locked(bridge)
+                displaced = self._displace_kind_locked(bridge)
                 logger.info(
                     "starting local %s bridge for environment %r", bridge.environment_kind, bridge.environment_id
                 )
                 runner = _Runner(bridge)
                 self._runners[bridge.session_id] = runner
+        for other in displaced:
+            other.notify_lost()
         try:
             if not runner.bridge.ready.wait(READY_TIMEOUT_S):
                 raise RuntimeError(
@@ -70,9 +73,11 @@ class BridgeManager:
             raise
         return started
 
-    def _displace_kind_locked(self, bridge: LocalBridge) -> None:
+    def _displace_kind_locked(self, bridge: LocalBridge) -> list[_Runner]:
         """One driver per kind: a machine has one desktop and one debuggable Chrome, so the newest
-        session takes the bridge over from any previous session still holding it."""
+        session takes the bridge over from any previous session still holding it. Returns the
+        displaced runners; the caller fires their loss handlers off the lock."""
+        displaced: list[_Runner] = []
         for sid, other in list(self._runners.items()):
             if other.bridge.environment_kind != bridge.environment_kind:
                 continue
@@ -85,6 +90,8 @@ class BridgeManager:
                 )
             del self._runners[sid]
             other.stop()
+            displaced.append(other)
+        return displaced
 
     def stop(self, session_ids: Sequence[str]) -> None:
         with self._lock:
@@ -116,18 +123,20 @@ class _Runner:
             self.error = exc
             if not sys.is_finalizing() and threading.main_thread().is_alive():
                 logger.exception("local %s bridge crashed", self.bridge.environment_kind)
-                self._notify_crash()
+                self.notify_lost()
         finally:
             self.bridge.ready.set()
             self.loop.close()
 
-    def _notify_crash(self) -> None:
-        """Only fires for crashes after a successful startup; startup failures surface to the ensure() caller."""
-        if self.bridge.ready.is_set() and self.bridge.on_crash is not None:
+    def notify_lost(self) -> None:
+        """Fires the bridge's loss handler once, on crash or displacement after a successful
+        startup; startup failures surface to the ensure() caller instead."""
+        handler, self.bridge.on_crash = self.bridge.on_crash, None
+        if handler is not None and self.bridge.ready.is_set():
             try:
-                self.bridge.on_crash()
+                handler()
             except Exception:
-                logger.exception("bridge crash handler failed")
+                logger.exception("bridge loss handler failed")
 
     def stop(self) -> None:
         with contextlib.suppress(RuntimeError):

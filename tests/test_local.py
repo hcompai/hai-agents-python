@@ -372,15 +372,20 @@ class TestManager:
             manager.ensure([NeverReadyBridge(api_key="k")])
         assert manager._runners == {}
 
-    def test_newer_session_takes_over_the_kind(self, manager):
+    def test_newer_session_takes_over_the_kind_and_notifies_the_displaced(self, manager):
         first = ServingBridge(api_key="k")
         second = ServingBridge(api_key="k")
         browser = BrowserServingBridge(api_key="k")
+        first_lost, second_lost = threading.Event(), threading.Event()
+        first.on_crash = first_lost.set
+        second.on_crash = second_lost.set
         manager.ensure([first, browser])
         first_runner = manager._runners[first.session_id]
         manager.ensure([second])
         assert first.session_id not in manager._runners
         assert not first_runner.thread.is_alive()
+        assert first_lost.is_set()
+        assert not second_lost.is_set()
         assert manager._runners[second.session_id].thread.is_alive()
         assert manager._runners[browser.session_id].thread.is_alive()
 
