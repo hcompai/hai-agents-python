@@ -11,7 +11,7 @@ from .browser import SeleniumBrowserBridge
 from .desktop import PyautoguiDesktopBridge
 
 if TYPE_CHECKING:
-    from ..types.agent import Agent
+    from hai_agents.types.agent import Agent
 
 AgentLike = Union[str, "Agent", Mapping[str, Any]]
 EnvironmentLike = Union[str, BaseModel, Mapping[str, Any]]

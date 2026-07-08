@@ -6,12 +6,12 @@ import httpx
 import pytest
 
 from hai_agents import Client
-from hai_agents.local import BridgeManager, LocalBridge, PyautoguiDesktopBridge, SeleniumBrowserBridge
-from hai_agents.local.config import AUTO_BRIDGE_ENV_VAR
-from hai_agents.local.errors import AuthError
-from hai_agents.local.routing import localize_agent
-from hai_agents.local.transport import Command, serialize_result
 from hai_agents.sessions.client import SessionsClient
+from hai_agents_local import BridgeManager, LocalBridge, PyautoguiDesktopBridge, SeleniumBrowserBridge
+from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR
+from hai_agents_local.errors import AuthError
+from hai_agents_local.routing import localize_agent
+from hai_agents_local.transport import Command, serialize_result
 
 API_KEY = "test-key"
 
@@ -108,7 +108,7 @@ class TestAutoStart:
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
         started: list = []
         captured: dict = {}
-        monkeypatch.setattr("hai_agents.client.ensure_bridges", lambda bridges: started.extend(bridges) or [])
+        monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: started.extend(bridges) or [])
         monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: captured.update(kw))
         Client(api_key=API_KEY).sessions.create_session(
             agent={
@@ -129,7 +129,7 @@ class TestAutoStart:
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
         started: list = []
         captured: dict = {}
-        monkeypatch.setattr("hai_agents.client.ensure_bridges", lambda bridges: started.extend(bridges) or [])
+        monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: started.extend(bridges) or [])
         monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: captured.update(kw))
         Client(api_key=API_KEY).sessions.create_session(agent="my-agent", messages="hi")
         assert started == []
@@ -138,8 +138,8 @@ class TestAutoStart:
     def test_create_session_failure_stops_newly_started_bridges(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
         stopped: list = []
-        monkeypatch.setattr("hai_agents.client.ensure_bridges", lambda bridges: ["new-sid"])
-        monkeypatch.setattr("hai_agents.client.stop_bridges", stopped.extend)
+        monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: ["new-sid"])
+        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", stopped.extend)
         monkeypatch.setattr(
             SessionsClient, "create_session", lambda self, **kw: (_ for _ in ()).throw(RuntimeError("api down"))
         )
@@ -154,7 +154,7 @@ class TestAutoStart:
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "0")
         started: list = []
         captured: dict = {}
-        monkeypatch.setattr("hai_agents.client.ensure_bridges", lambda bridges: started.extend(bridges) or [])
+        monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: started.extend(bridges) or [])
         monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: captured.update(kw))
         Client(api_key=API_KEY).sessions.create_session(
             agent={"name": "x", "environments": [{"id": "box", "kind": "desktop", "host": "user_device"}]},
@@ -252,7 +252,7 @@ class TestBridgeProtocol:
         assert [p["command_uid"] for p in exchange.posts] == ["u1", "u1"]
 
     async def test_undeliverable_result_raises_after_retries(self, monkeypatch):
-        import hai_agents.local.bridge as bridge_module
+        import hai_agents_local.bridge as bridge_module
 
         monkeypatch.setattr(bridge_module, "POST_RESULT_RETRIES", 1)
         bridge = _bridge(FakeDriver())
@@ -365,7 +365,7 @@ class TestManager:
                 self._serving = asyncio.Event()
                 await self._serving.wait()
 
-        import hai_agents.local.manager as manager_module
+        import hai_agents_local.manager as manager_module
 
         monkeypatch.setattr(manager_module, "READY_TIMEOUT_S", 0.05)
         with pytest.raises(RuntimeError, match="not ready"):

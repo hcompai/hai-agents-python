@@ -569,7 +569,7 @@ def local_browser(
     debug_port: int = typer.Option(9222, "--debug-port", help="Chrome remote-debugging port to attach to."),
 ) -> None:
     """Serve browser commands on this machine through Chrome on --debug-port."""
-    from hai_agents.local import SeleniumBrowserBridge
+    from hai_agents_local import SeleniumBrowserBridge
 
     _run_bridge(_state(ctx), SeleniumBrowserBridge, session_id, debugging_port=debug_port)
 
@@ -580,7 +580,7 @@ def local_desktop(
     session_id: str = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""
-    from hai_agents.local import PyautoguiDesktopBridge
+    from hai_agents_local import PyautoguiDesktopBridge
 
     _run_bridge(_state(ctx), PyautoguiDesktopBridge, session_id)
 

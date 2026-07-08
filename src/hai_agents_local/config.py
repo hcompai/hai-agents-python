@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from ..environment import HaiAgentsEnvironment
+from hai_agents.environment import HaiAgentsEnvironment
 
 BASE_URL_ENV_VAR = "HAI_API_BASE_URL"
 AUTO_BRIDGE_ENV_VAR = "HAI_AUTO_BRIDGE"
