@@ -8,7 +8,7 @@ import socket
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
 from rich.console import Console
@@ -23,6 +23,9 @@ from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
 
 from . import auth, mcp_hosts
+
+if TYPE_CHECKING:
+    from hai_agents_local import LocalBridge
 
 H_GLYPH = "\n".join(
     (
@@ -51,8 +54,9 @@ skills_app = typer.Typer(no_args_is_help=True, help="Browse available skills.")
 mcp_app = typer.Typer(no_args_is_help=True, help="Manage the hai-agents MCP server.")
 local_app = typer.Typer(
     no_args_is_help=True,
-    help="Manually run the local browser/desktop bridge. Only needed when sessions are launched "
-    "from another machine (e.g. the web app); `hai run` and the SDK start it automatically.",
+    help="Manually run the local browser/desktop bridge. Only needed when the session is started "
+    "elsewhere (the web app, another machine, or an agent referenced by name); sessions created "
+    "from the Python SDK with an inline agent start it automatically.",
 )
 
 
@@ -569,7 +573,7 @@ def _print_mcp_results(results: list[dict], server_url: str, json_output: bool) 
 @local_app.command("browser")
 def local_browser(
     ctx: typer.Context,
-    session_id: str = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
+    session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
     debug_port: int = typer.Option(9222, "--debug-port", help="Chrome remote-debugging port to attach to."),
 ) -> None:
     """Serve browser commands on this machine through Chrome on --debug-port."""
@@ -581,7 +585,7 @@ def local_browser(
 @local_app.command("desktop")
 def local_desktop(
     ctx: typer.Context,
-    session_id: str = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
+    session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""
     from hai_agents_local import PyautoguiDesktopBridge
@@ -589,16 +593,15 @@ def local_desktop(
     _run_bridge(_state(ctx), PyautoguiDesktopBridge, session_id)
 
 
-def _run_bridge(state: AppState, bridge_type: type, session_id: str | None, **options: Any) -> None:
+def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str | None, **options: Any) -> None:
     import logging
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     try:
-        base_url = credentials.resolve_base_url(state.base_url)
         bridge = bridge_type(
             api_key=credentials.resolve_api_key(state.api_key),
+            base_url=credentials.resolve_base_url(state.base_url),
             session_id=session_id,
-            **({"base_url": base_url} if base_url else {}),
             **options,
         )
     except (RuntimeError, ValueError) as exc:
