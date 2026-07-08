@@ -4,15 +4,16 @@ import typing
 
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
-from ..types.browser_kind import BrowserKind
-from ..types.browser_mode import BrowserMode
 from ..types.browser_network import BrowserNetwork
 from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
 from .raw_client import AsyncRawEnvironmentsClient, RawEnvironmentsClient
+from .types.create_environment_request import CreateEnvironmentRequest
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
+from .types.patch_environment_host import PatchEnvironmentHost
 from .types.patch_environment_mode import PatchEnvironmentMode
+from .types.update_environment_request_body import UpdateEnvironmentRequestBody
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -90,45 +91,14 @@ class EnvironmentsClient:
         return _response.data
 
     def create_environment(
-        self,
-        *,
-        id: str,
-        kind: typing.Optional[BrowserKind] = OMIT,
-        start_url: typing.Optional[str] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
-        mode: typing.Optional[BrowserMode] = OMIT,
-        vault_id: typing.Optional[str] = OMIT,
-        browser_profile_id: typing.Optional[str] = OMIT,
-        network: typing.Optional[BrowserNetwork] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
+        self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
     ) -> Environment:
         """
         Create an environment.
 
         Parameters
         ----------
-        id : str
-            Catalog identifier for this environment.
-
-        kind : typing.Optional[BrowserKind]
-
-        start_url : typing.Optional[str]
-            Initial URL to open.
-
-        headless : typing.Optional[bool]
-            Run the browser without a visible window.
-
-        mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser.
-
-        vault_id : typing.Optional[str]
-            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
-
-        browser_profile_id : typing.Optional[str]
-            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
-
-        network : typing.Optional[BrowserNetwork]
-            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+        request : CreateEnvironmentRequest
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -141,25 +111,18 @@ class EnvironmentsClient:
         Examples
         --------
         from hai_agents import Client
+        from hai_agents.environments import CreateEnvironmentRequest_Web
 
         client = Client(
             api_key="YOUR_API_KEY",
         )
         client.environments.create_environment(
-            id="id",
+            request=CreateEnvironmentRequest_Web(
+                id="id",
+            ),
         )
         """
-        _response = self._raw_client.create_environment(
-            id=id,
-            kind=kind,
-            start_url=start_url,
-            headless=headless,
-            mode=mode,
-            vault_id=vault_id,
-            browser_profile_id=browser_profile_id,
-            network=network,
-            request_options=request_options,
-        )
+        _response = self._raw_client.create_environment(request=request, request_options=request_options)
         return _response.data
 
     def get_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Environment:
@@ -193,48 +156,16 @@ class EnvironmentsClient:
         return _response.data
 
     def update_environment(
-        self,
-        id_: str,
-        *,
-        id: str,
-        kind: typing.Optional[BrowserKind] = OMIT,
-        start_url: typing.Optional[str] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
-        mode: typing.Optional[BrowserMode] = OMIT,
-        vault_id: typing.Optional[str] = OMIT,
-        browser_profile_id: typing.Optional[str] = OMIT,
-        network: typing.Optional[BrowserNetwork] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
+        self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
     ) -> Environment:
         """
         Replace the environment spec.
 
         Parameters
         ----------
-        id_ : str
-
         id : str
-            Catalog identifier for this environment.
 
-        kind : typing.Optional[BrowserKind]
-
-        start_url : typing.Optional[str]
-            Initial URL to open.
-
-        headless : typing.Optional[bool]
-            Run the browser without a visible window.
-
-        mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser.
-
-        vault_id : typing.Optional[str]
-            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
-
-        browser_profile_id : typing.Optional[str]
-            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
-
-        network : typing.Optional[BrowserNetwork]
-            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+        request : UpdateEnvironmentRequestBody
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -247,27 +178,19 @@ class EnvironmentsClient:
         Examples
         --------
         from hai_agents import Client
+        from hai_agents.environments import UpdateEnvironmentRequestBody_Web
 
         client = Client(
             api_key="YOUR_API_KEY",
         )
         client.environments.update_environment(
-            id_="id",
             id="id",
+            request=UpdateEnvironmentRequestBody_Web(
+                id="id",
+            ),
         )
         """
-        _response = self._raw_client.update_environment(
-            id_,
-            id=id,
-            kind=kind,
-            start_url=start_url,
-            headless=headless,
-            mode=mode,
-            vault_id=vault_id,
-            browser_profile_id=browser_profile_id,
-            network=network,
-            request_options=request_options,
-        )
+        _response = self._raw_client.update_environment(id, request=request, request_options=request_options)
         return _response.data
 
     def delete_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
@@ -303,11 +226,14 @@ class EnvironmentsClient:
         self,
         id: str,
         *,
+        host: typing.Optional[PatchEnvironmentHost] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         headless: typing.Optional[bool] = OMIT,
+        session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
@@ -318,15 +244,21 @@ class EnvironmentsClient:
         ----------
         id : str
 
+        host : typing.Optional[PatchEnvironmentHost]
+
         start_url : typing.Optional[str]
 
         headless : typing.Optional[bool]
+
+        session_id : typing.Optional[str]
 
         mode : typing.Optional[PatchEnvironmentMode]
 
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
+
+        persist_browser_profile : typing.Optional[bool]
 
         network : typing.Optional[BrowserNetwork]
 
@@ -351,11 +283,14 @@ class EnvironmentsClient:
         """
         _response = self._raw_client.patch_environment(
             id,
+            host=host,
             start_url=start_url,
             headless=headless,
+            session_id=session_id,
             mode=mode,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            persist_browser_profile=persist_browser_profile,
             network=network,
             request_options=request_options,
         )
@@ -442,45 +377,14 @@ class AsyncEnvironmentsClient:
         return _response.data
 
     async def create_environment(
-        self,
-        *,
-        id: str,
-        kind: typing.Optional[BrowserKind] = OMIT,
-        start_url: typing.Optional[str] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
-        mode: typing.Optional[BrowserMode] = OMIT,
-        vault_id: typing.Optional[str] = OMIT,
-        browser_profile_id: typing.Optional[str] = OMIT,
-        network: typing.Optional[BrowserNetwork] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
+        self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
     ) -> Environment:
         """
         Create an environment.
 
         Parameters
         ----------
-        id : str
-            Catalog identifier for this environment.
-
-        kind : typing.Optional[BrowserKind]
-
-        start_url : typing.Optional[str]
-            Initial URL to open.
-
-        headless : typing.Optional[bool]
-            Run the browser without a visible window.
-
-        mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser.
-
-        vault_id : typing.Optional[str]
-            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
-
-        browser_profile_id : typing.Optional[str]
-            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
-
-        network : typing.Optional[BrowserNetwork]
-            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+        request : CreateEnvironmentRequest
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -495,6 +399,7 @@ class AsyncEnvironmentsClient:
         import asyncio
 
         from hai_agents import AsyncClient
+        from hai_agents.environments import CreateEnvironmentRequest_Web
 
         client = AsyncClient(
             api_key="YOUR_API_KEY",
@@ -503,23 +408,15 @@ class AsyncEnvironmentsClient:
 
         async def main() -> None:
             await client.environments.create_environment(
-                id="id",
+                request=CreateEnvironmentRequest_Web(
+                    id="id",
+                ),
             )
 
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.create_environment(
-            id=id,
-            kind=kind,
-            start_url=start_url,
-            headless=headless,
-            mode=mode,
-            vault_id=vault_id,
-            browser_profile_id=browser_profile_id,
-            network=network,
-            request_options=request_options,
-        )
+        _response = await self._raw_client.create_environment(request=request, request_options=request_options)
         return _response.data
 
     async def get_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Environment:
@@ -561,48 +458,16 @@ class AsyncEnvironmentsClient:
         return _response.data
 
     async def update_environment(
-        self,
-        id_: str,
-        *,
-        id: str,
-        kind: typing.Optional[BrowserKind] = OMIT,
-        start_url: typing.Optional[str] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
-        mode: typing.Optional[BrowserMode] = OMIT,
-        vault_id: typing.Optional[str] = OMIT,
-        browser_profile_id: typing.Optional[str] = OMIT,
-        network: typing.Optional[BrowserNetwork] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
+        self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
     ) -> Environment:
         """
         Replace the environment spec.
 
         Parameters
         ----------
-        id_ : str
-
         id : str
-            Catalog identifier for this environment.
 
-        kind : typing.Optional[BrowserKind]
-
-        start_url : typing.Optional[str]
-            Initial URL to open.
-
-        headless : typing.Optional[bool]
-            Run the browser without a visible window.
-
-        mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser.
-
-        vault_id : typing.Optional[str]
-            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
-
-        browser_profile_id : typing.Optional[str]
-            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
-
-        network : typing.Optional[BrowserNetwork]
-            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+        request : UpdateEnvironmentRequestBody
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -617,6 +482,7 @@ class AsyncEnvironmentsClient:
         import asyncio
 
         from hai_agents import AsyncClient
+        from hai_agents.environments import UpdateEnvironmentRequestBody_Web
 
         client = AsyncClient(
             api_key="YOUR_API_KEY",
@@ -625,25 +491,16 @@ class AsyncEnvironmentsClient:
 
         async def main() -> None:
             await client.environments.update_environment(
-                id_="id",
                 id="id",
+                request=UpdateEnvironmentRequestBody_Web(
+                    id="id",
+                ),
             )
 
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.update_environment(
-            id_,
-            id=id,
-            kind=kind,
-            start_url=start_url,
-            headless=headless,
-            mode=mode,
-            vault_id=vault_id,
-            browser_profile_id=browser_profile_id,
-            network=network,
-            request_options=request_options,
-        )
+        _response = await self._raw_client.update_environment(id, request=request, request_options=request_options)
         return _response.data
 
     async def delete_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
@@ -687,11 +544,14 @@ class AsyncEnvironmentsClient:
         self,
         id: str,
         *,
+        host: typing.Optional[PatchEnvironmentHost] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         headless: typing.Optional[bool] = OMIT,
+        session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
@@ -702,15 +562,21 @@ class AsyncEnvironmentsClient:
         ----------
         id : str
 
+        host : typing.Optional[PatchEnvironmentHost]
+
         start_url : typing.Optional[str]
 
         headless : typing.Optional[bool]
+
+        session_id : typing.Optional[str]
 
         mode : typing.Optional[PatchEnvironmentMode]
 
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
+
+        persist_browser_profile : typing.Optional[bool]
 
         network : typing.Optional[BrowserNetwork]
 
@@ -743,11 +609,14 @@ class AsyncEnvironmentsClient:
         """
         _response = await self._raw_client.patch_environment(
             id,
+            host=host,
             start_url=start_url,
             headless=headless,
+            session_id=session_id,
             mode=mode,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            persist_browser_profile=persist_browser_profile,
             network=network,
             request_options=request_options,
         )

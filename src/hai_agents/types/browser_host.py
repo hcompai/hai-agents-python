@@ -2,4 +2,4 @@
 
 import typing
 
-EnvironmentKind = typing.Union[typing.Literal["web", "desktop"], typing.Any]
+BrowserHost = typing.Union[typing.Literal["user_device", "cloud"], typing.Any]

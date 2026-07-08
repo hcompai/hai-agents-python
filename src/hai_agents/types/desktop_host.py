@@ -2,4 +2,4 @@
 
 import typing
 
-BrowserKind = typing.Union[typing.Literal["web"], typing.Any]
+DesktopHost = typing.Union[typing.Literal["user_device"], typing.Any]
