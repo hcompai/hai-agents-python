@@ -30,6 +30,7 @@ class TestLocalizeAgent:
         assert [type(b) for b in bridges] == [SeleniumBrowserBridge, PyautoguiDesktopBridge]
         assert [e["session_id"] for e in envs] == [b.session_id for b in bridges]
         assert len({b.session_id for b in bridges}) == 2
+        assert envs[0]["kind"] == "web"
         assert "session_id" not in agent["environments"][0]
 
     def test_second_unclaimed_env_of_same_kind_raises(self):
@@ -89,9 +90,21 @@ class TestLocalizeAgent:
     def test_pydantic_env_model_is_stamped(self):
         from hai_agents.types.browser import Browser
 
-        agent = {"name": "x", "environments": [Browser(id="laptop", kind="web", host="user_device")]}
+        agent = {"name": "x", "environments": [Browser(id="laptop", host="user_device")]}
         localized, [bridge] = localize_agent(agent, api_key=API_KEY)
-        assert localized["environments"][0].session_id == bridge.session_id
+        env = localized["environments"][0]
+        assert env.session_id == bridge.session_id
+        assert env.model_dump()["kind"] == "web"
+
+    def test_bare_desktop_model_gets_a_desktop_bridge_and_kind_tag(self):
+        from hai_agents.types.desktop import Desktop
+
+        agent = {"name": "x", "environments": [Desktop(id="box", host="user_device")]}
+        localized, [bridge] = localize_agent(agent, api_key=API_KEY)
+        assert isinstance(bridge, PyautoguiDesktopBridge)
+        env = localized["environments"][0]
+        assert env.session_id == bridge.session_id
+        assert env.model_dump()["kind"] == "desktop"
 
     def test_bridge_mints_a_fresh_session_id(self):
         bridge = PyautoguiDesktopBridge(api_key=API_KEY)

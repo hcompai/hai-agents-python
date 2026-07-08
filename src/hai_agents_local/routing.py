@@ -65,19 +65,26 @@ def _localize_environment(
         )
     bridge = BRIDGE_TYPES[kind](_read(env, "id"), api_key=api_key, base_url=base_url)
     bridges.append(bridge)
-    return _replace(env, session_id=bridge.session_id)
+    return _replace(env, kind=kind, session_id=bridge.session_id)
 
 
 def _local_kind(env: EnvironmentLike) -> str | None:
     if _read(env, "host") != "user_device":
         return None
-    kind = _read(env, "kind") or "web"
+    kind = _read(env, "kind") or _model_kind(env) or "web"
     if kind not in BRIDGE_TYPES:
         raise ValueError(
             f"user_device environment {_read(env, 'id')!r} has kind {kind!r}, which cannot be served by a "
             f"local bridge; supported kinds: {sorted(BRIDGE_TYPES)}"
         )
     return kind
+
+
+def _model_kind(env: EnvironmentLike) -> str | None:
+    """The generated Browser/Desktop models carry no kind field; the class says which branch it is."""
+    from hai_agents.types import Desktop
+
+    return "desktop" if isinstance(env, Desktop) else None
 
 
 def _any_replaced(localized: Sequence[Any], original: Sequence[Any]) -> bool:
