@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import functools
 import inspect
 import json
@@ -24,15 +25,21 @@ def _token_source(client_wrapper: typing.Any) -> TokenSource:
 
 
 def _resolve_token(source: TokenSource) -> str:
-    """Resolve a token source to a string; runs off the event loop (bridge runner thread)."""
+    """Resolve a token source to a string, wherever the caller runs."""
     token = source() if callable(source) else source
-    if inspect.isawaitable(token):
+    if not inspect.isawaitable(token):
+        return token
 
-        async def consume() -> str:
-            return await token
+    async def consume() -> str:
+        return await token
 
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
         return asyncio.run(consume())
-    return token
+    # This thread already runs a loop; asyncio.run must happen on another one.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: asyncio.run(consume())).result()
 
 
 def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) -> None:

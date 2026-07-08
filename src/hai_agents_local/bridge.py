@@ -105,7 +105,8 @@ class LocalBridge(ABC, Generic[DriverT]):
                 self.ready.set()
                 await self._poll_loop(exchange)
         finally:
-            destroy = getattr(self._driver, "destroy", None)
+            driver, self._driver = self._driver, None
+            destroy = getattr(driver, "destroy", None)
             if callable(destroy):
                 try:
                     destroy()

@@ -112,6 +112,8 @@ class _Runner:
         self.bridge = bridge
         self.error: BaseException | None = None
         self.loop = asyncio.new_event_loop()
+        # A restarted bridge keeps its ready event from the previous run; the wait below must see this run's.
+        bridge.ready.clear()
         self.thread = threading.Thread(target=self._serve, daemon=True, name=f"hai-bridge-{bridge.environment_kind}")
         self.thread.start()
 
