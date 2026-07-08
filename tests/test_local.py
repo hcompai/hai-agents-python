@@ -150,35 +150,69 @@ class TestAutoStart:
             )
         assert stopped == ["new-sid"]
 
-    def test_bridge_loss_cancels_session_and_stops_sibling_bridges(self, monkeypatch):
-        cancelled: list = []
-        stopped: list = []
+    @staticmethod
+    def _crash_wiring(monkeypatch, cancelled: list, stopped: list, bridges: list) -> None:
+        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
         monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", stopped.extend)
         monkeypatch.setattr(SessionsClient, "cancel_session", lambda self, sid: cancelled.append(sid))
-        from hai_agents_local.sessions import _cancel_session_on_crash, _watch_crashes
+        monkeypatch.setattr(
+            "hai_agents_local.sessions.ensure_bridges",
+            lambda new: bridges.extend(new) or [b.session_id for b in new],
+        )
 
-        bridges = [PyautoguiDesktopBridge(api_key=API_KEY), SeleniumBrowserBridge(api_key=API_KEY)]
-        client = Client(api_key=API_KEY)
-        crashed = _watch_crashes(bridges)
-        _cancel_session_on_crash(client._client_wrapper, bridges, type("S", (), {"id": "sess-1"})(), crashed)
+    _TWO_ENV_AGENT = {
+        "name": "x",
+        "environments": [
+            {"id": "box", "kind": "desktop", "host": "user_device"},
+            {"id": "laptop", "kind": "web", "host": "user_device"},
+        ],
+    }
+
+    def test_bridge_loss_cancels_session_once_and_stops_sibling_bridges(self, monkeypatch):
+        cancelled: list = []
+        stopped: list = []
+        bridges: list = []
+        self._crash_wiring(monkeypatch, cancelled, stopped, bridges)
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: type("S", (), {"id": "sess-1"})())
+        Client(api_key=API_KEY).sessions.create_session(agent=dict(self._TWO_ENV_AGENT), messages="hi")
         bridges[0].on_crash()
         assert cancelled == ["sess-1"]
         assert stopped == [bridge.session_id for bridge in bridges]
+        bridges[1].on_crash()
+        assert cancelled == ["sess-1"]
 
-    def test_crash_before_session_creation_still_cancels(self, monkeypatch):
+    def test_crash_between_startup_and_session_creation_still_cancels(self, monkeypatch):
         cancelled: list = []
         stopped: list = []
-        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", stopped.extend)
-        monkeypatch.setattr(SessionsClient, "cancel_session", lambda self, sid: cancelled.append(sid))
-        from hai_agents_local.sessions import _cancel_session_on_crash, _watch_crashes
+        bridges: list = []
+        self._crash_wiring(monkeypatch, cancelled, stopped, bridges)
 
-        bridges = [PyautoguiDesktopBridge(api_key=API_KEY)]
-        client = Client(api_key=API_KEY)
-        crashed = _watch_crashes(bridges)
-        bridges[0].on_crash()
-        _cancel_session_on_crash(client._client_wrapper, bridges, type("S", (), {"id": "sess-2"})(), crashed)
+        def create_and_crash(self, **kw):
+            bridges[0].on_crash()
+            return type("S", (), {"id": "sess-2"})()
+
+        monkeypatch.setattr(SessionsClient, "create_session", create_and_crash)
+        Client(api_key=API_KEY).sessions.create_session(agent=dict(self._TWO_ENV_AGENT), messages="hi")
         assert cancelled == ["sess-2"]
-        assert stopped == [bridges[0].session_id]
+        assert stopped == [bridge.session_id for bridge in bridges]
+
+    async def test_async_crash_before_session_creation_cancels_off_the_loop(self, monkeypatch):
+        from hai_agents import AsyncClient
+        from hai_agents.sessions.client import AsyncSessionsClient
+
+        cancelled: list = []
+        stopped: list = []
+        bridges: list = []
+        self._crash_wiring(monkeypatch, cancelled, stopped, bridges)
+
+        async def create_and_crash(self, **kw):
+            bridges[0].on_crash()
+            return type("S", (), {"id": "sess-3"})()
+
+        monkeypatch.setattr(AsyncSessionsClient, "create_session", create_and_crash)
+        await AsyncClient(api_key=API_KEY).sessions.create_session(agent=dict(self._TWO_ENV_AGENT), messages="hi")
+        assert cancelled == ["sess-3"]
+        assert stopped == [bridge.session_id for bridge in bridges]
 
     def test_no_bridges_and_no_stamping_when_disabled(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "0")

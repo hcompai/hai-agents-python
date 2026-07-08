@@ -69,24 +69,42 @@ def _localize(client_wrapper: typing.Any, kwargs: typing.Dict[str, typing.Any]) 
     return bridges
 
 
-def _watch_crashes(bridges: typing.Sequence[LocalBridge]) -> threading.Event:
-    """Record bridge losses from startup on, so a crash before the session exists is not missed."""
-    crashed = threading.Event()
-    for bridge in bridges:
-        bridge.on_crash = crashed.set
-    return crashed
+class _LossWatcher:
+    """Watches bridges from startup on and runs a cancel action on the first loss, exactly once,
+    whether that loss lands before or after the action is attached."""
+
+    def __init__(self, bridges: typing.Sequence[LocalBridge]) -> None:
+        self._lock = threading.Lock()
+        self._lost = False
+        self._action: typing.Optional[typing.Callable[[], None]] = None
+        for bridge in bridges:
+            bridge.on_crash = self._fire
+
+    def _fire(self) -> None:
+        with self._lock:
+            if self._lost:
+                return
+            self._lost = True
+            action = self._action
+        if action is not None:
+            action()
+
+    def attach(self, action: typing.Callable[[], None]) -> bool:
+        """Arm the action for future losses; True when one already landed, so the caller runs it."""
+        with self._lock:
+            if self._lost:
+                return True
+            self._action = action
+        return False
 
 
-def _cancel_session_on_crash(
-    client_wrapper: typing.Any,
-    bridges: typing.Sequence[LocalBridge],
-    session: typing.Any,
-    crashed: threading.Event,
-) -> None:
+def _cancel_action(
+    client_wrapper: typing.Any, bridges: typing.Sequence[LocalBridge], session: typing.Any
+) -> typing.Optional[typing.Callable[[], None]]:
     """A bridge that dies mid-session leaves the agent without local control; cancel the session then."""
     session_id = getattr(session, "id", None)
     if session_id is None:
-        return
+        return None
 
     def cancel() -> None:
         logger.error("local bridge for session %s crashed; cancelling the session", session_id)
@@ -101,11 +119,7 @@ def _cancel_session_on_crash(
         finally:
             stop_bridges([bridge.session_id for bridge in bridges])
 
-    for bridge in bridges:
-        bridge.on_crash = cancel
-    if crashed.is_set():
-        # A bridge died between startup and session creation; its watcher already fired.
-        cancel()
+    return cancel
 
 
 class LocalSessionsClient(SessionsClient):
@@ -113,14 +127,17 @@ class LocalSessionsClient(SessionsClient):
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
         wrapper = self._raw_client._client_wrapper
         bridges = _localize(wrapper, kwargs)
-        crashed = _watch_crashes(bridges)
+        watcher = _LossWatcher(bridges)
         started = ensure_bridges(bridges)
         try:
             session = super().create_session(**kwargs)
         except BaseException:
             stop_bridges(started)
             raise
-        _cancel_session_on_crash(wrapper, bridges, session, crashed)
+        if bridges:
+            cancel = _cancel_action(wrapper, bridges, session)
+            if cancel is not None and watcher.attach(cancel):
+                cancel()
         return session
 
 
@@ -129,12 +146,16 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:
         wrapper = self._raw_client._client_wrapper
         bridges = _localize(wrapper, kwargs)
-        crashed = _watch_crashes(bridges)
+        watcher = _LossWatcher(bridges)
         started = await asyncio.to_thread(ensure_bridges, bridges)
         try:
             session = await super().create_session(**kwargs)
         except BaseException:
             await asyncio.to_thread(stop_bridges, started)
             raise
-        _cancel_session_on_crash(wrapper, bridges, session, crashed)
+        if bridges:
+            cancel = _cancel_action(wrapper, bridges, session)
+            if cancel is not None and watcher.attach(cancel):
+                # cancel_session blocks on HTTP; keep it off the event loop thread.
+                await asyncio.to_thread(cancel)
         return session
