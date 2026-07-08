@@ -1,4 +1,5 @@
 import asyncio
+import threading
 from typing import Any
 
 import httpx
@@ -9,7 +10,7 @@ from hai_agents.local import BridgeManager, LocalBridge, PyautoguiDesktopBridge,
 from hai_agents.local.config import AUTO_BRIDGE_ENV_VAR
 from hai_agents.local.errors import AuthError
 from hai_agents.local.routing import localize_agent
-from hai_agents.local.transport import serialize_result
+from hai_agents.local.transport import Command, serialize_result
 from hai_agents.sessions.client import SessionsClient
 
 API_KEY = "test-key"
@@ -20,17 +21,39 @@ class TestLocalizeAgent:
         agent = {
             "name": "x",
             "environments": [
-                {"id": "laptop", "kind": "web", "host": "user_device"},
-                {"id": "box", "kind": "desktop", "host": "user_device"},
                 {"host": "user_device"},
+                {"id": "box", "kind": "desktop", "host": "user_device"},
             ],
         }
         localized, bridges = localize_agent(agent, api_key=API_KEY)
         envs = localized["environments"]
-        assert [type(b) for b in bridges] == [SeleniumBrowserBridge, PyautoguiDesktopBridge, SeleniumBrowserBridge]
+        assert [type(b) for b in bridges] == [SeleniumBrowserBridge, PyautoguiDesktopBridge]
         assert [e["session_id"] for e in envs] == [b.session_id for b in bridges]
-        assert len({b.session_id for b in bridges}) == 3
+        assert len({b.session_id for b in bridges}) == 2
         assert "session_id" not in agent["environments"][0]
+
+    def test_second_unclaimed_env_of_same_kind_raises(self):
+        agent = {
+            "name": "orchestrator",
+            "environments": [{"id": "laptop", "kind": "web", "host": "user_device"}],
+            "subagents": [
+                {"name": "child", "environments": [{"id": "laptop-2", "kind": "web", "host": "user_device"}]}
+            ],
+        }
+        with pytest.raises(ValueError, match="multiple user_device web"):
+            localize_agent(agent, api_key=API_KEY)
+
+    def test_claimed_env_does_not_count_against_the_kind(self):
+        agent = {
+            "name": "x",
+            "environments": [
+                {"id": "pinned", "kind": "web", "host": "user_device", "session_id": "served-elsewhere"},
+                {"id": "laptop", "kind": "web", "host": "user_device"},
+            ],
+        }
+        localized, bridges = localize_agent(agent, api_key=API_KEY)
+        [bridge] = bridges
+        assert localized["environments"][1]["session_id"] == bridge.session_id
 
     def test_claimed_remote_and_string_targets_left_alone(self):
         agent = {
@@ -49,9 +72,7 @@ class TestLocalizeAgent:
     def test_inline_subagents_are_walked(self):
         agent = {
             "name": "orchestrator",
-            "subagents": [
-                {"name": "child", "environments": [{"id": "box", "kind": "desktop", "host": "user_device"}]}
-            ],
+            "subagents": [{"name": "child", "environments": [{"id": "box", "kind": "desktop", "host": "user_device"}]}],
         }
         localized, bridges = localize_agent(agent, api_key=API_KEY)
         [bridge] = bridges
@@ -72,17 +93,14 @@ class TestLocalizeAgent:
         localized, [bridge] = localize_agent(agent, api_key=API_KEY)
         assert localized["environments"][0].session_id == bridge.session_id
 
-    def test_bridge_defaults_api_key_from_env_and_mints_session_id(self, monkeypatch):
-        monkeypatch.setenv("HAI_API_KEY", "envkey")
-        bridge = PyautoguiDesktopBridge()
-        assert bridge.api_key == "envkey"
+    def test_bridge_mints_a_fresh_session_id(self):
+        bridge = PyautoguiDesktopBridge(api_key=API_KEY)
         assert bridge.session_id
-        assert bridge.session_id != PyautoguiDesktopBridge().session_id
+        assert bridge.session_id != PyautoguiDesktopBridge(api_key=API_KEY).session_id
 
-    def test_bridge_without_api_key_raises(self, monkeypatch):
-        monkeypatch.delenv("HAI_API_KEY", raising=False)
+    def test_bridge_without_api_key_raises(self):
         with pytest.raises(ValueError, match="api_key is required"):
-            PyautoguiDesktopBridge()
+            PyautoguiDesktopBridge(api_key="")
 
 
 class TestAutoStart:
@@ -179,9 +197,8 @@ class FakeExchange:
 
     async def post_result(
         self, command_id: str, *, command_uid: str, result: Any, error: str | None, timeout: float
-    ) -> bool:
+    ) -> None:
         self.posts.append({"id": command_id, "command_uid": command_uid, "result": result, "error": error})
-        return True
 
 
 def _bridge(driver: Any) -> FakeBridge:
@@ -219,8 +236,8 @@ class TestBridgeProtocol:
         driver = FakeDriver()
         bridge = _bridge(driver)
         exchange = FakeExchange()
-        cmd = {"id": "c1", "command_uid": "u1", "name": "click", "args": {"x": 0, "y": 0}}
-        await bridge._process_commands(exchange, [cmd, {**cmd, "id": "c2", "command_uid": "u2"}])
+        cmd = Command(id="c1", command_uid="u1", name="click", args={"x": 0, "y": 0})
+        await bridge._process_commands(exchange, [cmd, cmd.model_copy(update={"id": "c2", "command_uid": "u2"})])
         assert driver.clicks == 2
         assert [p["command_uid"] for p in exchange.posts] == ["u1", "u2"]
 
@@ -228,11 +245,30 @@ class TestBridgeProtocol:
         driver = FakeDriver()
         bridge = _bridge(driver)
         exchange = FakeExchange()
-        cmd = {"id": "c1", "command_uid": "u1", "name": "click", "args": {"x": 0, "y": 0}}
+        cmd = Command(id="c1", command_uid="u1", name="click", args={"x": 0, "y": 0})
         await bridge._process_commands(exchange, [cmd])
-        await bridge._process_commands(exchange, [{**cmd, "id": "c1-retry"}])
+        await bridge._process_commands(exchange, [cmd.model_copy(update={"id": "c1-retry"})])
         assert driver.clicks == 1
         assert [p["command_uid"] for p in exchange.posts] == ["u1", "u1"]
+
+    async def test_undeliverable_result_raises_after_retries(self, monkeypatch):
+        import hai_agents.local.bridge as bridge_module
+
+        monkeypatch.setattr(bridge_module, "POST_RESULT_RETRIES", 1)
+        bridge = _bridge(FakeDriver())
+        attempts = []
+
+        class FailingPostExchange:
+            async def post_result(self, *args: Any, **kwargs: Any) -> None:
+                attempts.append(1)
+                request = httpx.Request("POST", "http://test")
+                raise httpx.HTTPStatusError(
+                    "bad gateway", request=request, response=httpx.Response(502, request=request)
+                )
+
+        with pytest.raises(httpx.HTTPStatusError):
+            await bridge._deliver(FailingPostExchange(), "c1", "u1", None, None)
+        assert len(attempts) == 2
 
     async def test_auth_error_mid_poll_propagates(self):
         bridge = _bridge(FakeDriver())
@@ -261,10 +297,10 @@ class TestBridgeProtocol:
         bridge = _bridge(FakeDriver())
 
         class AuthPostExchange:
-            async def post_result(self, *args: Any, **kwargs: Any) -> bool:
+            async def post_result(self, *args: Any, **kwargs: Any) -> None:
                 raise AuthError("key revoked")
 
-        cmd = {"id": "c1", "command_uid": "u1", "name": "click", "args": {"x": 0, "y": 0}}
+        cmd = Command(id="c1", command_uid="u1", name="click", args={"x": 0, "y": 0})
         with pytest.raises(AuthError):
             await bridge._process_commands(AuthPostExchange(), [cmd])
 
@@ -331,10 +367,17 @@ class TestManager:
             manager.ensure([NeverReadyBridge(api_key="k")])
         assert manager._runners == {}
 
-    def test_second_environment_on_same_kind_raises(self, manager):
-        manager.ensure([ServingBridge(api_key="k"), BrowserServingBridge(api_key="k")])
-        with pytest.raises(RuntimeError, match="already serves"):
-            manager.ensure([ServingBridge(api_key="k")])
+    def test_newer_session_takes_over_the_kind(self, manager):
+        first = ServingBridge(api_key="k")
+        second = ServingBridge(api_key="k")
+        browser = BrowserServingBridge(api_key="k")
+        manager.ensure([first, browser])
+        first_runner = manager._runners[first.session_id]
+        manager.ensure([second])
+        assert first.session_id not in manager._runners
+        assert not first_runner.thread.is_alive()
+        assert manager._runners[second.session_id].thread.is_alive()
+        assert manager._runners[browser.session_id].thread.is_alive()
 
     def test_ensure_reports_new_bridges_and_stop_is_targeted(self, manager):
         bridge = ServingBridge(api_key="k")
@@ -344,8 +387,8 @@ class TestManager:
         manager.stop(ids)
         assert manager._runners == {}
 
-    def test_partial_start_is_rolled_back(self, manager):
-        with pytest.raises(RuntimeError, match="already serves"):
+    def test_two_same_kind_bridges_in_one_batch_raise(self, manager):
+        with pytest.raises(RuntimeError, match="two local desktop"):
             manager.ensure(
                 [
                     BrowserServingBridge(api_key="k"),
@@ -354,3 +397,30 @@ class TestManager:
                 ]
             )
         assert manager._runners == {}
+
+    def test_crash_after_ready_fires_on_crash(self, manager):
+        crashed = threading.Event()
+
+        class CrashingBridge(ServingBridge):
+            async def run(self):
+                self.ready.set()
+                await asyncio.sleep(0.2)
+                raise RuntimeError("boom mid-session")
+
+        bridge = CrashingBridge(api_key="k")
+        bridge.on_crash = crashed.set
+        manager.ensure([bridge])
+        assert crashed.wait(5.0)
+
+    def test_startup_failure_does_not_fire_on_crash(self, manager):
+        crashed = threading.Event()
+
+        class FailingBridge(ServingBridge):
+            async def run(self):
+                raise AuthError("bad key")
+
+        bridge = FailingBridge(api_key="k")
+        bridge.on_crash = crashed.set
+        with pytest.raises(RuntimeError):
+            manager.ensure([bridge])
+        assert not crashed.is_set()

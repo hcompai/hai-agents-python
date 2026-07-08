@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from .bridge import LocalBridge
+from .bridge import LocalBridge, TokenSource
 
 if TYPE_CHECKING:
     from hai_drivers.web.selenium import SeleniumWebDriver
@@ -50,7 +50,7 @@ class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
         environment_id: str | None = None,
         *,
         debugging_port: int = DEFAULT_DEBUG_PORT,
-        api_key: str | None = None,
+        api_key: TokenSource,
         base_url: str | None = None,
         session_id: str | None = None,
     ) -> None:

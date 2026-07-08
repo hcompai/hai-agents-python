@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 STOP_JOIN_TIMEOUT_S = 5.0
 READY_TIMEOUT_S = 60.0
 
+_default_manager: BridgeManager | None = None
+_default_manager_lock = threading.Lock()
+
 
 class BridgeManager:
     """Runs each bridge on a daemon thread, at most one per environment kind; cleans up at interpreter exit."""
@@ -32,6 +35,10 @@ class BridgeManager:
 
     def ensure(self, bridges: Sequence[LocalBridge]) -> list[str]:
         """Start any bridges not already running; returns the session ids of newly started ones."""
+        kinds = [bridge.environment_kind for bridge in bridges]
+        for kind in kinds:
+            if kinds.count(kind) > 1:
+                raise RuntimeError(f"cannot serve two local {kind} environments from one machine")
         started: list[str] = []
         try:
             for bridge in bridges:
@@ -47,14 +54,7 @@ class BridgeManager:
             runner = self._runners.get(bridge.session_id)
             started = runner is None or not runner.thread.is_alive()
             if started:
-                if any(
-                    other.bridge.environment_kind == bridge.environment_kind and other.thread.is_alive()
-                    for other in self._runners.values()
-                ):
-                    raise RuntimeError(
-                        f"this machine already serves a local {bridge.environment_kind} environment; "
-                        f"cannot also serve {bridge.environment_id!r}"
-                    )
+                self._displace_kind_locked(bridge)
                 logger.info(
                     "starting local %s bridge for environment %r", bridge.environment_kind, bridge.environment_id
                 )
@@ -78,6 +78,22 @@ class BridgeManager:
                 runner.stop()
             raise
         return started
+
+    def _displace_kind_locked(self, bridge: LocalBridge) -> None:
+        """One driver per kind: a machine has one desktop and one debuggable Chrome, so the newest
+        session takes the bridge over from any previous session still holding it."""
+        for sid, other in list(self._runners.items()):
+            if other.bridge.environment_kind != bridge.environment_kind:
+                continue
+            if other.thread.is_alive():
+                logger.warning(
+                    "stopping the local %s bridge for session %s to serve session %s",
+                    bridge.environment_kind,
+                    other.bridge.session_id,
+                    bridge.session_id,
+                )
+            del self._runners[sid]
+            other.stop()
 
     def stop(self, session_ids: Sequence[str]) -> None:
         with self._lock:
@@ -109,18 +125,23 @@ class _Runner:
             self.error = exc
             if not sys.is_finalizing() and threading.main_thread().is_alive():
                 logger.exception("local %s bridge crashed", self.bridge.environment_kind)
+                self._notify_crash()
         finally:
             self.bridge.ready.set()
             self.loop.close()
+
+    def _notify_crash(self) -> None:
+        """Only fires for crashes after a successful startup; startup failures surface to the ensure() caller."""
+        if self.bridge.ready.is_set() and self.bridge.on_crash is not None:
+            try:
+                self.bridge.on_crash()
+            except Exception:
+                logger.exception("bridge crash handler failed")
 
     def stop(self) -> None:
         with contextlib.suppress(RuntimeError):
             self.loop.call_soon_threadsafe(self.bridge.request_stop)
         self.thread.join(timeout=STOP_JOIN_TIMEOUT_S)
-
-
-_default_manager: BridgeManager | None = None
-_default_manager_lock = threading.Lock()
 
 
 def default_manager() -> BridgeManager:

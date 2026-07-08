@@ -590,10 +590,9 @@ def _run_bridge(state: AppState, bridge_type: type, session_id: str | None, **op
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     try:
-        key = credentials.resolve_api_key(state.api_key)
         base_url = credentials.resolve_base_url(state.base_url)
         bridge = bridge_type(
-            api_key=key() if callable(key) else key,
+            api_key=credentials.resolve_api_key(state.api_key),
             session_id=session_id,
             **({"base_url": base_url} if base_url else {}),
             **options,

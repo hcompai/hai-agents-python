@@ -10,16 +10,18 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Callable
-from typing import Any, ClassVar, Generic, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import Any, AsyncIterator, ClassVar, Generic, TypeVar, Union
 
 import httpx
 
-from .config import API_KEY_ENV_VAR, LocalSettings
+from .config import LocalSettings
 from .errors import RateLimitedError, SessionNotFoundError
 from .transport import Command, CommandExchange, Json, deserialize_args, serialize_result
 
 logger = logging.getLogger(__name__)
+
+TokenSource = Union[str, Callable[[], str], Callable[[], Awaitable[str]]]
 
 LONG_POLL_SECONDS = 20
 LONG_POLL_READ_TIMEOUT_S = 21.0
@@ -34,6 +36,20 @@ RESULT_CACHE_SIZE = 512
 DriverT = TypeVar("DriverT")
 
 
+class _BearerAuth(httpx.Auth):
+    """Resolves the bearer token per request, so rotating or async token sources stay current."""
+
+    def __init__(self, source: TokenSource) -> None:
+        self._source = source
+
+    async def async_auth_flow(self, request: httpx.Request) -> AsyncIterator[httpx.Response]:
+        token = self._source() if callable(self._source) else self._source
+        if inspect.isawaitable(token):
+            token = await token
+        request.headers["Authorization"] = f"Bearer {token}"
+        yield request
+
+
 class LocalBridge(ABC, Generic[DriverT]):
     """Polls the command channel for session_id and dispatches each command to a local hai-drivers driver."""
 
@@ -43,19 +59,18 @@ class LocalBridge(ABC, Generic[DriverT]):
         self,
         environment_id: str | None = None,
         *,
-        api_key: str | None = None,
+        api_key: TokenSource,
         base_url: str | None = None,
         session_id: str | None = None,
     ) -> None:
-        settings = LocalSettings.from_env()
-        resolved_key = api_key or settings.api_key
-        if not resolved_key:
-            raise ValueError(f"api_key is required (pass api_key= or set {API_KEY_ENV_VAR})")
+        if not api_key:
+            raise ValueError("api_key is required")
         self.environment_id = environment_id or self.environment_kind
-        self.api_key = resolved_key
-        self.base_url = base_url or settings.base_url
+        self.api_key = api_key
+        self.base_url = base_url or LocalSettings.from_env().base_url
         self.session_id = session_id or str(uuid.uuid4())
         self.ready = threading.Event()
+        self.on_crash: Callable[[], None] | None = None
         self._driver: DriverT | None = None
         self._stop_event = asyncio.Event()
         self._results: OrderedDict[str, tuple[Json, str | None]] = OrderedDict()
@@ -79,9 +94,10 @@ class LocalBridge(ABC, Generic[DriverT]):
     async def run(self) -> None:
         """Serve commands until stopped; raises AuthError on a bad key."""
         self._stop_event.clear()
-        headers = {"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"}
         try:
-            async with httpx.AsyncClient(headers=headers, follow_redirects=True) as client:
+            async with httpx.AsyncClient(
+                headers={"Accept": "application/json"}, auth=_BearerAuth(self.api_key), follow_redirects=True
+            ) as client:
                 exchange = CommandExchange(client, self.base_url)
                 await exchange.ensure_channel(self.session_id)
                 if self._driver is None:
@@ -165,21 +181,16 @@ class LocalBridge(ABC, Generic[DriverT]):
         for cmd in commands:
             if self._stop_event.is_set():
                 break
-            cmd_id, cmd_uid = cmd.get("id"), cmd.get("command_uid")
-            if cmd_id is None or cmd_uid is None:
-                logger.warning("skipping command with missing id/command_uid: %s", cmd)
-                continue
-            cmd_uid = str(cmd_uid)
-            if cmd_uid in self._results:
+            if cmd.command_uid in self._results:
                 # Redelivered command: repost the cached result instead of re-executing.
-                self._results.move_to_end(cmd_uid)
-                result, error = self._results[cmd_uid]
+                self._results.move_to_end(cmd.command_uid)
+                result, error = self._results[cmd.command_uid]
             else:
-                result, error = await asyncio.to_thread(self._dispatch, cmd.get("name", ""), cmd.get("args") or {})
-                self._results[cmd_uid] = (result, error)
+                result, error = await asyncio.to_thread(self._dispatch, cmd.name, cmd.args)
+                self._results[cmd.command_uid] = (result, error)
                 while len(self._results) > RESULT_CACHE_SIZE:
                     self._results.popitem(last=False)
-            await self._deliver(exchange, str(cmd_id), cmd_uid, result, error)
+            await self._deliver(exchange, cmd.id, cmd.command_uid, result, error)
 
     def _dispatch(self, name: str, args: dict[str, Any]) -> tuple[Json, str | None]:
         if name not in self.commands:
@@ -214,17 +225,19 @@ class LocalBridge(ABC, Generic[DriverT]):
     async def _deliver(
         self, exchange: CommandExchange, command_id: str, command_uid: str, result: Json, error: str | None
     ) -> None:
+        """Post the result, retrying transient failures; raises when delivery keeps failing so the poll
+        loop backs off and the redelivered command reposts from the result cache."""
         for attempt in range(POST_RESULT_RETRIES + 1):
             try:
-                if await exchange.post_result(
+                await exchange.post_result(
                     command_id, command_uid=command_uid, result=result, error=error, timeout=POST_RESULT_TIMEOUT_S
-                ):
-                    return
+                )
+                return
             except httpx.HTTPError as exc:
+                if attempt == POST_RESULT_RETRIES:
+                    raise
                 logger.warning("post result for %s failed (attempt %d): %s", command_id, attempt + 1, exc)
-            if attempt < POST_RESULT_RETRIES:
-                await asyncio.sleep(0.5 * (attempt + 1))
-        logger.error("failed to deliver result for command %s", command_id)
+            await asyncio.sleep(0.5 * (attempt + 1))
 
     async def _interruptible_sleep(self, seconds: float) -> bool:
         """Sleep up to ``seconds``; True when woken by a stop request."""
