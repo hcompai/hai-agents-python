@@ -54,9 +54,14 @@ class Browser(UniversalBaseModel):
     Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run with a fresh profile.
     """
 
+    use_default_browser_profile: typing.Optional[bool] = pydantic.Field(default=None)
+    """
+    When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile. Only supported on cloud-hosted browsers.
+    """
+
     persist_browser_profile: typing.Optional[bool] = pydantic.Field(default=None)
     """
-    When true, the browser profile is updated with this session's final browser state (cookies, storage) when the session ends. Requires browser_profile_id. Only one active session at a time may persist a given profile; concurrent read-only use is always allowed.
+    When true, the browser profile is updated with this session's final browser state (cookies, storage) when the session ends. Requires browser_profile_id or use_default_browser_profile. Only one active session at a time may persist a given profile; concurrent read-only use is always allowed.
     """
 
     network: typing.Optional[BrowserNetwork] = pydantic.Field(default=None)

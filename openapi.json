@@ -3597,6 +3597,152 @@
         }
       }
     },
+    "/api/v2/browser-profiles/default": {
+      "get": {
+        "tags": [
+          "Browser Profiles"
+        ],
+        "summary": "Get Default Browser Profile",
+        "description": "Fetch the caller's default profile for a browser flavor (404 when unset).",
+        "operationId": "get_default_browser_profile_api_v2_browser_profiles_default_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "browser_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Browser flavor, e.g. 'chromium'",
+              "title": "Browser Name"
+            },
+            "description": "Browser flavor, e.g. 'chromium'"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserProfileRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/browser-profiles/{profile_id}/default": {
+      "put": {
+        "tags": [
+          "Browser Profiles"
+        ],
+        "summary": "Set Default Browser Profile",
+        "description": "Mark a profile as the caller's default for its browser flavor.\n\nSessions created with ``use_default_browser_profile: true`` attach this\nprofile. Replaces the caller's previous default for the same browser_name.",
+        "operationId": "set_default_browser_profile_api_v2_browser_profiles__profile_id__default_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserProfileRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Browser Profiles"
+        ],
+        "summary": "Unset Default Browser Profile",
+        "description": "Clear the default flag on a profile.",
+        "operationId": "unset_default_browser_profile_api_v2_browser_profiles__profile_id__default_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserProfileRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/browser-profiles/{profile_id}": {
       "get": {
         "tags": [
@@ -4659,10 +4805,16 @@
             "title": "Browser Profile Id",
             "description": "Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run with a fresh profile."
           },
+          "use_default_browser_profile": {
+            "type": "boolean",
+            "title": "Use Default Browser Profile",
+            "description": "When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile. Only supported on cloud-hosted browsers.",
+            "default": false
+          },
           "persist_browser_profile": {
             "type": "boolean",
             "title": "Persist Browser Profile",
-            "description": "When true, the browser profile is updated with this session's final browser state (cookies, storage) when the session ends. Requires browser_profile_id. Only one active session at a time may persist a given profile; concurrent read-only use is always allowed.",
+            "description": "When true, the browser profile is updated with this session's final browser state (cookies, storage) when the session ends. Requires browser_profile_id or use_default_browser_profile. Only one active session at a time may persist a given profile; concurrent read-only use is always allowed.",
             "default": false
           },
           "network": {
@@ -4889,6 +5041,11 @@
               }
             ],
             "title": "Labels"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
           },
           "created_at": {
             "type": "string",
@@ -6146,6 +6303,17 @@
               }
             ],
             "title": "Browser Profile Id"
+          },
+          "use_default_browser_profile": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Use Default Browser Profile"
           },
           "persist_browser_profile": {
             "anyOf": [

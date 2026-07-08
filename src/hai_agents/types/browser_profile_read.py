@@ -29,6 +29,7 @@ class BrowserProfileRead(UniversalBaseModel):
     usage_count: typing.Optional[int] = None
     last_used_at: typing.Optional[dt.datetime] = None
     labels: typing.Optional[typing.Dict[str, typing.Any]] = None
+    is_default: typing.Optional[bool] = None
     created_at: dt.datetime
     updated_at: dt.datetime
 

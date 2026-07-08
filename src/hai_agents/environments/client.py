@@ -233,6 +233,7 @@ class EnvironmentsClient:
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -257,6 +258,8 @@ class EnvironmentsClient:
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
+
+        use_default_browser_profile : typing.Optional[bool]
 
         persist_browser_profile : typing.Optional[bool]
 
@@ -290,6 +293,7 @@ class EnvironmentsClient:
             mode=mode,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            use_default_browser_profile=use_default_browser_profile,
             persist_browser_profile=persist_browser_profile,
             network=network,
             request_options=request_options,
@@ -551,6 +555,7 @@ class AsyncEnvironmentsClient:
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -575,6 +580,8 @@ class AsyncEnvironmentsClient:
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
+
+        use_default_browser_profile : typing.Optional[bool]
 
         persist_browser_profile : typing.Optional[bool]
 
@@ -616,6 +623,7 @@ class AsyncEnvironmentsClient:
             mode=mode,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
+            use_default_browser_profile=use_default_browser_profile,
             persist_browser_profile=persist_browser_profile,
             network=network,
             request_options=request_options,
