@@ -8,6 +8,7 @@ import functools
 import inspect
 import json
 import logging
+import threading
 import typing
 
 from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
@@ -68,8 +69,19 @@ def _localize(client_wrapper: typing.Any, kwargs: typing.Dict[str, typing.Any]) 
     return bridges
 
 
+def _watch_crashes(bridges: typing.Sequence[LocalBridge]) -> threading.Event:
+    """Record bridge losses from startup on, so a crash before the session exists is not missed."""
+    crashed = threading.Event()
+    for bridge in bridges:
+        bridge.on_crash = crashed.set
+    return crashed
+
+
 def _cancel_session_on_crash(
-    client_wrapper: typing.Any, bridges: typing.Sequence[LocalBridge], session: typing.Any
+    client_wrapper: typing.Any,
+    bridges: typing.Sequence[LocalBridge],
+    session: typing.Any,
+    crashed: threading.Event,
 ) -> None:
     """A bridge that dies mid-session leaves the agent without local control; cancel the session then."""
     session_id = getattr(session, "id", None)
@@ -91,6 +103,9 @@ def _cancel_session_on_crash(
 
     for bridge in bridges:
         bridge.on_crash = cancel
+    if crashed.is_set():
+        # A bridge died between startup and session creation; its watcher already fired.
+        cancel()
 
 
 class LocalSessionsClient(SessionsClient):
@@ -98,13 +113,14 @@ class LocalSessionsClient(SessionsClient):
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
         wrapper = self._raw_client._client_wrapper
         bridges = _localize(wrapper, kwargs)
+        crashed = _watch_crashes(bridges)
         started = ensure_bridges(bridges)
         try:
             session = super().create_session(**kwargs)
         except BaseException:
             stop_bridges(started)
             raise
-        _cancel_session_on_crash(wrapper, bridges, session)
+        _cancel_session_on_crash(wrapper, bridges, session, crashed)
         return session
 
 
@@ -113,11 +129,12 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:
         wrapper = self._raw_client._client_wrapper
         bridges = _localize(wrapper, kwargs)
+        crashed = _watch_crashes(bridges)
         started = await asyncio.to_thread(ensure_bridges, bridges)
         try:
             session = await super().create_session(**kwargs)
         except BaseException:
             await asyncio.to_thread(stop_bridges, started)
             raise
-        _cancel_session_on_crash(wrapper, bridges, session)
+        _cancel_session_on_crash(wrapper, bridges, session, crashed)
         return session

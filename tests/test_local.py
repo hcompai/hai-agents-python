@@ -155,14 +155,30 @@ class TestAutoStart:
         stopped: list = []
         monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", stopped.extend)
         monkeypatch.setattr(SessionsClient, "cancel_session", lambda self, sid: cancelled.append(sid))
-        from hai_agents_local.sessions import _cancel_session_on_crash
+        from hai_agents_local.sessions import _cancel_session_on_crash, _watch_crashes
 
         bridges = [PyautoguiDesktopBridge(api_key=API_KEY), SeleniumBrowserBridge(api_key=API_KEY)]
         client = Client(api_key=API_KEY)
-        _cancel_session_on_crash(client._client_wrapper, bridges, type("S", (), {"id": "sess-1"})())
+        crashed = _watch_crashes(bridges)
+        _cancel_session_on_crash(client._client_wrapper, bridges, type("S", (), {"id": "sess-1"})(), crashed)
         bridges[0].on_crash()
         assert cancelled == ["sess-1"]
         assert stopped == [bridge.session_id for bridge in bridges]
+
+    def test_crash_before_session_creation_still_cancels(self, monkeypatch):
+        cancelled: list = []
+        stopped: list = []
+        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", stopped.extend)
+        monkeypatch.setattr(SessionsClient, "cancel_session", lambda self, sid: cancelled.append(sid))
+        from hai_agents_local.sessions import _cancel_session_on_crash, _watch_crashes
+
+        bridges = [PyautoguiDesktopBridge(api_key=API_KEY)]
+        client = Client(api_key=API_KEY)
+        crashed = _watch_crashes(bridges)
+        bridges[0].on_crash()
+        _cancel_session_on_crash(client._client_wrapper, bridges, type("S", (), {"id": "sess-2"})(), crashed)
+        assert cancelled == ["sess-2"]
+        assert stopped == [bridges[0].session_id]
 
     def test_no_bridges_and_no_stamping_when_disabled(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "0")
