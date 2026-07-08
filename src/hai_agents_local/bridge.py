@@ -65,6 +65,11 @@ class LocalBridge(ABC, Generic[DriverT]):
     ) -> None:
         if not api_key:
             raise ValueError("api_key is required")
+        if session_id is not None:
+            try:
+                uuid.UUID(session_id)
+            except ValueError:
+                raise ValueError(f"session_id must be a UUID (the platform rejects {session_id!r})") from None
         self.environment_id = environment_id or self.environment_kind
         self.api_key = api_key
         self.base_url = base_url or default_base_url()

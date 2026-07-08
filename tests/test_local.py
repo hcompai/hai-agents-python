@@ -115,6 +115,10 @@ class TestLocalizeAgent:
         with pytest.raises(ValueError, match="api_key is required"):
             PyautoguiDesktopBridge(api_key="")
 
+    def test_bridge_rejects_non_uuid_session_id(self):
+        with pytest.raises(ValueError, match="must be a UUID"):
+            PyautoguiDesktopBridge(api_key=API_KEY, session_id="my-laptop-1")
+
 
 class TestAutoStart:
     def test_create_session_starts_bridges_and_stamps_matching_session_ids(self, monkeypatch):
