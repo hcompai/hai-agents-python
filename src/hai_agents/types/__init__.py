@@ -38,7 +38,7 @@ if typing.TYPE_CHECKING:
     from .answer_event_answer import AnswerEventAnswer
     from .answer_outcome import AnswerOutcome
     from .browser import Browser
-    from .browser_kind import BrowserKind
+    from .browser_host import BrowserHost
     from .browser_mode import BrowserMode, BrowserMode_Text, BrowserMode_Visual
     from .browser_network import BrowserNetwork
     from .browser_profile_list import BrowserProfileList
@@ -47,7 +47,9 @@ if typing.TYPE_CHECKING:
     from .browser_visual_mode import BrowserVisualMode
     from .cron_timing import CronTiming
     from .cron_timing_type import CronTimingType
-    from .environment import Environment
+    from .desktop import Desktop
+    from .desktop_host import DesktopHost
+    from .environment import Environment, Environment_Desktop, Environment_Web
     from .environment_kind import EnvironmentKind
     from .environment_page import EnvironmentPage
     from .error_event import ErrorEvent
@@ -175,7 +177,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "AnswerEventAnswer": ".answer_event_answer",
     "AnswerOutcome": ".answer_outcome",
     "Browser": ".browser",
-    "BrowserKind": ".browser_kind",
+    "BrowserHost": ".browser_host",
     "BrowserMode": ".browser_mode",
     "BrowserMode_Text": ".browser_mode",
     "BrowserMode_Visual": ".browser_mode",
@@ -186,9 +188,13 @@ _dynamic_imports: typing.Dict[str, str] = {
     "BrowserVisualMode": ".browser_visual_mode",
     "CronTiming": ".cron_timing",
     "CronTimingType": ".cron_timing_type",
+    "Desktop": ".desktop",
+    "DesktopHost": ".desktop_host",
     "Environment": ".environment",
     "EnvironmentKind": ".environment_kind",
     "EnvironmentPage": ".environment_page",
+    "Environment_Desktop": ".environment",
+    "Environment_Web": ".environment",
     "ErrorEvent": ".error_event",
     "ErrorEventKind": ".error_event_kind",
     "Feedback": ".feedback",
@@ -334,7 +340,7 @@ __all__ = [
     "AnswerEventAnswer",
     "AnswerOutcome",
     "Browser",
-    "BrowserKind",
+    "BrowserHost",
     "BrowserMode",
     "BrowserMode_Text",
     "BrowserMode_Visual",
@@ -345,9 +351,13 @@ __all__ = [
     "BrowserVisualMode",
     "CronTiming",
     "CronTimingType",
+    "Desktop",
+    "DesktopHost",
     "Environment",
     "EnvironmentKind",
     "EnvironmentPage",
+    "Environment_Desktop",
+    "Environment_Web",
     "ErrorEvent",
     "ErrorEventKind",
     "Feedback",

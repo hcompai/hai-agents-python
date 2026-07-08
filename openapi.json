@@ -1668,7 +1668,22 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Browser"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Browser"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Desktop"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "kind",
+                  "mapping": {
+                    "web": "#/components/schemas/Browser",
+                    "desktop": "#/components/schemas/Desktop"
+                  }
+                },
+                "title": "Create"
               }
             }
           }
@@ -1920,7 +1935,22 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Browser"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Browser"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Desktop"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "kind",
+                  "mapping": {
+                    "web": "#/components/schemas/Browser",
+                    "desktop": "#/components/schemas/Desktop"
+                  }
+                },
+                "title": "Update"
               }
             }
           }
@@ -4550,6 +4580,16 @@
             "title": "Kind",
             "default": "web"
           },
+          "host": {
+            "type": "string",
+            "enum": [
+              "user_device",
+              "cloud"
+            ],
+            "title": "Host",
+            "description": "Where the browser runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.",
+            "default": "cloud"
+          },
           "start_url": {
             "type": "string",
             "title": "Start Url",
@@ -4561,6 +4601,18 @@
             "title": "Headless",
             "description": "Run the browser without a visible window.",
             "default": false
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Connect to an existing browser session by id instead of starting a new one."
           },
           "mode": {
             "oneOf": [
@@ -4592,7 +4644,7 @@
               }
             ],
             "title": "Vault Id",
-            "description": "Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access."
+            "description": "Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run without secret access."
           },
           "browser_profile_id": {
             "anyOf": [
@@ -4605,7 +4657,13 @@
               }
             ],
             "title": "Browser Profile Id",
-            "description": "Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile."
+            "description": "Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run with a fresh profile."
+          },
+          "persist_browser_profile": {
+            "type": "boolean",
+            "title": "Persist Browser Profile",
+            "description": "When true, the browser profile is updated with this session's final browser state (cookies, storage) when the session ends. Requires browser_profile_id. Only one active session at a time may persist a given profile; concurrent read-only use is always allowed.",
+            "default": false
           },
           "network": {
             "anyOf": [
@@ -5013,13 +5071,68 @@
         "title": "CronTiming",
         "description": "Cron cadence evaluated in an IANA timezone."
       },
+      "Desktop": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id",
+            "description": "Catalog identifier for this environment."
+          },
+          "kind": {
+            "type": "string",
+            "const": "desktop",
+            "title": "Kind",
+            "default": "desktop"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host",
+            "const": "user_device"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Connect to an existing desktop session by id instead of starting a new one."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "host"
+        ],
+        "title": "Desktop",
+        "description": "A desktop the agent controls via mouse, keyboard, and screenshots."
+      },
       "Environment": {
-        "$ref": "#/components/schemas/Browser"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Browser"
+          },
+          {
+            "$ref": "#/components/schemas/Desktop"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "desktop": "#/components/schemas/Desktop",
+            "web": "#/components/schemas/Browser"
+          }
+        }
       },
       "EnvironmentKind": {
         "type": "string",
         "enum": [
-          "web"
+          "web",
+          "desktop"
         ],
         "title": "EnvironmentKind",
         "description": "Environment family."
@@ -5937,6 +6050,21 @@
       },
       "PatchEnvironment": {
         "properties": {
+          "host": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "user_device",
+                  "cloud"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
           "start_url": {
             "anyOf": [
               {
@@ -5958,6 +6086,17 @@
               }
             ],
             "title": "Headless"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
           },
           "mode": {
             "anyOf": [
@@ -6007,6 +6146,17 @@
               }
             ],
             "title": "Browser Profile Id"
+          },
+          "persist_browser_profile": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persist Browser Profile"
           },
           "network": {
             "anyOf": [
