@@ -4,18 +4,35 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import inspect
 import json
 import logging
 import typing
 
 from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
 
-from .bridge import LocalBridge
+from .bridge import LocalBridge, TokenSource
 from .config import auto_bridges_enabled
 from .manager import ensure_bridges, stop_bridges
 from .routing import localize_agent
 
 logger = logging.getLogger(__name__)
+
+
+def _token_source(client_wrapper: typing.Any) -> TokenSource:
+    return getattr(client_wrapper, "_async_token", None) or client_wrapper._get_api_key
+
+
+def _resolve_token(source: TokenSource) -> str:
+    """Resolve a token source to a string; runs off the event loop (bridge runner thread)."""
+    token = source() if callable(source) else source
+    if inspect.isawaitable(token):
+
+        async def consume() -> str:
+            return await token
+
+        return asyncio.run(consume())
+    return token
 
 
 def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) -> None:
@@ -37,8 +54,9 @@ def _localize(client_wrapper: typing.Any, kwargs: typing.Dict[str, typing.Any]) 
     if agent is None or isinstance(agent, str) or not auto_bridges_enabled():
         return []
     _warn_if_overrides_target_user_device(kwargs)
-    token_source = getattr(client_wrapper, "_async_token", None) or client_wrapper._get_api_key
-    localized, bridges = localize_agent(agent, api_key=token_source, base_url=client_wrapper.get_base_url())
+    localized, bridges = localize_agent(
+        agent, api_key=_token_source(client_wrapper), base_url=client_wrapper.get_base_url()
+    )
     kwargs["agent"] = localized
     return bridges
 
@@ -56,7 +74,8 @@ def _cancel_session_on_crash(
         try:
             from hai_agents.client import Client
 
-            client = Client(api_key=client_wrapper._get_api_key(), base_url=client_wrapper.get_base_url())
+            api_key = _resolve_token(_token_source(client_wrapper))
+            client = Client(api_key=api_key, base_url=client_wrapper.get_base_url())
             client.sessions.cancel_session(session_id)
         except Exception:
             logger.exception("failed to cancel session %s after its local bridge crashed", session_id)
