@@ -1,10 +1,6 @@
 """Exceptions raised by the local bridge stack."""
 
 
-class BridgeBusyError(RuntimeError):
-    """Another process on this machine already serves this bridge's session."""
-
-
 class AuthError(Exception):
     """The platform rejected the API key; the bridge cannot serve."""
 

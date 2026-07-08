@@ -47,7 +47,7 @@ class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
 
     def __init__(
         self,
-        environment_id: str,
+        environment_id: str | None = None,
         *,
         debugging_port: int = DEFAULT_DEBUG_PORT,
         api_key: str | None = None,

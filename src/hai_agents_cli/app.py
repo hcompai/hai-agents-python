@@ -565,27 +565,27 @@ def _print_mcp_results(results: list[dict], server_url: str, json_output: bool) 
 @local_app.command("browser")
 def local_browser(
     ctx: typer.Context,
-    env_id: str = typer.Option(..., "--env-id", help="Environment id to bind this machine to."),
+    session_id: str = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
     debug_port: int = typer.Option(9222, "--debug-port", help="Chrome remote-debugging port to attach to."),
 ) -> None:
     """Serve browser commands on this machine through Chrome on --debug-port."""
     from hai_agents.local import SeleniumBrowserBridge
 
-    _run_bridge(_state(ctx), SeleniumBrowserBridge, env_id, debugging_port=debug_port)
+    _run_bridge(_state(ctx), SeleniumBrowserBridge, session_id, debugging_port=debug_port)
 
 
 @local_app.command("desktop")
 def local_desktop(
     ctx: typer.Context,
-    env_id: str = typer.Option(..., "--env-id", help="Environment id to bind this machine to."),
+    session_id: str = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""
     from hai_agents.local import PyautoguiDesktopBridge
 
-    _run_bridge(_state(ctx), PyautoguiDesktopBridge, env_id)
+    _run_bridge(_state(ctx), PyautoguiDesktopBridge, session_id)
 
 
-def _run_bridge(state: AppState, bridge_type: type, env_id: str, **options: Any) -> None:
+def _run_bridge(state: AppState, bridge_type: type, session_id: str | None, **options: Any) -> None:
     import logging
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -593,8 +593,8 @@ def _run_bridge(state: AppState, bridge_type: type, env_id: str, **options: Any)
         key = credentials.resolve_api_key(state.api_key)
         base_url = credentials.resolve_base_url(state.base_url)
         bridge = bridge_type(
-            env_id,
             api_key=key() if callable(key) else key,
+            session_id=session_id,
             **({"base_url": base_url} if base_url else {}),
             **options,
         )
@@ -602,9 +602,13 @@ def _run_bridge(state: AppState, bridge_type: type, env_id: str, **options: Any)
         _raise_cli_error(exc)
 
     console.print(
-        f"[bold]Local {bridge.environment_kind} bridge[/bold] bound to [cyan]{env_id}[/cyan]. Press Ctrl-C to stop."
+        f"[bold]Local {bridge.environment_kind} bridge[/bold] serving session id "
+        f"[cyan]{bridge.session_id}[/cyan]. Press Ctrl-C to stop."
     )
-    console.print(f"[dim]Command channel session id: {bridge.session_id}[/dim]")
+    console.print(
+        "[dim]Point a user_device environment at it: "
+        f'{{"kind": "{bridge.environment_kind}", "host": "user_device", "session_id": "{bridge.session_id}"}}[/dim]'
+    )
     try:
         asyncio.run(_serve_bridge(bridge))
     except KeyboardInterrupt:

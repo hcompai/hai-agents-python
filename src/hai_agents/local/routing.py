@@ -1,15 +1,14 @@
-"""Routes user_device environments to local bridges by stamping deterministic session ids."""
+"""Spawns local bridges for user_device environments and stamps their session ids into the agent spec."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence, Union
+from typing import TYPE_CHECKING, Any, Mapping, Sequence, Union
 
 from pydantic import BaseModel
 
 from .bridge import LocalBridge
 from .browser import SeleniumBrowserBridge
 from .desktop import PyautoguiDesktopBridge
-from .utils import session_id_from_environment_id
 
 if TYPE_CHECKING:
     from ..types.agent import Agent
@@ -23,120 +22,58 @@ BRIDGE_TYPES: dict[str, type[LocalBridge]] = {
 }
 
 
-class SessionRouter:
-    """Stamps user_device environments with deterministic session ids and builds their local bridges."""
-
-    def __init__(self, get_api_key: Callable[[], str], base_url: str | None = None) -> None:
-        self._get_api_key = get_api_key
-        self._base_url = base_url
-
-    def stamp_agent(self, agent: AgentLike) -> AgentLike:
-        if isinstance(agent, str):
-            return agent
-        changes: dict[str, Any] = {}
-        environments = _read(agent, "environments")
-        if environments:
-            stamped = self.stamp_environments(environments)
-            if _any_replaced(stamped, environments):
-                changes["environments"] = stamped
-        subagents = _read(agent, "subagents")
-        if subagents:
-            stamped = self.stamp_subagents(subagents)
-            if _any_replaced(stamped, subagents):
-                changes["subagents"] = stamped
-        return _replace(agent, **changes) if changes else agent
-
-    def stamp_environments(self, environments: Sequence[EnvironmentLike]) -> Sequence[EnvironmentLike]:
-        if not isinstance(environments, (list, tuple)):
-            return environments
-        return [self._stamp_environment(env) for env in environments]
-
-    def stamp_subagents(self, subagents: Sequence[AgentLike]) -> Sequence[AgentLike]:
-        if not isinstance(subagents, (list, tuple)):
-            return subagents
-        return [self.stamp_agent(sub) for sub in subagents]
-
-    def stamp_agent_kwargs(self, kwargs: dict[str, Any]) -> None:
-        if kwargs.get("environments"):
-            kwargs["environments"] = self.stamp_environments(kwargs["environments"])
-        if kwargs.get("subagents"):
-            kwargs["subagents"] = self.stamp_subagents(kwargs["subagents"])
-
-    def bridges_for_agent(
-        self, agent: AgentLike, fetch_agent: Callable[[str], AgentLike | None] | None = None
-    ) -> list[LocalBridge]:
-        """Bridges for every user_device environment in the tree; fetch_agent resolves string subagents."""
-        return self._collect_bridges(agent, fetch_agent, seen=set())
-
-    def _collect_bridges(
-        self, agent: AgentLike, fetch_agent: Callable[[str], AgentLike | None] | None, seen: set[str]
-    ) -> list[LocalBridge]:
-        bridges: list[LocalBridge] = []
-        for env in _read(agent, "environments") or ():
-            target = _local_target(env)
-            if target is None:
-                continue
-            kind, env_id = target
-            session_id = _read(env, "session_id")
-            if not session_id:
-                raise RuntimeError(
-                    f"user_device environment {env_id!r} has no session_id, so sessions cannot route commands "
-                    "to the local bridge; create or patch the agent with this SDK to set it"
-                )
-            bridges.append(
-                BRIDGE_TYPES[kind](env_id, api_key=self._get_api_key(), base_url=self._base_url, session_id=session_id)
-            )
-        for sub in _read(agent, "subagents") or ():
-            if isinstance(sub, str):
-                # Dedupe by name; the platform already rejects cyclic or overly deep subagent graphs at resolve time.
-                if sub in seen:
-                    continue
-                seen.add(sub)
-                resolved = fetch_agent(sub) if fetch_agent is not None else None
-                if resolved is None:
-                    continue
-                sub = resolved
-            bridges.extend(self._collect_bridges(sub, fetch_agent, seen))
-        return bridges
-
-    def _stamp_environment(self, env: EnvironmentLike) -> EnvironmentLike:
-        target = _local_target(env)
-        if target is None or _read(env, "session_id"):
-            return env
-        kind, env_id = target
-        return _replace(env, session_id=session_id_from_environment_id(env_id, self._get_api_key(), kind))
+def localize_agent(
+    agent: AgentLike, *, api_key: str, base_url: str | None = None
+) -> tuple[AgentLike, list[LocalBridge]]:
+    """Copy of the agent where every unclaimed user_device environment is stamped with the session id
+    of a freshly built bridge, plus those bridges. Environments that already carry a session_id are
+    assumed to be served elsewhere and left alone, as are string agent references."""
+    if isinstance(agent, str):
+        return agent, []
+    bridges: list[LocalBridge] = []
+    changes: dict[str, Any] = {}
+    environments = _read(agent, "environments")
+    if isinstance(environments, (list, tuple)):
+        localized_envs = [_localize_environment(env, bridges, api_key, base_url) for env in environments]
+        if _any_replaced(localized_envs, environments):
+            changes["environments"] = localized_envs
+    subagents = _read(agent, "subagents")
+    if isinstance(subagents, (list, tuple)):
+        localized_subs = []
+        for sub in subagents:
+            localized, sub_bridges = localize_agent(sub, api_key=api_key, base_url=base_url)
+            localized_subs.append(localized)
+            bridges.extend(sub_bridges)
+        if _any_replaced(localized_subs, subagents):
+            changes["subagents"] = localized_subs
+    return (_replace(agent, **changes) if changes else agent), bridges
 
 
-def subagent_names(agent: AgentLike) -> list[str]:
-    """Names of subagents referenced by registration rather than defined inline, at any depth."""
-    names: list[str] = []
-    for sub in _read(agent, "subagents") or ():
-        if isinstance(sub, str):
-            names.append(sub)
-        else:
-            names.extend(subagent_names(sub))
-    return names
+def _localize_environment(
+    env: EnvironmentLike, bridges: list[LocalBridge], api_key: str, base_url: str | None
+) -> EnvironmentLike:
+    kind = _local_kind(env)
+    if kind is None or _read(env, "session_id"):
+        return env
+    bridge = BRIDGE_TYPES[kind](_read(env, "id"), api_key=api_key, base_url=base_url)
+    bridges.append(bridge)
+    return _replace(env, session_id=bridge.session_id)
 
 
-def _any_replaced(stamped: Any, original: Any) -> bool:
-    if stamped is original:
-        return False
-    return any(new is not old for new, old in zip(stamped, original))
-
-
-def _local_target(env: EnvironmentLike) -> tuple[str, str] | None:
+def _local_kind(env: EnvironmentLike) -> str | None:
     if _read(env, "host") != "user_device":
         return None
     kind = _read(env, "kind") or "web"
-    env_id = _read(env, "id")
     if kind not in BRIDGE_TYPES:
         raise ValueError(
-            f"user_device environment {env_id!r} has kind {kind!r}, which cannot be served by a local "
-            f"bridge; supported kinds: {sorted(BRIDGE_TYPES)}"
+            f"user_device environment {_read(env, 'id')!r} has kind {kind!r}, which cannot be served by a "
+            f"local bridge; supported kinds: {sorted(BRIDGE_TYPES)}"
         )
-    if not env_id:
-        raise ValueError("user_device environments need an id to derive their local session")
-    return kind, env_id
+    return kind
+
+
+def _any_replaced(localized: Sequence[Any], original: Sequence[Any]) -> bool:
+    return any(new is not old for new, old in zip(localized, original))
 
 
 def _read(obj: Any, key: str) -> Any:

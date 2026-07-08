@@ -7,6 +7,7 @@ import inspect
 import logging
 import threading
 import time
+import uuid
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Callable
@@ -15,10 +16,8 @@ from typing import Any, ClassVar, Generic, TypeVar
 import httpx
 
 from .config import API_KEY_ENV_VAR, LocalSettings
-from .errors import BridgeBusyError, RateLimitedError, SessionNotFoundError
-from .lease import MachineLease
+from .errors import RateLimitedError, SessionNotFoundError
 from .transport import Command, CommandExchange, Json, deserialize_args, serialize_result
-from .utils import session_id_from_environment_id
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +30,6 @@ FETCH_TRANSIENT_RETRIES = 2
 MAX_RECONNECT_DELAY_S = 60.0
 MIN_RATE_LIMIT_BACKOFF_S = 1.0
 RESULT_CACHE_SIZE = 512
-LEASE_GRACE_S = 10.0
-LEASE_RETRY_S = 0.5
 
 DriverT = TypeVar("DriverT")
 
@@ -44,7 +41,7 @@ class LocalBridge(ABC, Generic[DriverT]):
 
     def __init__(
         self,
-        environment_id: str,
+        environment_id: str | None = None,
         *,
         api_key: str | None = None,
         base_url: str | None = None,
@@ -54,15 +51,12 @@ class LocalBridge(ABC, Generic[DriverT]):
         resolved_key = api_key or settings.api_key
         if not resolved_key:
             raise ValueError(f"api_key is required (pass api_key= or set {API_KEY_ENV_VAR})")
-        self.environment_id = environment_id
+        self.environment_id = environment_id or self.environment_kind
         self.api_key = resolved_key
         self.base_url = base_url or settings.base_url
-        self.session_id = session_id or session_id_from_environment_id(
-            environment_id, self.api_key, self.environment_kind
-        )
+        self.session_id = session_id or str(uuid.uuid4())
         self.ready = threading.Event()
         self._driver: DriverT | None = None
-        self._lease = MachineLease(self.environment_kind, self.session_id)
         self._stop_event = asyncio.Event()
         self._results: OrderedDict[str, tuple[Json, str | None]] = OrderedDict()
 
@@ -83,8 +77,7 @@ class LocalBridge(ABC, Generic[DriverT]):
         self._stop_event.set()
 
     async def run(self) -> None:
-        """Serve commands until stopped; raises BridgeBusyError when the lease is held, AuthError on a bad key."""
-        await self._acquire_lease()
+        """Serve commands until stopped; raises AuthError on a bad key."""
         self._stop_event.clear()
         headers = {"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"}
         try:
@@ -102,20 +95,6 @@ class LocalBridge(ABC, Generic[DriverT]):
                     destroy()
                 except Exception:
                     logger.warning("driver teardown failed", exc_info=True)
-            self._lease.release()
-
-    async def _acquire_lease(self) -> None:
-        """Retry briefly: a stopping bridge may hold the kind lease until its in-flight command finishes."""
-        deadline = time.monotonic() + LEASE_GRACE_S
-        while True:
-            try:
-                self._lease.acquire()
-                return
-            except BridgeBusyError:
-                raise
-            except RuntimeError:
-                if time.monotonic() >= deadline or await self._interruptible_sleep(LEASE_RETRY_S):
-                    raise
 
     async def _poll_loop(self, exchange: CommandExchange) -> None:
         retry_delay = 1.0
