@@ -1,6 +1,6 @@
 """The OpenAPI spec's const+default discriminators must survive into the generated models.
 
-The API discriminates several tagged unions on a constant field (``Browser.kind``,
+The API discriminates several tagged unions on a constant field (the environment ``kind``,
 ``OnePasswordConfig.provider``, event ``type`` tags). The spec declares those fields with both
 ``const`` and ``default``, but the Fern generator drops the default and emits ``= None`` — the
 serializer then omits the field entirely and the server rejects the payload with a 422
@@ -19,7 +19,13 @@ import pytest
 
 import hai_agents.types as types_module
 from hai_agents.core.http_client import get_request_body
-from hai_agents.types import Browser, OnePasswordConfig, ToolResultEvent, UserMessageEvent
+from hai_agents.types import (
+    Environment_Desktop,
+    Environment_Web,
+    OnePasswordConfig,
+    ToolResultEvent,
+    UserMessageEvent,
+)
 
 OPENAPI_PATH = pathlib.Path(__file__).parent.parent / "openapi.json"
 
@@ -32,10 +38,11 @@ FIELD_DROPPED_ENTIRELY = {
     ("PolicyEvent", "kind"),
     ("BrowserVisualMode", "type"),
     ("BrowserTextMode", "type"),
+    ("Browser", "kind"),
+    ("Desktop", "kind"),
 }
 
 MINIMAL_KWARGS: dict[str, dict[str, typing.Any]] = {
-    "Browser": {"id": "browser"},
     "OnePasswordConfig": {"op_vault_id": "vault_1"},
     "ToolResultEvent": {"tool_req": {"tool_name": "click"}, "result": "ok"},
     "UserMessageEvent": {"message": "hi"},
@@ -86,7 +93,8 @@ def test_generated_model_honors_spec_default(schema_name, prop_name, expected_de
 @pytest.mark.parametrize(
     "instance,field,expected",
     [
-        (Browser(id="browser", start_url="https://x.test"), "kind", "web"),
+        (Environment_Web(id="browser", start_url="https://x.test"), "kind", "web"),
+        (Environment_Desktop(id="box", host="user_device"), "kind", "desktop"),
         (OnePasswordConfig(op_vault_id="vault_1"), "provider", "onepassword"),
         (ToolResultEvent(tool_req={"tool_name": "click"}, result="ok"), "kind", "tool_result"),
         (UserMessageEvent(message="hi"), "type", "user_message"),
