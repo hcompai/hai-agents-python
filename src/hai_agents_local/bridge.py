@@ -93,7 +93,8 @@ class LocalBridge(ABC, Generic[DriverT]):
 
     async def run(self) -> None:
         """Serve commands until stopped; raises AuthError on a bad key."""
-        self._stop_event.clear()
+        # An asyncio.Event binds to the loop it is first awaited on; a restarted bridge runs on a new loop.
+        self._stop_event = asyncio.Event()
         try:
             async with httpx.AsyncClient(
                 headers={"Accept": "application/json"}, auth=_BearerAuth(self.api_key), follow_redirects=True

@@ -438,6 +438,31 @@ class TestManager:
             )
         assert manager._runners == {}
 
+    def test_restarted_bridge_serves_again_on_a_fresh_loop(self, manager, monkeypatch):
+        class IdleExchange:
+            def __init__(self, client: Any, base_url: str) -> None:
+                pass
+
+            async def ensure_channel(self, session_id: str) -> None:
+                pass
+
+            async def fetch_commands(self, session_id: str, **kwargs: Any) -> None:
+                await asyncio.sleep(0.01)
+                return None
+
+        import hai_agents_local.bridge as bridge_module
+
+        monkeypatch.setattr(bridge_module, "CommandExchange", IdleExchange)
+        bridge = FakeBridge(api_key="k")
+        crashed = threading.Event()
+        bridge.on_crash = crashed.set
+        assert manager.ensure([bridge]) == [bridge.session_id]
+        manager.stop([bridge.session_id])
+        assert manager.ensure([bridge]) == [bridge.session_id]
+        assert not crashed.wait(0.5)
+        assert manager._runners[bridge.session_id].thread.is_alive()
+        manager.stop([bridge.session_id])
+
     def test_crash_after_ready_fires_on_crash(self, manager):
         crashed = threading.Event()
 
