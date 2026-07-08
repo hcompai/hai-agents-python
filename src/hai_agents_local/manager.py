@@ -143,7 +143,9 @@ class _Runner:
     def stop(self) -> None:
         with contextlib.suppress(RuntimeError):
             self.loop.call_soon_threadsafe(self.bridge.request_stop)
-        self.thread.join(timeout=STOP_JOIN_TIMEOUT_S)
+        # A bridge's loss handler runs on its own runner thread; a thread cannot join itself.
+        if threading.current_thread() is not self.thread:
+            self.thread.join(timeout=STOP_JOIN_TIMEOUT_S)
 
 
 # Process-wide manager behind ensure_bridges/stop_bridges.

@@ -86,6 +86,8 @@ def _cancel_session_on_crash(
             client.sessions.cancel_session(session_id)
         except Exception:
             logger.exception("failed to cancel session %s after its local bridge crashed", session_id)
+        finally:
+            stop_bridges([bridge.session_id for bridge in bridges])
 
     for bridge in bridges:
         bridge.on_crash = cancel

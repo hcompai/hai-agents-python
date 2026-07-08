@@ -150,6 +150,20 @@ class TestAutoStart:
             )
         assert stopped == ["new-sid"]
 
+    def test_bridge_loss_cancels_session_and_stops_sibling_bridges(self, monkeypatch):
+        cancelled: list = []
+        stopped: list = []
+        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", stopped.extend)
+        monkeypatch.setattr(SessionsClient, "cancel_session", lambda self, sid: cancelled.append(sid))
+        from hai_agents_local.sessions import _cancel_session_on_crash
+
+        bridges = [PyautoguiDesktopBridge(api_key=API_KEY), SeleniumBrowserBridge(api_key=API_KEY)]
+        client = Client(api_key=API_KEY)
+        _cancel_session_on_crash(client._client_wrapper, bridges, type("S", (), {"id": "sess-1"})())
+        bridges[0].on_crash()
+        assert cancelled == ["sess-1"]
+        assert stopped == [bridge.session_id for bridge in bridges]
+
     def test_no_bridges_and_no_stamping_when_disabled(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "0")
         started: list = []
