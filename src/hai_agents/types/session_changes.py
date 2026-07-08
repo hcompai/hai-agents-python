@@ -5,8 +5,10 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .answer_outcome import AnswerOutcome
 from .metrics import Metrics
 from .session_changes_answer import SessionChangesAnswer
+from .session_error_code import SessionErrorCode
 from .session_event import SessionEvent
 from .trajectory_status import TrajectoryStatus
 
@@ -20,8 +22,10 @@ class SessionChanges(UniversalBaseModel):
     started_at: typing.Optional[dt.datetime] = None
     finished_at: typing.Optional[dt.datetime] = None
     error: typing.Optional[str] = None
+    error_code: typing.Optional[SessionErrorCode] = None
     new_events: typing.Optional[typing.List[SessionEvent]] = None
     answer: typing.Optional[SessionChangesAnswer] = None
+    outcome: typing.Optional[AnswerOutcome] = None
     metrics: typing.Optional[Metrics] = None
 
     if IS_PYDANTIC_V2:

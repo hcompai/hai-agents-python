@@ -40,6 +40,11 @@ class SessionRequest(UniversalBaseModel):
     Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers.
     """
 
+    queue: typing.Optional[bool] = pydantic.Field(default=None)
+    """
+    When the organization is at its concurrent-session limit, accept this session into a queue (status 'queued') instead of rejecting it with 429. Queued sessions start automatically, oldest first, as running sessions finish. Set to false to get an immediate 429 when no slot is available.
+    """
+
     group_id: typing.Optional[str] = pydantic.Field(default=None)
     """
     Optional id to group and list related sessions together.
@@ -48,11 +53,6 @@ class SessionRequest(UniversalBaseModel):
     parent_session_id: typing.Optional[str] = pydantic.Field(default=None)
     """
     Id of the parent session, when this is a child run.
-    """
-
-    agent_artifact: typing.Optional[str] = pydantic.Field(default=None)
-    """
-    Target version of the agent artifact to use.
     """
 
     overrides: typing.Optional[typing.Dict[str, typing.Any]] = pydantic.Field(default=None)

@@ -4,6 +4,7 @@ import typing
 
 TrajectoryStatus = typing.Union[
     typing.Literal[
+        "queued",
         "pending",
         "running",
         "paused",

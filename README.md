@@ -18,7 +18,7 @@
 <p align="center">
   <b><a href="https://hub.hcompany.ai/computer-use-agents">Documentation</a></b>
   &nbsp;·&nbsp;
-  <a href="https://portal.hcompany.ai">Get an API key</a>
+  <a href="https://platform.hcompany.ai/settings/api-keys">Get an API key</a>
   &nbsp;·&nbsp;
   <a href="https://pypi.org/project/hai-agents/">PyPI</a>
   &nbsp;·&nbsp;
@@ -39,7 +39,7 @@ Add the optional command-line tools with the `cli` extra:
 pip install "hai-agents[cli]"
 ```
 
-Python 3.10 or newer is required. Get an API key at [portal.hcompany.ai](https://portal.hcompany.ai) and export it:
+Python 3.10 or newer is required. Get an API key at [platform.hcompany.ai/settings/api-keys](https://platform.hcompany.ai/settings/api-keys) and export it:
 
 ```bash
 export HAI_API_KEY=hk-...
@@ -47,21 +47,23 @@ export HAI_API_KEY=hk-...
 
 ## Quickstart
 
-Launch the built-in `h/web-surfer-holo3-1-35b` agent, which ships with its own browser, and describe the task in plain language. `run_session` polls until the agent finishes and returns the final answer.
+Launch the built-in `h/web-surfer-pro` agent, which ships with its own browser, and describe the task in plain language. `run_session` polls until the agent finishes and returns the final answer.
 
 ```python
 from hai_agents import Client
 
-client = Client()  # reads HAI_API_KEY from the environment
+client = Client()
 
 result = client.run_session(
-    agent="h/web-surfer-holo3-1-35b",
+    agent="h/web-surfer-pro",
     messages="What are the top 3 stories on Hacker News right now?",
 )
 
-print(result.status)  # a settled state: "idle" on EU (the default), "completed" on US
+print(result.status)
 print(result.answer)
 ```
+
+`Client()` reads `HAI_API_KEY` from the environment.
 
 `result` is a `SessionRunResult`: `id`, `status`, `answer`, the accumulated `events`, and `final_changes`.
 
@@ -73,7 +75,7 @@ You drive a session two ways. `run_session` creates it and blocks until it settl
 
 ```python
 session = client.start_session(
-    agent="h/web-surfer-holo3-1-35b",
+    agent="h/web-surfer-pro",
     messages="Find the top story on Hacker News",
 )
 
@@ -87,22 +89,24 @@ print(result.status, result.answer)
 A handle bound to the session `id` exposes the full lifecycle. Read the agent's progress at three levels of detail:
 
 ```python
-session.status()               # cheap snapshot: state, step count, token usage
-session.changes(from_index=0)  # new events and the final answer, long-polled
-session.get()                  # the full Session resource
+session.status()
+session.changes(from_index=0)
+session.get()
 ```
+
+`status()` is a cheap snapshot with the state, step count, and token usage. `changes(from_index=0)` long-polls for new events and the final answer. `get()` returns the full Session resource.
 
 While the session is not in a terminal state, you can intervene:
 
 ```python
 session.send_message({"type": "user_message", "message": "Only consider the last 24 hours"})
-session.pause()         # halt with state preserved
-session.resume()        # continue where it left off
-session.force_answer()  # stop exploring and answer from what it has
-session.cancel()        # stop for good; ends in "interrupted"
+session.pause()
+session.resume()
+session.force_answer()
+session.cancel()
 ```
 
-`send_message` redirects the agent on its next step. Sending a message to an `idle` session also wakes it.
+`send_message` redirects the agent on its next step and wakes an `idle` session. `pause` halts with state preserved until `resume`. `force_answer` makes the agent stop exploring and answer from what it has. `cancel` ends the session as `interrupted`.
 
 ## Multi-turn sessions
 
@@ -110,7 +114,7 @@ By default a session ends as soon as the agent answers. Set `idle_timeout_s` to 
 
 ```python
 session = client.start_session(
-    agent="h/web-surfer-holo3-1-35b",
+    agent="h/web-surfer-pro",
     idle_timeout_s=600,
     messages="Find the top story on Hacker News",
 )
@@ -137,12 +141,12 @@ class Jobs(BaseModel):
 
 client = Client()
 result = client.run_session(
-    agent="h/web-surfer-holo3-1-35b",
+    agent="h/web-surfer-pro",
     messages="Find 3 open ML engineering roles in Paris.",
     answer_schema=Jobs,
 )
 
-for job in result.answer.jobs:  # result.answer is a Jobs instance
+for job in result.answer.jobs:
     print(job.title, "@", job.company)
 ```
 
@@ -162,7 +166,7 @@ def get_weather(city: str) -> str:
 client = Client()
 
 result = client.run_session(
-    agent="h/web-surfer-holo3-1-35b",
+    agent="h/web-surfer-pro",
     messages="What should I wear in Paris today?",
     tools=[get_weather],
 )
@@ -186,7 +190,7 @@ Start a session on a browser that already knows the user. A [browser profile](ht
 
 ```python
 result = client.run_session(
-    agent="h/web-surfer-holo3-1-35b",
+    agent="h/web-surfer-pro",
     messages="Open my dashboard and report any new alerts",
     overrides={
         "agent.environments[kind=web].browser_profile_id": "<profile-id>",
@@ -206,7 +210,7 @@ from hai_agents import AsyncClient
 async def main():
     client = AsyncClient()
     result = await client.run_session(
-        agent="h/web-surfer-holo3-1-35b",
+        agent="h/web-surfer-pro",
         messages="What are the top 3 stories on Hacker News right now?",
     )
     print(result.answer)
@@ -229,13 +233,17 @@ print(link.share_url)
 
 ## Regions and configuration
 
-The client targets the EU region by default. Point it at the US region or a custom URL, and override the API key in code when you do not want to use the environment variable:
+The client targets the EU region by default; pass `environment` to use the US region instead:
 
 ```python
 from hai_agents import Client, HaiAgentsEnvironment
 
 client = Client(environment=HaiAgentsEnvironment.US)
-# or
+```
+
+`Client` also accepts a custom `base_url`, and an `api_key` when you do not want to use the environment variable:
+
+```python
 client = Client(base_url="https://agp.hcompany.ai", api_key="hk-...")
 ```
 
@@ -264,14 +272,14 @@ print(event.type, event.data)
 The `cli` extra installs the `hai` command for driving agents from your terminal:
 
 ```bash
-hai login                 # browser sign-in, stores a key in ~/.config/hai/.env
+hai login
 hai run "What's the top story on Hacker News?"
 hai sessions list
 hai sessions watch <session-id>
-hai mcp install           # add the hai-agents MCP server to Cursor, VS Code, Claude Code, ...
+hai mcp install
 ```
 
-Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`. Run `hai --help` for the full command set.
+`hai login` signs in through the browser and stores a key in `~/.config/hai/.env`. `hai mcp install` adds the hai-agents MCP server to Cursor, VS Code, Claude Code, and other MCP clients. Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`, then `~/.config/hai/.env`. Run `hai --help` for the full command set.
 
 ## Documentation
 

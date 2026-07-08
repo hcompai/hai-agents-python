@@ -4,23 +4,23 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .answer_event_answer import AnswerEventAnswer
-from .answer_outcome import AnswerOutcome
+from .cron_timing_type import CronTimingType
 
 
-class AnswerEvent(UniversalBaseModel):
+class CronTiming(UniversalBaseModel):
     """
-    Agent's final answer for the current task.
-    """
-
-    answer: AnswerEventAnswer = pydantic.Field()
-    """
-    Final answer, plain text or structured JSON; any embedded image is inlined as base64, not a URL.
+    Cron cadence evaluated in an IANA timezone.
     """
 
-    outcome: typing.Optional[AnswerOutcome] = pydantic.Field(default=None)
+    type: typing.Optional[CronTimingType] = "cron"
+    expression: str = pydantic.Field()
     """
-    Agent's self-assessment of the task outcome; null when the agent did not report one.
+    Five-field cron expression, e.g. '0 9 * * 1-5'.
+    """
+
+    timezone: str = pydantic.Field()
+    """
+    IANA timezone the expression is evaluated in, e.g. 'Europe/Paris'.
     """
 
     if IS_PYDANTIC_V2:

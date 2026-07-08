@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hai-agents"
-version = "1.0.1"
+version = "1.0.5"
 description = "Python SDK for H Company's Computer-Use Agents: autonomous agents powered by Holo."
 requires-python = ">=3.10"
 readme = "README.md"
@@ -66,7 +66,7 @@ dev = [
   # Used only by tests/integration/ — read HAI_API_KEY_TEST when running locally.
   "python-dotenv>=1.2.2,<2",
   "rich>=13,<16",
-  "ruff==0.15.18",
+  "ruff==0.15.20",
   "typer>=0.12,<1",
 ]
 

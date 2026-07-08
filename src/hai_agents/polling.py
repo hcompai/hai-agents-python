@@ -72,6 +72,11 @@ class SessionRunResult(typing.Generic[AnswerT]):
 
     ``answer`` is the validated ``answer_schema`` instance when one was requested and the
     session completed; otherwise the raw wire value (also at ``final_changes.answer``).
+
+    ``outcome`` is the agent's self-assessed task outcome (``success``/``partial``/
+    ``infeasible``/``blocked``), when reported. ``error`` and ``error_code`` describe the
+    failure when the session failed or timed out; they come from the authoritative
+    ``/status`` response, falling back to ``final_changes``.
     """
 
     id: str
@@ -80,10 +85,17 @@ class SessionRunResult(typing.Generic[AnswerT]):
     next_from_index: int
     final_changes: typing.Optional[SessionChanges] = None
     answer: typing.Optional[AnswerT] = None
+    outcome: typing.Optional[str] = None
+    error: typing.Optional[str] = None
+    error_code: typing.Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.answer is None and self.final_changes is not None:
             object.__setattr__(self, "answer", self.final_changes.answer)
+        if self.final_changes is not None:
+            for field in ("outcome", "error", "error_code"):
+                if getattr(self, field) is None:
+                    object.__setattr__(self, field, getattr(self.final_changes, field, None))
 
 
 def _attach_answer_schema(params: typing.Dict[str, typing.Any], model: typing.Type[typing.Any]) -> None:
@@ -342,11 +354,22 @@ async def _async_post_tool_results(
     _raise_unless_posted(response)
 
 
+def _settled_cleanly(status: TrajectoryStatus) -> bool:
+    return status in ("completed", "idle")
+
+
 def _final_changes(
-    client: Client, id: str, last_changes: typing.Optional[SessionChanges], limit: typing.Optional[int]
+    client: Client,
+    id: str,
+    last_changes: typing.Optional[SessionChanges],
+    limit: typing.Optional[int],
+    status: TrajectoryStatus,
 ) -> typing.Optional[SessionChanges]:
-    """The terminal answer lives in ``/changes``; fetch it once if streaming didn't surface it."""
-    if last_changes is not None and last_changes.answer is not None:
+    """The terminal answer lives in ``/changes``; fetch it once if streaming didn't surface it.
+
+    On failure statuses the error fields land after the last streamed poll, so always refetch.
+    """
+    if _settled_cleanly(status) and last_changes is not None and last_changes.answer is not None:
         return last_changes
     fetched = client.sessions.get_session_changes(
         id, from_index=0, limit=limit, include_events=False, wait_for_seconds=0
@@ -421,7 +444,7 @@ def wait_for_session(
                         last_changes = tail
                     events.extend(batch)
                     next_from_index += len(batch)
-            changes = _final_changes(client, id, last_changes, limit)
+            changes = _final_changes(client, id, last_changes, limit, status.status)
             raw = changes.answer if changes is not None else None
             return SessionRunResult(
                 id=id,
@@ -430,6 +453,9 @@ def wait_for_session(
                 next_from_index=next_from_index,
                 final_changes=changes,
                 answer=_parse_answer(raw, status.status, answer_schema),
+                outcome=status.outcome,
+                error=status.error,
+                error_code=status.error_code,
             )
 
         if tools_by_name:
@@ -491,10 +517,14 @@ def run_session(
 
 
 async def _async_final_changes(
-    client: AsyncClient, id: str, last_changes: typing.Optional[SessionChanges], limit: typing.Optional[int]
+    client: AsyncClient,
+    id: str,
+    last_changes: typing.Optional[SessionChanges],
+    limit: typing.Optional[int],
+    status: TrajectoryStatus,
 ) -> typing.Optional[SessionChanges]:
     """Async version of ``_final_changes``."""
-    if last_changes is not None and last_changes.answer is not None:
+    if _settled_cleanly(status) and last_changes is not None and last_changes.answer is not None:
         return last_changes
     fetched = await client.sessions.get_session_changes(
         id, from_index=0, limit=limit, include_events=False, wait_for_seconds=0
@@ -564,7 +594,7 @@ async def async_wait_for_session(
                         last_changes = tail
                     events.extend(batch)
                     next_from_index += len(batch)
-            changes = await _async_final_changes(client, id, last_changes, limit)
+            changes = await _async_final_changes(client, id, last_changes, limit, status.status)
             raw = changes.answer if changes is not None else None
             return SessionRunResult(
                 id=id,
@@ -573,6 +603,9 @@ async def async_wait_for_session(
                 next_from_index=next_from_index,
                 final_changes=changes,
                 answer=_parse_answer(raw, status.status, answer_schema),
+                outcome=status.outcome,
+                error=status.error,
+                error_code=status.error_code,
             )
 
         if tools_by_name:

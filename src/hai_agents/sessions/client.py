@@ -49,6 +49,7 @@ class SessionsClient:
         agent: typing.Optional[typing.Sequence[str]] = None,
         group_id: typing.Optional[str] = None,
         parent_session_id: typing.Optional[str] = None,
+        schedule_id: typing.Optional[str] = None,
         search: typing.Optional[str] = None,
         created_before: typing.Optional[dt.datetime] = None,
         created_after: typing.Optional[dt.datetime] = None,
@@ -73,6 +74,9 @@ class SessionsClient:
         group_id : typing.Optional[str]
 
         parent_session_id : typing.Optional[str]
+
+        schedule_id : typing.Optional[str]
+            Only sessions created by this schedule.
 
         search : typing.Optional[str]
             Case-insensitive match on the session's first message or answer.
@@ -117,6 +121,7 @@ class SessionsClient:
             agent=agent,
             group_id=group_id,
             parent_session_id=parent_session_id,
+            schedule_id=schedule_id,
             search=search,
             created_before=created_before,
             created_after=created_after,
@@ -138,9 +143,9 @@ class SessionsClient:
         max_steps: typing.Optional[int] = OMIT,
         max_time_s: typing.Optional[float] = OMIT,
         idle_timeout_s: typing.Optional[int] = OMIT,
+        queue: typing.Optional[bool] = OMIT,
         group_id: typing.Optional[str] = OMIT,
         parent_session_id: typing.Optional[str] = OMIT,
-        agent_artifact: typing.Optional[str] = OMIT,
         overrides: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Session:
@@ -166,14 +171,14 @@ class SessionsClient:
         idle_timeout_s : typing.Optional[int]
             Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers.
 
+        queue : typing.Optional[bool]
+            When the organization is at its concurrent-session limit, accept this session into a queue (status 'queued') instead of rejecting it with 429. Queued sessions start automatically, oldest first, as running sessions finish. Set to false to get an immediate 429 when no slot is available.
+
         group_id : typing.Optional[str]
             Optional id to group and list related sessions together.
 
         parent_session_id : typing.Optional[str]
             Id of the parent session, when this is a child run.
-
-        agent_artifact : typing.Optional[str]
-            Target version of the agent artifact to use.
 
         overrides : typing.Optional[typing.Dict[str, typing.Any]]
             Per-run overrides applied to the resolved request, keyed by a dotted path. List members are selected with an explicit [field=value] clause, e.g. {"agent.environments[kind=web].start_url": "https://bing.com"}. Each value must match the type of the field its path targets.
@@ -204,9 +209,9 @@ class SessionsClient:
             max_steps=max_steps,
             max_time_s=max_time_s,
             idle_timeout_s=idle_timeout_s,
+            queue=queue,
             group_id=group_id,
             parent_session_id=parent_session_id,
-            agent_artifact=agent_artifact,
             overrides=overrides,
             request_options=request_options,
         )
@@ -813,6 +818,7 @@ class AsyncSessionsClient:
         agent: typing.Optional[typing.Sequence[str]] = None,
         group_id: typing.Optional[str] = None,
         parent_session_id: typing.Optional[str] = None,
+        schedule_id: typing.Optional[str] = None,
         search: typing.Optional[str] = None,
         created_before: typing.Optional[dt.datetime] = None,
         created_after: typing.Optional[dt.datetime] = None,
@@ -837,6 +843,9 @@ class AsyncSessionsClient:
         group_id : typing.Optional[str]
 
         parent_session_id : typing.Optional[str]
+
+        schedule_id : typing.Optional[str]
+            Only sessions created by this schedule.
 
         search : typing.Optional[str]
             Case-insensitive match on the session's first message or answer.
@@ -889,6 +898,7 @@ class AsyncSessionsClient:
             agent=agent,
             group_id=group_id,
             parent_session_id=parent_session_id,
+            schedule_id=schedule_id,
             search=search,
             created_before=created_before,
             created_after=created_after,
@@ -910,9 +920,9 @@ class AsyncSessionsClient:
         max_steps: typing.Optional[int] = OMIT,
         max_time_s: typing.Optional[float] = OMIT,
         idle_timeout_s: typing.Optional[int] = OMIT,
+        queue: typing.Optional[bool] = OMIT,
         group_id: typing.Optional[str] = OMIT,
         parent_session_id: typing.Optional[str] = OMIT,
-        agent_artifact: typing.Optional[str] = OMIT,
         overrides: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Session:
@@ -938,14 +948,14 @@ class AsyncSessionsClient:
         idle_timeout_s : typing.Optional[int]
             Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers.
 
+        queue : typing.Optional[bool]
+            When the organization is at its concurrent-session limit, accept this session into a queue (status 'queued') instead of rejecting it with 429. Queued sessions start automatically, oldest first, as running sessions finish. Set to false to get an immediate 429 when no slot is available.
+
         group_id : typing.Optional[str]
             Optional id to group and list related sessions together.
 
         parent_session_id : typing.Optional[str]
             Id of the parent session, when this is a child run.
-
-        agent_artifact : typing.Optional[str]
-            Target version of the agent artifact to use.
 
         overrides : typing.Optional[typing.Dict[str, typing.Any]]
             Per-run overrides applied to the resolved request, keyed by a dotted path. List members are selected with an explicit [field=value] clause, e.g. {"agent.environments[kind=web].start_url": "https://bing.com"}. Each value must match the type of the field its path targets.
@@ -984,9 +994,9 @@ class AsyncSessionsClient:
             max_steps=max_steps,
             max_time_s=max_time_s,
             idle_timeout_s=idle_timeout_s,
+            queue=queue,
             group_id=group_id,
             parent_session_id=parent_session_id,
-            agent_artifact=agent_artifact,
             overrides=overrides,
             request_options=request_options,
         )

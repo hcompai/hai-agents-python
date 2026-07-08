@@ -10,34 +10,38 @@ from ..core.jsonable_encoder import encode_path_param
 from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
+from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
+from ..types.cron_timing import CronTiming
 from ..types.http_validation_error import HttpValidationError
-from ..types.page_webhook_record import PageWebhookRecord
-from ..types.webhook_event_type_definition import WebhookEventTypeDefinition
-from ..types.webhook_ping_result import WebhookPingResult
-from ..types.webhook_record import WebhookRecord
-from ..types.webhook_with_secret import WebhookWithSecret
-from .types.list_webhooks_request_sort_item import ListWebhooksRequestSortItem
+from ..types.page_schedule_record import PageScheduleRecord
+from ..types.page_schedule_run_record import PageScheduleRunRecord
+from ..types.pause_schedule import PauseSchedule
+from ..types.schedule_record import ScheduleRecord
+from ..types.schedule_run_record import ScheduleRunRecord
+from ..types.session_request import SessionRequest
+from .types.list_schedule_runs_request_sort_item import ListScheduleRunsRequestSortItem
+from .types.list_schedules_request_sort_item import ListSchedulesRequestSortItem
 from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
 
 
-class RawWebhooksClient:
+class RawSchedulesClient:
     def __init__(self, *, client_wrapper: SyncClientWrapper):
         self._client_wrapper = client_wrapper
 
-    def list_webhooks(
+    def list_schedules(
         self,
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListWebhooksRequestSortItem]] = None,
+        sort: typing.Optional[typing.Sequence[ListSchedulesRequestSortItem]] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[PageWebhookRecord]:
+    ) -> HttpResponse[PageScheduleRecord]:
         """
-        List the organization's webhooks.
+        List the organization's schedules.
 
         Parameters
         ----------
@@ -47,7 +51,7 @@ class RawWebhooksClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListWebhooksRequestSortItem]]
+        sort : typing.Optional[typing.Sequence[ListSchedulesRequestSortItem]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -55,11 +59,11 @@ class RawWebhooksClient:
 
         Returns
         -------
-        HttpResponse[PageWebhookRecord]
+        HttpResponse[PageScheduleRecord]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
-            "api/v2/webhooks",
+            "api/v2/schedules",
             method="GET",
             params={
                 "page": page,
@@ -71,9 +75,9 @@ class RawWebhooksClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    PageWebhookRecord,
+                    PageScheduleRecord,
                     parse_obj_as(
-                        type_=PageWebhookRecord,  # type: ignore
+                        type_=PageScheduleRecord,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -98,23 +102,26 @@ class RawWebhooksClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def create_webhook(
+    def create_schedule(
         self,
         *,
-        url: str,
-        enabled_events: typing.Optional[typing.Sequence[str]] = OMIT,
+        name: str,
+        timing: CronTiming,
+        session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[WebhookWithSecret]:
+    ) -> HttpResponse[ScheduleRecord]:
         """
-        Register a webhook. The signing secret is only returned here; store it securely.
+        Create a schedule that starts a session on each fire.
 
         Parameters
         ----------
-        url : str
+        name : str
 
-        enabled_events : typing.Optional[typing.Sequence[str]]
-            Event types delivered to this webhook. '*' subscribes to the session.status_updated firehose; granular session.* types are delivered only when listed explicitly.
+        timing : CronTiming
+
+        session_request : SessionRequest
+            Template used to create each scheduled session; re-resolved on every fire.
 
         description : typing.Optional[str]
 
@@ -123,16 +130,21 @@ class RawWebhooksClient:
 
         Returns
         -------
-        HttpResponse[WebhookWithSecret]
+        HttpResponse[ScheduleRecord]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
-            "api/v2/webhooks",
+            "api/v2/schedules",
             method="POST",
             json={
-                "url": url,
-                "enabled_events": enabled_events,
+                "name": name,
                 "description": description,
+                "timing": convert_and_respect_annotation_metadata(
+                    object_=timing, annotation=CronTiming, direction="write"
+                ),
+                "session_request": convert_and_respect_annotation_metadata(
+                    object_=session_request, annotation=SessionRequest, direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
@@ -143,9 +155,9 @@ class RawWebhooksClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    WebhookWithSecret,
+                    ScheduleRecord,
                     parse_obj_as(
-                        type_=WebhookWithSecret,  # type: ignore
+                        type_=ScheduleRecord,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -170,86 +182,35 @@ class RawWebhooksClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def list_webhook_events(
-        self, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> HttpResponse[typing.List[WebhookEventTypeDefinition]]:
+    def get_schedule(
+        self, schedule_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[ScheduleRecord]:
         """
-        List concrete webhook event types clients can subscribe to.
+        Fetch a schedule by id.
 
         Parameters
         ----------
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        HttpResponse[typing.List[WebhookEventTypeDefinition]]
-            Successful Response
-        """
-        _response = self._client_wrapper.httpx_client.request(
-            "api/v2/webhooks/events",
-            method="GET",
-            request_options=request_options,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    typing.List[WebhookEventTypeDefinition],
-                    parse_obj_as(
-                        type_=typing.List[WebhookEventTypeDefinition],  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return HttpResponse(response=_response, data=_data)
-            if _response.status_code == 422:
-                raise UnprocessableEntityError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        HttpValidationError,
-                        parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        except ValidationError as e:
-            raise ParsingError(
-                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
-            )
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-    def get_webhook(
-        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> HttpResponse[WebhookRecord]:
-        """
-        Fetch a webhook by id.
-
-        Parameters
-        ----------
-        webhook_id : str
+        schedule_id : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        HttpResponse[WebhookRecord]
+        HttpResponse[ScheduleRecord]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
-            f"api/v2/webhooks/{encode_path_param(webhook_id)}",
+            f"api/v2/schedules/{encode_path_param(schedule_id)}",
             method="GET",
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    WebhookRecord,
+                    ScheduleRecord,
                     parse_obj_as(
-                        type_=WebhookRecord,  # type: ignore
+                        type_=ScheduleRecord,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -274,15 +235,15 @@ class RawWebhooksClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def delete_webhook(
-        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    def delete_schedule(
+        self, schedule_id: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> HttpResponse[None]:
         """
-        Delete a webhook.
+        Delete a schedule. Future fires stop; sessions already created keep running.
 
         Parameters
         ----------
-        webhook_id : str
+        schedule_id : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -292,7 +253,7 @@ class RawWebhooksClient:
         HttpResponse[None]
         """
         _response = self._client_wrapper.httpx_client.request(
-            f"api/v2/webhooks/{encode_path_param(webhook_id)}",
+            f"api/v2/schedules/{encode_path_param(schedule_id)}",
             method="DELETE",
             request_options=request_options,
         )
@@ -319,47 +280,51 @@ class RawWebhooksClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def update_webhook(
+    def update_schedule(
         self,
-        webhook_id: str,
+        schedule_id: str,
         *,
-        url: typing.Optional[str] = OMIT,
-        enabled_events: typing.Optional[typing.Sequence[str]] = OMIT,
+        name: typing.Optional[str] = OMIT,
         description: typing.Optional[str] = OMIT,
-        disabled: typing.Optional[bool] = OMIT,
+        timing: typing.Optional[CronTiming] = OMIT,
+        session_request: typing.Optional[SessionRequest] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[WebhookRecord]:
+    ) -> HttpResponse[ScheduleRecord]:
         """
-        Update a webhook; only provided fields change.
+        Update a schedule; only provided fields change. Timing changes recompute the next fire.
 
         Parameters
         ----------
-        webhook_id : str
+        schedule_id : str
 
-        url : typing.Optional[str]
-
-        enabled_events : typing.Optional[typing.Sequence[str]]
+        name : typing.Optional[str]
 
         description : typing.Optional[str]
 
-        disabled : typing.Optional[bool]
+        timing : typing.Optional[CronTiming]
+
+        session_request : typing.Optional[SessionRequest]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        HttpResponse[WebhookRecord]
+        HttpResponse[ScheduleRecord]
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
-            f"api/v2/webhooks/{encode_path_param(webhook_id)}",
+            f"api/v2/schedules/{encode_path_param(schedule_id)}",
             method="PATCH",
             json={
-                "url": url,
-                "enabled_events": enabled_events,
+                "name": name,
                 "description": description,
-                "disabled": disabled,
+                "timing": convert_and_respect_annotation_metadata(
+                    object_=timing, annotation=typing.Optional[CronTiming], direction="write"
+                ),
+                "session_request": convert_and_respect_annotation_metadata(
+                    object_=session_request, annotation=typing.Optional[SessionRequest], direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
@@ -370,9 +335,9 @@ class RawWebhooksClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    WebhookRecord,
+                    ScheduleRecord,
                     parse_obj_as(
-                        type_=WebhookRecord,  # type: ignore
+                        type_=ScheduleRecord,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -397,137 +362,201 @@ class RawWebhooksClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def rotate_webhook_secret(
-        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> HttpResponse[WebhookWithSecret]:
-        """
-        Replace the signing secret. Only returned here; make your receiver accept both secrets before rotating.
-
-        Parameters
-        ----------
-        webhook_id : str
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        HttpResponse[WebhookWithSecret]
-            Successful Response
-        """
-        _response = self._client_wrapper.httpx_client.request(
-            f"api/v2/webhooks/{encode_path_param(webhook_id)}/rotate",
-            method="POST",
-            request_options=request_options,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    WebhookWithSecret,
-                    parse_obj_as(
-                        type_=WebhookWithSecret,  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return HttpResponse(response=_response, data=_data)
-            if _response.status_code == 422:
-                raise UnprocessableEntityError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        HttpValidationError,
-                        parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        except ValidationError as e:
-            raise ParsingError(
-                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
-            )
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-    def ping_webhook(
-        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> HttpResponse[WebhookPingResult]:
-        """
-        Send a signed ping event to the webhook and report the receiver's HTTP response.
-
-        Parameters
-        ----------
-        webhook_id : str
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        HttpResponse[WebhookPingResult]
-            Successful Response
-        """
-        _response = self._client_wrapper.httpx_client.request(
-            f"api/v2/webhooks/{encode_path_param(webhook_id)}/ping",
-            method="POST",
-            request_options=request_options,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    WebhookPingResult,
-                    parse_obj_as(
-                        type_=WebhookPingResult,  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return HttpResponse(response=_response, data=_data)
-            if _response.status_code == 422:
-                raise UnprocessableEntityError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        HttpValidationError,
-                        parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        except ValidationError as e:
-            raise ParsingError(
-                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
-            )
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-
-class AsyncRawWebhooksClient:
-    def __init__(self, *, client_wrapper: AsyncClientWrapper):
-        self._client_wrapper = client_wrapper
-
-    async def list_webhooks(
+    def pause_schedule(
         self,
+        schedule_id: str,
+        *,
+        request: typing.Optional[PauseSchedule] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[ScheduleRecord]:
+        """
+        Pause a schedule with an optional note.
+
+        Parameters
+        ----------
+        schedule_id : str
+
+        request : typing.Optional[PauseSchedule]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[ScheduleRecord]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/schedules/{encode_path_param(schedule_id)}/pause",
+            method="POST",
+            json=convert_and_respect_annotation_metadata(
+                object_=request, annotation=typing.Optional[PauseSchedule], direction="write"
+            ),
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    ScheduleRecord,
+                    parse_obj_as(
+                        type_=ScheduleRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def resume_schedule(
+        self, schedule_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[ScheduleRecord]:
+        """
+        Resume a paused schedule; the next fire is recomputed from now.
+
+        Parameters
+        ----------
+        schedule_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[ScheduleRecord]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/schedules/{encode_path_param(schedule_id)}/resume",
+            method="POST",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    ScheduleRecord,
+                    parse_obj_as(
+                        type_=ScheduleRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def trigger_schedule(
+        self, schedule_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[ScheduleRunRecord]:
+        """
+        Fire the schedule once now (works while paused); the regular cadence is unaffected.
+
+        Parameters
+        ----------
+        schedule_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[ScheduleRunRecord]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/schedules/{encode_path_param(schedule_id)}/trigger",
+            method="POST",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    ScheduleRunRecord,
+                    parse_obj_as(
+                        type_=ScheduleRunRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def list_schedule_runs(
+        self,
+        schedule_id: str,
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListWebhooksRequestSortItem]] = None,
+        sort: typing.Optional[typing.Sequence[ListScheduleRunsRequestSortItem]] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[PageWebhookRecord]:
+    ) -> HttpResponse[PageScheduleRunRecord]:
         """
-        List the organization's webhooks.
+        List the schedule's recent run outcomes, newest fire first.
 
         Parameters
         ----------
+        schedule_id : str
+
         page : typing.Optional[int]
             Page number (1-based)
 
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListWebhooksRequestSortItem]]
+        sort : typing.Optional[typing.Sequence[ListScheduleRunsRequestSortItem]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -535,11 +564,11 @@ class AsyncRawWebhooksClient:
 
         Returns
         -------
-        AsyncHttpResponse[PageWebhookRecord]
+        HttpResponse[PageScheduleRunRecord]
             Successful Response
         """
-        _response = await self._client_wrapper.httpx_client.request(
-            "api/v2/webhooks",
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/schedules/{encode_path_param(schedule_id)}/runs",
             method="GET",
             params={
                 "page": page,
@@ -551,9 +580,84 @@ class AsyncRawWebhooksClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    PageWebhookRecord,
+                    PageScheduleRunRecord,
                     parse_obj_as(
-                        type_=PageWebhookRecord,  # type: ignore
+                        type_=PageScheduleRunRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+
+class AsyncRawSchedulesClient:
+    def __init__(self, *, client_wrapper: AsyncClientWrapper):
+        self._client_wrapper = client_wrapper
+
+    async def list_schedules(
+        self,
+        *,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[typing.Sequence[ListSchedulesRequestSortItem]] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[PageScheduleRecord]:
+        """
+        List the organization's schedules.
+
+        Parameters
+        ----------
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Sequence[ListSchedulesRequestSortItem]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[PageScheduleRecord]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            "api/v2/schedules",
+            method="GET",
+            params={
+                "page": page,
+                "size": size,
+                "sort": sort,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    PageScheduleRecord,
+                    parse_obj_as(
+                        type_=PageScheduleRecord,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -578,23 +682,26 @@ class AsyncRawWebhooksClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def create_webhook(
+    async def create_schedule(
         self,
         *,
-        url: str,
-        enabled_events: typing.Optional[typing.Sequence[str]] = OMIT,
+        name: str,
+        timing: CronTiming,
+        session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[WebhookWithSecret]:
+    ) -> AsyncHttpResponse[ScheduleRecord]:
         """
-        Register a webhook. The signing secret is only returned here; store it securely.
+        Create a schedule that starts a session on each fire.
 
         Parameters
         ----------
-        url : str
+        name : str
 
-        enabled_events : typing.Optional[typing.Sequence[str]]
-            Event types delivered to this webhook. '*' subscribes to the session.status_updated firehose; granular session.* types are delivered only when listed explicitly.
+        timing : CronTiming
+
+        session_request : SessionRequest
+            Template used to create each scheduled session; re-resolved on every fire.
 
         description : typing.Optional[str]
 
@@ -603,16 +710,21 @@ class AsyncRawWebhooksClient:
 
         Returns
         -------
-        AsyncHttpResponse[WebhookWithSecret]
+        AsyncHttpResponse[ScheduleRecord]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            "api/v2/webhooks",
+            "api/v2/schedules",
             method="POST",
             json={
-                "url": url,
-                "enabled_events": enabled_events,
+                "name": name,
                 "description": description,
+                "timing": convert_and_respect_annotation_metadata(
+                    object_=timing, annotation=CronTiming, direction="write"
+                ),
+                "session_request": convert_and_respect_annotation_metadata(
+                    object_=session_request, annotation=SessionRequest, direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
@@ -623,9 +735,9 @@ class AsyncRawWebhooksClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    WebhookWithSecret,
+                    ScheduleRecord,
                     parse_obj_as(
-                        type_=WebhookWithSecret,  # type: ignore
+                        type_=ScheduleRecord,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -650,86 +762,35 @@ class AsyncRawWebhooksClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def list_webhook_events(
-        self, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[typing.List[WebhookEventTypeDefinition]]:
+    async def get_schedule(
+        self, schedule_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[ScheduleRecord]:
         """
-        List concrete webhook event types clients can subscribe to.
+        Fetch a schedule by id.
 
         Parameters
         ----------
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        AsyncHttpResponse[typing.List[WebhookEventTypeDefinition]]
-            Successful Response
-        """
-        _response = await self._client_wrapper.httpx_client.request(
-            "api/v2/webhooks/events",
-            method="GET",
-            request_options=request_options,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    typing.List[WebhookEventTypeDefinition],
-                    parse_obj_as(
-                        type_=typing.List[WebhookEventTypeDefinition],  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return AsyncHttpResponse(response=_response, data=_data)
-            if _response.status_code == 422:
-                raise UnprocessableEntityError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        HttpValidationError,
-                        parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        except ValidationError as e:
-            raise ParsingError(
-                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
-            )
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-    async def get_webhook(
-        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[WebhookRecord]:
-        """
-        Fetch a webhook by id.
-
-        Parameters
-        ----------
-        webhook_id : str
+        schedule_id : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        AsyncHttpResponse[WebhookRecord]
+        AsyncHttpResponse[ScheduleRecord]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            f"api/v2/webhooks/{encode_path_param(webhook_id)}",
+            f"api/v2/schedules/{encode_path_param(schedule_id)}",
             method="GET",
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    WebhookRecord,
+                    ScheduleRecord,
                     parse_obj_as(
-                        type_=WebhookRecord,  # type: ignore
+                        type_=ScheduleRecord,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -754,15 +815,15 @@ class AsyncRawWebhooksClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def delete_webhook(
-        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    async def delete_schedule(
+        self, schedule_id: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> AsyncHttpResponse[None]:
         """
-        Delete a webhook.
+        Delete a schedule. Future fires stop; sessions already created keep running.
 
         Parameters
         ----------
-        webhook_id : str
+        schedule_id : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -772,7 +833,7 @@ class AsyncRawWebhooksClient:
         AsyncHttpResponse[None]
         """
         _response = await self._client_wrapper.httpx_client.request(
-            f"api/v2/webhooks/{encode_path_param(webhook_id)}",
+            f"api/v2/schedules/{encode_path_param(schedule_id)}",
             method="DELETE",
             request_options=request_options,
         )
@@ -799,47 +860,51 @@ class AsyncRawWebhooksClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def update_webhook(
+    async def update_schedule(
         self,
-        webhook_id: str,
+        schedule_id: str,
         *,
-        url: typing.Optional[str] = OMIT,
-        enabled_events: typing.Optional[typing.Sequence[str]] = OMIT,
+        name: typing.Optional[str] = OMIT,
         description: typing.Optional[str] = OMIT,
-        disabled: typing.Optional[bool] = OMIT,
+        timing: typing.Optional[CronTiming] = OMIT,
+        session_request: typing.Optional[SessionRequest] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[WebhookRecord]:
+    ) -> AsyncHttpResponse[ScheduleRecord]:
         """
-        Update a webhook; only provided fields change.
+        Update a schedule; only provided fields change. Timing changes recompute the next fire.
 
         Parameters
         ----------
-        webhook_id : str
+        schedule_id : str
 
-        url : typing.Optional[str]
-
-        enabled_events : typing.Optional[typing.Sequence[str]]
+        name : typing.Optional[str]
 
         description : typing.Optional[str]
 
-        disabled : typing.Optional[bool]
+        timing : typing.Optional[CronTiming]
+
+        session_request : typing.Optional[SessionRequest]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        AsyncHttpResponse[WebhookRecord]
+        AsyncHttpResponse[ScheduleRecord]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            f"api/v2/webhooks/{encode_path_param(webhook_id)}",
+            f"api/v2/schedules/{encode_path_param(schedule_id)}",
             method="PATCH",
             json={
-                "url": url,
-                "enabled_events": enabled_events,
+                "name": name,
                 "description": description,
-                "disabled": disabled,
+                "timing": convert_and_respect_annotation_metadata(
+                    object_=timing, annotation=typing.Optional[CronTiming], direction="write"
+                ),
+                "session_request": convert_and_respect_annotation_metadata(
+                    object_=session_request, annotation=typing.Optional[SessionRequest], direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
@@ -850,9 +915,9 @@ class AsyncRawWebhooksClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    WebhookRecord,
+                    ScheduleRecord,
                     parse_obj_as(
-                        type_=WebhookRecord,  # type: ignore
+                        type_=ScheduleRecord,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -877,35 +942,48 @@ class AsyncRawWebhooksClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def rotate_webhook_secret(
-        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[WebhookWithSecret]:
+    async def pause_schedule(
+        self,
+        schedule_id: str,
+        *,
+        request: typing.Optional[PauseSchedule] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[ScheduleRecord]:
         """
-        Replace the signing secret. Only returned here; make your receiver accept both secrets before rotating.
+        Pause a schedule with an optional note.
 
         Parameters
         ----------
-        webhook_id : str
+        schedule_id : str
+
+        request : typing.Optional[PauseSchedule]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        AsyncHttpResponse[WebhookWithSecret]
+        AsyncHttpResponse[ScheduleRecord]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            f"api/v2/webhooks/{encode_path_param(webhook_id)}/rotate",
+            f"api/v2/schedules/{encode_path_param(schedule_id)}/pause",
             method="POST",
+            json=convert_and_respect_annotation_metadata(
+                object_=request, annotation=typing.Optional[PauseSchedule], direction="write"
+            ),
+            headers={
+                "content-type": "application/json",
+            },
             request_options=request_options,
+            omit=OMIT,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    WebhookWithSecret,
+                    ScheduleRecord,
                     parse_obj_as(
-                        type_=WebhookWithSecret,  # type: ignore
+                        type_=ScheduleRecord,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -930,35 +1008,161 @@ class AsyncRawWebhooksClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def ping_webhook(
-        self, webhook_id: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[WebhookPingResult]:
+    async def resume_schedule(
+        self, schedule_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[ScheduleRecord]:
         """
-        Send a signed ping event to the webhook and report the receiver's HTTP response.
+        Resume a paused schedule; the next fire is recomputed from now.
 
         Parameters
         ----------
-        webhook_id : str
+        schedule_id : str
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        AsyncHttpResponse[WebhookPingResult]
+        AsyncHttpResponse[ScheduleRecord]
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            f"api/v2/webhooks/{encode_path_param(webhook_id)}/ping",
+            f"api/v2/schedules/{encode_path_param(schedule_id)}/resume",
             method="POST",
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    WebhookPingResult,
+                    ScheduleRecord,
                     parse_obj_as(
-                        type_=WebhookPingResult,  # type: ignore
+                        type_=ScheduleRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def trigger_schedule(
+        self, schedule_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[ScheduleRunRecord]:
+        """
+        Fire the schedule once now (works while paused); the regular cadence is unaffected.
+
+        Parameters
+        ----------
+        schedule_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[ScheduleRunRecord]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/schedules/{encode_path_param(schedule_id)}/trigger",
+            method="POST",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    ScheduleRunRecord,
+                    parse_obj_as(
+                        type_=ScheduleRunRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def list_schedule_runs(
+        self,
+        schedule_id: str,
+        *,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[typing.Sequence[ListScheduleRunsRequestSortItem]] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[PageScheduleRunRecord]:
+        """
+        List the schedule's recent run outcomes, newest fire first.
+
+        Parameters
+        ----------
+        schedule_id : str
+
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Sequence[ListScheduleRunsRequestSortItem]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[PageScheduleRunRecord]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/schedules/{encode_path_param(schedule_id)}/runs",
+            method="GET",
+            params={
+                "page": page,
+                "size": size,
+                "sort": sort,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    PageScheduleRunRecord,
+                    parse_obj_as(
+                        type_=PageScheduleRunRecord,  # type: ignore
                         object_=_response.json(),
                     ),
                 )

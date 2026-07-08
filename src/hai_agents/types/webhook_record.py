@@ -5,6 +5,7 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .webhook_record_last_delivery_status import WebhookRecordLastDeliveryStatus
 
 
 class WebhookRecord(UniversalBaseModel):
@@ -17,6 +18,31 @@ class WebhookRecord(UniversalBaseModel):
     enabled_events: typing.List[str]
     description: typing.Optional[str] = None
     disabled: bool
+    last_delivery_status: typing.Optional[WebhookRecordLastDeliveryStatus] = pydantic.Field(default=None)
+    """
+    Result of the most recent delivery attempt; null before the first attempt.
+    """
+
+    last_delivery_error: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    What went wrong on the most recent delivery attempt; null when it succeeded.
+    """
+
+    last_delivery_at: typing.Optional[dt.datetime] = pydantic.Field(default=None)
+    """
+    When the most recent delivery attempt happened; null before the first attempt.
+    """
+
+    last_success_at: typing.Optional[dt.datetime] = pydantic.Field(default=None)
+    """
+    When a delivery last succeeded; null if none has.
+    """
+
+    consecutive_failures: typing.Optional[int] = pydantic.Field(default=None)
+    """
+    Failed delivery attempts since the last success. The endpoint is automatically disabled when this grows too large; resets to zero on success or re-enable.
+    """
+
     created_at: dt.datetime
     updated_at: dt.datetime
 

@@ -4,6 +4,7 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .managed_proxy_selection import ManagedProxySelection
 
 
 class BrowserNetwork(UniversalBaseModel):
@@ -13,7 +14,12 @@ class BrowserNetwork(UniversalBaseModel):
 
     proxy_url: typing.Optional[str] = pydantic.Field(default=None)
     """
-    Optional bring-your-own HTTP/HTTPS/SOCKS proxy URL for browser egress (e.g. http://user:pass@proxy.example.com:8080). Applied when provisioning a new remote browser session. Only supported for headful chromium-based runners. Ignored when session_id attaches to an existing session.
+    Optional bring-your-own HTTP/HTTPS/SOCKS proxy URL for browser egress (e.g. http://user:pass@proxy.example.com:8080). Applied when provisioning a new remote browser session. Only supported for chromium-based browser runners (headful and headless). Ignored when session_id attaches to an existing session. Mutually exclusive with managed_proxy.
+    """
+
+    managed_proxy: typing.Optional[ManagedProxySelection] = pydantic.Field(default=None)
+    """
+    Optional H-managed proxy (e.g. Oxylabs), provisioned for the session. Applied when provisioning a new remote browser session. Only supported for chromium-based browser runners (headful and headless). Ignored when session_id attaches to an existing session. Mutually exclusive with proxy_url.
     """
 
     if IS_PYDANTIC_V2:

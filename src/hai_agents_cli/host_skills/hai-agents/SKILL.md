@@ -5,7 +5,7 @@ description: Delegate a task to an autonomous H Company agent (Holo-powered web 
 
 # hai-agents
 
-The `hai-agents` MCP server runs H Company's autonomous agents (e.g. the `h/web-surfer-holo3` family) on H Company's infrastructure and streams back a single answer. You hand an agent a self-contained `task`; it opens its own browse-and-act loop in a remote browser and works until it has an answer, hits its step or time budget, or is cancelled. Nothing runs on the user's machine.
+The `hai-agents` MCP server runs H Company's autonomous agents on H Company's infrastructure and streams back a single answer. You hand an agent a self-contained `task`; it opens its own browse-and-act loop in a remote browser and works until it has an answer, hits its step or time budget, or is cancelled. Nothing runs on the user's machine.
 
 The agent is blind to this conversation. It sees only the `task` string, so fold in the context it needs: which site or source, what "done" looks like, the shape of the answer you want back. Keep the user's own action verbs and any literal text (search queries, message bodies) verbatim, since the agent grounds well on natural imperatives. Paraphrase by adding context, not by rewording.
 
@@ -35,11 +35,11 @@ This loop is the whole protocol: a run that finishes fast returns straight from 
 User: *"find the cheapest direct flight from Paris to Lisbon next Friday"*
 
     run_agent
-      agent: h/web-surfer-holo3-1-35b
+      agent: h/web-surfer-pro
       task: On Google Flights, find the cheapest direct (non-stop) flight from Paris (any CDG/ORY) to Lisbon (LIS) departing next Friday, returning the airline, departure and arrival times, and total price in EUR.
 
 User: *"is the H Company Agent API quickstart still showing the curl example"*
 
     run_agent
-      agent: h/web-surfer-holo3-1-35b
+      agent: h/web-surfer-pro
       task: Open https://hub.hcompany.ai/computer-use-agents/quickstart and confirm whether the quickstart page still shows a curl example. Return yes or no and quote the first line of the example if present.

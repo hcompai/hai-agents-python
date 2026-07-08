@@ -36,6 +36,7 @@ if typing.TYPE_CHECKING:
     from .agent_subagents_item import AgentSubagentsItem
     from .answer_event import AnswerEvent
     from .answer_event_answer import AnswerEventAnswer
+    from .answer_outcome import AnswerOutcome
     from .browser import Browser
     from .browser_kind import BrowserKind
     from .browser_mode import BrowserMode, BrowserMode_Text, BrowserMode_Visual
@@ -44,6 +45,8 @@ if typing.TYPE_CHECKING:
     from .browser_profile_read import BrowserProfileRead
     from .browser_text_mode import BrowserTextMode
     from .browser_visual_mode import BrowserVisualMode
+    from .cron_timing import CronTiming
+    from .cron_timing_type import CronTimingType
     from .environment import Environment
     from .environment_kind import EnvironmentKind
     from .environment_page import EnvironmentPage
@@ -58,8 +61,7 @@ if typing.TYPE_CHECKING:
     from .json_value import JsonValue
     from .live_view_url_data import LiveViewUrlData
     from .live_view_url_event import LiveViewUrlEvent
-    from .mcp_server import McpServer
-    from .mcp_server_transport import McpServerTransport
+    from .managed_proxy_selection import ManagedProxySelection
     from .message_event import MessageEvent
     from .message_event_content_item import MessageEventContentItem
     from .metrics import Metrics
@@ -71,20 +73,28 @@ if typing.TYPE_CHECKING:
     from .one_password_config import OnePasswordConfig
     from .one_password_config_provider import OnePasswordConfigProvider
     from .page_agent import PageAgent
+    from .page_schedule_record import PageScheduleRecord
+    from .page_schedule_run_record import PageScheduleRunRecord
     from .page_session_event import PageSessionEvent
     from .page_session_summary import PageSessionSummary
     from .page_skill import PageSkill
     from .page_webhook_record import PageWebhookRecord
+    from .pause_schedule import PauseSchedule
     from .policy_event import PolicyEvent
+    from .proxy_pool import ProxyPool
     from .quota_status import QuotaStatus
     from .quota_status_scope import QuotaStatusScope
     from .request_start_data import RequestStartData
     from .request_start_dispatched_data import RequestStartDispatchedData
     from .request_start_dispatched_event import RequestStartDispatchedEvent
     from .request_start_event import RequestStartEvent
+    from .schedule_record import ScheduleRecord
+    from .schedule_run_record import ScheduleRunRecord
+    from .schedule_run_record_status import ScheduleRunRecordStatus
     from .session import Session
     from .session_changes import SessionChanges
     from .session_changes_answer import SessionChangesAnswer
+    from .session_error_code import SessionErrorCode
     from .session_event import SessionEvent
     from .session_event_zero import (
         SessionEventZero,
@@ -128,8 +138,12 @@ if typing.TYPE_CHECKING:
     from .vault_config_list import VaultConfigList
     from .vault_config_read import VaultConfigRead
     from .vault_health import VaultHealth
+    from .webhook_event_type_definition import WebhookEventTypeDefinition
+    from .webhook_ping_result import WebhookPingResult
     from .webhook_record import WebhookRecord
+    from .webhook_record_last_delivery_status import WebhookRecordLastDeliveryStatus
     from .webhook_with_secret import WebhookWithSecret
+    from .webhook_with_secret_last_delivery_status import WebhookWithSecretLastDeliveryStatus
 _dynamic_imports: typing.Dict[str, str] = {
     "ActiveStateChangeData": ".active_state_change_data",
     "ActiveStateChangeDataState": ".active_state_change_data_state",
@@ -159,6 +173,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "AgentSubagentsItem": ".agent_subagents_item",
     "AnswerEvent": ".answer_event",
     "AnswerEventAnswer": ".answer_event_answer",
+    "AnswerOutcome": ".answer_outcome",
     "Browser": ".browser",
     "BrowserKind": ".browser_kind",
     "BrowserMode": ".browser_mode",
@@ -169,6 +184,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "BrowserProfileRead": ".browser_profile_read",
     "BrowserTextMode": ".browser_text_mode",
     "BrowserVisualMode": ".browser_visual_mode",
+    "CronTiming": ".cron_timing",
+    "CronTimingType": ".cron_timing_type",
     "Environment": ".environment",
     "EnvironmentKind": ".environment_kind",
     "EnvironmentPage": ".environment_page",
@@ -183,8 +200,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "JsonValue": ".json_value",
     "LiveViewUrlData": ".live_view_url_data",
     "LiveViewUrlEvent": ".live_view_url_event",
-    "McpServer": ".mcp_server",
-    "McpServerTransport": ".mcp_server_transport",
+    "ManagedProxySelection": ".managed_proxy_selection",
     "MessageEvent": ".message_event",
     "MessageEventContentItem": ".message_event_content_item",
     "Metrics": ".metrics",
@@ -196,20 +212,28 @@ _dynamic_imports: typing.Dict[str, str] = {
     "OnePasswordConfig": ".one_password_config",
     "OnePasswordConfigProvider": ".one_password_config_provider",
     "PageAgent": ".page_agent",
+    "PageScheduleRecord": ".page_schedule_record",
+    "PageScheduleRunRecord": ".page_schedule_run_record",
     "PageSessionEvent": ".page_session_event",
     "PageSessionSummary": ".page_session_summary",
     "PageSkill": ".page_skill",
     "PageWebhookRecord": ".page_webhook_record",
+    "PauseSchedule": ".pause_schedule",
     "PolicyEvent": ".policy_event",
+    "ProxyPool": ".proxy_pool",
     "QuotaStatus": ".quota_status",
     "QuotaStatusScope": ".quota_status_scope",
     "RequestStartData": ".request_start_data",
     "RequestStartDispatchedData": ".request_start_dispatched_data",
     "RequestStartDispatchedEvent": ".request_start_dispatched_event",
     "RequestStartEvent": ".request_start_event",
+    "ScheduleRecord": ".schedule_record",
+    "ScheduleRunRecord": ".schedule_run_record",
+    "ScheduleRunRecordStatus": ".schedule_run_record_status",
     "Session": ".session",
     "SessionChanges": ".session_changes",
     "SessionChangesAnswer": ".session_changes_answer",
+    "SessionErrorCode": ".session_error_code",
     "SessionEvent": ".session_event",
     "SessionEventZero": ".session_event_zero",
     "SessionEventZero_ActiveStateChangeEvent": ".session_event_zero",
@@ -249,8 +273,12 @@ _dynamic_imports: typing.Dict[str, str] = {
     "VaultConfigList": ".vault_config_list",
     "VaultConfigRead": ".vault_config_read",
     "VaultHealth": ".vault_health",
+    "WebhookEventTypeDefinition": ".webhook_event_type_definition",
+    "WebhookPingResult": ".webhook_ping_result",
     "WebhookRecord": ".webhook_record",
+    "WebhookRecordLastDeliveryStatus": ".webhook_record_last_delivery_status",
     "WebhookWithSecret": ".webhook_with_secret",
+    "WebhookWithSecretLastDeliveryStatus": ".webhook_with_secret_last_delivery_status",
 }
 
 
@@ -304,6 +332,7 @@ __all__ = [
     "AgentSubagentsItem",
     "AnswerEvent",
     "AnswerEventAnswer",
+    "AnswerOutcome",
     "Browser",
     "BrowserKind",
     "BrowserMode",
@@ -314,6 +343,8 @@ __all__ = [
     "BrowserProfileRead",
     "BrowserTextMode",
     "BrowserVisualMode",
+    "CronTiming",
+    "CronTimingType",
     "Environment",
     "EnvironmentKind",
     "EnvironmentPage",
@@ -328,8 +359,7 @@ __all__ = [
     "JsonValue",
     "LiveViewUrlData",
     "LiveViewUrlEvent",
-    "McpServer",
-    "McpServerTransport",
+    "ManagedProxySelection",
     "MessageEvent",
     "MessageEventContentItem",
     "Metrics",
@@ -341,20 +371,28 @@ __all__ = [
     "OnePasswordConfig",
     "OnePasswordConfigProvider",
     "PageAgent",
+    "PageScheduleRecord",
+    "PageScheduleRunRecord",
     "PageSessionEvent",
     "PageSessionSummary",
     "PageSkill",
     "PageWebhookRecord",
+    "PauseSchedule",
     "PolicyEvent",
+    "ProxyPool",
     "QuotaStatus",
     "QuotaStatusScope",
     "RequestStartData",
     "RequestStartDispatchedData",
     "RequestStartDispatchedEvent",
     "RequestStartEvent",
+    "ScheduleRecord",
+    "ScheduleRunRecord",
+    "ScheduleRunRecordStatus",
     "Session",
     "SessionChanges",
     "SessionChangesAnswer",
+    "SessionErrorCode",
     "SessionEvent",
     "SessionEventZero",
     "SessionEventZero_ActiveStateChangeEvent",
@@ -394,6 +432,10 @@ __all__ = [
     "VaultConfigList",
     "VaultConfigRead",
     "VaultHealth",
+    "WebhookEventTypeDefinition",
+    "WebhookPingResult",
     "WebhookRecord",
+    "WebhookRecordLastDeliveryStatus",
     "WebhookWithSecret",
+    "WebhookWithSecretLastDeliveryStatus",
 ]

@@ -19,7 +19,6 @@ from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
 from ..types.http_validation_error import HttpValidationError
-from ..types.mcp_server import McpServer
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
 from .types.patch_environment_mode import PatchEnvironmentMode
 from pydantic import ValidationError
@@ -44,7 +43,7 @@ class RawEnvironmentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[EnvironmentPage]:
         """
-        List reserved + caller's org environments.
+        List reserved + caller's org environments. Unauthenticated callers see reserved ``h/`` environments only.
 
         Parameters
         ----------
@@ -123,6 +122,7 @@ class RawEnvironmentsClient:
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
         start_url: typing.Optional[str] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
@@ -141,6 +141,9 @@ class RawEnvironmentsClient:
 
         start_url : typing.Optional[str]
             Initial URL to open.
+
+        headless : typing.Optional[bool]
+            Run the browser without a visible window.
 
         mode : typing.Optional[BrowserMode]
             How the agent perceives and drives the browser.
@@ -169,6 +172,7 @@ class RawEnvironmentsClient:
                 "id": id,
                 "kind": kind,
                 "start_url": start_url,
+                "headless": headless,
                 "mode": convert_and_respect_annotation_metadata(
                     object_=mode, annotation=BrowserMode, direction="write"
                 ),
@@ -274,6 +278,7 @@ class RawEnvironmentsClient:
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
         start_url: typing.Optional[str] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
@@ -294,6 +299,9 @@ class RawEnvironmentsClient:
 
         start_url : typing.Optional[str]
             Initial URL to open.
+
+        headless : typing.Optional[bool]
+            Run the browser without a visible window.
 
         mode : typing.Optional[BrowserMode]
             How the agent perceives and drives the browser.
@@ -322,6 +330,7 @@ class RawEnvironmentsClient:
                 "id": id,
                 "kind": kind,
                 "start_url": start_url,
+                "headless": headless,
                 "mode": convert_and_respect_annotation_metadata(
                     object_=mode, annotation=BrowserMode, direction="write"
                 ),
@@ -417,16 +426,11 @@ class RawEnvironmentsClient:
         id: str,
         *,
         start_url: typing.Optional[str] = OMIT,
-        session_id: typing.Optional[str] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
-        pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
-        env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
-        mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
-        servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
-        namespace: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Environment]:
         """
@@ -438,7 +442,7 @@ class RawEnvironmentsClient:
 
         start_url : typing.Optional[str]
 
-        session_id : typing.Optional[str]
+        headless : typing.Optional[bool]
 
         mode : typing.Optional[PatchEnvironmentMode]
 
@@ -447,16 +451,6 @@ class RawEnvironmentsClient:
         browser_profile_id : typing.Optional[str]
 
         network : typing.Optional[BrowserNetwork]
-
-        pip_packages : typing.Optional[typing.Sequence[str]]
-
-        env : typing.Optional[typing.Dict[str, typing.Optional[str]]]
-
-        mcp_servers : typing.Optional[typing.Sequence[McpServer]]
-
-        servers : typing.Optional[typing.Sequence[McpServer]]
-
-        namespace : typing.Optional[str]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -471,7 +465,7 @@ class RawEnvironmentsClient:
             method="PATCH",
             json={
                 "start_url": start_url,
-                "session_id": session_id,
+                "headless": headless,
                 "mode": convert_and_respect_annotation_metadata(
                     object_=mode, annotation=typing.Optional[PatchEnvironmentMode], direction="write"
                 ),
@@ -480,15 +474,6 @@ class RawEnvironmentsClient:
                 "network": convert_and_respect_annotation_metadata(
                     object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
                 ),
-                "pip_packages": pip_packages,
-                "env": env,
-                "mcp_servers": convert_and_respect_annotation_metadata(
-                    object_=mcp_servers, annotation=typing.Optional[typing.Sequence[McpServer]], direction="write"
-                ),
-                "servers": convert_and_respect_annotation_metadata(
-                    object_=servers, annotation=typing.Optional[typing.Sequence[McpServer]], direction="write"
-                ),
-                "namespace": namespace,
             },
             headers={
                 "content-type": "application/json",
@@ -543,7 +528,7 @@ class AsyncRawEnvironmentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[EnvironmentPage]:
         """
-        List reserved + caller's org environments.
+        List reserved + caller's org environments. Unauthenticated callers see reserved ``h/`` environments only.
 
         Parameters
         ----------
@@ -622,6 +607,7 @@ class AsyncRawEnvironmentsClient:
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
         start_url: typing.Optional[str] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
@@ -640,6 +626,9 @@ class AsyncRawEnvironmentsClient:
 
         start_url : typing.Optional[str]
             Initial URL to open.
+
+        headless : typing.Optional[bool]
+            Run the browser without a visible window.
 
         mode : typing.Optional[BrowserMode]
             How the agent perceives and drives the browser.
@@ -668,6 +657,7 @@ class AsyncRawEnvironmentsClient:
                 "id": id,
                 "kind": kind,
                 "start_url": start_url,
+                "headless": headless,
                 "mode": convert_and_respect_annotation_metadata(
                     object_=mode, annotation=BrowserMode, direction="write"
                 ),
@@ -773,6 +763,7 @@ class AsyncRawEnvironmentsClient:
         id: str,
         kind: typing.Optional[BrowserKind] = OMIT,
         start_url: typing.Optional[str] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
         mode: typing.Optional[BrowserMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
@@ -793,6 +784,9 @@ class AsyncRawEnvironmentsClient:
 
         start_url : typing.Optional[str]
             Initial URL to open.
+
+        headless : typing.Optional[bool]
+            Run the browser without a visible window.
 
         mode : typing.Optional[BrowserMode]
             How the agent perceives and drives the browser.
@@ -821,6 +815,7 @@ class AsyncRawEnvironmentsClient:
                 "id": id,
                 "kind": kind,
                 "start_url": start_url,
+                "headless": headless,
                 "mode": convert_and_respect_annotation_metadata(
                     object_=mode, annotation=BrowserMode, direction="write"
                 ),
@@ -916,16 +911,11 @@ class AsyncRawEnvironmentsClient:
         id: str,
         *,
         start_url: typing.Optional[str] = OMIT,
-        session_id: typing.Optional[str] = OMIT,
+        headless: typing.Optional[bool] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
-        pip_packages: typing.Optional[typing.Sequence[str]] = OMIT,
-        env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
-        mcp_servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
-        servers: typing.Optional[typing.Sequence[McpServer]] = OMIT,
-        namespace: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Environment]:
         """
@@ -937,7 +927,7 @@ class AsyncRawEnvironmentsClient:
 
         start_url : typing.Optional[str]
 
-        session_id : typing.Optional[str]
+        headless : typing.Optional[bool]
 
         mode : typing.Optional[PatchEnvironmentMode]
 
@@ -946,16 +936,6 @@ class AsyncRawEnvironmentsClient:
         browser_profile_id : typing.Optional[str]
 
         network : typing.Optional[BrowserNetwork]
-
-        pip_packages : typing.Optional[typing.Sequence[str]]
-
-        env : typing.Optional[typing.Dict[str, typing.Optional[str]]]
-
-        mcp_servers : typing.Optional[typing.Sequence[McpServer]]
-
-        servers : typing.Optional[typing.Sequence[McpServer]]
-
-        namespace : typing.Optional[str]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -970,7 +950,7 @@ class AsyncRawEnvironmentsClient:
             method="PATCH",
             json={
                 "start_url": start_url,
-                "session_id": session_id,
+                "headless": headless,
                 "mode": convert_and_respect_annotation_metadata(
                     object_=mode, annotation=typing.Optional[PatchEnvironmentMode], direction="write"
                 ),
@@ -979,15 +959,6 @@ class AsyncRawEnvironmentsClient:
                 "network": convert_and_respect_annotation_metadata(
                     object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
                 ),
-                "pip_packages": pip_packages,
-                "env": env,
-                "mcp_servers": convert_and_respect_annotation_metadata(
-                    object_=mcp_servers, annotation=typing.Optional[typing.Sequence[McpServer]], direction="write"
-                ),
-                "servers": convert_and_respect_annotation_metadata(
-                    object_=servers, annotation=typing.Optional[typing.Sequence[McpServer]], direction="write"
-                ),
-                "namespace": namespace,
             },
             headers={
                 "content-type": "application/json",
