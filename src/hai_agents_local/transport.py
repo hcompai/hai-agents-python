@@ -25,7 +25,7 @@ class Command(BaseModel):
 
     id: str
     command_uid: str
-    name: str = ""
+    name: str
     args: dict[str, Any] = Field(default_factory=dict)
 
 

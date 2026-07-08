@@ -17,12 +17,11 @@ READY_TIMEOUT_S = 60.0
 
 
 class BridgeManager:
-    """Runs each bridge on a daemon thread, at most one per environment kind; cleans up at interpreter exit."""
+    """Runs each bridge on a daemon thread, at most one per environment kind."""
 
     def __init__(self) -> None:
         self._runners: dict[str, _Runner] = {}
         self._lock = threading.Lock()
-        atexit.register(self.stop_all)
 
     def ensure(self, bridges: Sequence[LocalBridge]) -> list[str]:
         """Start any bridges not already running; returns the session ids of newly started ones."""
@@ -53,6 +52,7 @@ class BridgeManager:
                 runner = _Runner(bridge)
                 self._runners[bridge.session_id] = runner
         for other in displaced:
+            other.stop()
             other.notify_lost()
         try:
             if not runner.bridge.ready.wait(READY_TIMEOUT_S):
@@ -76,7 +76,8 @@ class BridgeManager:
     def _displace_kind_locked(self, bridge: LocalBridge) -> list[_Runner]:
         """One driver per kind: a machine has one desktop and one debuggable Chrome, so the newest
         session takes the bridge over from any previous session still holding it. Returns the
-        displaced runners; the caller fires their loss handlers off the lock."""
+        displaced runners; the caller stops them and fires their loss handlers off the lock,
+        since a stopping runner's own loss handler may need this lock."""
         displaced: list[_Runner] = []
         for sid, other in list(self._runners.items()):
             if other.bridge.environment_kind != bridge.environment_kind:
@@ -89,7 +90,6 @@ class BridgeManager:
                     bridge.session_id,
                 )
             del self._runners[sid]
-            other.stop()
             displaced.append(other)
         return displaced
 
@@ -148,8 +148,9 @@ class _Runner:
             self.thread.join(timeout=STOP_JOIN_TIMEOUT_S)
 
 
-# Process-wide manager behind ensure_bridges/stop_bridges.
+# Process-wide manager behind ensure_bridges/stop_bridges; cleaned up at interpreter exit.
 _default_manager = BridgeManager()
+atexit.register(_default_manager.stop_all)
 
 
 def ensure_bridges(bridges: Sequence[LocalBridge]) -> list[str]:
