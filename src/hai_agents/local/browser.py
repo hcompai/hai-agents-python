@@ -6,7 +6,6 @@ import logging
 import platform
 import shutil
 import subprocess
-import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -23,8 +22,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_DEBUG_PORT = 9222
 CHROME_STARTUP_TIMEOUT_S = 20.0
 CHROME_PROFILE_DIR = Path.home() / ".hai" / "chrome-profile"
-
-_launch_lock = threading.Lock()
 
 # Fixed install locations per OS; on Linux, Chrome/Chromium are found on PATH via _CHROME_COMMANDS.
 _CHROME_CANDIDATES = {
@@ -77,44 +74,41 @@ class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
     def _ensure_local_chrome(self) -> None:
         """Reuse a Chrome already listening on the debugging port, or launch one with a dedicated profile."""
         port = self.debugging_port
-        with _launch_lock:
+        if _debugger_listening(port):
+            return
+        binary = next((p for p in _CHROME_CANDIDATES.get(platform.system(), ()) if Path(p).exists()), None) or next(
+            (found for command in _CHROME_COMMANDS if (found := shutil.which(command))), None
+        )
+        if binary is None:
+            raise RuntimeError(
+                "Google Chrome was not found. Install Chrome, or start a browser yourself with "
+                f"--remote-debugging-port={port}."
+            )
+        CHROME_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info("launching Chrome with remote debugging on port %d (profile: %s)", port, CHROME_PROFILE_DIR)
+        process = subprocess.Popen(
+            [
+                binary,
+                f"--remote-debugging-port={port}",
+                f"--user-data-dir={CHROME_PROFILE_DIR}",
+                "--no-first-run",
+                "--no-default-browser-check",
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        deadline = time.monotonic() + CHROME_STARTUP_TIMEOUT_S
+        while time.monotonic() < deadline:
             if _debugger_listening(port):
                 return
-            binary = next((p for p in _CHROME_CANDIDATES.get(platform.system(), ()) if Path(p).exists()), None) or next(
-                (found for command in _CHROME_COMMANDS if (found := shutil.which(command))), None
-            )
-            if binary is None:
-                raise RuntimeError(
-                    "Google Chrome was not found. Install Chrome, or start a browser yourself with "
-                    f"--remote-debugging-port={port}."
-                )
-            CHROME_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
-            logger.info("launching Chrome with remote debugging on port %d (profile: %s)", port, CHROME_PROFILE_DIR)
-            process = subprocess.Popen(
-                [
-                    binary,
-                    f"--remote-debugging-port={port}",
-                    f"--user-data-dir={CHROME_PROFILE_DIR}",
-                    "--no-first-run",
-                    "--no-default-browser-check",
-                ],
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
-            deadline = time.monotonic() + CHROME_STARTUP_TIMEOUT_S
-            while time.monotonic() < deadline:
-                if _debugger_listening(port):
-                    return
-                if process.poll() is not None:
-                    # Only reachable for the Chrome launched here; a user-started browser is found by the probe above.
-                    raise RuntimeError(
-                        f"Chrome exited with code {process.returncode} before opening debugging port {port}"
-                    )
-                time.sleep(0.25)
-            process.kill()
-            raise RuntimeError(f"Chrome did not open debugging port {port} within {CHROME_STARTUP_TIMEOUT_S:.0f}s")
+            if process.poll() is not None:
+                # Only reachable for the Chrome launched here; a user-started browser is found by the probe above.
+                raise RuntimeError(f"Chrome exited with code {process.returncode} before opening debugging port {port}")
+            time.sleep(0.25)
+        process.kill()
+        raise RuntimeError(f"Chrome did not open debugging port {port} within {CHROME_STARTUP_TIMEOUT_S:.0f}s")
 
 
 def _debugger_listening(port: int) -> bool:

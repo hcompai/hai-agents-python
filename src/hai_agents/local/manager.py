@@ -15,9 +15,6 @@ logger = logging.getLogger(__name__)
 STOP_JOIN_TIMEOUT_S = 5.0
 READY_TIMEOUT_S = 60.0
 
-_default_manager: BridgeManager | None = None
-_default_manager_lock = threading.Lock()
-
 
 class BridgeManager:
     """Runs each bridge on a daemon thread, at most one per environment kind; cleans up at interpreter exit."""
@@ -26,12 +23,6 @@ class BridgeManager:
         self._runners: dict[str, _Runner] = {}
         self._lock = threading.Lock()
         atexit.register(self.stop_all)
-
-    def __enter__(self) -> BridgeManager:
-        return self
-
-    def __exit__(self, *exc_info: object) -> None:
-        self.stop_all()
 
     def ensure(self, bridges: Sequence[LocalBridge]) -> list[str]:
         """Start any bridges not already running; returns the session ids of newly started ones."""
@@ -144,21 +135,16 @@ class _Runner:
         self.thread.join(timeout=STOP_JOIN_TIMEOUT_S)
 
 
-def default_manager() -> BridgeManager:
-    """Process-wide manager behind ensure_bridges/stop_bridges, created on first use."""
-    global _default_manager
-    with _default_manager_lock:
-        if _default_manager is None:
-            _default_manager = BridgeManager()
-        return _default_manager
+# Process-wide manager behind ensure_bridges/stop_bridges.
+_default_manager = BridgeManager()
 
 
 def ensure_bridges(bridges: Sequence[LocalBridge]) -> list[str]:
-    return default_manager().ensure(bridges)
+    return _default_manager.ensure(bridges)
 
 
 def stop_bridges(session_ids: Sequence[str] | None = None) -> None:
     if session_ids is None:
-        default_manager().stop_all()
+        _default_manager.stop_all()
     else:
-        default_manager().stop(session_ids)
+        _default_manager.stop(session_ids)

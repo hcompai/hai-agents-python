@@ -15,7 +15,7 @@ from typing import Any, AsyncIterator, ClassVar, Generic, TypeVar, Union
 
 import httpx
 
-from .config import LocalSettings
+from .config import default_base_url
 from .errors import RateLimitedError, SessionNotFoundError
 from .transport import Command, CommandExchange, Json, deserialize_args, serialize_result
 
@@ -67,7 +67,7 @@ class LocalBridge(ABC, Generic[DriverT]):
             raise ValueError("api_key is required")
         self.environment_id = environment_id or self.environment_kind
         self.api_key = api_key
-        self.base_url = base_url or LocalSettings.from_env().base_url
+        self.base_url = base_url or default_base_url()
         self.session_id = session_id or str(uuid.uuid4())
         self.ready = threading.Event()
         self.on_crash: Callable[[], None] | None = None

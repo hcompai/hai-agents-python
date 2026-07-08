@@ -345,14 +345,19 @@ class TestManager:
         yield manager
         manager.stop_all()
 
-    def test_startup_failure_surfaces_to_caller(self, manager):
+    def test_startup_failure_surfaces_to_caller_without_firing_on_crash(self, manager):
+        crashed = threading.Event()
+
         class FailingBridge(ServingBridge):
             async def run(self):
                 raise AuthError("bad key")
 
+        bridge = FailingBridge(api_key="k")
+        bridge.on_crash = crashed.set
         with pytest.raises(RuntimeError) as exc_info:
-            manager.ensure([FailingBridge(api_key="k")])
+            manager.ensure([bridge])
         assert isinstance(exc_info.value.__cause__, AuthError)
+        assert not crashed.is_set()
 
     def test_readiness_timeout_raises(self, manager, monkeypatch):
         class NeverReadyBridge(ServingBridge):
@@ -411,16 +416,3 @@ class TestManager:
         bridge.on_crash = crashed.set
         manager.ensure([bridge])
         assert crashed.wait(5.0)
-
-    def test_startup_failure_does_not_fire_on_crash(self, manager):
-        crashed = threading.Event()
-
-        class FailingBridge(ServingBridge):
-            async def run(self):
-                raise AuthError("bad key")
-
-        bridge = FailingBridge(api_key="k")
-        bridge.on_crash = crashed.set
-        with pytest.raises(RuntimeError):
-            manager.ensure([bridge])
-        assert not crashed.is_set()

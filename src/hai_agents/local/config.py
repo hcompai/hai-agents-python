@@ -1,12 +1,8 @@
-"""Every environment variable read by hai_agents.local, as one validated model."""
+"""Environment variables read by hai_agents.local."""
 
 from __future__ import annotations
 
 import os
-from typing import Any, Mapping
-
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-from pydantic_core import PydanticUseDefault
 
 from ..environment import HaiAgentsEnvironment
 
@@ -18,35 +14,10 @@ DEFAULT_BASE_URL = HaiAgentsEnvironment.EU.value
 _FLAG_FALSE = {"0", "false", "no"}
 
 
-class LocalSettings(BaseModel):
-    """Environment variables read by the local bridge stack; blank values fall back to the defaults."""
-
-    model_config = ConfigDict(extra="ignore", populate_by_name=True)
-
-    base_url: str = Field(default=DEFAULT_BASE_URL, validation_alias=BASE_URL_ENV_VAR)
-    """Platform API base URL."""
-    auto_bridge: bool = Field(default=True, validation_alias=AUTO_BRIDGE_ENV_VAR)
-    """Auto-start bridges for user_device environments on session creation."""
-
-    @field_validator("base_url", mode="before")
-    @classmethod
-    def _blank_uses_default(cls, value: Any) -> Any:
-        if isinstance(value, str) and not value.strip():
-            raise PydanticUseDefault()
-        return value
-
-    @field_validator("auto_bridge", mode="before")
-    @classmethod
-    def _parse_flag(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return value.strip().lower() not in _FLAG_FALSE
-        return value
-
-    @classmethod
-    def from_env(cls, environ: Mapping[str, str] | None = None) -> LocalSettings:
-        return cls.model_validate(dict(os.environ if environ is None else environ))
+def default_base_url() -> str:
+    return os.getenv(BASE_URL_ENV_VAR, "").strip() or DEFAULT_BASE_URL
 
 
 def auto_bridges_enabled() -> bool:
     """Read at each session creation, so the flag can be flipped at runtime."""
-    return LocalSettings.from_env().auto_bridge
+    return os.getenv(AUTO_BRIDGE_ENV_VAR, "").strip().lower() not in _FLAG_FALSE
