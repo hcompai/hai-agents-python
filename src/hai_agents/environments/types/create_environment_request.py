@@ -23,6 +23,7 @@ class CreateEnvironmentRequest_Web(UniversalBaseModel):
     mode: typing.Optional[BrowserMode] = None
     vault_id: typing.Optional[str] = None
     browser_profile_id: typing.Optional[str] = None
+    use_default_browser_profile: typing.Optional[bool] = None
     persist_browser_profile: typing.Optional[bool] = None
     network: typing.Optional[BrowserNetwork] = None
 
