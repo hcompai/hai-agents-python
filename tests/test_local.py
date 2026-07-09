@@ -288,6 +288,81 @@ def _bridge(driver: Any) -> FakeBridge:
     return bridge
 
 
+class TestChannelSetup:
+    async def test_429_is_retried_with_backoff_then_succeeds(self, monkeypatch):
+        import hai_agents_local.bridge as bridge_module
+
+        async def instant_sleep(self, seconds: float) -> bool:
+            return False
+
+        monkeypatch.setattr(FakeBridge, "_interruptible_sleep", instant_sleep)
+        calls = {"n": 0}
+
+        def responder(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(429, headers={"Retry-After": "0"}) if calls["n"] < 3 else httpx.Response(200)
+
+        bridge = FakeBridge(api_key="k")
+        async with httpx.AsyncClient(transport=httpx.MockTransport(responder)) as client:
+            exchange = bridge_module.CommandExchange(client, "http://test")
+            assert await bridge._open_channel(exchange) is True
+        assert calls["n"] == 3
+
+    async def test_429_gives_up_with_a_clear_error(self, monkeypatch):
+        async def instant_sleep(self, seconds: float) -> bool:
+            return False
+
+        monkeypatch.setattr(FakeBridge, "_interruptible_sleep", instant_sleep)
+        from hai_agents_local.transport import CommandExchange
+
+        bridge = FakeBridge(api_key="k")
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda request: httpx.Response(429, headers={"Retry-After": "0"}))
+        ) as client:
+            with pytest.raises(RuntimeError, match="rate-limiting"):
+                await bridge._open_channel(CommandExchange(client, "http://test"))
+
+    async def test_auth_error_is_not_retried(self):
+        from hai_agents_local.transport import CommandExchange
+
+        bridge = FakeBridge(api_key="k")
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(401))) as client:
+            with pytest.raises(AuthError):
+                await bridge._open_channel(CommandExchange(client, "http://test"))
+
+
+class TestMacosPermissionPreflight:
+    def _fake_frameworks(self, monkeypatch, *, ax: bool, screen: bool):
+        import sys as _sys
+        import types
+
+        apps = types.ModuleType("ApplicationServices")
+        apps.kAXTrustedCheckOptionPrompt = "AXTrustedCheckOptionPrompt"
+        apps.AXIsProcessTrustedWithOptions = lambda options: ax
+        quartz = types.ModuleType("Quartz")
+        quartz.CGPreflightScreenCaptureAccess = lambda: screen
+        quartz.CGRequestScreenCaptureAccess = lambda: screen
+        monkeypatch.setitem(_sys.modules, "ApplicationServices", apps)
+        monkeypatch.setitem(_sys.modules, "Quartz", quartz)
+        monkeypatch.setattr("hai_agents_local.desktop.sys.platform", "darwin")
+
+    def test_missing_grants_fail_fast_with_instructions(self, monkeypatch):
+        from hai_agents_local.desktop import ensure_macos_input_permissions
+
+        self._fake_frameworks(monkeypatch, ax=False, screen=True)
+        with pytest.raises(PermissionError, match="Accessibility"):
+            ensure_macos_input_permissions()
+        self._fake_frameworks(monkeypatch, ax=True, screen=False)
+        with pytest.raises(PermissionError, match="Screen Recording"):
+            ensure_macos_input_permissions()
+
+    def test_granted_passes(self, monkeypatch):
+        from hai_agents_local.desktop import ensure_macos_input_permissions
+
+        self._fake_frameworks(monkeypatch, ax=True, screen=True)
+        ensure_macos_input_permissions()
+
+
 class TestBridgeProtocol:
     def test_bytes_results_are_base64(self):
         assert serialize_result(b"abc") == "YWJj"

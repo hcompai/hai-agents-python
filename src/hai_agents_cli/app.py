@@ -12,7 +12,8 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
 from rich.console import Console
-from rich.table import Table
+from rich.markup import escape
+from rich.table import Column, Table
 
 from hai_agents import Client, assert_request_under_limit, is_settled_session_status, wait_for_session
 from hai_agents.core.api_error import ApiError
@@ -225,7 +226,8 @@ def list_sessions(
         _print_json(result)
         return
 
-    table = Table("ID", "Status", "Agent", "Created")
+    # The ID column never shrinks: a truncated UUID cannot be pasted into follow-up commands.
+    table = Table(Column("ID", min_width=36, no_wrap=True), "Status", "Agent", "Created")
     for item in result.items:
         url = getattr(item, "agent_view_url", None)
         id_cell = f"[link={url}]{item.id}[/link]" if url else item.id
@@ -330,7 +332,7 @@ def status(ctx: typer.Context, session_id: str = typer.Argument(...)) -> None:
     if result.steps is not None:
         table.add_row("Steps", str(result.steps))
     if result.error:
-        table.add_row("Error", result.error)
+        table.add_row("Error", escape(result.error))
     console.print(table)
 
 
@@ -425,7 +427,7 @@ def list_agents_command(
         return
     table = Table("Name", "Description")
     for item in result.items:
-        table.add_row(item.name, _truncate(item.description))
+        table.add_row(item.name, escape(_truncate(item.description)))
     console.print(table)
 
 
@@ -463,7 +465,7 @@ def list_skills_command(
         return
     table = Table("Name", "Description")
     for item in result.items:
-        table.add_row(item.name, _truncate(item.description))
+        table.add_row(item.name, escape(_truncate(item.description)))
     console.print(table)
 
 
@@ -675,7 +677,7 @@ def _select_agent(state: AppState, client: Client) -> str:
         if len(desc) > 80:
             desc = desc[:77] + "..."
         line = f"  [bold]{i}[/bold]. {item.name}"
-        console.print(f"{line}  [dim]{desc}[/dim]" if desc else line)
+        console.print(f"{line}  [dim]{escape(desc)}[/dim]" if desc else line)
     choice = typer.prompt("Agent number", type=int)
     if not 1 <= choice <= len(agents):
         _raise_cli_error(RuntimeError(f"Choice must be between 1 and {len(agents)}."))
@@ -695,7 +697,7 @@ def _print_run_result(result, json_output: bool, agent_view_url: str | None = No
     console.print(f"[bold]Session:[/bold] {result.id}")
     console.print(f"[bold]Status:[/bold] {_status_text(result.status)}")
     if result.answer is not None:
-        console.print(result.answer)
+        console.print(escape(result.answer))
 
 
 def _print_ack(action: str, json_output: bool) -> None:
@@ -717,10 +719,10 @@ def _print_watch_result(state: AppState, status_result, final) -> None:
     console.print(f"[bold]Status:[/bold] {_status_text(status_result.status)}")
     error = status_result.error or (final.error if final is not None else None)
     if error:
-        console.print(f"[bold]Error:[/bold] {error}")
+        console.print(f"[bold]Error:[/bold] {escape(error)}")
     answer = final.answer if final is not None else None
     if answer is not None:
-        console.print(answer)
+        console.print(escape(answer))
 
 
 def _status_text(status) -> str:
@@ -737,7 +739,7 @@ def _event_line(index: int, event) -> str:
     event_type = getattr(event, "type", "Event")
     data = getattr(event, "data", None)
     detail = _truncate(json.dumps(to_jsonable(data), sort_keys=True), 120) if data is not None else ""
-    return f"[dim]{index:>4}[/dim] [cyan]{event_type}[/cyan]" + (f"  {detail}" if detail else "")
+    return f"[dim]{index:>4}[/dim] [cyan]{event_type}[/cyan]" + (f"  {escape(detail)}" if detail else "")
 
 
 def _emit_watch_event(state: AppState, index: int, event) -> None:
@@ -776,5 +778,6 @@ def _raise_cli_error(exc: Exception) -> NoReturn:
             message = f"API error {exc.status_code}: {message}"
     else:
         message = str(exc)
-    err_console.print(f"[red]Error:[/red] {message}")
+    # Escape: rich would otherwise eat brackets in messages, e.g. pip extras like hai-agents[browser].
+    err_console.print(f"[red]Error:[/red] {escape(message)}")
     raise typer.Exit(1)

@@ -56,9 +56,10 @@ class BridgeManager:
             other.notify_lost()
         try:
             if not runner.bridge.ready.wait(READY_TIMEOUT_S):
+                hint = f" ({bridge.startup_hint})" if bridge.startup_hint else ""
                 raise RuntimeError(
                     f"local {bridge.environment_kind} bridge for environment {bridge.environment_id!r} "
-                    f"was not ready after {READY_TIMEOUT_S:.0f}s"
+                    f"was not ready after {READY_TIMEOUT_S:.0f}s{hint}"
                 )
             if runner.error is not None:
                 raise RuntimeError(

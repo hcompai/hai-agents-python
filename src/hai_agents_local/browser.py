@@ -41,6 +41,10 @@ class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
     """Serves web environments by attaching Selenium to a Chrome debugging port on this machine."""
 
     environment_kind = "web"
+    startup_hint = (
+        "a stale Chrome or Chromium already holding the debug port (default 9222) is the usual cause; "
+        "quit it, or serve on another port with `hai local browser --debug-port <port>`"
+    )
 
     def __init__(
         self,

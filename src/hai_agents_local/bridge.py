@@ -5,6 +5,7 @@ import contextlib
 import functools
 import inspect
 import logging
+import random
 import threading
 import time
 import uuid
@@ -29,6 +30,7 @@ MIN_POLL_INTERVAL_S = 1.0
 POST_RESULT_TIMEOUT_S = 10.0
 POST_RESULT_RETRIES = 2
 FETCH_TRANSIENT_RETRIES = 2
+CHANNEL_SETUP_ATTEMPTS = 5
 MAX_RECONNECT_DELAY_S = 60.0
 MIN_RATE_LIMIT_BACKOFF_S = 1.0
 RESULT_CACHE_SIZE = 512
@@ -54,6 +56,8 @@ class LocalBridge(ABC, Generic[DriverT]):
     """Polls the command channel for session_id and dispatches each command to a local hai-drivers driver."""
 
     environment_kind: ClassVar[str]
+    startup_hint: ClassVar[str] = ""
+    """Appended to the manager's not-ready timeout error; names the common cause of a hung startup."""
 
     def __init__(
         self,
@@ -105,7 +109,8 @@ class LocalBridge(ABC, Generic[DriverT]):
                 headers={"Accept": "application/json"}, auth=_BearerAuth(self.api_key), follow_redirects=True
             ) as client:
                 exchange = CommandExchange(client, self.base_url)
-                await exchange.ensure_channel(self.session_id)
+                if not await self._open_channel(exchange):
+                    return
                 if self._driver is None:
                     self._driver = await asyncio.to_thread(self.create_driver)
                 self.ready.set()
@@ -118,6 +123,48 @@ class LocalBridge(ABC, Generic[DriverT]):
                     destroy()
                 except Exception:
                     logger.warning("driver teardown failed", exc_info=True)
+
+    async def _open_channel(self, exchange: CommandExchange) -> bool:
+        """Open the command channel, retrying rate limits and transient failures with jittered backoff.
+
+        False means a stop was requested mid-setup; definitive failures (auth, 4xx) raise.
+        """
+        delay = 1.0
+        for attempt in range(1, CHANNEL_SETUP_ATTEMPTS + 1):
+            try:
+                await exchange.ensure_channel(self.session_id)
+                return True
+            except RateLimitedError as exc:
+                if attempt == CHANNEL_SETUP_ATTEMPTS:
+                    raise RuntimeError(
+                        f"the platform kept rate-limiting command-channel setup ({CHANNEL_SETUP_ATTEMPTS} "
+                        "attempts); wait a minute and retry"
+                    ) from exc
+                backoff = max(exc.retry_after, MIN_RATE_LIMIT_BACKOFF_S) * (1 + random.uniform(0, 0.25))
+                logger.warning(
+                    "platform rate-limited channel setup (attempt %d/%d); retrying in %.1fs",
+                    attempt,
+                    CHANNEL_SETUP_ATTEMPTS,
+                    backoff,
+                )
+                if await self._interruptible_sleep(backoff):
+                    return False
+            except httpx.HTTPError as exc:
+                definitive = isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500
+                if definitive or attempt == CHANNEL_SETUP_ATTEMPTS:
+                    raise
+                backoff = delay * (1 + random.uniform(0, 0.25))
+                logger.warning(
+                    "channel setup failed (attempt %d/%d): %s; retrying in %.1fs",
+                    attempt,
+                    CHANNEL_SETUP_ATTEMPTS,
+                    exc,
+                    backoff,
+                )
+                if await self._interruptible_sleep(backoff):
+                    return False
+                delay = min(delay * 2, MAX_RECONNECT_DELAY_S)
+        return False
 
     async def _poll_loop(self, exchange: CommandExchange) -> None:
         retry_delay = 1.0
