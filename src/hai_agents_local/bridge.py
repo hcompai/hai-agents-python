@@ -31,6 +31,9 @@ POST_RESULT_TIMEOUT_S = 10.0
 POST_RESULT_RETRIES = 2
 FETCH_TRANSIENT_RETRIES = 2
 CHANNEL_SETUP_ATTEMPTS = 5
+# Must stay under the manager's READY_TIMEOUT_S so setup gives up with the real
+# error instead of the manager's generic not-ready timeout firing first.
+CHANNEL_SETUP_TIMEOUT_S = 45.0
 MAX_RECONNECT_DELAY_S = 60.0
 MIN_RATE_LIMIT_BACKOFF_S = 1.0
 RESULT_CACHE_SIZE = 512
@@ -56,7 +59,7 @@ class LocalBridge(ABC, Generic[DriverT]):
     """Polls the command channel for session_id and dispatches each command to a local hai-drivers driver."""
 
     environment_kind: ClassVar[str]
-    startup_hint: ClassVar[str] = ""
+    startup_hint: ClassVar[str | None] = None
     """Appended to the manager's not-ready timeout error; names the common cause of a hung startup."""
 
     def __init__(
@@ -127,20 +130,21 @@ class LocalBridge(ABC, Generic[DriverT]):
     async def _open_channel(self, exchange: CommandExchange) -> bool:
         """Open the command channel, retrying rate limits and transient failures with jittered backoff.
 
-        False means a stop was requested mid-setup; definitive failures (auth, 4xx) raise.
+        Retries stop at CHANNEL_SETUP_ATTEMPTS or the CHANNEL_SETUP_TIMEOUT_S deadline, whichever
+        comes first. False means a stop was requested mid-setup; definitive failures (auth, 4xx) raise.
         """
+        deadline = time.monotonic() + CHANNEL_SETUP_TIMEOUT_S
         delay = 1.0
         for attempt in range(1, CHANNEL_SETUP_ATTEMPTS + 1):
             try:
                 await exchange.ensure_channel(self.session_id)
                 return True
             except RateLimitedError as exc:
-                if attempt == CHANNEL_SETUP_ATTEMPTS:
-                    raise RuntimeError(
-                        f"the platform kept rate-limiting command-channel setup ({CHANNEL_SETUP_ATTEMPTS} "
-                        "attempts); wait a minute and retry"
-                    ) from exc
                 backoff = max(exc.retry_after, MIN_RATE_LIMIT_BACKOFF_S) * (1 + random.uniform(0, 0.25))
+                if attempt == CHANNEL_SETUP_ATTEMPTS or time.monotonic() + backoff > deadline:
+                    raise RuntimeError(
+                        "the platform kept rate-limiting command-channel setup; wait a minute and retry"
+                    ) from exc
                 logger.warning(
                     "platform rate-limited channel setup (attempt %d/%d); retrying in %.1fs",
                     attempt,
@@ -150,10 +154,10 @@ class LocalBridge(ABC, Generic[DriverT]):
                 if await self._interruptible_sleep(backoff):
                     return False
             except httpx.HTTPError as exc:
-                definitive = isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500
-                if definitive or attempt == CHANNEL_SETUP_ATTEMPTS:
-                    raise
                 backoff = delay * (1 + random.uniform(0, 0.25))
+                definitive = isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500
+                if definitive or attempt == CHANNEL_SETUP_ATTEMPTS or time.monotonic() + backoff > deadline:
+                    raise
                 logger.warning(
                     "channel setup failed (attempt %d/%d): %s; retrying in %.1fs",
                     attempt,

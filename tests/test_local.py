@@ -344,7 +344,6 @@ class TestMacosPermissionPreflight:
         quartz.CGRequestScreenCaptureAccess = lambda: screen
         monkeypatch.setitem(_sys.modules, "ApplicationServices", apps)
         monkeypatch.setitem(_sys.modules, "Quartz", quartz)
-        monkeypatch.setattr("hai_agents_local.desktop.sys.platform", "darwin")
 
     def test_missing_grants_fail_fast_with_instructions(self, monkeypatch):
         from hai_agents_local.desktop import ensure_macos_input_permissions
