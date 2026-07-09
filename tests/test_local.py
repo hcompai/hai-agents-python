@@ -515,6 +515,15 @@ class TestManager:
         assert isinstance(exc_info.value.__cause__, AuthError)
         assert not crashed.is_set()
 
+    def test_stop_during_setup_surfaces_as_startup_failure(self, manager):
+        class StoppedDuringSetupBridge(ServingBridge):
+            async def run(self):
+                self.request_stop()
+
+        with pytest.raises(RuntimeError, match="failed to start"):
+            manager.ensure([StoppedDuringSetupBridge(api_key="k")])
+        assert manager._runners == {}
+
     def test_readiness_timeout_raises(self, manager, monkeypatch):
         class NeverReadyBridge(ServingBridge):
             async def run(self):

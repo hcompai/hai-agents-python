@@ -122,6 +122,10 @@ class _Runner:
         asyncio.set_event_loop(self.loop)
         try:
             self.loop.run_until_complete(self.bridge.run())
+            if not self.bridge.ready.is_set():
+                # Stopped mid-setup (e.g. displaced during channel retry backoff): the finally
+                # below unblocks ensure(), which must see a failure, not a serving bridge.
+                self.error = RuntimeError("bridge was stopped before it became ready")
         except Exception as exc:
             self.error = exc
             if not sys.is_finalizing() and threading.main_thread().is_alive():
