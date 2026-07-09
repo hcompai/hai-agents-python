@@ -211,6 +211,22 @@ def test_imap_otp_handler_reads_newest_unread_and_marks_seen(monkeypatch: pytest
     assert conn.logged_out
 
 
+def test_imap_otp_handler_skips_message_that_fails_to_fetch_or_parse(monkeypatch: pytest.MonkeyPatch) -> None:
+    import imaplib
+
+    class _BrokenNewestImapConn(_FakeImapConn):
+        def fetch(self, msg_id, spec):  # type: ignore[no-untyped-def]
+            if msg_id == b"2":
+                raise imaplib.IMAP4.error("FETCH failed")
+            body = b"Subject: Your login code\r\nContent-Type: text/plain\r\n\r\nYour login code is 271828.\r\n"
+            return "OK", [(msg_id + b" (BODY[] {0}", body), b")"]
+
+    monkeypatch.setattr(imaplib, "IMAP4_SSL", _BrokenNewestImapConn)
+    handler = imap_otp_handler(host="imap.test", username="u@test", password="pw")
+    assert handler(OtpRequest(prompt="Enter the code")) == "271828"
+    assert _BrokenNewestImapConn.last.stored == [(b"1", "+FLAGS", "\\Seen")]
+
+
 def test_imap_otp_handler_times_out(monkeypatch: pytest.MonkeyPatch) -> None:
     import imaplib
 

@@ -244,14 +244,19 @@ def imap_otp_handler(
                 criteria = ["UNSEEN"] + (["FROM", f'"{sender}"'] if sender else [])
                 _, data = conn.search(None, *criteria)
                 for msg_id in reversed((data[0] or b"").split()):
-                    _, fetched = conn.fetch(msg_id, "(INTERNALDATE BODY.PEEK[])")
-                    if not fetched or not isinstance(fetched[0], tuple):
+                    try:
+                        _, fetched = conn.fetch(msg_id, "(INTERNALDATE BODY.PEEK[])")
+                        if not fetched or not isinstance(fetched[0], tuple):
+                            continue
+                        received = imaplib.Internaldate2tuple(fetched[0][0])
+                        if received is not None and time.time() - time.mktime(received) > max_age_s:
+                            continue
+                        message = email.message_from_bytes(fetched[0][1], policy=email.policy.default)
+                        text = _message_text(message)
+                    except Exception:
+                        # One malformed or oversized message must not abort the poll; skip it.
                         continue
-                    received = imaplib.Internaldate2tuple(fetched[0][0])
-                    if received is not None and time.time() - time.mktime(received) > max_age_s:
-                        continue
-                    message = email.message_from_bytes(fetched[0][1], policy=email.policy.default)
-                    value = extract_otp(_message_text(message), request.kind, compiled)
+                    value = extract_otp(text, request.kind, compiled)
                     if value:
                         if mark_seen:
                             conn.store(msg_id, "+FLAGS", "\\Seen")
