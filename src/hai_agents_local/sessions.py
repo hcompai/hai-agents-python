@@ -16,10 +16,22 @@ from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
 
 from .bridge import LocalBridge, TokenSource
 from .config import auto_bridges_enabled
+from .killswitch import StopWatcher
 from .manager import ensure_bridges, stop_bridges
 from .routing import localize_agent
 
 logger = logging.getLogger(__name__)
+
+# Runaway guards for sessions whose caller passes no budget: a local session left running (its
+# serving process was SIGKILLed, the laptop slept) burns steps against a dead channel until it
+# hits these. Explicit values, including None for unbounded, are respected.
+DEFAULT_LOCAL_MAX_STEPS = 150
+DEFAULT_LOCAL_MAX_TIME_S = 1800.0
+
+
+def _apply_runaway_budgets(kwargs: typing.Dict[str, typing.Any]) -> None:
+    kwargs.setdefault("max_steps", DEFAULT_LOCAL_MAX_STEPS)
+    kwargs.setdefault("max_time_s", DEFAULT_LOCAL_MAX_TIME_S)
 
 
 def _token_source(client_wrapper: typing.Any) -> TokenSource:
@@ -132,6 +144,7 @@ def _cancel_remote_session(client_wrapper: typing.Any, session_id: str) -> None:
 # with the process, so leaving those sessions running only burns steps against a dead channel.
 _exit_cancels: typing.Dict[str, typing.Callable[[], None]] = {}
 _exit_lock = threading.Lock()
+_stop_watcher: typing.Optional[StopWatcher] = None
 
 
 def _register_exit_cancel(client_wrapper: typing.Any, session_id: str) -> None:
@@ -143,8 +156,18 @@ def _register_exit_cancel(client_wrapper: typing.Any, session_id: str) -> None:
         except Exception as exc:
             logger.debug("exit-time cancel of session %s skipped: %s", session_id, exc)
 
+    global _stop_watcher
     with _exit_lock:
         _exit_cancels[session_id] = cancel_quietly
+        # A fired watcher is spent; each new session needs live kill-switch coverage.
+        if _stop_watcher is None or not _stop_watcher.active:
+            _stop_watcher = StopWatcher(_panic_stop)
+
+
+def _panic_stop() -> None:
+    logger.warning("kill switch fired: cancelling local sessions and stopping bridges")
+    _cancel_sessions_at_exit()
+    stop_bridges()
 
 
 def _deregister_exit_cancel(session_id: str) -> None:
@@ -168,6 +191,8 @@ class LocalSessionsClient(SessionsClient):
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
         wrapper = self._raw_client._client_wrapper
         bridges = _localize(wrapper, kwargs)
+        if bridges:
+            _apply_runaway_budgets(kwargs)
         watcher = _LossWatcher(bridges)
         started = ensure_bridges(bridges)
         try:
@@ -190,6 +215,8 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:
         wrapper = self._raw_client._client_wrapper
         bridges = _localize(wrapper, kwargs)
+        if bridges:
+            _apply_runaway_budgets(kwargs)
         watcher = _LossWatcher(bridges)
         started = await asyncio.to_thread(ensure_bridges, bridges)
         try:

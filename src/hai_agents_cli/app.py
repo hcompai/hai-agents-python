@@ -110,6 +110,25 @@ def logout() -> None:
 
 
 @app.command()
+def doctor(ctx: typer.Context) -> None:
+    """Diagnose this machine's hai setup: login, platform access, local browser/desktop. Read-only."""
+    from .doctor import run_checks
+
+    state = _state(ctx)
+    results = run_checks(api_key=state.api_key, base_url=state.base_url)
+    if state.json_output:
+        _print_json([{"name": r.name, "ok": r.ok, "detail": r.detail, "fix": r.fix} for r in results])
+    else:
+        for r in results:
+            mark = "[bold green]ok[/bold green]" if r.ok else "[bold red]fail[/bold red]"
+            console.print(f"{mark} [bold]{r.name}[/bold] {escape(r.detail)}")
+            if r.fix is not None:
+                console.print(f"   [dim]fix:[/dim] {escape(r.fix)}")
+    if not all(r.ok for r in results):
+        raise typer.Exit(1)
+
+
+@app.command()
 def whoami(ctx: typer.Context) -> None:
     """Show the resolved endpoint and authentication status."""
     state = _state(ctx)
@@ -595,6 +614,17 @@ def local_desktop(
     _run_bridge(_state(ctx), PyautoguiDesktopBridge, session_id)
 
 
+@local_app.command("stop")
+def local_stop() -> None:
+    """Stop any in-flight local browser/desktop turn on this machine (same effect as double-Esc)."""
+    from hai_agents_local.killswitch import request_stop
+
+    request_stop()
+    console.print(
+        "Stop requested: local bridges on this machine will halt, and SDK-attached sessions will be cancelled."
+    )
+
+
 def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str | None, **options: Any) -> None:
     import logging
 
@@ -611,7 +641,7 @@ def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str
 
     console.print(
         f"[bold]Local {bridge.environment_kind} bridge[/bold] serving session id "
-        f"[cyan]{bridge.session_id}[/cyan]. Press Ctrl-C to stop."
+        f"[cyan]{bridge.session_id}[/cyan]. Press Ctrl-C to stop, or run `hai local stop` from any terminal."
     )
     console.print(
         "[dim]Point a user_device environment at it: "
@@ -628,13 +658,37 @@ def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str
 async def _serve_bridge(bridge: Any) -> None:
     import signal
 
+    from hai_agents_local.killswitch import StopWatcher
+
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             loop.add_signal_handler(sig, bridge.request_stop)
         except (NotImplementedError, RuntimeError, ValueError):
             pass
-    await bridge.run()
+    watcher = StopWatcher(lambda: loop.call_soon_threadsafe(bridge.request_stop))
+    listener = _arm_kill_switch(bridge)
+    try:
+        await bridge.run()
+    finally:
+        watcher.stop()
+        if listener is not None:
+            listener.stop()
+
+
+def _arm_kill_switch(bridge: Any) -> Any:
+    """Arm the double-Esc listener for desktop serving; a desktop turn steals focus, so Ctrl-C may be out of reach."""
+    if bridge.environment_kind != "desktop" or not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return None
+    from hai_agents_local.killswitch import KILL_SWITCH_ARMED_HINT, KILL_SWITCH_UNAVAILABLE_HINT, arm_esc_listener
+
+    listener = arm_esc_listener()
+    if listener is not None:
+        console.print(f"[dim]{KILL_SWITCH_ARMED_HINT}[/dim]")
+    elif sys.platform == "darwin":
+        # A panic button that silently failed to arm is dangerous; always say so.
+        console.print(f"[yellow]{KILL_SWITCH_UNAVAILABLE_HINT}[/yellow]")
+    return listener
 
 
 app.add_typer(sessions_app, name="sessions")

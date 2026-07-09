@@ -258,6 +258,48 @@ class TestAutoStart:
         sessions_module._cancel_sessions_at_exit()
         assert cancelled == ["sess-5"]
 
+    def test_local_sessions_get_default_runaway_budgets(self, monkeypatch):
+        from hai_agents_local.sessions import DEFAULT_LOCAL_MAX_STEPS, DEFAULT_LOCAL_MAX_TIME_S
+
+        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        captured: dict = {}
+        monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: [])
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: captured.update(kw))
+        client = Client(api_key=API_KEY)
+        client.sessions.create_session(agent=dict(self._TWO_ENV_AGENT), messages="hi")
+        assert captured["max_steps"] == DEFAULT_LOCAL_MAX_STEPS
+        assert captured["max_time_s"] == DEFAULT_LOCAL_MAX_TIME_S
+        captured.clear()
+        client.sessions.create_session(agent=dict(self._TWO_ENV_AGENT), messages="hi", max_steps=None, max_time_s=10)
+        assert captured["max_steps"] is None and captured["max_time_s"] == 10
+        captured.clear()
+        client.sessions.create_session(agent="named-agent", messages="hi")
+        assert "max_steps" not in captured and "max_time_s" not in captured
+
+    def test_kill_switch_stop_cancels_local_sessions(self, monkeypatch, tmp_path):
+        import time as _time
+
+        from hai_agents_local import killswitch
+        from hai_agents_local import sessions as sessions_module
+
+        monkeypatch.setattr(killswitch, "STOP_PATH", tmp_path / "stop")
+        monkeypatch.setattr(killswitch, "STOP_POLL_S", 0.02)
+        monkeypatch.setattr(sessions_module, "_stop_watcher", None)
+        cancelled: list = []
+        stopped: list = []
+        bridges: list = []
+        self._crash_wiring(monkeypatch, cancelled, stopped, bridges)
+        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", lambda *args: stopped.append(args))
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: type("S", (), {"id": "sess-ks"})())
+        Client(api_key=API_KEY).sessions.create_session(agent=dict(self._TWO_ENV_AGENT), messages="hi")
+        killswitch.request_stop()
+        deadline = _time.monotonic() + 3.0
+        while not stopped and _time.monotonic() < deadline:
+            _time.sleep(0.02)
+        # Watchers leaked by earlier tests may also fire; the registry pops entries, so the cancel is single.
+        assert cancelled == ["sess-ks"]
+        assert () in stopped
+
     def test_no_bridges_and_no_stamping_when_disabled(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "0")
         started: list = []
@@ -637,3 +679,37 @@ class TestManager:
         bridge.on_crash = crashed.set
         manager.ensure([bridge])
         assert crashed.wait(5.0)
+
+
+class TestKillSwitch:
+    def test_double_tap_fires_only_within_the_window_then_resets(self):
+        from hai_agents_local.killswitch import MultiTapDetector
+
+        detector = MultiTapDetector(taps=2, window_s=0.5)
+        assert not detector.record(1.0)
+        assert not detector.record(2.0)
+        assert detector.record(2.3)
+        assert not detector.record(2.4)
+
+    def test_only_stops_filed_after_start_count(self, monkeypatch, tmp_path):
+        from hai_agents_local import killswitch
+
+        monkeypatch.setattr(killswitch, "STOP_PATH", tmp_path / "stop")
+        sentinel = killswitch.StopSentinel(started_at=200.0)
+        assert not sentinel.stop_requested()
+        killswitch.request_stop(100.0)
+        assert not sentinel.stop_requested()
+        killswitch.request_stop(300.0)
+        assert sentinel.stop_requested()
+
+
+class TestDoctor:
+    def test_missing_login_fails_with_fix_and_skips_the_platform_check(self, monkeypatch):
+        from hai_agents_cli import doctor
+
+        monkeypatch.setattr(doctor.credentials, "current_api_key", lambda explicit=None: None)
+        results = doctor.run_checks(api_key=None, base_url=None)
+        by_name = {result.name: result for result in results}
+        assert not by_name["login"].ok and by_name["login"].fix is not None
+        assert "platform" not in by_name
+        assert {"browser", "desktop"} <= set(by_name)

@@ -8,6 +8,9 @@ from .bridge import LocalBridge
 if TYPE_CHECKING:
     from hai_drivers.desktop.local import LocalDesktopDriver
 
+ACCESSIBILITY_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+SCREEN_RECORDING_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+
 
 def ensure_macos_input_permissions() -> None:
     """Fail fast when macOS would silently drop synthesized input, triggering the native grant prompts.
@@ -28,7 +31,8 @@ def ensure_macos_input_permissions() -> None:
             "macOS blocks this Python process from controlling the desktop. Missing permissions: "
             + "; ".join(missing)
             + ". Grant them to the app that runs Python (your terminal) in System Settings -> "
-            "Privacy & Security, then restart that app and run again; grants only apply to a fresh process."
+            "Privacy & Security, then restart that app and run again; grants only apply to a fresh process. "
+            f"Open the panes directly: {ACCESSIBILITY_SETTINGS_URL} and {SCREEN_RECORDING_SETTINGS_URL}"
         )
 
 
