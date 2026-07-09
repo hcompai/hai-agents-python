@@ -231,6 +231,33 @@ class TestAutoStart:
         assert cancelled == ["sess-3"]
         assert stopped == [bridge.session_id for bridge in bridges]
 
+    def test_interpreter_exit_cancels_sessions_served_by_this_process(self, monkeypatch):
+        from hai_agents_local import sessions as sessions_module
+
+        cancelled: list = []
+        stopped: list = []
+        bridges: list = []
+        self._crash_wiring(monkeypatch, cancelled, stopped, bridges)
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: type("S", (), {"id": "sess-4"})())
+        Client(api_key=API_KEY).sessions.create_session(agent=dict(self._TWO_ENV_AGENT), messages="hi")
+        sessions_module._cancel_sessions_at_exit()
+        assert cancelled == ["sess-4"]
+        sessions_module._cancel_sessions_at_exit()
+        assert cancelled == ["sess-4"]
+
+    def test_crash_cancel_deregisters_the_exit_hook(self, monkeypatch):
+        from hai_agents_local import sessions as sessions_module
+
+        cancelled: list = []
+        stopped: list = []
+        bridges: list = []
+        self._crash_wiring(monkeypatch, cancelled, stopped, bridges)
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: type("S", (), {"id": "sess-5"})())
+        Client(api_key=API_KEY).sessions.create_session(agent=dict(self._TWO_ENV_AGENT), messages="hi")
+        bridges[0].on_crash()
+        sessions_module._cancel_sessions_at_exit()
+        assert cancelled == ["sess-5"]
+
     def test_no_bridges_and_no_stamping_when_disabled(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "0")
         started: list = []
