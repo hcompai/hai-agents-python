@@ -57,7 +57,7 @@ Issues = "https://github.com/hcompai/hai-agents-python/issues"
 Documentation = "https://hub.hcompany.ai/computer-use-agents"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/hai_agents", "src/hai_agents_cli", "src/hai_agents_common", "src/hai_agents_local"]
+packages = ["src/hai_agents", "src/hai_agents_cli", "src/hai_agents_common", "src/hai_agents_local", "src/hai_agents_tools"]
 
 [dependency-groups]
 dev = [
