@@ -147,6 +147,15 @@ _exit_lock = threading.Lock()
 _stop_watcher: typing.Optional[StopWatcher] = None
 
 
+def _ensure_stop_watcher() -> StopWatcher:
+    """Arm kill-switch coverage, replacing a fired watcher; a fired one is spent."""
+    global _stop_watcher
+    with _exit_lock:
+        if _stop_watcher is None or not _stop_watcher.active:
+            _stop_watcher = StopWatcher(_panic_stop)
+        return _stop_watcher
+
+
 def _register_exit_cancel(client_wrapper: typing.Any, session_id: str) -> None:
     def cancel_quietly() -> None:
         # Best effort: the session may have finished long ago; the platform rejects the cancel then.
@@ -156,12 +165,9 @@ def _register_exit_cancel(client_wrapper: typing.Any, session_id: str) -> None:
         except Exception as exc:
             logger.debug("exit-time cancel of session %s skipped: %s", session_id, exc)
 
-    global _stop_watcher
     with _exit_lock:
         _exit_cancels[session_id] = cancel_quietly
-        # A fired watcher is spent; each new session needs live kill-switch coverage.
-        if _stop_watcher is None or not _stop_watcher.active:
-            _stop_watcher = StopWatcher(_panic_stop)
+    _ensure_stop_watcher()
 
 
 def _panic_stop() -> None:
@@ -193,6 +199,7 @@ class LocalSessionsClient(SessionsClient):
         bridges = _localize(wrapper, kwargs)
         if bridges:
             _apply_runaway_budgets(kwargs)
+        stop_watcher = _ensure_stop_watcher() if bridges else None
         watcher = _LossWatcher(bridges)
         started = ensure_bridges(bridges)
         try:
@@ -207,6 +214,9 @@ class LocalSessionsClient(SessionsClient):
                     cancel()
                 else:
                     _register_exit_cancel(wrapper, session.id)
+                    if stop_watcher is not None and not stop_watcher.active:
+                        # A stop was filed while bridges or the session were starting; apply it now.
+                        _panic_stop()
         return session
 
 
@@ -217,6 +227,7 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
         bridges = _localize(wrapper, kwargs)
         if bridges:
             _apply_runaway_budgets(kwargs)
+        stop_watcher = _ensure_stop_watcher() if bridges else None
         watcher = _LossWatcher(bridges)
         started = await asyncio.to_thread(ensure_bridges, bridges)
         try:
@@ -232,4 +243,7 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
                     await asyncio.to_thread(cancel)
                 else:
                     _register_exit_cancel(wrapper, session.id)
+                    if stop_watcher is not None and not stop_watcher.active:
+                        # A stop was filed while bridges or the session were starting; apply it now.
+                        await asyncio.to_thread(_panic_stop)
         return session

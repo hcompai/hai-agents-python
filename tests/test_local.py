@@ -302,6 +302,34 @@ class TestAutoStart:
         assert cancelled == ["sess-ks"]
         assert stopped == [()]
 
+    def test_stop_filed_during_session_creation_cancels_the_new_session(self, monkeypatch, tmp_path):
+        import time as _time
+
+        from hai_agents_local import killswitch
+        from hai_agents_local import sessions as sessions_module
+
+        monkeypatch.setattr(killswitch, "STOP_PATH", tmp_path / "stop")
+        monkeypatch.setattr(killswitch, "STOP_POLL_S", 0.02)
+        if sessions_module._stop_watcher is not None:
+            sessions_module._stop_watcher.stop()
+        monkeypatch.setattr(sessions_module, "_stop_watcher", None)
+        cancelled: list = []
+        stopped: list = []
+        bridges: list = []
+        self._crash_wiring(monkeypatch, cancelled, stopped, bridges)
+        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", lambda *args: stopped.append(args))
+
+        def create_while_stop_lands(self, **kw):
+            killswitch.request_stop()
+            deadline = _time.monotonic() + 3.0
+            while sessions_module._stop_watcher.active and _time.monotonic() < deadline:
+                _time.sleep(0.02)
+            return type("S", (), {"id": "sess-mid"})()
+
+        monkeypatch.setattr(SessionsClient, "create_session", create_while_stop_lands)
+        Client(api_key=API_KEY).sessions.create_session(agent=dict(self._TWO_ENV_AGENT), messages="hi")
+        assert cancelled == ["sess-mid"]
+
     def test_no_bridges_and_no_stamping_when_disabled(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "0")
         started: list = []
