@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from .bridge import LocalBridge
 
 if TYPE_CHECKING:
-    from hai_drivers.desktop.local import LocalDesktopDriver
+    from hai_drivers.desktop.interface import DesktopDriverInterface
 
 ACCESSIBILITY_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 SCREEN_RECORDING_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
@@ -40,7 +40,7 @@ def ensure_macos_input_permissions() -> None:
         )
 
 
-class PyautoguiDesktopBridge(LocalBridge["LocalDesktopDriver"]):
+class PyautoguiDesktopBridge(LocalBridge["DesktopDriverInterface"]):
     """Serves desktop environments (mouse, keyboard, screen, files, shell) on this machine via pyautogui."""
 
     environment_kind = "desktop"
@@ -51,17 +51,21 @@ class PyautoguiDesktopBridge(LocalBridge["LocalDesktopDriver"]):
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
         self.screenshot_max_width = screenshot_max_width
 
-    def create_driver(self) -> LocalDesktopDriver:
+    def create_driver(self) -> DesktopDriverInterface:
         # Runtime import: hai-drivers is absent unless installed with hai-agents[desktop].
         try:
             from hai_drivers.desktop.local import LocalDesktopDriver
+            from hai_drivers.desktop.scaled import ScaledDesktopDriver
         except ImportError as exc:
             raise ImportError(
                 "Local desktop control requires extra deps. Install with: pip install 'hai-agents[desktop]'"
             ) from exc
         if sys.platform == "darwin":
             ensure_macos_input_permissions()
-        return LocalDesktopDriver(screenshot_max_width=self.screenshot_max_width)
+        driver = LocalDesktopDriver()
+        if self.screenshot_max_width is None:
+            return driver
+        return ScaledDesktopDriver(driver, max_width=self.screenshot_max_width)
 
     def driver_interface(self) -> type:
         # Runtime import: hai-drivers is absent unless installed with hai-agents[desktop].
