@@ -607,11 +607,16 @@ def local_browser(
 def local_desktop(
     ctx: typer.Context,
     session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
+    screenshot_max_width: int = typer.Option(
+        1920,
+        "--screenshot-max-width",
+        help="Downscale screenshots wider than this before upload; 0 keeps native resolution.",
+    ),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""
     from hai_agents_local import PyautoguiDesktopBridge
 
-    _run_bridge(_state(ctx), PyautoguiDesktopBridge, session_id)
+    _run_bridge(_state(ctx), PyautoguiDesktopBridge, session_id, screenshot_max_width=screenshot_max_width or None)
 
 
 @local_app.command("stop")

@@ -284,6 +284,9 @@ class TestAutoStart:
 
         monkeypatch.setattr(killswitch, "STOP_PATH", tmp_path / "stop")
         monkeypatch.setattr(killswitch, "STOP_POLL_S", 0.02)
+        # Stop the watcher a previous test may have left, or it races this test's watcher for the stop.
+        if sessions_module._stop_watcher is not None:
+            sessions_module._stop_watcher.stop()
         monkeypatch.setattr(sessions_module, "_stop_watcher", None)
         cancelled: list = []
         stopped: list = []
@@ -296,9 +299,8 @@ class TestAutoStart:
         deadline = _time.monotonic() + 3.0
         while not stopped and _time.monotonic() < deadline:
             _time.sleep(0.02)
-        # Watchers leaked by earlier tests may also fire; the registry pops entries, so the cancel is single.
         assert cancelled == ["sess-ks"]
-        assert () in stopped
+        assert stopped == [()]
 
     def test_no_bridges_and_no_stamping_when_disabled(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "0")

@@ -11,6 +11,10 @@ if TYPE_CHECKING:
 ACCESSIBILITY_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 SCREEN_RECORDING_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 
+# HiDPI displays capture at backing resolution (a 5K display yields ~14 MP PNGs), which blows past
+# the platform's request body limit when posted; 1920 matches the width production desktop agents use.
+DEFAULT_SCREENSHOT_MAX_WIDTH = 1920
+
 
 def ensure_macos_input_permissions() -> None:
     """Fail fast when macOS would silently drop synthesized input, triggering the native grant prompts.
@@ -41,6 +45,12 @@ class PyautoguiDesktopBridge(LocalBridge["LocalDesktopDriver"]):
 
     environment_kind = "desktop"
 
+    def __init__(
+        self, *args: object, screenshot_max_width: int | None = DEFAULT_SCREENSHOT_MAX_WIDTH, **kwargs: object
+    ) -> None:
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        self.screenshot_max_width = screenshot_max_width
+
     def create_driver(self) -> LocalDesktopDriver:
         # Runtime import: hai-drivers is absent unless installed with hai-agents[desktop].
         try:
@@ -51,7 +61,7 @@ class PyautoguiDesktopBridge(LocalBridge["LocalDesktopDriver"]):
             ) from exc
         if sys.platform == "darwin":
             ensure_macos_input_permissions()
-        return LocalDesktopDriver()
+        return LocalDesktopDriver(screenshot_max_width=self.screenshot_max_width)
 
     def driver_interface(self) -> type:
         # Runtime import: hai-drivers is absent unless installed with hai-agents[desktop].
