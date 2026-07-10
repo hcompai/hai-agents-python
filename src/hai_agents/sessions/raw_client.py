@@ -167,6 +167,8 @@ class RawSessionsClient:
         max_steps: typing.Optional[int] = OMIT,
         max_time_s: typing.Optional[float] = OMIT,
         idle_timeout_s: typing.Optional[int] = OMIT,
+        delete_after_min: typing.Optional[int] = OMIT,
+        delete_screenshot_after_min: typing.Optional[int] = OMIT,
         queue: typing.Optional[bool] = OMIT,
         group_id: typing.Optional[str] = OMIT,
         parent_session_id: typing.Optional[str] = OMIT,
@@ -194,6 +196,12 @@ class RawSessionsClient:
 
         idle_timeout_s : typing.Optional[int]
             Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers.
+
+        delete_after_min : typing.Optional[int]
+            Minutes after the session finishes before it is automatically deleted. Defaults to 30 days. Null keeps the session forever.
+
+        delete_screenshot_after_min : typing.Optional[int]
+            Minutes after the session finishes before its screenshots are deleted. Defaults to 30 days. Null keeps screenshots for the session's lifetime.
 
         queue : typing.Optional[bool]
             When the organization is at its concurrent-session limit, accept this session into a queue (status 'queued') instead of rejecting it with 429. Queued sessions start automatically, oldest first, as running sessions finish. Set to false to get an immediate 429 when no slot is available.
@@ -228,6 +236,8 @@ class RawSessionsClient:
                 "max_steps": max_steps,
                 "max_time_s": max_time_s,
                 "idle_timeout_s": idle_timeout_s,
+                "delete_after_min": delete_after_min,
+                "delete_screenshot_after_min": delete_screenshot_after_min,
                 "queue": queue,
                 "group_id": group_id,
                 "parent_session_id": parent_session_id,
@@ -1284,6 +1294,8 @@ class AsyncRawSessionsClient:
         max_steps: typing.Optional[int] = OMIT,
         max_time_s: typing.Optional[float] = OMIT,
         idle_timeout_s: typing.Optional[int] = OMIT,
+        delete_after_min: typing.Optional[int] = OMIT,
+        delete_screenshot_after_min: typing.Optional[int] = OMIT,
         queue: typing.Optional[bool] = OMIT,
         group_id: typing.Optional[str] = OMIT,
         parent_session_id: typing.Optional[str] = OMIT,
@@ -1311,6 +1323,12 @@ class AsyncRawSessionsClient:
 
         idle_timeout_s : typing.Optional[int]
             Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers.
+
+        delete_after_min : typing.Optional[int]
+            Minutes after the session finishes before it is automatically deleted. Defaults to 30 days. Null keeps the session forever.
+
+        delete_screenshot_after_min : typing.Optional[int]
+            Minutes after the session finishes before its screenshots are deleted. Defaults to 30 days. Null keeps screenshots for the session's lifetime.
 
         queue : typing.Optional[bool]
             When the organization is at its concurrent-session limit, accept this session into a queue (status 'queued') instead of rejecting it with 429. Queued sessions start automatically, oldest first, as running sessions finish. Set to false to get an immediate 429 when no slot is available.
@@ -1345,6 +1363,8 @@ class AsyncRawSessionsClient:
                 "max_steps": max_steps,
                 "max_time_s": max_time_s,
                 "idle_timeout_s": idle_timeout_s,
+                "delete_after_min": delete_after_min,
+                "delete_screenshot_after_min": delete_screenshot_after_min,
                 "queue": queue,
                 "group_id": group_id,
                 "parent_session_id": parent_session_id,

@@ -283,7 +283,8 @@ async def _async_execute_tool_call(
         result = f"Tool {name!r} is not registered with this client."
     else:
         try:
-            result = local_tool.fn(**(call.get("args") or {}))
+            args = call.get("args") or {}
+            result = await asyncio.get_running_loop().run_in_executor(None, lambda: local_tool.fn(**args))
             if inspect.isawaitable(result):
                 result = await result
         except Exception as exc:
