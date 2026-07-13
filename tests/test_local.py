@@ -119,6 +119,28 @@ class TestLocalizeAgent:
         with pytest.raises(ValueError, match="must be a UUID"):
             PyautoguiDesktopBridge(api_key=API_KEY, session_id="my-laptop-1")
 
+    def test_desktop_screenshots_are_scaled_at_the_source(self, monkeypatch):
+        from hai_drivers.desktop import local as local_module
+        from hai_drivers.desktop.scaled import ScaledDesktopDriver
+
+        monkeypatch.setattr(local_module, "LocalDesktopDriver", _FakeLocalDriver)
+        bridge = PyautoguiDesktopBridge(api_key=API_KEY, max_width=1280, image_format="webp", quality=70)
+        driver = bridge.create_driver()
+        assert isinstance(driver, ScaledDesktopDriver)
+        assert (driver._max_width, driver._image_format, driver._quality) == (1280, "webp", 70)
+        assert isinstance(driver._driver, _FakeLocalDriver)
+
+    def test_desktop_bridge_with_all_knobs_off_serves_the_raw_driver(self, monkeypatch):
+        from hai_drivers.desktop import local as local_module
+
+        monkeypatch.setattr(local_module, "LocalDesktopDriver", _FakeLocalDriver)
+        bridge = PyautoguiDesktopBridge(api_key=API_KEY, max_width=None, image_format=None)
+        assert isinstance(bridge.create_driver(), _FakeLocalDriver)
+
+
+class _FakeLocalDriver:
+    """Stands in for LocalDesktopDriver, whose constructor needs a display."""
+
 
 class TestAutoStart:
     def test_create_session_starts_bridges_and_stamps_matching_session_ids(self, monkeypatch):
@@ -396,7 +418,7 @@ class TestDriverInterfaces:
     def test_desktop_commands_match_hai_drivers_interface(self):
         pytest.importorskip("hai_drivers.desktop.interface")
         commands = PyautoguiDesktopBridge(api_key="k").commands
-        assert {"click", "write", "run_command", "read_file", "screenshot_b64"} <= commands
+        assert {"click", "write", "run_command", "read_file", "screenshot"} <= commands
         assert not any(name.startswith("_") for name in commands)
 
 

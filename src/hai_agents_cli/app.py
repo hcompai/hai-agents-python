@@ -21,6 +21,7 @@ from hai_agents.types import PageSessionSummary
 from hai_agents_common import credentials
 from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
+from hai_agents_local import desktop as desktop_defaults
 
 from . import auth, mcp_hosts
 
@@ -586,11 +587,31 @@ def local_browser(
 def local_desktop(
     ctx: typer.Context,
     session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
+    max_width: int = typer.Option(
+        desktop_defaults.DEFAULT_MAX_WIDTH, "--max-width", help="Cap screenshot width in pixels. 0 disables."
+    ),
+    max_height: int = typer.Option(0, "--max-height", help="Cap screenshot height in pixels. 0 disables."),
+    image_format: str = typer.Option(
+        desktop_defaults.DEFAULT_IMAGE_FORMAT, "--image-format", help="Screenshot encoding: png, jpeg, or webp."
+    ),
+    quality: int = typer.Option(
+        desktop_defaults.DEFAULT_QUALITY, "--quality", help="Encoding quality (1-100) for jpeg/webp."
+    ),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""
     from hai_agents_local import PyautoguiDesktopBridge
 
-    _run_bridge(_state(ctx), PyautoguiDesktopBridge, session_id)
+    if image_format not in ("png", "jpeg", "webp"):
+        _raise_cli_error(ValueError(f"--image-format must be png, jpeg, or webp; got {image_format!r}"))
+    _run_bridge(
+        _state(ctx),
+        PyautoguiDesktopBridge,
+        session_id,
+        max_width=max_width or None,
+        max_height=max_height or None,
+        image_format=image_format,
+        quality=quality,
+    )
 
 
 def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str | None, **options: Any) -> None:
