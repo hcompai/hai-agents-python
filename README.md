@@ -52,16 +52,18 @@ Launch the built-in `h/web-surfer-pro` agent, which ships with its own browser, 
 ```python
 from hai_agents import Client
 
-client = Client()  # reads HAI_API_KEY from the environment
+client = Client()
 
 result = client.run_session(
     agent="h/web-surfer-pro",
     messages="What are the top 3 stories on Hacker News right now?",
 )
 
-print(result.status)  # a settled state: "idle" on EU (the default), "completed" on US
+print(result.status)
 print(result.answer)
 ```
+
+`Client()` reads `HAI_API_KEY` from the environment.
 
 `result` is a `SessionRunResult`: `id`, `status`, `answer`, the accumulated `events`, and `final_changes`.
 
@@ -87,22 +89,24 @@ print(result.status, result.answer)
 A handle bound to the session `id` exposes the full lifecycle. Read the agent's progress at three levels of detail:
 
 ```python
-session.status()               # cheap snapshot: state, step count, token usage
-session.changes(from_index=0)  # new events and the final answer, long-polled
-session.get()                  # the full Session resource
+session.status()
+session.changes(from_index=0)
+session.get()
 ```
+
+`status()` is a cheap snapshot with the state, step count, and token usage. `changes(from_index=0)` long-polls for new events and the final answer. `get()` returns the full Session resource.
 
 While the session is not in a terminal state, you can intervene:
 
 ```python
 session.send_message({"type": "user_message", "message": "Only consider the last 24 hours"})
-session.pause()         # halt with state preserved
-session.resume()        # continue where it left off
-session.force_answer()  # stop exploring and answer from what it has
-session.cancel()        # stop for good; ends in "interrupted"
+session.pause()
+session.resume()
+session.force_answer()
+session.cancel()
 ```
 
-`send_message` redirects the agent on its next step. Sending a message to an `idle` session also wakes it.
+`send_message` redirects the agent on its next step and wakes an `idle` session. `pause` halts with state preserved until `resume`. `force_answer` makes the agent stop exploring and answer from what it has. `cancel` ends the session as `interrupted`.
 
 ## Multi-turn sessions
 
@@ -142,7 +146,7 @@ result = client.run_session(
     answer_schema=Jobs,
 )
 
-for job in result.answer.jobs:  # result.answer is a Jobs instance
+for job in result.answer.jobs:
     print(job.title, "@", job.company)
 ```
 
@@ -179,6 +183,32 @@ def lookup(order_id: str) -> dict:
 ```
 
 A tool that raises is reported to the agent as a tool error rather than crashing the run. With `AsyncClient`, tools may be `async def`.
+
+### Prebuilt: one-time passwords (2FA)
+
+`hai_agents_tools` ships ready-made tools. `otp_tool` lets the agent ask for a one-time password, verification code, or confirmation link when a login or signup step needs one. Without a handler it prompts on stdin; `imap_otp_handler` reads the code straight from a mailbox over IMAP (for Gmail, use an app password).
+
+```python
+import os
+
+from hai_agents import Client
+from hai_agents_tools import imap_otp_handler, otp_tool
+
+handler = imap_otp_handler(
+    host="imap.gmail.com",
+    username="agent-inbox@gmail.com",
+    password=os.environ["GMAIL_APP_PASSWORD"],
+)
+
+client = Client()
+result = client.run_session(
+    agent="h/web-surfer-pro",
+    messages="Log in to example.com and check for new notifications",
+    tools=[otp_tool(handler)],
+)
+```
+
+Like every custom tool, the handler runs entirely in your process: the IMAP credentials never leave your machine, and the agent only receives the single extracted code or link -- never mailbox contents.
 
 ## Browser profiles and vaults
 
@@ -229,13 +259,17 @@ print(link.share_url)
 
 ## Regions and configuration
 
-The client targets the EU region by default. Point it at the US region or a custom URL, and override the API key in code when you do not want to use the environment variable:
+The client targets the EU region by default; pass `environment` to use the US region instead:
 
 ```python
 from hai_agents import Client, HaiAgentsEnvironment
 
 client = Client(environment=HaiAgentsEnvironment.US)
-# or
+```
+
+`Client` also accepts a custom `base_url`, and an `api_key` when you do not want to use the environment variable:
+
+```python
 client = Client(base_url="https://agp.hcompany.ai", api_key="hk-...")
 ```
 
@@ -264,14 +298,14 @@ print(event.type, event.data)
 The `cli` extra installs the `hai` command for driving agents from your terminal:
 
 ```bash
-hai login                 # browser sign-in, stores a key in ~/.config/hai/.env
+hai login
 hai run "What's the top story on Hacker News?"
 hai sessions list
 hai sessions watch <session-id>
-hai mcp install           # add the hai-agents MCP server to Cursor, VS Code, Claude Code, ...
+hai mcp install
 ```
 
-Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`, then `~/.config/hai/.env`. Run `hai --help` for the full command set.
+`hai login` signs in through the browser and stores a key in `~/.config/hai/.env`. `hai mcp install` adds the hai-agents MCP server to Cursor, VS Code, Claude Code, and other MCP clients. Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`, then `~/.config/hai/.env`. Run `hai --help` for the full command set.
 
 ## Documentation
 

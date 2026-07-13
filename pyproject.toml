@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hai-agents"
-version = "1.0.4"
+version = "1.0.6"
 description = "Python SDK for H Company's Computer-Use Agents: autonomous agents powered by Holo."
 requires-python = ">=3.10"
 readme = "README.md"
@@ -41,10 +41,14 @@ cli = [
 # `pip install "hai-agents[local]"` valid documentation and lets a real
 # dependency land later without a breaking install-instruction change.
 local = []
+desktop = [
+  "hai-drivers[desktop]>=0.1.0",
+]
+browser = [
+  "hai-drivers[web]>=0.1.0",
+]
 all = [
-  "python-dotenv>=1.2.2,<2",
-  "rich>=13,<16",
-  "typer>=0.12,<1",
+  "hai-agents[browser,cli,desktop]",
 ]
 
 [project.scripts]
@@ -57,7 +61,7 @@ Issues = "https://github.com/hcompai/hai-agents-python/issues"
 Documentation = "https://hub.hcompany.ai/computer-use-agents"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/hai_agents", "src/hai_agents_cli", "src/hai_agents_common"]
+packages = ["src/hai_agents", "src/hai_agents_cli", "src/hai_agents_common", "src/hai_agents_local", "src/hai_agents_tools"]
 
 [dependency-groups]
 dev = [
@@ -66,7 +70,7 @@ dev = [
   # Used only by tests/integration/ — read HAI_API_KEY_TEST when running locally.
   "python-dotenv>=1.2.2,<2",
   "rich>=13,<16",
-  "ruff==0.15.20",
+  "ruff==0.15.21",
   "typer>=0.12,<1",
 ]
 

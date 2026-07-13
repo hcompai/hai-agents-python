@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import socket
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
 from rich.console import Console
@@ -22,6 +23,9 @@ from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
 
 from . import auth, mcp_hosts
+
+if TYPE_CHECKING:
+    from hai_agents_local import LocalBridge
 
 H_GLYPH = "\n".join(
     (
@@ -48,6 +52,12 @@ sessions_app = typer.Typer(no_args_is_help=True, help="Inspect and steer session
 agents_app = typer.Typer(no_args_is_help=True, help="Browse available agents.")
 skills_app = typer.Typer(no_args_is_help=True, help="Browse available skills.")
 mcp_app = typer.Typer(no_args_is_help=True, help="Manage the hai-agents MCP server.")
+local_app = typer.Typer(
+    no_args_is_help=True,
+    help="Manually run the local browser/desktop bridge. Only needed when the session is started "
+    "elsewhere (the web app, another machine, or an agent referenced by name); sessions created "
+    "from the Python SDK with an inline agent start it automatically.",
+)
 
 
 @dataclass(frozen=True)
@@ -560,10 +570,76 @@ def _print_mcp_results(results: list[dict], server_url: str, json_output: bool) 
     console.print("[yellow]Your API key was written into these configs in plaintext. Keep them private.[/yellow]")
 
 
+@local_app.command("browser")
+def local_browser(
+    ctx: typer.Context,
+    session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
+    debug_port: int = typer.Option(9222, "--debug-port", help="Chrome remote-debugging port to attach to."),
+) -> None:
+    """Serve browser commands on this machine through Chrome on --debug-port."""
+    from hai_agents_local import SeleniumBrowserBridge
+
+    _run_bridge(_state(ctx), SeleniumBrowserBridge, session_id, debugging_port=debug_port)
+
+
+@local_app.command("desktop")
+def local_desktop(
+    ctx: typer.Context,
+    session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
+) -> None:
+    """Serve desktop commands on this machine's mouse, keyboard, and screen."""
+    from hai_agents_local import PyautoguiDesktopBridge
+
+    _run_bridge(_state(ctx), PyautoguiDesktopBridge, session_id)
+
+
+def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str | None, **options: Any) -> None:
+    import logging
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    try:
+        bridge = bridge_type(
+            api_key=credentials.resolve_api_key(state.api_key),
+            base_url=credentials.resolve_base_url(state.base_url),
+            session_id=session_id,
+            **options,
+        )
+    except (RuntimeError, ValueError) as exc:
+        _raise_cli_error(exc)
+
+    console.print(
+        f"[bold]Local {bridge.environment_kind} bridge[/bold] serving session id "
+        f"[cyan]{bridge.session_id}[/cyan]. Press Ctrl-C to stop."
+    )
+    console.print(
+        "[dim]Point a user_device environment at it: "
+        f'{{"kind": "{bridge.environment_kind}", "host": "user_device", "session_id": "{bridge.session_id}"}}[/dim]'
+    )
+    try:
+        asyncio.run(_serve_bridge(bridge))
+    except KeyboardInterrupt:
+        console.print("Stopped.")
+    except Exception as exc:
+        _raise_cli_error(exc)
+
+
+async def _serve_bridge(bridge: Any) -> None:
+    import signal
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, bridge.request_stop)
+        except (NotImplementedError, RuntimeError, ValueError):
+            pass
+    await bridge.run()
+
+
 app.add_typer(sessions_app, name="sessions")
 app.add_typer(agents_app, name="agents")
 app.add_typer(skills_app, name="skills")
 app.add_typer(mcp_app, name="mcp")
+app.add_typer(local_app, name="local")
 
 
 def main() -> None:

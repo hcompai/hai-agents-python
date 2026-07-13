@@ -7,6 +7,8 @@ import socket
 
 import pytest
 
+from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR
+
 FAKE_RUNTIME_SOURCE = '''#!/usr/bin/env python3
 """Stand-in hai-agent-runtime: /health plus a bearer-checked empty sessions list.
 
@@ -65,3 +67,8 @@ def free_port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+
+
+@pytest.fixture(autouse=True)
+def _no_auto_bridges(monkeypatch):
+    monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "0")

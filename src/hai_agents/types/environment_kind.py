@@ -2,4 +2,4 @@
 
 import typing
 
-EnvironmentKind = typing.Union[typing.Literal["web"], typing.Any]
+EnvironmentKind = typing.Union[typing.Literal["web", "desktop"], typing.Any]

@@ -12,15 +12,16 @@ from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
 from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
-from ..types.browser_kind import BrowserKind
-from ..types.browser_mode import BrowserMode
 from ..types.browser_network import BrowserNetwork
 from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
 from ..types.http_validation_error import HttpValidationError
+from .types.create_environment_request import CreateEnvironmentRequest
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
+from .types.patch_environment_host import PatchEnvironmentHost
 from .types.patch_environment_mode import PatchEnvironmentMode
+from .types.update_environment_request_body import UpdateEnvironmentRequestBody
 from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
@@ -117,45 +118,14 @@ class RawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     def create_environment(
-        self,
-        *,
-        id: str,
-        kind: typing.Optional[BrowserKind] = OMIT,
-        start_url: typing.Optional[str] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
-        mode: typing.Optional[BrowserMode] = OMIT,
-        vault_id: typing.Optional[str] = OMIT,
-        browser_profile_id: typing.Optional[str] = OMIT,
-        network: typing.Optional[BrowserNetwork] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
+        self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
     ) -> HttpResponse[Environment]:
         """
         Create an environment.
 
         Parameters
         ----------
-        id : str
-            Catalog identifier for this environment.
-
-        kind : typing.Optional[BrowserKind]
-
-        start_url : typing.Optional[str]
-            Initial URL to open.
-
-        headless : typing.Optional[bool]
-            Run the browser without a visible window.
-
-        mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser.
-
-        vault_id : typing.Optional[str]
-            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
-
-        browser_profile_id : typing.Optional[str]
-            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
-
-        network : typing.Optional[BrowserNetwork]
-            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+        request : CreateEnvironmentRequest
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -168,20 +138,9 @@ class RawEnvironmentsClient:
         _response = self._client_wrapper.httpx_client.request(
             "api/v2/environments",
             method="POST",
-            json={
-                "id": id,
-                "kind": kind,
-                "start_url": start_url,
-                "headless": headless,
-                "mode": convert_and_respect_annotation_metadata(
-                    object_=mode, annotation=BrowserMode, direction="write"
-                ),
-                "vault_id": vault_id,
-                "browser_profile_id": browser_profile_id,
-                "network": convert_and_respect_annotation_metadata(
-                    object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
-                ),
-            },
+            json=convert_and_respect_annotation_metadata(
+                object_=request, annotation=CreateEnvironmentRequest, direction="write"
+            ),
             headers={
                 "content-type": "application/json",
             },
@@ -272,48 +231,16 @@ class RawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     def update_environment(
-        self,
-        id_: str,
-        *,
-        id: str,
-        kind: typing.Optional[BrowserKind] = OMIT,
-        start_url: typing.Optional[str] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
-        mode: typing.Optional[BrowserMode] = OMIT,
-        vault_id: typing.Optional[str] = OMIT,
-        browser_profile_id: typing.Optional[str] = OMIT,
-        network: typing.Optional[BrowserNetwork] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
+        self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
     ) -> HttpResponse[Environment]:
         """
         Replace the environment spec.
 
         Parameters
         ----------
-        id_ : str
-
         id : str
-            Catalog identifier for this environment.
 
-        kind : typing.Optional[BrowserKind]
-
-        start_url : typing.Optional[str]
-            Initial URL to open.
-
-        headless : typing.Optional[bool]
-            Run the browser without a visible window.
-
-        mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser.
-
-        vault_id : typing.Optional[str]
-            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
-
-        browser_profile_id : typing.Optional[str]
-            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
-
-        network : typing.Optional[BrowserNetwork]
-            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+        request : UpdateEnvironmentRequestBody
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -324,22 +251,11 @@ class RawEnvironmentsClient:
             Successful Response
         """
         _response = self._client_wrapper.httpx_client.request(
-            f"api/v2/environments/{encode_path_param(id_)}",
+            f"api/v2/environments/{encode_path_param(id)}",
             method="PUT",
-            json={
-                "id": id,
-                "kind": kind,
-                "start_url": start_url,
-                "headless": headless,
-                "mode": convert_and_respect_annotation_metadata(
-                    object_=mode, annotation=BrowserMode, direction="write"
-                ),
-                "vault_id": vault_id,
-                "browser_profile_id": browser_profile_id,
-                "network": convert_and_respect_annotation_metadata(
-                    object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
-                ),
-            },
+            json=convert_and_respect_annotation_metadata(
+                object_=request, annotation=UpdateEnvironmentRequestBody, direction="write"
+            ),
             headers={
                 "content-type": "application/json",
             },
@@ -425,11 +341,15 @@ class RawEnvironmentsClient:
         self,
         id: str,
         *,
+        host: typing.Optional[PatchEnvironmentHost] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         headless: typing.Optional[bool] = OMIT,
+        session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        use_default_browser_profile: typing.Optional[bool] = OMIT,
+        persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Environment]:
@@ -440,15 +360,23 @@ class RawEnvironmentsClient:
         ----------
         id : str
 
+        host : typing.Optional[PatchEnvironmentHost]
+
         start_url : typing.Optional[str]
 
         headless : typing.Optional[bool]
+
+        session_id : typing.Optional[str]
 
         mode : typing.Optional[PatchEnvironmentMode]
 
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
+
+        use_default_browser_profile : typing.Optional[bool]
+
+        persist_browser_profile : typing.Optional[bool]
 
         network : typing.Optional[BrowserNetwork]
 
@@ -464,13 +392,17 @@ class RawEnvironmentsClient:
             f"api/v2/environments/{encode_path_param(id)}",
             method="PATCH",
             json={
+                "host": host,
                 "start_url": start_url,
                 "headless": headless,
+                "session_id": session_id,
                 "mode": convert_and_respect_annotation_metadata(
                     object_=mode, annotation=typing.Optional[PatchEnvironmentMode], direction="write"
                 ),
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
+                "use_default_browser_profile": use_default_browser_profile,
+                "persist_browser_profile": persist_browser_profile,
                 "network": convert_and_respect_annotation_metadata(
                     object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
                 ),
@@ -602,45 +534,14 @@ class AsyncRawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     async def create_environment(
-        self,
-        *,
-        id: str,
-        kind: typing.Optional[BrowserKind] = OMIT,
-        start_url: typing.Optional[str] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
-        mode: typing.Optional[BrowserMode] = OMIT,
-        vault_id: typing.Optional[str] = OMIT,
-        browser_profile_id: typing.Optional[str] = OMIT,
-        network: typing.Optional[BrowserNetwork] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
+        self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
     ) -> AsyncHttpResponse[Environment]:
         """
         Create an environment.
 
         Parameters
         ----------
-        id : str
-            Catalog identifier for this environment.
-
-        kind : typing.Optional[BrowserKind]
-
-        start_url : typing.Optional[str]
-            Initial URL to open.
-
-        headless : typing.Optional[bool]
-            Run the browser without a visible window.
-
-        mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser.
-
-        vault_id : typing.Optional[str]
-            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
-
-        browser_profile_id : typing.Optional[str]
-            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
-
-        network : typing.Optional[BrowserNetwork]
-            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+        request : CreateEnvironmentRequest
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -653,20 +554,9 @@ class AsyncRawEnvironmentsClient:
         _response = await self._client_wrapper.httpx_client.request(
             "api/v2/environments",
             method="POST",
-            json={
-                "id": id,
-                "kind": kind,
-                "start_url": start_url,
-                "headless": headless,
-                "mode": convert_and_respect_annotation_metadata(
-                    object_=mode, annotation=BrowserMode, direction="write"
-                ),
-                "vault_id": vault_id,
-                "browser_profile_id": browser_profile_id,
-                "network": convert_and_respect_annotation_metadata(
-                    object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
-                ),
-            },
+            json=convert_and_respect_annotation_metadata(
+                object_=request, annotation=CreateEnvironmentRequest, direction="write"
+            ),
             headers={
                 "content-type": "application/json",
             },
@@ -757,48 +647,16 @@ class AsyncRawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     async def update_environment(
-        self,
-        id_: str,
-        *,
-        id: str,
-        kind: typing.Optional[BrowserKind] = OMIT,
-        start_url: typing.Optional[str] = OMIT,
-        headless: typing.Optional[bool] = OMIT,
-        mode: typing.Optional[BrowserMode] = OMIT,
-        vault_id: typing.Optional[str] = OMIT,
-        browser_profile_id: typing.Optional[str] = OMIT,
-        network: typing.Optional[BrowserNetwork] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
+        self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
     ) -> AsyncHttpResponse[Environment]:
         """
         Replace the environment spec.
 
         Parameters
         ----------
-        id_ : str
-
         id : str
-            Catalog identifier for this environment.
 
-        kind : typing.Optional[BrowserKind]
-
-        start_url : typing.Optional[str]
-            Initial URL to open.
-
-        headless : typing.Optional[bool]
-            Run the browser without a visible window.
-
-        mode : typing.Optional[BrowserMode]
-            How the agent perceives and drives the browser.
-
-        vault_id : typing.Optional[str]
-            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
-
-        browser_profile_id : typing.Optional[str]
-            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
-
-        network : typing.Optional[BrowserNetwork]
-            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
+        request : UpdateEnvironmentRequestBody
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -809,22 +667,11 @@ class AsyncRawEnvironmentsClient:
             Successful Response
         """
         _response = await self._client_wrapper.httpx_client.request(
-            f"api/v2/environments/{encode_path_param(id_)}",
+            f"api/v2/environments/{encode_path_param(id)}",
             method="PUT",
-            json={
-                "id": id,
-                "kind": kind,
-                "start_url": start_url,
-                "headless": headless,
-                "mode": convert_and_respect_annotation_metadata(
-                    object_=mode, annotation=BrowserMode, direction="write"
-                ),
-                "vault_id": vault_id,
-                "browser_profile_id": browser_profile_id,
-                "network": convert_and_respect_annotation_metadata(
-                    object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
-                ),
-            },
+            json=convert_and_respect_annotation_metadata(
+                object_=request, annotation=UpdateEnvironmentRequestBody, direction="write"
+            ),
             headers={
                 "content-type": "application/json",
             },
@@ -910,11 +757,15 @@ class AsyncRawEnvironmentsClient:
         self,
         id: str,
         *,
+        host: typing.Optional[PatchEnvironmentHost] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         headless: typing.Optional[bool] = OMIT,
+        session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
+        use_default_browser_profile: typing.Optional[bool] = OMIT,
+        persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Environment]:
@@ -925,15 +776,23 @@ class AsyncRawEnvironmentsClient:
         ----------
         id : str
 
+        host : typing.Optional[PatchEnvironmentHost]
+
         start_url : typing.Optional[str]
 
         headless : typing.Optional[bool]
+
+        session_id : typing.Optional[str]
 
         mode : typing.Optional[PatchEnvironmentMode]
 
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
+
+        use_default_browser_profile : typing.Optional[bool]
+
+        persist_browser_profile : typing.Optional[bool]
 
         network : typing.Optional[BrowserNetwork]
 
@@ -949,13 +808,17 @@ class AsyncRawEnvironmentsClient:
             f"api/v2/environments/{encode_path_param(id)}",
             method="PATCH",
             json={
+                "host": host,
                 "start_url": start_url,
                 "headless": headless,
+                "session_id": session_id,
                 "mode": convert_and_respect_annotation_metadata(
                     object_=mode, annotation=typing.Optional[PatchEnvironmentMode], direction="write"
                 ),
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
+                "use_default_browser_profile": use_default_browser_profile,
+                "persist_browser_profile": persist_browser_profile,
                 "network": convert_and_respect_annotation_metadata(
                     object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
                 ),

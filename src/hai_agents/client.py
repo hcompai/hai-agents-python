@@ -24,6 +24,7 @@ from .polling import (
 )
 from .polling import async_run_session as _async_run_session
 from .polling import run_session as _run_session
+from .sessions.client import AsyncSessionsClient, SessionsClient
 from .tools import ToolInput, as_tools
 
 if typing.TYPE_CHECKING:
@@ -117,6 +118,14 @@ class Client(BaseClient):
         client._local_runtime = runtime  # keep the manager reachable for lifecycle calls
         return client
 
+    @property
+    def sessions(self) -> SessionsClient:
+        if self._sessions is None:
+            from hai_agents_local.sessions import LocalSessionsClient
+
+            self._sessions = LocalSessionsClient(client_wrapper=self._client_wrapper)
+        return self._sessions
+
 
 class AsyncClient(AsyncBaseClient):
     async def run_session(
@@ -187,3 +196,11 @@ class AsyncClient(AsyncBaseClient):
         client = cls(base_url=runtime.base_url, api_key=runtime.api_key)
         client._local_runtime = runtime  # keep the manager reachable for lifecycle calls
         return client
+
+    @property
+    def sessions(self) -> AsyncSessionsClient:
+        if self._sessions is None:
+            from hai_agents_local.sessions import LocalAsyncSessionsClient
+
+            self._sessions = LocalAsyncSessionsClient(client_wrapper=self._client_wrapper)
+        return self._sessions

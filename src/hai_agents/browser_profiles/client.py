@@ -159,6 +159,108 @@ class BrowserProfilesClient:
         )
         return _response.data
 
+    def get_default_browser_profile(
+        self, *, browser_name: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> BrowserProfileRead:
+        """
+        Fetch the caller's default profile for a browser flavor (404 when unset).
+
+        Parameters
+        ----------
+        browser_name : str
+            Browser flavor, e.g. 'chromium'
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        BrowserProfileRead
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.browser_profiles.get_default_browser_profile(
+            browser_name="browser_name",
+        )
+        """
+        _response = self._raw_client.get_default_browser_profile(
+            browser_name=browser_name, request_options=request_options
+        )
+        return _response.data
+
+    def set_default_browser_profile(
+        self, profile_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> BrowserProfileRead:
+        """
+        Mark a profile as the caller's default for its browser flavor.
+
+        Sessions created with ``use_default_browser_profile: true`` attach this
+        profile. Replaces the caller's previous default for the same browser_name.
+
+        Parameters
+        ----------
+        profile_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        BrowserProfileRead
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.browser_profiles.set_default_browser_profile(
+            profile_id="profile_id",
+        )
+        """
+        _response = self._raw_client.set_default_browser_profile(profile_id, request_options=request_options)
+        return _response.data
+
+    def unset_default_browser_profile(
+        self, profile_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> BrowserProfileRead:
+        """
+        Clear the default flag on a profile.
+
+        Parameters
+        ----------
+        profile_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        BrowserProfileRead
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.browser_profiles.unset_default_browser_profile(
+            profile_id="profile_id",
+        )
+        """
+        _response = self._raw_client.unset_default_browser_profile(profile_id, request_options=request_options)
+        return _response.data
+
     def get_browser_profile(
         self, profile_id: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> BrowserProfileRead:
@@ -393,6 +495,132 @@ class AsyncBrowserProfilesClient:
             labels=labels,
             request_options=request_options,
         )
+        return _response.data
+
+    async def get_default_browser_profile(
+        self, *, browser_name: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> BrowserProfileRead:
+        """
+        Fetch the caller's default profile for a browser flavor (404 when unset).
+
+        Parameters
+        ----------
+        browser_name : str
+            Browser flavor, e.g. 'chromium'
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        BrowserProfileRead
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.browser_profiles.get_default_browser_profile(
+                browser_name="browser_name",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.get_default_browser_profile(
+            browser_name=browser_name, request_options=request_options
+        )
+        return _response.data
+
+    async def set_default_browser_profile(
+        self, profile_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> BrowserProfileRead:
+        """
+        Mark a profile as the caller's default for its browser flavor.
+
+        Sessions created with ``use_default_browser_profile: true`` attach this
+        profile. Replaces the caller's previous default for the same browser_name.
+
+        Parameters
+        ----------
+        profile_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        BrowserProfileRead
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.browser_profiles.set_default_browser_profile(
+                profile_id="profile_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.set_default_browser_profile(profile_id, request_options=request_options)
+        return _response.data
+
+    async def unset_default_browser_profile(
+        self, profile_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> BrowserProfileRead:
+        """
+        Clear the default flag on a profile.
+
+        Parameters
+        ----------
+        profile_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        BrowserProfileRead
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.browser_profiles.unset_default_browser_profile(
+                profile_id="profile_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.unset_default_browser_profile(profile_id, request_options=request_options)
         return _response.data
 
     async def get_browser_profile(
