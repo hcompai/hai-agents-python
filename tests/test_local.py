@@ -418,7 +418,7 @@ class TestDriverInterfaces:
     def test_desktop_commands_match_hai_drivers_interface(self):
         pytest.importorskip("hai_drivers.desktop.interface")
         commands = PyautoguiDesktopBridge(api_key="k").commands
-        assert {"click", "write", "run_command", "read_file", "screenshot"} <= commands
+        assert {"click", "write", "run_command", "read_file", "screenshot_b64"} <= commands
         assert not any(name.startswith("_") for name in commands)
 
 
