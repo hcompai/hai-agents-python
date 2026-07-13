@@ -114,11 +114,9 @@ def _signal(proc: subprocess.Popen, *, force: bool) -> bool:
     if os.name == "posix":
         return _killpg_posix(proc.pid, signal.SIGKILL if force else signal.SIGTERM)
     try:
-        command = ["taskkill"]
-        if force:
-            command.append("/F")
-        command.extend(["/T", "/PID", str(proc.pid)])
-        subprocess.run(command, check=True, capture_output=True)
+        # Windows has no portable graceful process-group signal. /F is required
+        # to ensure an executable launched through a .cmd shim cannot outlive it.
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], check=True, capture_output=True)
     except (OSError, subprocess.CalledProcessError):
         return False
     return True
