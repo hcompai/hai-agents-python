@@ -110,15 +110,16 @@ def kill_process_group(pid: int) -> bool:
 
 
 def _signal(proc: subprocess.Popen, *, force: bool) -> bool:
-    """Signal the runtime's whole process group (posix) or just the process; False if already gone."""
+    """Signal the runtime's whole process tree; False if it was already gone."""
     if os.name == "posix":
         return _killpg_posix(proc.pid, signal.SIGKILL if force else signal.SIGTERM)
     try:
+        command = ["taskkill"]
         if force:
-            proc.kill()
-        else:
-            proc.terminate()
-    except (OSError, ProcessLookupError):
+            command.append("/F")
+        command.extend(["/T", "/PID", str(proc.pid)])
+        subprocess.run(command, check=True, capture_output=True)
+    except (OSError, subprocess.CalledProcessError):
         return False
     return True
 
