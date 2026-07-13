@@ -45,15 +45,14 @@ class PyautoguiDesktopBridge(LocalBridge["DesktopDriverInterface"]):
         # Runtime import: hai-drivers is absent unless installed with hai-agents[desktop].
         try:
             from hai_drivers.desktop.local import LocalDesktopDriver
+            from hai_drivers.desktop.scaled import ScaledDesktopDriver
         except ImportError as exc:
             raise ImportError(
-                "Local desktop control requires extra deps. Install with: pip install 'hai-agents[desktop]'"
+                "Local desktop control requires hai-drivers>=0.1.2. Install with: pip install 'hai-agents[desktop]'"
             ) from exc
         driver = LocalDesktopDriver()
         if self.max_width is None and self.max_height is None and self.image_format is None:
             return driver
-        from hai_drivers.desktop.scaled import ScaledDesktopDriver
-
         return ScaledDesktopDriver(
             driver,
             max_width=self.max_width,
