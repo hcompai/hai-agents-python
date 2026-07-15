@@ -184,7 +184,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "hai-agents", extras = ["browser", "cli", "desktop"], marker = "extra == 'all'" },
-    { name = "hai-drivers", extras = ["desktop"], marker = "extra == 'desktop'", specifier = ">=0.1.0" },
+    { name = "hai-drivers", extras = ["desktop"], marker = "extra == 'desktop'", specifier = ">=0.1.2" },
     { name = "hai-drivers", extras = ["web"], marker = "extra == 'browser'", specifier = ">=0.1.0" },
     { name = "httpx", specifier = ">=0.23.0,<0.29.0" },
     { name = "pydantic", specifier = ">=2.0,<3" },
@@ -207,19 +207,19 @@ dev = [
 
 [[package]]
 name = "hai-drivers"
-version = "0.1.1"
+version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdownify" },
+    { name = "pillow" },
     { name = "pydantic" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/37/b9/0deb075f1d76f0b4c470ad0be7bb1476a224c375b6d98da95978e46025a8/hai_drivers-0.1.1-py3-none-any.whl", hash = "sha256:bdf6207e2226c488a432cf064acd49943c71e9ac4d90a2529e2e5f2f3cda59fb", size = 31073, upload-time = "2026-07-07T13:27:09Z" },
+    { url = "https://files.pythonhosted.org/packages/1a/d9/f4bf3bbd6340f1a24f5b760028d5370bdf2180d03fcc3bc274279750285e/hai_drivers-0.1.2-py3-none-any.whl", hash = "sha256:586d93678ad225d6face74c0bcab40b91deb8a5ca63258cbee0010b215c0568d", size = 34347, upload-time = "2026-07-15T16:11:31.487Z" },
 ]
 
 [package.optional-dependencies]
 desktop = [
-    { name = "pillow" },
     { name = "pyautogui" },
     { name = "pynput" },
 ]
