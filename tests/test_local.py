@@ -11,7 +11,7 @@ from hai_agents import Client
 from hai_agents.sessions.client import SessionsClient
 from hai_agents_local import BridgeManager, LocalBridge, PyautoguiDesktopBridge, SeleniumBrowserBridge
 from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR
-from hai_agents_local.errors import AuthError
+from hai_agents_local.errors import AuthError, RateLimitedError, SessionNotFoundError
 from hai_agents_local.routing import localize_agent
 from hai_agents_local.transport import Command, serialize_result
 
@@ -582,6 +582,35 @@ class TestBridgeProtocol:
 
         with pytest.raises(AuthError):
             await bridge._poll_loop(AuthFailingExchange())
+
+    async def test_channel_recreation_backs_off_on_rate_limit(self, monkeypatch):
+        """A 429 while recreating a lost channel must back off and retry, not kill the bridge."""
+        bridge = _bridge(FakeDriver())
+
+        async def instant_sleep(seconds: float) -> bool:
+            return False
+
+        monkeypatch.setattr(bridge, "_interruptible_sleep", instant_sleep)
+        ensures = []
+
+        class Exchange:
+            def __init__(self) -> None:
+                self.fetches = 0
+
+            async def fetch_commands(self, *args: Any, **kwargs: Any) -> None:
+                self.fetches += 1
+                if self.fetches == 1:
+                    raise SessionNotFoundError("channel gone")
+                bridge.request_stop()
+                return None
+
+            async def ensure_channel(self, session_id: str) -> None:
+                ensures.append(session_id)
+                if len(ensures) == 1:
+                    raise RateLimitedError(retry_after=0.0)
+
+        await bridge._poll_loop(Exchange())
+        assert ensures == [bridge.session_id, bridge.session_id]
 
     async def test_permanent_4xx_in_poll_loop_propagates(self):
         bridge = _bridge(FakeDriver())

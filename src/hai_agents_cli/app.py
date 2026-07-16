@@ -673,8 +673,11 @@ def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str
         asyncio.run(_serve_bridge(bridge))
     except KeyboardInterrupt:
         console.print("Stopped.")
+        return
     except Exception as exc:
         _raise_cli_error(exc)
+    if not bridge.ready.is_set():
+        _raise_cli_error(RuntimeError("the bridge was stopped during setup and never served"))
 
 
 async def _serve_bridge(bridge: Any) -> None:

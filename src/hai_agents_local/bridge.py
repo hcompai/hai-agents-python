@@ -179,8 +179,12 @@ class LocalBridge(ABC, Generic[DriverT]):
 
     async def _poll_loop(self, exchange: CommandExchange) -> None:
         retry_delay = 1.0
+        recreate_channel = False
         while not self._stop_event.is_set():
             try:
+                if recreate_channel:
+                    await exchange.ensure_channel(self.session_id)
+                    recreate_channel = False
                 started = time.monotonic()
                 commands = await self._fetch_until_stop(exchange)
                 retry_delay = 1.0
@@ -192,9 +196,10 @@ class LocalBridge(ABC, Generic[DriverT]):
                     # Instant empty polls are paced so a misbehaving server cannot cause a busy loop.
                     break
             except SessionNotFoundError:
-                # Channel was garbage-collected server-side; recreate and resume.
+                # Channel was garbage-collected server-side; recreate on the next iteration so
+                # rate limits and transient errors during recreation hit the handlers below.
                 logger.warning("channel %s missing; recreating", self.session_id)
-                await exchange.ensure_channel(self.session_id)
+                recreate_channel = True
                 if await self._interruptible_sleep(retry_delay):
                     break
                 retry_delay = min(retry_delay * 2, MAX_RECONNECT_DELAY_S)
