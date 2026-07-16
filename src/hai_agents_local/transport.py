@@ -66,6 +66,8 @@ class CommandExchange:
         check = await self._client.get(f"{self._base}/api/v1/trajectories/{session_id}/")
         if check.status_code in {HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN}:
             raise AuthError(f"auth error checking channel ({check.status_code})")
+        if check.status_code == HTTPStatus.TOO_MANY_REQUESTS:
+            raise RateLimitedError(_retry_after(check))
         if check.status_code == HTTPStatus.OK:
             return
         resp = await self._client.post(
@@ -74,6 +76,8 @@ class CommandExchange:
         )
         if resp.status_code in {HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN}:
             raise AuthError(f"auth error creating channel ({resp.status_code})")
+        if resp.status_code == HTTPStatus.TOO_MANY_REQUESTS:
+            raise RateLimitedError(_retry_after(resp))
         if resp.status_code == HTTPStatus.CONFLICT:
             return
         resp.raise_for_status()

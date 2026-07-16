@@ -38,7 +38,7 @@ cli = [
   "typer>=0.12,<1",
 ]
 desktop = [
-  "hai-drivers[desktop]>=0.1.0",
+  "hai-drivers[desktop]>=0.1.2",
 ]
 browser = [
   "hai-drivers[web]>=0.1.0",

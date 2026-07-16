@@ -12,7 +12,8 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
 from rich.console import Console
-from rich.table import Table
+from rich.markup import escape
+from rich.table import Column, Table
 
 from hai_agents import Client, assert_request_under_limit, is_settled_session_status, wait_for_session
 from hai_agents.core.api_error import ApiError
@@ -21,6 +22,7 @@ from hai_agents.types import PageSessionSummary
 from hai_agents_common import credentials
 from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
+from hai_agents_local import desktop as desktop_defaults
 
 from . import auth, mcp_hosts
 
@@ -106,6 +108,25 @@ def logout() -> None:
     """Remove the stored API key from ~/.config/hai/.env."""
     path = credentials.clear_api_key()
     console.print(f"Removed {credentials.API_KEY_VAR} from {path}." if path else "No stored key found.")
+
+
+@app.command()
+def doctor(ctx: typer.Context) -> None:
+    """Diagnose this machine's hai setup: login, platform access, local browser/desktop. Read-only."""
+    from .doctor import run_checks
+
+    state = _state(ctx)
+    results = run_checks(api_key=state.api_key, base_url=state.base_url)
+    if state.json_output:
+        _print_json([{"name": r.name, "ok": r.ok, "detail": r.detail, "fix": r.fix} for r in results])
+    else:
+        for r in results:
+            mark = "[bold green]ok[/bold green]" if r.ok else "[bold red]fail[/bold red]"
+            console.print(f"{mark} [bold]{r.name}[/bold] {escape(r.detail)}")
+            if r.fix is not None:
+                console.print(f"   [dim]fix:[/dim] {escape(r.fix)}")
+    if not all(r.ok for r in results):
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -225,7 +246,8 @@ def list_sessions(
         _print_json(result)
         return
 
-    table = Table("ID", "Status", "Agent", "Created")
+    # The ID column never shrinks: a truncated UUID cannot be pasted into follow-up commands.
+    table = Table(Column("ID", min_width=36, no_wrap=True), "Status", "Agent", "Created")
     for item in result.items:
         url = getattr(item, "agent_view_url", None)
         id_cell = f"[link={url}]{item.id}[/link]" if url else item.id
@@ -330,7 +352,7 @@ def status(ctx: typer.Context, session_id: str = typer.Argument(...)) -> None:
     if result.steps is not None:
         table.add_row("Steps", str(result.steps))
     if result.error:
-        table.add_row("Error", result.error)
+        table.add_row("Error", escape(result.error))
     console.print(table)
 
 
@@ -425,7 +447,7 @@ def list_agents_command(
         return
     table = Table("Name", "Description")
     for item in result.items:
-        table.add_row(item.name, _truncate(item.description))
+        table.add_row(item.name, escape(_truncate(item.description)))
     console.print(table)
 
 
@@ -463,7 +485,7 @@ def list_skills_command(
         return
     table = Table("Name", "Description")
     for item in result.items:
-        table.add_row(item.name, _truncate(item.description))
+        table.add_row(item.name, escape(_truncate(item.description)))
     console.print(table)
 
 
@@ -586,11 +608,42 @@ def local_browser(
 def local_desktop(
     ctx: typer.Context,
     session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
+    max_width: int = typer.Option(
+        desktop_defaults.DEFAULT_MAX_WIDTH, "--max-width", help="Cap screenshot width in pixels. 0 disables."
+    ),
+    max_height: int = typer.Option(0, "--max-height", help="Cap screenshot height in pixels. 0 disables."),
+    image_format: str = typer.Option(
+        desktop_defaults.DEFAULT_IMAGE_FORMAT, "--image-format", help="Screenshot encoding: png, jpeg, or webp."
+    ),
+    quality: int = typer.Option(
+        desktop_defaults.DEFAULT_QUALITY, "--quality", help="Encoding quality (1-100) for jpeg/webp."
+    ),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""
     from hai_agents_local import PyautoguiDesktopBridge
 
-    _run_bridge(_state(ctx), PyautoguiDesktopBridge, session_id)
+    if image_format not in ("png", "jpeg", "webp"):
+        _raise_cli_error(ValueError(f"--image-format must be png, jpeg, or webp; got {image_format!r}"))
+    _run_bridge(
+        _state(ctx),
+        PyautoguiDesktopBridge,
+        session_id,
+        max_width=max_width or None,
+        max_height=max_height or None,
+        image_format=image_format,
+        quality=quality,
+    )
+
+
+@local_app.command("stop")
+def local_stop() -> None:
+    """Stop any in-flight local browser/desktop turn on this machine (same effect as double-Esc)."""
+    from hai_agents_local.killswitch import request_stop
+
+    request_stop()
+    console.print(
+        "Stop requested: local bridges on this machine will halt, and SDK-attached sessions will be cancelled."
+    )
 
 
 def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str | None, **options: Any) -> None:
@@ -604,12 +657,13 @@ def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str
             session_id=session_id,
             **options,
         )
-    except (RuntimeError, ValueError) as exc:
+        bridge.preflight()
+    except (RuntimeError, ValueError, PermissionError) as exc:
         _raise_cli_error(exc)
 
     console.print(
         f"[bold]Local {bridge.environment_kind} bridge[/bold] serving session id "
-        f"[cyan]{bridge.session_id}[/cyan]. Press Ctrl-C to stop."
+        f"[cyan]{bridge.session_id}[/cyan]. Press Ctrl-C to stop, or run `hai local stop` from any terminal."
     )
     console.print(
         "[dim]Point a user_device environment at it: "
@@ -619,12 +673,17 @@ def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str
         asyncio.run(_serve_bridge(bridge))
     except KeyboardInterrupt:
         console.print("Stopped.")
+        return
     except Exception as exc:
         _raise_cli_error(exc)
+    if not bridge.ready.is_set():
+        _raise_cli_error(RuntimeError("the bridge was stopped during setup and never served"))
 
 
 async def _serve_bridge(bridge: Any) -> None:
     import signal
+
+    from hai_agents_local.killswitch import StopWatcher
 
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -632,7 +691,29 @@ async def _serve_bridge(bridge: Any) -> None:
             loop.add_signal_handler(sig, bridge.request_stop)
         except (NotImplementedError, RuntimeError, ValueError):
             pass
-    await bridge.run()
+    watcher = StopWatcher(lambda: loop.call_soon_threadsafe(bridge.request_stop))
+    listener = _arm_kill_switch(bridge)
+    try:
+        await bridge.run()
+    finally:
+        watcher.stop()
+        if listener is not None:
+            listener.stop()
+
+
+def _arm_kill_switch(bridge: Any) -> Any:
+    """Arm the double-Esc listener for desktop serving; a desktop turn steals focus, so Ctrl-C may be out of reach."""
+    if bridge.environment_kind != "desktop" or not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return None
+    from hai_agents_local.killswitch import KILL_SWITCH_ARMED_HINT, KILL_SWITCH_UNAVAILABLE_HINT, arm_esc_listener
+
+    listener = arm_esc_listener()
+    if listener is not None:
+        console.print(f"[dim]{KILL_SWITCH_ARMED_HINT}[/dim]")
+    elif sys.platform == "darwin":
+        # A panic button that silently failed to arm is dangerous; always say so.
+        console.print(f"[yellow]{KILL_SWITCH_UNAVAILABLE_HINT}[/yellow]")
+    return listener
 
 
 app.add_typer(sessions_app, name="sessions")
@@ -675,7 +756,7 @@ def _select_agent(state: AppState, client: Client) -> str:
         if len(desc) > 80:
             desc = desc[:77] + "..."
         line = f"  [bold]{i}[/bold]. {item.name}"
-        console.print(f"{line}  [dim]{desc}[/dim]" if desc else line)
+        console.print(f"{line}  [dim]{escape(desc)}[/dim]" if desc else line)
     choice = typer.prompt("Agent number", type=int)
     if not 1 <= choice <= len(agents):
         _raise_cli_error(RuntimeError(f"Choice must be between 1 and {len(agents)}."))
@@ -695,7 +776,7 @@ def _print_run_result(result, json_output: bool, agent_view_url: str | None = No
     console.print(f"[bold]Session:[/bold] {result.id}")
     console.print(f"[bold]Status:[/bold] {_status_text(result.status)}")
     if result.answer is not None:
-        console.print(result.answer)
+        console.print(escape(result.answer))
 
 
 def _print_ack(action: str, json_output: bool) -> None:
@@ -717,10 +798,10 @@ def _print_watch_result(state: AppState, status_result, final) -> None:
     console.print(f"[bold]Status:[/bold] {_status_text(status_result.status)}")
     error = status_result.error or (final.error if final is not None else None)
     if error:
-        console.print(f"[bold]Error:[/bold] {error}")
+        console.print(f"[bold]Error:[/bold] {escape(error)}")
     answer = final.answer if final is not None else None
     if answer is not None:
-        console.print(answer)
+        console.print(escape(answer))
 
 
 def _status_text(status) -> str:
@@ -737,7 +818,7 @@ def _event_line(index: int, event) -> str:
     event_type = getattr(event, "type", "Event")
     data = getattr(event, "data", None)
     detail = _truncate(json.dumps(to_jsonable(data), sort_keys=True), 120) if data is not None else ""
-    return f"[dim]{index:>4}[/dim] [cyan]{event_type}[/cyan]" + (f"  {detail}" if detail else "")
+    return f"[dim]{index:>4}[/dim] [cyan]{event_type}[/cyan]" + (f"  {escape(detail)}" if detail else "")
 
 
 def _emit_watch_event(state: AppState, index: int, event) -> None:
@@ -776,5 +857,6 @@ def _raise_cli_error(exc: Exception) -> NoReturn:
             message = f"API error {exc.status_code}: {message}"
     else:
         message = str(exc)
-    err_console.print(f"[red]Error:[/red] {message}")
+    # Escape: rich would otherwise eat brackets in messages, e.g. pip extras like hai-agents[browser].
+    err_console.print(f"[red]Error:[/red] {escape(message)}")
     raise typer.Exit(1)

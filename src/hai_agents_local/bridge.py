@@ -5,6 +5,7 @@ import contextlib
 import functools
 import inspect
 import logging
+import random
 import threading
 import time
 import uuid
@@ -29,6 +30,10 @@ MIN_POLL_INTERVAL_S = 1.0
 POST_RESULT_TIMEOUT_S = 10.0
 POST_RESULT_RETRIES = 2
 FETCH_TRANSIENT_RETRIES = 2
+CHANNEL_SETUP_ATTEMPTS = 5
+# Must stay under the manager's READY_TIMEOUT_S so setup gives up with the real
+# error instead of the manager's generic not-ready timeout firing first.
+CHANNEL_SETUP_TIMEOUT_S = 45.0
 MAX_RECONNECT_DELAY_S = 60.0
 MIN_RATE_LIMIT_BACKOFF_S = 1.0
 RESULT_CACHE_SIZE = 512
@@ -54,6 +59,8 @@ class LocalBridge(ABC, Generic[DriverT]):
     """Polls the command channel for session_id and dispatches each command to a local hai-drivers driver."""
 
     environment_kind: ClassVar[str]
+    startup_hint: ClassVar[str | None] = None
+    """Appended to the manager's not-ready timeout error; names the common cause of a hung startup."""
 
     def __init__(
         self,
@@ -80,6 +87,13 @@ class LocalBridge(ABC, Generic[DriverT]):
         self._stop_event = asyncio.Event()
         self._results: OrderedDict[str, tuple[Json, str | None]] = OrderedDict()
 
+    def preflight(self) -> None:
+        """Check host prerequisites before the bridge thread starts.
+
+        Runs on the caller's thread, so OS permission prompts (macOS TCC dialogs) can appear;
+        create_driver later runs on a worker thread where they cannot.
+        """
+
     @abstractmethod
     def create_driver(self) -> DriverT:
         """Build the hai-drivers driver this bridge dispatches commands to."""
@@ -105,7 +119,8 @@ class LocalBridge(ABC, Generic[DriverT]):
                 headers={"Accept": "application/json"}, auth=_BearerAuth(self.api_key), follow_redirects=True
             ) as client:
                 exchange = CommandExchange(client, self.base_url)
-                await exchange.ensure_channel(self.session_id)
+                if not await self._open_channel(exchange):
+                    return
                 if self._driver is None:
                     self._driver = await asyncio.to_thread(self.create_driver)
                 self.ready.set()
@@ -119,10 +134,57 @@ class LocalBridge(ABC, Generic[DriverT]):
                 except Exception:
                     logger.warning("driver teardown failed", exc_info=True)
 
+    async def _open_channel(self, exchange: CommandExchange) -> bool:
+        """Open the command channel, retrying rate limits and transient failures with jittered backoff.
+
+        Retries stop at CHANNEL_SETUP_ATTEMPTS or the CHANNEL_SETUP_TIMEOUT_S deadline, whichever
+        comes first. False means a stop was requested mid-setup; definitive failures (auth, 4xx) raise.
+        """
+        deadline = time.monotonic() + CHANNEL_SETUP_TIMEOUT_S
+        delay = 1.0
+        for attempt in range(1, CHANNEL_SETUP_ATTEMPTS + 1):
+            try:
+                await exchange.ensure_channel(self.session_id)
+                return True
+            except RateLimitedError as exc:
+                backoff = max(exc.retry_after, MIN_RATE_LIMIT_BACKOFF_S) * (1 + random.uniform(0, 0.25))
+                if attempt == CHANNEL_SETUP_ATTEMPTS or time.monotonic() + backoff > deadline:
+                    raise RuntimeError(
+                        "the platform kept rate-limiting command-channel setup; wait a minute and retry"
+                    ) from exc
+                logger.warning(
+                    "platform rate-limited channel setup (attempt %d/%d); retrying in %.1fs",
+                    attempt,
+                    CHANNEL_SETUP_ATTEMPTS,
+                    backoff,
+                )
+                if await self._interruptible_sleep(backoff):
+                    return False
+            except httpx.HTTPError as exc:
+                backoff = delay * (1 + random.uniform(0, 0.25))
+                definitive = isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500
+                if definitive or attempt == CHANNEL_SETUP_ATTEMPTS or time.monotonic() + backoff > deadline:
+                    raise
+                logger.warning(
+                    "channel setup failed (attempt %d/%d): %s; retrying in %.1fs",
+                    attempt,
+                    CHANNEL_SETUP_ATTEMPTS,
+                    exc,
+                    backoff,
+                )
+                if await self._interruptible_sleep(backoff):
+                    return False
+                delay = min(delay * 2, MAX_RECONNECT_DELAY_S)
+        return False
+
     async def _poll_loop(self, exchange: CommandExchange) -> None:
         retry_delay = 1.0
+        recreate_channel = False
         while not self._stop_event.is_set():
             try:
+                if recreate_channel:
+                    await exchange.ensure_channel(self.session_id)
+                    recreate_channel = False
                 started = time.monotonic()
                 commands = await self._fetch_until_stop(exchange)
                 retry_delay = 1.0
@@ -134,9 +196,10 @@ class LocalBridge(ABC, Generic[DriverT]):
                     # Instant empty polls are paced so a misbehaving server cannot cause a busy loop.
                     break
             except SessionNotFoundError:
-                # Channel was garbage-collected server-side; recreate and resume.
+                # Channel was garbage-collected server-side; recreate on the next iteration so
+                # rate limits and transient errors during recreation hit the handlers below.
                 logger.warning("channel %s missing; recreating", self.session_id)
-                await exchange.ensure_channel(self.session_id)
+                recreate_channel = True
                 if await self._interruptible_sleep(retry_delay):
                     break
                 retry_delay = min(retry_delay * 2, MAX_RECONNECT_DELAY_S)

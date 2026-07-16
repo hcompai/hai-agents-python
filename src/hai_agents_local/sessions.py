@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import atexit
 import concurrent.futures
 import functools
 import inspect
@@ -15,10 +16,22 @@ from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
 
 from .bridge import LocalBridge, TokenSource
 from .config import auto_bridges_enabled
+from .killswitch import StopWatcher
 from .manager import ensure_bridges, stop_bridges
 from .routing import localize_agent
 
 logger = logging.getLogger(__name__)
+
+# Runaway guards for sessions whose caller passes no budget: a local session left running (its
+# serving process was SIGKILLed, the laptop slept) burns steps against a dead channel until it
+# hits these. Explicit values, including None for unbounded, are respected.
+DEFAULT_LOCAL_MAX_STEPS = 150
+DEFAULT_LOCAL_MAX_TIME_S = 1800.0
+
+
+def _apply_runaway_budgets(kwargs: typing.Dict[str, typing.Any]) -> None:
+    kwargs.setdefault("max_steps", DEFAULT_LOCAL_MAX_STEPS)
+    kwargs.setdefault("max_time_s", DEFAULT_LOCAL_MAX_TIME_S)
 
 
 def _token_source(client_wrapper: typing.Any) -> TokenSource:
@@ -108,12 +121,9 @@ def _cancel_action(
 
     def cancel() -> None:
         logger.error("local bridge for session %s crashed; cancelling the session", session_id)
+        _deregister_exit_cancel(session_id)
         try:
-            from hai_agents.client import Client
-
-            api_key = _resolve_token(_token_source(client_wrapper))
-            client = Client(api_key=api_key, base_url=client_wrapper.get_base_url())
-            client.sessions.cancel_session(session_id)
+            _cancel_remote_session(client_wrapper, session_id)
         except Exception:
             logger.exception("failed to cancel session %s after its local bridge crashed", session_id)
         finally:
@@ -122,11 +132,74 @@ def _cancel_action(
     return cancel
 
 
+def _cancel_remote_session(client_wrapper: typing.Any, session_id: str) -> None:
+    from hai_agents.client import Client
+
+    api_key = _resolve_token(_token_source(client_wrapper))
+    client = Client(api_key=api_key, base_url=client_wrapper.get_base_url())
+    client.sessions.cancel_session(session_id)
+
+
+# Sessions that depend on this process's bridges, cancelled at interpreter exit: the bridges die
+# with the process, so leaving those sessions running only burns steps against a dead channel.
+_exit_cancels: typing.Dict[str, typing.Callable[[], None]] = {}
+_exit_lock = threading.Lock()
+_stop_watcher: typing.Optional[StopWatcher] = None
+
+
+def _ensure_stop_watcher() -> StopWatcher:
+    """Arm kill-switch coverage, replacing a fired watcher; a fired one is spent."""
+    global _stop_watcher
+    with _exit_lock:
+        if _stop_watcher is None or not _stop_watcher.active:
+            _stop_watcher = StopWatcher(_panic_stop)
+        return _stop_watcher
+
+
+def _register_exit_cancel(client_wrapper: typing.Any, session_id: str) -> None:
+    def cancel_quietly() -> None:
+        # Best effort: the session may have finished long ago; the platform rejects the cancel then.
+        try:
+            _cancel_remote_session(client_wrapper, session_id)
+            logger.info("cancelled session %s at exit: its local bridge lives in this process", session_id)
+        except Exception as exc:
+            logger.debug("exit-time cancel of session %s skipped: %s", session_id, exc)
+
+    with _exit_lock:
+        _exit_cancels[session_id] = cancel_quietly
+    _ensure_stop_watcher()
+
+
+def _panic_stop() -> None:
+    logger.warning("kill switch fired: cancelling local sessions and stopping bridges")
+    _cancel_sessions_at_exit()
+    stop_bridges()
+
+
+def _deregister_exit_cancel(session_id: str) -> None:
+    with _exit_lock:
+        _exit_cancels.pop(session_id, None)
+
+
+def _cancel_sessions_at_exit() -> None:
+    with _exit_lock:
+        cancels = list(_exit_cancels.values())
+        _exit_cancels.clear()
+    for cancel in cancels:
+        cancel()
+
+
+atexit.register(_cancel_sessions_at_exit)
+
+
 class LocalSessionsClient(SessionsClient):
     @functools.wraps(SessionsClient.create_session)
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
         wrapper = self._raw_client._client_wrapper
         bridges = _localize(wrapper, kwargs)
+        if bridges:
+            _apply_runaway_budgets(kwargs)
+        stop_watcher = _ensure_stop_watcher() if bridges else None
         watcher = _LossWatcher(bridges)
         started = ensure_bridges(bridges)
         try:
@@ -136,8 +209,14 @@ class LocalSessionsClient(SessionsClient):
             raise
         if bridges:
             cancel = _cancel_action(wrapper, bridges, session)
-            if cancel is not None and watcher.attach(cancel):
-                cancel()
+            if cancel is not None:
+                if watcher.attach(cancel):
+                    cancel()
+                else:
+                    _register_exit_cancel(wrapper, session.id)
+                    if stop_watcher is not None and not stop_watcher.active:
+                        # A stop was filed while bridges or the session were starting; apply it now.
+                        _panic_stop()
         return session
 
 
@@ -146,6 +225,9 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:
         wrapper = self._raw_client._client_wrapper
         bridges = _localize(wrapper, kwargs)
+        if bridges:
+            _apply_runaway_budgets(kwargs)
+        stop_watcher = _ensure_stop_watcher() if bridges else None
         watcher = _LossWatcher(bridges)
         started = await asyncio.to_thread(ensure_bridges, bridges)
         try:
@@ -155,7 +237,13 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
             raise
         if bridges:
             cancel = _cancel_action(wrapper, bridges, session)
-            if cancel is not None and watcher.attach(cancel):
-                # cancel_session blocks on HTTP; keep it off the event loop thread.
-                await asyncio.to_thread(cancel)
+            if cancel is not None:
+                if watcher.attach(cancel):
+                    # cancel_session blocks on HTTP; keep it off the event loop thread.
+                    await asyncio.to_thread(cancel)
+                else:
+                    _register_exit_cancel(wrapper, session.id)
+                    if stop_watcher is not None and not stop_watcher.active:
+                        # A stop was filed while bridges or the session were starting; apply it now.
+                        await asyncio.to_thread(_panic_stop)
         return session

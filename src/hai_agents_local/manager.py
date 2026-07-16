@@ -40,6 +40,7 @@ class BridgeManager:
         return started
 
     def _ensure_one(self, bridge: LocalBridge) -> bool:
+        bridge.preflight()
         displaced: list[_Runner] = []
         with self._lock:
             runner = self._runners.get(bridge.session_id)
@@ -56,9 +57,10 @@ class BridgeManager:
             other.notify_lost()
         try:
             if not runner.bridge.ready.wait(READY_TIMEOUT_S):
+                hint = f" ({bridge.startup_hint})" if bridge.startup_hint is not None else ""
                 raise RuntimeError(
                     f"local {bridge.environment_kind} bridge for environment {bridge.environment_id!r} "
-                    f"was not ready after {READY_TIMEOUT_S:.0f}s"
+                    f"was not ready after {READY_TIMEOUT_S:.0f}s{hint}"
                 )
             if runner.error is not None:
                 raise RuntimeError(
@@ -121,6 +123,10 @@ class _Runner:
         asyncio.set_event_loop(self.loop)
         try:
             self.loop.run_until_complete(self.bridge.run())
+            if not self.bridge.ready.is_set():
+                # Stopped mid-setup (e.g. displaced during channel retry backoff): the finally
+                # below unblocks ensure(), which must see a failure, not a serving bridge.
+                self.error = RuntimeError("bridge was stopped before it became ready")
         except Exception as exc:
             self.error = exc
             if not sys.is_finalizing() and threading.main_thread().is_alive():
