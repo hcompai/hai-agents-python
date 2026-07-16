@@ -1,5 +1,7 @@
 import asyncio
+import sys
 import threading
+import types
 from typing import Any
 
 import httpx
@@ -120,10 +122,9 @@ class TestLocalizeAgent:
             PyautoguiDesktopBridge(api_key=API_KEY, session_id="my-laptop-1")
 
     def test_desktop_screenshots_are_scaled_at_the_source(self, monkeypatch):
-        from hai_drivers.desktop import local as local_module
         from hai_drivers.desktop.scaled import ScaledDesktopDriver
 
-        monkeypatch.setattr(local_module, "LocalDesktopDriver", _FakeLocalDriver)
+        _stub_local_driver(monkeypatch)
         bridge = PyautoguiDesktopBridge(api_key=API_KEY, max_width=1280, image_format="webp", quality=70)
         driver = bridge.create_driver()
         assert isinstance(driver, ScaledDesktopDriver)
@@ -131,15 +132,20 @@ class TestLocalizeAgent:
         assert isinstance(driver._driver, _FakeLocalDriver)
 
     def test_desktop_bridge_with_all_knobs_off_serves_the_raw_driver(self, monkeypatch):
-        from hai_drivers.desktop import local as local_module
-
-        monkeypatch.setattr(local_module, "LocalDesktopDriver", _FakeLocalDriver)
+        _stub_local_driver(monkeypatch)
         bridge = PyautoguiDesktopBridge(api_key=API_KEY, max_width=None, image_format=None)
         assert isinstance(bridge.create_driver(), _FakeLocalDriver)
 
 
 class _FakeLocalDriver:
-    """Stands in for LocalDesktopDriver, whose constructor needs a display."""
+    """Stands in for LocalDesktopDriver, whose module cannot even import without a display."""
+
+
+def _stub_local_driver(monkeypatch):
+    module = types.ModuleType("hai_drivers.desktop.local")
+    module.LocalDesktopDriver = _FakeLocalDriver
+    monkeypatch.setitem(sys.modules, "hai_drivers.desktop.local", module)
+    monkeypatch.setattr("hai_agents_local.desktop.ensure_macos_input_permissions", lambda: None)
 
 
 class TestAutoStart:
