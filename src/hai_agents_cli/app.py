@@ -657,7 +657,8 @@ def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str
             session_id=session_id,
             **options,
         )
-    except (RuntimeError, ValueError) as exc:
+        bridge.preflight()
+    except (RuntimeError, ValueError, PermissionError) as exc:
         _raise_cli_error(exc)
 
     console.print(

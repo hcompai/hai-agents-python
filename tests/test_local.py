@@ -145,7 +145,7 @@ def _stub_local_driver(monkeypatch):
     module = types.ModuleType("hai_drivers.desktop.local")
     module.LocalDesktopDriver = _FakeLocalDriver
     monkeypatch.setitem(sys.modules, "hai_drivers.desktop.local", module)
-    monkeypatch.setattr("hai_agents_local.desktop.ensure_macos_input_permissions", lambda: None)
+    monkeypatch.setattr("hai_agents_local.desktop.ensure_macos_input_permissions", lambda prompt=True: None)
 
 
 class TestAutoStart:
@@ -463,14 +463,25 @@ class TestMacosPermissionPreflight:
         import sys as _sys
         import types
 
+        calls = {"ax_prompts": [], "screen_requests": 0}
         apps = types.ModuleType("ApplicationServices")
         apps.kAXTrustedCheckOptionPrompt = "AXTrustedCheckOptionPrompt"
-        apps.AXIsProcessTrustedWithOptions = lambda options: ax
+
+        def ax_check(options):
+            calls["ax_prompts"].append(options["AXTrustedCheckOptionPrompt"])
+            return ax
+
+        def screen_request():
+            calls["screen_requests"] += 1
+            return screen
+
+        apps.AXIsProcessTrustedWithOptions = ax_check
         quartz = types.ModuleType("Quartz")
         quartz.CGPreflightScreenCaptureAccess = lambda: screen
-        quartz.CGRequestScreenCaptureAccess = lambda: screen
+        quartz.CGRequestScreenCaptureAccess = screen_request
         monkeypatch.setitem(_sys.modules, "ApplicationServices", apps)
         monkeypatch.setitem(_sys.modules, "Quartz", quartz)
+        return calls
 
     def test_missing_grants_fail_fast_with_instructions(self, monkeypatch):
         from hai_agents_local.desktop import ensure_macos_input_permissions
@@ -487,6 +498,16 @@ class TestMacosPermissionPreflight:
 
         self._fake_frameworks(monkeypatch, ax=True, screen=True)
         ensure_macos_input_permissions()
+
+    def test_prompt_false_never_triggers_dialogs(self, monkeypatch):
+        """create_driver re-checks from a worker thread, where TCC dialogs cannot appear."""
+        from hai_agents_local.desktop import ensure_macos_input_permissions
+
+        calls = self._fake_frameworks(monkeypatch, ax=False, screen=False)
+        with pytest.raises(PermissionError):
+            ensure_macos_input_permissions(prompt=False)
+        assert calls["ax_prompts"] == [False]
+        assert calls["screen_requests"] == 0
 
 
 class TestBridgeProtocol:

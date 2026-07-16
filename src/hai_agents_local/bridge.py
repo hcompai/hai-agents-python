@@ -87,6 +87,13 @@ class LocalBridge(ABC, Generic[DriverT]):
         self._stop_event = asyncio.Event()
         self._results: OrderedDict[str, tuple[Json, str | None]] = OrderedDict()
 
+    def preflight(self) -> None:
+        """Check host prerequisites before the bridge thread starts.
+
+        Runs on the caller's thread, so OS permission prompts (macOS TCC dialogs) can appear;
+        create_driver later runs on a worker thread where they cannot.
+        """
+
     @abstractmethod
     def create_driver(self) -> DriverT:
         """Build the hai-drivers driver this bridge dispatches commands to."""

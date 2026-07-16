@@ -40,6 +40,7 @@ class BridgeManager:
         return started
 
     def _ensure_one(self, bridge: LocalBridge) -> bool:
+        bridge.preflight()
         displaced: list[_Runner] = []
         with self._lock:
             runner = self._runners.get(bridge.session_id)
