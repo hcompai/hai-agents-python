@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
-from .bridge import LocalBridge
+from .bridge import LocalBridge, TokenSource
 
 if TYPE_CHECKING:
     from hai_drivers.desktop.interface import DesktopDriverInterface
@@ -11,9 +11,11 @@ if TYPE_CHECKING:
 ACCESSIBILITY_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 SCREEN_RECORDING_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 
-# HiDPI displays capture at backing resolution (a 5K display yields ~14 MP PNGs), which blows past
-# the platform's request body limit when posted; 1920 matches the width production desktop agents use.
-DEFAULT_SCREENSHOT_MAX_WIDTH = 1920
+ImageFormat = Literal["png", "jpeg", "webp"]
+
+DEFAULT_MAX_WIDTH = 1920
+DEFAULT_IMAGE_FORMAT: ImageFormat = "jpeg"
+DEFAULT_QUALITY = 85
 
 
 def ensure_macos_input_permissions() -> None:
@@ -41,15 +43,31 @@ def ensure_macos_input_permissions() -> None:
 
 
 class PyautoguiDesktopBridge(LocalBridge["DesktopDriverInterface"]):
-    """Serves desktop environments (mouse, keyboard, screen, files, shell) on this machine via pyautogui."""
+    """Serves desktop environments (mouse, keyboard, screen, files, shell) on this machine via pyautogui.
+
+    Screenshots are downscaled and encoded here, before they cross the network; set every
+    knob to None to serve raw native-resolution captures.
+    """
 
     environment_kind = "desktop"
 
     def __init__(
-        self, *args: object, screenshot_max_width: int | None = DEFAULT_SCREENSHOT_MAX_WIDTH, **kwargs: object
+        self,
+        environment_id: str | None = None,
+        *,
+        api_key: TokenSource,
+        base_url: str | None = None,
+        session_id: str | None = None,
+        max_width: int | None = DEFAULT_MAX_WIDTH,
+        max_height: int | None = None,
+        image_format: ImageFormat | None = DEFAULT_IMAGE_FORMAT,
+        quality: int = DEFAULT_QUALITY,
     ) -> None:
-        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
-        self.screenshot_max_width = screenshot_max_width
+        super().__init__(environment_id, api_key=api_key, base_url=base_url, session_id=session_id)
+        self.max_width = max_width
+        self.max_height = max_height
+        self.image_format = image_format
+        self.quality = quality
 
     def create_driver(self) -> DesktopDriverInterface:
         # Runtime import: hai-drivers is absent unless installed with hai-agents[desktop].
@@ -58,14 +76,20 @@ class PyautoguiDesktopBridge(LocalBridge["DesktopDriverInterface"]):
             from hai_drivers.desktop.scaled import ScaledDesktopDriver
         except ImportError as exc:
             raise ImportError(
-                "Local desktop control requires extra deps. Install with: pip install 'hai-agents[desktop]'"
+                "Local desktop control requires hai-drivers>=0.1.2. Install with: pip install 'hai-agents[desktop]'"
             ) from exc
         if sys.platform == "darwin":
             ensure_macos_input_permissions()
         driver = LocalDesktopDriver()
-        if self.screenshot_max_width is None:
+        if self.max_width is None and self.max_height is None and self.image_format is None:
             return driver
-        return ScaledDesktopDriver(driver, max_width=self.screenshot_max_width)
+        return ScaledDesktopDriver(
+            driver,
+            max_width=self.max_width,
+            max_height=self.max_height,
+            image_format=self.image_format,
+            quality=self.quality,
+        )
 
     def driver_interface(self) -> type:
         # Runtime import: hai-drivers is absent unless installed with hai-agents[desktop].
