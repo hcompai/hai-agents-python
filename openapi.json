@@ -7054,6 +7054,34 @@
             "title": "Idle Timeout S",
             "description": "Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers."
           },
+          "delete_after_min": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delete After Min",
+            "description": "Minutes after the session finishes before it is automatically deleted. Defaults to 30 days. Null keeps the session forever.",
+            "default": 43200
+          },
+          "delete_screenshot_after_min": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delete Screenshot After Min",
+            "description": "Minutes after the session finishes before its screenshots are deleted. Defaults to 30 days. Null keeps screenshots for the session's lifetime.",
+            "default": 43200
+          },
           "queue": {
             "type": "boolean",
             "title": "Queue",

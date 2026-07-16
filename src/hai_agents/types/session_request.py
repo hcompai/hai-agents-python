@@ -40,6 +40,16 @@ class SessionRequest(UniversalBaseModel):
     Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers.
     """
 
+    delete_after_min: typing.Optional[int] = pydantic.Field(default=None)
+    """
+    Minutes after the session finishes before it is automatically deleted. Defaults to 30 days. Null keeps the session forever.
+    """
+
+    delete_screenshot_after_min: typing.Optional[int] = pydantic.Field(default=None)
+    """
+    Minutes after the session finishes before its screenshots are deleted. Defaults to 30 days. Null keeps screenshots for the session's lifetime.
+    """
+
     queue: typing.Optional[bool] = pydantic.Field(default=None)
     """
     When the organization is at its concurrent-session limit, accept this session into a queue (status 'queued') instead of rejecting it with 429. Queued sessions start automatically, oldest first, as running sessions finish. Set to false to get an immediate 429 when no slot is available.
