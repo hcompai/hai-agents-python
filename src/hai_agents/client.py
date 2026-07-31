@@ -2,7 +2,9 @@
 
 Fern emits the API surface as ``BaseClient``/``AsyncBaseClient``; these thin
 subclasses add the object-oriented sugar (``run_session``, ``start_session``,
-``session``) that delegates to the hand-written polling helpers.
+``session``) that delegates to the hand-written polling helpers, and swap in the
+resource clients that accept flat keyword arguments for the union-bodied
+environment endpoints.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ import typing
 import typing_extensions
 
 from .base_client import AsyncBaseClient, BaseClient
+from .environments_flat import AsyncFlatEnvironmentsClient, FlatEnvironmentsClient
 from .polling import (
     AnswerT,
     AsyncSessionHandle,
@@ -84,6 +87,12 @@ class Client(BaseClient):
             self._sessions = LocalSessionsClient(client_wrapper=self._client_wrapper)
         return self._sessions
 
+    @property
+    def environments(self) -> FlatEnvironmentsClient:
+        if self._environments is None:
+            self._environments = FlatEnvironmentsClient(client_wrapper=self._client_wrapper)
+        return typing.cast(FlatEnvironmentsClient, self._environments)
+
 
 class AsyncClient(AsyncBaseClient):
     async def run_session(
@@ -140,3 +149,9 @@ class AsyncClient(AsyncBaseClient):
 
             self._sessions = LocalAsyncSessionsClient(client_wrapper=self._client_wrapper)
         return self._sessions
+
+    @property
+    def environments(self) -> AsyncFlatEnvironmentsClient:
+        if self._environments is None:
+            self._environments = AsyncFlatEnvironmentsClient(client_wrapper=self._client_wrapper)
+        return typing.cast(AsyncFlatEnvironmentsClient, self._environments)
