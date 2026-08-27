@@ -14,6 +14,7 @@ from .agent_error_data import AgentErrorData
 from .agent_event_data import AgentEventData
 from .agent_run_status_change_data import AgentRunStatusChangeData
 from .agent_started_data import AgentStartedData
+from .file_transfer_data import FileTransferData
 from .live_view_url_data import LiveViewUrlData
 from .metrics_update_data import MetricsUpdateData
 from .request_start_data import RequestStartData
@@ -110,6 +111,21 @@ class SessionEventZero_AgentStartedEvent(UniversalBaseModel):
             extra = pydantic.Extra.allow
 
 
+class SessionEventZero_FileTransferEvent(UniversalBaseModel):
+    type: typing.Literal["FileTransferEvent"] = "FileTransferEvent"
+    timestamp: dt.datetime
+    data: FileTransferData
+
+    if IS_PYDANTIC_V2:
+        model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
+    else:
+
+        class Config:
+            frozen = True
+            smart_union = True
+            extra = pydantic.Extra.allow
+
+
 class SessionEventZero_LiveViewUrlEvent(UniversalBaseModel):
     type: typing.Literal["LiveViewUrlEvent"] = "LiveViewUrlEvent"
     timestamp: dt.datetime
@@ -178,6 +194,7 @@ SessionEventZero = typing_extensions.Annotated[
         SessionEventZero_AgentEvent,
         SessionEventZero_AgentRunStatusChangeEvent,
         SessionEventZero_AgentStartedEvent,
+        SessionEventZero_FileTransferEvent,
         SessionEventZero_LiveViewUrlEvent,
         SessionEventZero_MetricsUpdateEvent,
         SessionEventZero_RequestStartDispatchedEvent,

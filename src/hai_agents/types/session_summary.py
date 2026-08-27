@@ -26,6 +26,11 @@ class SessionSummary(UniversalBaseModel):
     created_at: dt.datetime
     started_at: typing.Optional[dt.datetime] = None
     finished_at: typing.Optional[dt.datetime] = None
+    last_activity_at: typing.Optional[dt.datetime] = pydantic.Field(default=None)
+    """
+    When the session's latest event was ingested (agent steps, status changes, user messages). Null for sessions that predate this field.
+    """
+
     anonymized_at: typing.Optional[dt.datetime] = pydantic.Field(default=None)
     """
     When the session's PII text and screenshots were irreversibly anonymized. Null if not anonymized.

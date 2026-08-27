@@ -4186,6 +4186,183 @@
         }
       }
     },
+    "/api/v2/sessions/{session_id}/files/list_files": {
+      "post": {
+        "tags": [
+          "Session Files"
+        ],
+        "summary": "List Files",
+        "description": "List files on the session's pod (allowlisted roots only), newest first, paged via the cursor.",
+        "operationId": "list_files_api_v2_sessions__session_id__files_list_files_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListFilesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListFilesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{session_id}/files/read_file": {
+      "post": {
+        "tags": [
+          "Session Files"
+        ],
+        "summary": "Read File",
+        "description": "Read a file from the session's pod, returned base64-encoded (size-capped).",
+        "operationId": "read_file_api_v2_sessions__session_id__files_read_file_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadFileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadFileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{session_id}/files/write_file": {
+      "post": {
+        "tags": [
+          "Session Files"
+        ],
+        "summary": "Write File",
+        "description": "Write base64-encoded content to a file on the session's pod (size-capped).",
+        "operationId": "write_file_api_v2_sessions__session_id__files_write_file_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteFileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteFileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/quota/tokens": {
       "get": {
         "tags": [
@@ -5383,6 +5560,101 @@
         "title": "Feedback",
         "description": "Feedback on the semantic success of the trajectory."
       },
+      "FileEntry": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "modified_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Modified At"
+          },
+          "is_dir": {
+            "type": "boolean",
+            "title": "Is Dir"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "path",
+          "size_bytes",
+          "modified_at",
+          "is_dir"
+        ],
+        "title": "FileEntry",
+        "description": "One entry in a directory listing."
+      },
+      "FileTransferData": {
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "download",
+              "upload"
+            ],
+            "title": "Direction"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "direction",
+          "path"
+        ],
+        "title": "FileTransferData"
+      },
+      "FileTransferEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "FileTransferEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/FileTransferData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "FileTransferEvent",
+        "description": "The agent moved a file in or out of its environment."
+      },
       "FlowEvent": {
         "properties": {
           "kind": {
@@ -5493,6 +5765,74 @@
         "description": "Response model for initiating a browser profile upload."
       },
       "JsonValue": {},
+      "ListFilesRequest": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "default": "~/Downloads"
+          },
+          "max_entries": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Entries",
+            "default": 500
+          },
+          "modified_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified Before"
+          },
+          "name_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name After"
+          }
+        },
+        "type": "object",
+        "title": "ListFilesRequest",
+        "description": "Directory to list on the session's pod."
+      },
+      "ListFilesResponse": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileEntry"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "files",
+          "truncated"
+        ],
+        "title": "ListFilesResponse",
+        "description": "Directory listing, newest first; ``truncated`` when capped at ``max_entries``."
+      },
       "LiveViewUrlData": {
         "properties": {
           "live_view_url": {
@@ -6509,6 +6849,50 @@
         "title": "QuotaStatus",
         "description": "Quota status."
       },
+      "ReadFileRequest": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "ReadFileRequest",
+        "description": "File to read from the session's pod."
+      },
+      "ReadFileResponse": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "content_base64": {
+            "type": "string",
+            "title": "Content Base64"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "modified_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Modified At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "content_base64",
+          "size_bytes",
+          "modified_at"
+        ],
+        "title": "ReadFileResponse",
+        "description": "A file's base64 contents and metadata."
+      },
       "RequestStartData": {
         "properties": {},
         "additionalProperties": true,
@@ -6956,6 +7340,9 @@
                 "$ref": "#/components/schemas/MetricsUpdateEvent"
               },
               {
+                "$ref": "#/components/schemas/FileTransferEvent"
+              },
+              {
                 "$ref": "#/components/schemas/AgentEvent"
               }
             ],
@@ -6968,6 +7355,7 @@
                 "AgentEvent": "#/components/schemas/AgentEvent",
                 "AgentRunStatusChangeEvent": "#/components/schemas/AgentRunStatusChangeEvent",
                 "AgentStartedEvent": "#/components/schemas/AgentStartedEvent",
+                "FileTransferEvent": "#/components/schemas/FileTransferEvent",
                 "LiveViewUrlEvent": "#/components/schemas/LiveViewUrlEvent",
                 "MetricsUpdateEvent": "#/components/schemas/MetricsUpdateEvent",
                 "RequestStartDispatchedEvent": "#/components/schemas/RequestStartDispatchedEvent",
@@ -7268,6 +7656,19 @@
               }
             ],
             "title": "Finished At"
+          },
+          "last_activity_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Activity At",
+            "description": "When the session's latest event was ingested (agent steps, status changes, user messages). Null for sessions that predate this field."
           },
           "anonymized_at": {
             "anyOf": [
@@ -8240,6 +8641,44 @@
         ],
         "title": "WebhookWithSecret",
         "description": "Create response: the only time the signing secret is returned."
+      },
+      "WriteFileRequest": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "content_base64": {
+            "type": "string",
+            "title": "Content Base64"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "content_base64"
+        ],
+        "title": "WriteFileRequest",
+        "description": "File to write on the session's pod, base64-encoded."
+      },
+      "WriteFileResponse": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "size_bytes"
+        ],
+        "title": "WriteFileResponse",
+        "description": "The written file's resolved path and byte count."
       }
     },
     "securitySchemes": {

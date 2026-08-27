@@ -55,12 +55,17 @@ if typing.TYPE_CHECKING:
     from .error_event import ErrorEvent
     from .error_event_kind import ErrorEventKind
     from .feedback import Feedback
+    from .file_entry import FileEntry
+    from .file_transfer_data import FileTransferData
+    from .file_transfer_data_direction import FileTransferDataDirection
+    from .file_transfer_event import FileTransferEvent
     from .flow_event import FlowEvent
     from .http_validation_error import HttpValidationError
     from .image_content import ImageContent
     from .image_content_type import ImageContentType
     from .initiate_upload_response import InitiateUploadResponse
     from .json_value import JsonValue
+    from .list_files_response import ListFilesResponse
     from .live_view_url_data import LiveViewUrlData
     from .live_view_url_event import LiveViewUrlEvent
     from .managed_proxy_selection import ManagedProxySelection
@@ -86,6 +91,7 @@ if typing.TYPE_CHECKING:
     from .proxy_pool import ProxyPool
     from .quota_status import QuotaStatus
     from .quota_status_scope import QuotaStatusScope
+    from .read_file_response import ReadFileResponse
     from .request_start_data import RequestStartData
     from .request_start_dispatched_data import RequestStartDispatchedData
     from .request_start_dispatched_event import RequestStartDispatchedEvent
@@ -106,6 +112,7 @@ if typing.TYPE_CHECKING:
         SessionEventZero_AgentEvent,
         SessionEventZero_AgentRunStatusChangeEvent,
         SessionEventZero_AgentStartedEvent,
+        SessionEventZero_FileTransferEvent,
         SessionEventZero_LiveViewUrlEvent,
         SessionEventZero_MetricsUpdateEvent,
         SessionEventZero_RequestStartDispatchedEvent,
@@ -146,6 +153,7 @@ if typing.TYPE_CHECKING:
     from .webhook_record_last_delivery_status import WebhookRecordLastDeliveryStatus
     from .webhook_with_secret import WebhookWithSecret
     from .webhook_with_secret_last_delivery_status import WebhookWithSecretLastDeliveryStatus
+    from .write_file_response import WriteFileResponse
 _dynamic_imports: typing.Dict[str, str] = {
     "ActiveStateChangeData": ".active_state_change_data",
     "ActiveStateChangeDataState": ".active_state_change_data_state",
@@ -198,12 +206,17 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ErrorEvent": ".error_event",
     "ErrorEventKind": ".error_event_kind",
     "Feedback": ".feedback",
+    "FileEntry": ".file_entry",
+    "FileTransferData": ".file_transfer_data",
+    "FileTransferDataDirection": ".file_transfer_data_direction",
+    "FileTransferEvent": ".file_transfer_event",
     "FlowEvent": ".flow_event",
     "HttpValidationError": ".http_validation_error",
     "ImageContent": ".image_content",
     "ImageContentType": ".image_content_type",
     "InitiateUploadResponse": ".initiate_upload_response",
     "JsonValue": ".json_value",
+    "ListFilesResponse": ".list_files_response",
     "LiveViewUrlData": ".live_view_url_data",
     "LiveViewUrlEvent": ".live_view_url_event",
     "ManagedProxySelection": ".managed_proxy_selection",
@@ -229,6 +242,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ProxyPool": ".proxy_pool",
     "QuotaStatus": ".quota_status",
     "QuotaStatusScope": ".quota_status_scope",
+    "ReadFileResponse": ".read_file_response",
     "RequestStartData": ".request_start_data",
     "RequestStartDispatchedData": ".request_start_dispatched_data",
     "RequestStartDispatchedEvent": ".request_start_dispatched_event",
@@ -248,6 +262,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "SessionEventZero_AgentEvent": ".session_event_zero",
     "SessionEventZero_AgentRunStatusChangeEvent": ".session_event_zero",
     "SessionEventZero_AgentStartedEvent": ".session_event_zero",
+    "SessionEventZero_FileTransferEvent": ".session_event_zero",
     "SessionEventZero_LiveViewUrlEvent": ".session_event_zero",
     "SessionEventZero_MetricsUpdateEvent": ".session_event_zero",
     "SessionEventZero_RequestStartDispatchedEvent": ".session_event_zero",
@@ -285,6 +300,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "WebhookRecordLastDeliveryStatus": ".webhook_record_last_delivery_status",
     "WebhookWithSecret": ".webhook_with_secret",
     "WebhookWithSecretLastDeliveryStatus": ".webhook_with_secret_last_delivery_status",
+    "WriteFileResponse": ".write_file_response",
 }
 
 
@@ -361,12 +377,17 @@ __all__ = [
     "ErrorEvent",
     "ErrorEventKind",
     "Feedback",
+    "FileEntry",
+    "FileTransferData",
+    "FileTransferDataDirection",
+    "FileTransferEvent",
     "FlowEvent",
     "HttpValidationError",
     "ImageContent",
     "ImageContentType",
     "InitiateUploadResponse",
     "JsonValue",
+    "ListFilesResponse",
     "LiveViewUrlData",
     "LiveViewUrlEvent",
     "ManagedProxySelection",
@@ -392,6 +413,7 @@ __all__ = [
     "ProxyPool",
     "QuotaStatus",
     "QuotaStatusScope",
+    "ReadFileResponse",
     "RequestStartData",
     "RequestStartDispatchedData",
     "RequestStartDispatchedEvent",
@@ -411,6 +433,7 @@ __all__ = [
     "SessionEventZero_AgentEvent",
     "SessionEventZero_AgentRunStatusChangeEvent",
     "SessionEventZero_AgentStartedEvent",
+    "SessionEventZero_FileTransferEvent",
     "SessionEventZero_LiveViewUrlEvent",
     "SessionEventZero_MetricsUpdateEvent",
     "SessionEventZero_RequestStartDispatchedEvent",
@@ -448,4 +471,5 @@ __all__ = [
     "WebhookRecordLastDeliveryStatus",
     "WebhookWithSecret",
     "WebhookWithSecretLastDeliveryStatus",
+    "WriteFileResponse",
 ]
