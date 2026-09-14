@@ -231,6 +231,7 @@ class EnvironmentsClient:
         headless: typing.Optional[bool] = OMIT,
         session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
+        lazy: typing.Optional[bool] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         use_default_browser_profile: typing.Optional[bool] = OMIT,
@@ -254,6 +255,8 @@ class EnvironmentsClient:
         session_id : typing.Optional[str]
 
         mode : typing.Optional[PatchEnvironmentMode]
+
+        lazy : typing.Optional[bool]
 
         vault_id : typing.Optional[str]
 
@@ -291,6 +294,7 @@ class EnvironmentsClient:
             headless=headless,
             session_id=session_id,
             mode=mode,
+            lazy=lazy,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
             use_default_browser_profile=use_default_browser_profile,
@@ -553,6 +557,7 @@ class AsyncEnvironmentsClient:
         headless: typing.Optional[bool] = OMIT,
         session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
+        lazy: typing.Optional[bool] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         use_default_browser_profile: typing.Optional[bool] = OMIT,
@@ -576,6 +581,8 @@ class AsyncEnvironmentsClient:
         session_id : typing.Optional[str]
 
         mode : typing.Optional[PatchEnvironmentMode]
+
+        lazy : typing.Optional[bool]
 
         vault_id : typing.Optional[str]
 
@@ -621,6 +628,7 @@ class AsyncEnvironmentsClient:
             headless=headless,
             session_id=session_id,
             mode=mode,
+            lazy=lazy,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
             use_default_browser_profile=use_default_browser_profile,

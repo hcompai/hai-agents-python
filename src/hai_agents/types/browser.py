@@ -44,6 +44,11 @@ class Browser(UniversalBaseModel):
     How the agent perceives and drives the browser.
     """
 
+    lazy: typing.Optional[bool] = pydantic.Field(default=None)
+    """
+    Provision on the agent's first use instead of at startup. Skips the initial observation.
+    """
+
     vault_id: typing.Optional[str] = pydantic.Field(default=None)
     """
     Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run without secret access.

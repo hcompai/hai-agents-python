@@ -21,6 +21,16 @@ class ToolResultEvent(UniversalBaseModel):
     Tool output as opaque JSON; any embedded image is inlined as base64, not a URL.
     """
 
+    truncated: typing.Optional[bool] = pydantic.Field(default=None)
+    """
+    Inline tool text was omitted; does not imply it was saved.
+    """
+
+    output_artifact_path: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    Path to retained tool text in the originating sandbox, not a downloadable URL.
+    """
+
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
     else:

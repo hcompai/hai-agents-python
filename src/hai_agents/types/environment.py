@@ -37,6 +37,7 @@ class Environment_Web(UniversalBaseModel):
     headless: typing.Optional[bool] = None
     session_id: typing.Optional[str] = None
     mode: typing.Optional[BrowserMode] = None
+    lazy: typing.Optional[bool] = None
     vault_id: typing.Optional[str] = None
     browser_profile_id: typing.Optional[str] = None
     use_default_browser_profile: typing.Optional[bool] = None
