@@ -6,26 +6,32 @@ def server_detail(body: Any) -> Optional[str]:
 
     The API answers errors with ``{"message", "detail"}`` where ``detail`` is a string, a
     ``{"message"}`` object, or a list of ``{"msg"}`` / ``{"message"}`` items (FastAPI
-    validation errors).
+    validation errors). The body may be the raw dict or a parsed pydantic model.
     """
-    if not isinstance(body, dict):
-        return None
-    detail = body.get("detail")
+    detail = _field(body, "detail")
     if isinstance(detail, list):
         parts = [text for text in (_text(item) for item in detail) if text is not None]
         if parts:
             return "; ".join(parts)
-        return _text(body.get("message"))
-    return _text(detail) or _text(body.get("message"))
+        return _text(_field(body, "message"))
+    return _text(detail) or _text(_field(body, "message"))
+
+
+def _field(obj: Any, name: str) -> Any:
+    if isinstance(obj, dict):
+        return obj.get(name)
+    if isinstance(obj, (str, bytes, list)) or obj is None:
+        return None
+    return getattr(obj, name, None)
 
 
 def _text(value: Any) -> Optional[str]:
     if isinstance(value, str):
         return value
-    if isinstance(value, dict):
-        for key in ("msg", "message"):
-            if isinstance(value.get(key), str):
-                return value[key]
+    for key in ("msg", "message"):
+        text = _field(value, key)
+        if isinstance(text, str):
+            return text
     return None
 
 
