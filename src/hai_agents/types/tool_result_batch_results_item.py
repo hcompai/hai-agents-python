@@ -31,6 +31,8 @@ class ToolResultBatchResultsItem_ToolResult(UniversalBaseModel):
     kind: typing.Literal["tool_result"] = "tool_result"
     tool_req: ToolRequest
     result: typing.Optional[JsonValue] = None
+    truncated: typing.Optional[bool] = None
+    output_artifact_path: typing.Optional[str] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

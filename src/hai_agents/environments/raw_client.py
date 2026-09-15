@@ -346,6 +346,7 @@ class RawEnvironmentsClient:
         headless: typing.Optional[bool] = OMIT,
         session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
+        lazy: typing.Optional[bool] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         use_default_browser_profile: typing.Optional[bool] = OMIT,
@@ -369,6 +370,8 @@ class RawEnvironmentsClient:
         session_id : typing.Optional[str]
 
         mode : typing.Optional[PatchEnvironmentMode]
+
+        lazy : typing.Optional[bool]
 
         vault_id : typing.Optional[str]
 
@@ -399,6 +402,7 @@ class RawEnvironmentsClient:
                 "mode": convert_and_respect_annotation_metadata(
                     object_=mode, annotation=typing.Optional[PatchEnvironmentMode], direction="write"
                 ),
+                "lazy": lazy,
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
                 "use_default_browser_profile": use_default_browser_profile,
@@ -762,6 +766,7 @@ class AsyncRawEnvironmentsClient:
         headless: typing.Optional[bool] = OMIT,
         session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
+        lazy: typing.Optional[bool] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         use_default_browser_profile: typing.Optional[bool] = OMIT,
@@ -785,6 +790,8 @@ class AsyncRawEnvironmentsClient:
         session_id : typing.Optional[str]
 
         mode : typing.Optional[PatchEnvironmentMode]
+
+        lazy : typing.Optional[bool]
 
         vault_id : typing.Optional[str]
 
@@ -815,6 +822,7 @@ class AsyncRawEnvironmentsClient:
                 "mode": convert_and_respect_annotation_metadata(
                     object_=mode, annotation=typing.Optional[PatchEnvironmentMode], direction="write"
                 ),
+                "lazy": lazy,
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
                 "use_default_browser_profile": use_default_browser_profile,
