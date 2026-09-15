@@ -124,8 +124,22 @@ def _retry_timeout_from_retries(retries: int) -> float:
     return _add_symmetric_jitter(backoff)
 
 
-def _should_retry(response: httpx.Response) -> bool:
-    return response.status_code >= 500 or response.status_code in [429, 408, 409]
+_IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "PUT", "DELETE"})
+
+
+def _is_idempotent(method: str) -> bool:
+    return method.upper() in _IDEMPOTENT_METHODS
+
+
+def _should_retry(response: httpx.Response, method: str) -> bool:
+    if response.status_code in (408, 429):
+        return True
+    return response.status_code >= 500 and _is_idempotent(method)
+
+
+def _may_resend(method: str, exc: Exception) -> bool:
+    """A request that never reached the server is always safe to resend."""
+    return isinstance(exc, httpx.ConnectError) or _is_idempotent(method)
 
 
 _SENSITIVE_HEADERS = frozenset(
@@ -389,8 +403,8 @@ class HttpClient:
                 files=request_files,
                 timeout=timeout,
             )
-        except (httpx.ConnectError, httpx.RemoteProtocolError):
-            if retries < max_retries:
+        except (httpx.ConnectError, httpx.RemoteProtocolError) as exc:
+            if retries < max_retries and _may_resend(method, exc):
                 time.sleep(_retry_timeout_from_retries(retries=retries))
                 return self.request(
                     path=path,
@@ -409,7 +423,7 @@ class HttpClient:
                 )
             raise
 
-        if _should_retry(response=response):
+        if _should_retry(response=response, method=method):
             if retries < max_retries:
                 time.sleep(_retry_timeout(response=response, retries=retries))
                 return self.request(
@@ -681,8 +695,8 @@ class AsyncHttpClient:
                 files=request_files,
                 timeout=timeout,
             )
-        except (httpx.ConnectError, httpx.RemoteProtocolError):
-            if retries < max_retries:
+        except (httpx.ConnectError, httpx.RemoteProtocolError) as exc:
+            if retries < max_retries and _may_resend(method, exc):
                 await asyncio.sleep(_retry_timeout_from_retries(retries=retries))
                 return await self.request(
                     path=path,
@@ -701,7 +715,7 @@ class AsyncHttpClient:
                 )
             raise
 
-        if _should_retry(response=response):
+        if _should_retry(response=response, method=method):
             if retries < max_retries:
                 await asyncio.sleep(_retry_timeout(response=response, retries=retries))
                 return await self.request(
