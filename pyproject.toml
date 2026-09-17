@@ -26,9 +26,9 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "httpx>=0.23.0,<0.29.0",
-  "pydantic>=2.0,<3",
-  "typing_extensions>=4.6",
+  "httpx>=0.28.1,<0.29.0",
+  "pydantic>=2.13.5,<3",
+  "typing_extensions>=4.16.0",
 ]
 
 [project.optional-dependencies]
