@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Computer-Use Agents",
+    "title": "Agents API",
     "version": "1.0.0"
   },
   "servers": [
