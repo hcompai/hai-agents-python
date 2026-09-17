@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://github.com/hcompai/hai-agents-python/blob/main/assets/banner-dark.gif?raw=true" />
-    <img src="https://github.com/hcompai/hai-agents-python/blob/main/assets/banner-light.gif?raw=true" alt="Computer-Use Agents" width="700" />
+    <img src="https://github.com/hcompai/hai-agents-python/blob/main/assets/banner-light.gif?raw=true" alt="Agents API" width="700" />
   </picture>
 </p>
 
@@ -12,11 +12,11 @@
 </p>
 
 <p align="center">
-  Python SDK for <a href="https://hcompany.ai">H Company</a>'s <a href="https://hub.hcompany.ai/computer-use-agents">Computer-Use Agents</a>.
+  Python SDK for <a href="https://hcompany.ai">H Company</a>'s <a href="https://hub.hcompany.ai/agents-api">Agents API</a>.
 </p>
 
 <p align="center">
-  <b><a href="https://hub.hcompany.ai/computer-use-agents">Documentation</a></b>
+  <b><a href="https://hub.hcompany.ai/agents-api">Documentation</a></b>
   &nbsp;·&nbsp;
   <a href="https://platform.hcompany.ai/settings/api-keys">Get an API key</a>
   &nbsp;·&nbsp;
@@ -212,7 +212,7 @@ Like every custom tool, the handler runs entirely in your process: the IMAP cred
 
 ## Browser profiles and vaults
 
-Start a session on a browser that already knows the user. A [browser profile](https://hub.hcompany.ai/computer-use-agents/browser-profiles) restores saved cookies and storage from an earlier session, and a [vault](https://hub.hcompany.ai/computer-use-agents/vaults) lets the agent sign in to sites with secrets that never enter its context. Bind both through per-run overrides:
+Start a session on a browser that already knows the user. A [browser profile](https://hub.hcompany.ai/agents-api/browser-profiles) restores saved cookies and storage from an earlier session, and a [vault](https://hub.hcompany.ai/agents-api/vaults) lets the agent sign in to sites with secrets that never enter its context. Bind both through per-run overrides:
 
 ```python
 result = client.run_session(
@@ -309,7 +309,7 @@ hai mcp install
 
 ## Documentation
 
-Guides, core concepts, and the full API reference live at **[hub.hcompany.ai/computer-use-agents](https://hub.hcompany.ai/computer-use-agents)**.
+Guides, core concepts, and the full API reference live at **[hub.hcompany.ai/agents-api](https://hub.hcompany.ai/agents-api)**.
 
 ## License
 

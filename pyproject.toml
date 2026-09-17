@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "hai-agents"
 version = "1.0.9"
-description = "Python SDK for H Company's Computer-Use Agents: autonomous agents powered by Holo."
+description = "Python SDK for H Company's Agents API: autonomous agents powered by Holo."
 requires-python = ">=3.10"
 readme = "README.md"
 authors = [{name = "H Company", email = "contact@hcompany.ai"}]
@@ -54,7 +54,7 @@ hai = "hai_agents_cli:main"
 Homepage = "https://hcompany.ai"
 Repository = "https://github.com/hcompai/hai-agents-python"
 Issues = "https://github.com/hcompai/hai-agents-python/issues"
-Documentation = "https://hub.hcompany.ai/computer-use-agents"
+Documentation = "https://hub.hcompany.ai/agents-api"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hai_agents", "src/hai_agents_cli", "src/hai_agents_common", "src/hai_agents_local", "src/hai_agents_tools"]
@@ -84,6 +84,6 @@ testpaths = ["tests"]
 addopts = "-ra -q -m 'not integration'"
 asyncio_mode = "auto"
 markers = [
-  "integration: tests that hit a live Computer-Use Agents backend (requires HAI_API_KEY_TEST)",
+  "integration: tests that hit a live Agents API backend (requires HAI_API_KEY_TEST)",
   "slow: integration tests that consume significant tokens or wall-clock time"
 ]

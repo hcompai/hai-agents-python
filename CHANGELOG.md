@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.12]
 
-Baseline public release of the Computer-Use Agents SDK and `hai` CLI. Earlier
+Baseline public release of the Agents API SDK and `hai` CLI. Earlier
 `0.1.x` releases are available on [PyPI](https://pypi.org/project/hai-agents/#history).
 
 [Unreleased]: https://github.com/hcompai/hai-agents-python/compare/v0.1.12...HEAD
