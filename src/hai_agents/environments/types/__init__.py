@@ -8,6 +8,7 @@ from importlib import import_module
 if typing.TYPE_CHECKING:
     from .create_environment_request import (
         CreateEnvironmentRequest,
+        CreateEnvironmentRequest_Android,
         CreateEnvironmentRequest_Desktop,
         CreateEnvironmentRequest_Web,
     )
@@ -16,11 +17,13 @@ if typing.TYPE_CHECKING:
     from .patch_environment_mode import PatchEnvironmentMode, PatchEnvironmentMode_Text, PatchEnvironmentMode_Visual
     from .update_environment_request_body import (
         UpdateEnvironmentRequestBody,
+        UpdateEnvironmentRequestBody_Android,
         UpdateEnvironmentRequestBody_Desktop,
         UpdateEnvironmentRequestBody_Web,
     )
 _dynamic_imports: typing.Dict[str, str] = {
     "CreateEnvironmentRequest": ".create_environment_request",
+    "CreateEnvironmentRequest_Android": ".create_environment_request",
     "CreateEnvironmentRequest_Desktop": ".create_environment_request",
     "CreateEnvironmentRequest_Web": ".create_environment_request",
     "ListEnvironmentsRequestSortItem": ".list_environments_request_sort_item",
@@ -29,6 +32,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PatchEnvironmentMode_Text": ".patch_environment_mode",
     "PatchEnvironmentMode_Visual": ".patch_environment_mode",
     "UpdateEnvironmentRequestBody": ".update_environment_request_body",
+    "UpdateEnvironmentRequestBody_Android": ".update_environment_request_body",
     "UpdateEnvironmentRequestBody_Desktop": ".update_environment_request_body",
     "UpdateEnvironmentRequestBody_Web": ".update_environment_request_body",
 }
@@ -57,6 +61,7 @@ def __dir__():
 
 __all__ = [
     "CreateEnvironmentRequest",
+    "CreateEnvironmentRequest_Android",
     "CreateEnvironmentRequest_Desktop",
     "CreateEnvironmentRequest_Web",
     "ListEnvironmentsRequestSortItem",
@@ -65,6 +70,7 @@ __all__ = [
     "PatchEnvironmentMode_Text",
     "PatchEnvironmentMode_Visual",
     "UpdateEnvironmentRequestBody",
+    "UpdateEnvironmentRequestBody_Android",
     "UpdateEnvironmentRequestBody_Desktop",
     "UpdateEnvironmentRequestBody_Web",
 ]

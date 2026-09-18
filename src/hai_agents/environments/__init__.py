@@ -8,6 +8,7 @@ from importlib import import_module
 if typing.TYPE_CHECKING:
     from .types import (
         CreateEnvironmentRequest,
+        CreateEnvironmentRequest_Android,
         CreateEnvironmentRequest_Desktop,
         CreateEnvironmentRequest_Web,
         ListEnvironmentsRequestSortItem,
@@ -16,11 +17,13 @@ if typing.TYPE_CHECKING:
         PatchEnvironmentMode_Text,
         PatchEnvironmentMode_Visual,
         UpdateEnvironmentRequestBody,
+        UpdateEnvironmentRequestBody_Android,
         UpdateEnvironmentRequestBody_Desktop,
         UpdateEnvironmentRequestBody_Web,
     )
 _dynamic_imports: typing.Dict[str, str] = {
     "CreateEnvironmentRequest": ".types",
+    "CreateEnvironmentRequest_Android": ".types",
     "CreateEnvironmentRequest_Desktop": ".types",
     "CreateEnvironmentRequest_Web": ".types",
     "ListEnvironmentsRequestSortItem": ".types",
@@ -29,6 +32,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PatchEnvironmentMode_Text": ".types",
     "PatchEnvironmentMode_Visual": ".types",
     "UpdateEnvironmentRequestBody": ".types",
+    "UpdateEnvironmentRequestBody_Android": ".types",
     "UpdateEnvironmentRequestBody_Desktop": ".types",
     "UpdateEnvironmentRequestBody_Web": ".types",
 }
@@ -57,6 +61,7 @@ def __dir__():
 
 __all__ = [
     "CreateEnvironmentRequest",
+    "CreateEnvironmentRequest_Android",
     "CreateEnvironmentRequest_Desktop",
     "CreateEnvironmentRequest_Web",
     "ListEnvironmentsRequestSortItem",
@@ -65,6 +70,7 @@ __all__ = [
     "PatchEnvironmentMode_Text",
     "PatchEnvironmentMode_Visual",
     "UpdateEnvironmentRequestBody",
+    "UpdateEnvironmentRequestBody_Android",
     "UpdateEnvironmentRequestBody_Desktop",
     "UpdateEnvironmentRequestBody_Web",
 ]

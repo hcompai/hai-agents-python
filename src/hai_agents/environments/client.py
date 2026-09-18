@@ -237,6 +237,7 @@ class EnvironmentsClient:
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
+        image: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -267,6 +268,8 @@ class EnvironmentsClient:
         persist_browser_profile : typing.Optional[bool]
 
         network : typing.Optional[BrowserNetwork]
+
+        image : typing.Optional[str]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -300,6 +303,7 @@ class EnvironmentsClient:
             use_default_browser_profile=use_default_browser_profile,
             persist_browser_profile=persist_browser_profile,
             network=network,
+            image=image,
             request_options=request_options,
         )
         return _response.data
@@ -563,6 +567,7 @@ class AsyncEnvironmentsClient:
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
+        image: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -593,6 +598,8 @@ class AsyncEnvironmentsClient:
         persist_browser_profile : typing.Optional[bool]
 
         network : typing.Optional[BrowserNetwork]
+
+        image : typing.Optional[str]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -634,6 +641,7 @@ class AsyncEnvironmentsClient:
             use_default_browser_profile=use_default_browser_profile,
             persist_browser_profile=persist_browser_profile,
             network=network,
+            image=image,
             request_options=request_options,
         )
         return _response.data

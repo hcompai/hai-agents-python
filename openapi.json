@@ -1674,13 +1674,17 @@
                   },
                   {
                     "$ref": "#/components/schemas/Desktop"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Android"
                   }
                 ],
                 "discriminator": {
                   "propertyName": "kind",
                   "mapping": {
                     "web": "#/components/schemas/Browser",
-                    "desktop": "#/components/schemas/Desktop"
+                    "desktop": "#/components/schemas/Desktop",
+                    "android": "#/components/schemas/Android"
                   }
                 },
                 "title": "Create"
@@ -1941,13 +1945,17 @@
                   },
                   {
                     "$ref": "#/components/schemas/Desktop"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Android"
                   }
                 ],
                 "discriminator": {
                   "propertyName": "kind",
                   "mapping": {
                     "web": "#/components/schemas/Browser",
-                    "desktop": "#/components/schemas/Desktop"
+                    "desktop": "#/components/schemas/Desktop",
+                    "android": "#/components/schemas/Android"
                   }
                 },
                 "title": "Update"
@@ -4838,6 +4846,58 @@
         "title": "AgentStartedEvent",
         "description": "The agent process started."
       },
+      "Android": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id",
+            "description": "Catalog identifier for this environment."
+          },
+          "kind": {
+            "type": "string",
+            "const": "android",
+            "title": "Kind",
+            "default": "android"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Connect to an existing Android session by id instead of starting a new one."
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image",
+            "description": "Emulator image to boot instead of the default one, e.g. an image with an app preinstalled. Ignored when session_id attaches to an existing session."
+          },
+          "lazy": {
+            "type": "boolean",
+            "title": "Lazy",
+            "description": "Provision on the agent's first use instead of at startup. Skips the initial observation.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "Android",
+        "description": "An Android device the agent controls via touch, keyboard, and screenshots."
+      },
       "AnswerEvent": {
         "properties": {
           "kind": {
@@ -5427,8 +5487,12 @@
           },
           "host": {
             "type": "string",
+            "enum": [
+              "user_device",
+              "cloud"
+            ],
             "title": "Host",
-            "const": "user_device"
+            "description": "Where the desktop runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine."
           },
           "session_id": {
             "anyOf": [
@@ -5441,6 +5505,12 @@
             ],
             "title": "Session Id",
             "description": "Connect to an existing desktop session by id instead of starting a new one."
+          },
+          "lazy": {
+            "type": "boolean",
+            "title": "Lazy",
+            "description": "Provision on the agent's first use instead of at startup. Skips the initial observation.",
+            "default": false
           }
         },
         "type": "object",
@@ -5458,11 +5528,15 @@
           },
           {
             "$ref": "#/components/schemas/Desktop"
+          },
+          {
+            "$ref": "#/components/schemas/Android"
           }
         ],
         "discriminator": {
           "propertyName": "kind",
           "mapping": {
+            "android": "#/components/schemas/Android",
             "desktop": "#/components/schemas/Desktop",
             "web": "#/components/schemas/Browser"
           }
@@ -5472,7 +5546,8 @@
         "type": "string",
         "enum": [
           "web",
-          "desktop"
+          "desktop",
+          "android"
         ],
         "title": "EnvironmentKind",
         "description": "Environment family."
@@ -6692,6 +6767,17 @@
                 "type": "null"
               }
             ]
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
           }
         },
         "type": "object",

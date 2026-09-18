@@ -352,6 +352,7 @@ class RawEnvironmentsClient:
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
+        image: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Environment]:
         """
@@ -383,6 +384,8 @@ class RawEnvironmentsClient:
 
         network : typing.Optional[BrowserNetwork]
 
+        image : typing.Optional[str]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -410,6 +413,7 @@ class RawEnvironmentsClient:
                 "network": convert_and_respect_annotation_metadata(
                     object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
                 ),
+                "image": image,
             },
             headers={
                 "content-type": "application/json",
@@ -772,6 +776,7 @@ class AsyncRawEnvironmentsClient:
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
+        image: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Environment]:
         """
@@ -803,6 +808,8 @@ class AsyncRawEnvironmentsClient:
 
         network : typing.Optional[BrowserNetwork]
 
+        image : typing.Optional[str]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -830,6 +837,7 @@ class AsyncRawEnvironmentsClient:
                 "network": convert_and_respect_annotation_metadata(
                     object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
                 ),
+                "image": image,
             },
             headers={
                 "content-type": "application/json",

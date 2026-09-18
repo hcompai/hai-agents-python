@@ -43,6 +43,24 @@ class CreateEnvironmentRequest_Desktop(UniversalBaseModel):
     id: str
     host: DesktopHost
     session_id: typing.Optional[str] = None
+    lazy: typing.Optional[bool] = None
+
+    if IS_PYDANTIC_V2:
+        model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
+    else:
+
+        class Config:
+            frozen = True
+            smart_union = True
+            extra = pydantic.Extra.allow
+
+
+class CreateEnvironmentRequest_Android(UniversalBaseModel):
+    kind: typing.Literal["android"] = "android"
+    id: str
+    session_id: typing.Optional[str] = None
+    image: typing.Optional[str] = None
+    lazy: typing.Optional[bool] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
@@ -55,5 +73,6 @@ class CreateEnvironmentRequest_Desktop(UniversalBaseModel):
 
 
 CreateEnvironmentRequest = typing_extensions.Annotated[
-    typing.Union[CreateEnvironmentRequest_Web, CreateEnvironmentRequest_Desktop], pydantic.Field(discriminator="kind")
+    typing.Union[CreateEnvironmentRequest_Web, CreateEnvironmentRequest_Desktop, CreateEnvironmentRequest_Android],
+    pydantic.Field(discriminator="kind"),
 ]

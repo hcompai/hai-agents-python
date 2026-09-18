@@ -13,11 +13,29 @@ from .browser_network import BrowserNetwork
 from .desktop_host import DesktopHost
 
 
+class Environment_Android(UniversalBaseModel):
+    kind: typing.Literal["android"] = "android"
+    id: str
+    session_id: typing.Optional[str] = None
+    image: typing.Optional[str] = None
+    lazy: typing.Optional[bool] = None
+
+    if IS_PYDANTIC_V2:
+        model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
+    else:
+
+        class Config:
+            frozen = True
+            smart_union = True
+            extra = pydantic.Extra.allow
+
+
 class Environment_Desktop(UniversalBaseModel):
     kind: typing.Literal["desktop"] = "desktop"
     id: str
     host: DesktopHost
     session_id: typing.Optional[str] = None
+    lazy: typing.Optional[bool] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
@@ -55,5 +73,5 @@ class Environment_Web(UniversalBaseModel):
 
 
 Environment = typing_extensions.Annotated[
-    typing.Union[Environment_Desktop, Environment_Web], pydantic.Field(discriminator="kind")
+    typing.Union[Environment_Android, Environment_Desktop, Environment_Web], pydantic.Field(discriminator="kind")
 ]

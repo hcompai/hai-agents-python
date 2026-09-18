@@ -4,12 +4,11 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .desktop_host import DesktopHost
 
 
-class Desktop(UniversalBaseModel):
+class Android(UniversalBaseModel):
     """
-    A desktop the agent controls via mouse, keyboard, and screenshots.
+    An Android device the agent controls via touch, keyboard, and screenshots.
     """
 
     id: str = pydantic.Field()
@@ -17,14 +16,14 @@ class Desktop(UniversalBaseModel):
     Catalog identifier for this environment.
     """
 
-    host: DesktopHost = pydantic.Field()
-    """
-    Where the desktop runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.
-    """
-
     session_id: typing.Optional[str] = pydantic.Field(default=None)
     """
-    Connect to an existing desktop session by id instead of starting a new one.
+    Connect to an existing Android session by id instead of starting a new one.
+    """
+
+    image: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    Emulator image to boot instead of the default one, e.g. an image with an app preinstalled. Ignored when session_id attaches to an existing session.
     """
 
     lazy: typing.Optional[bool] = pydantic.Field(default=None)
