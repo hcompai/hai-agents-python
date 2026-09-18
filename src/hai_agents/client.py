@@ -27,6 +27,28 @@ from .polling import run_session as _run_session
 from .sessions.client import AsyncSessionsClient, SessionsClient
 from .tools import ToolInput, as_tools
 
+if typing.TYPE_CHECKING:
+    from .local.runtime import LocalRuntime
+
+
+def _ensure_local_runtime(
+    runtime: typing.Optional["LocalRuntime"],
+    *,
+    spawn_env: typing.Optional[typing.Dict[str, str]] = None,
+    **local_kwargs: typing.Any,
+) -> "LocalRuntime":
+    """Import hai_agents.local lazily so remote-only users never pay for it."""
+    if runtime is not None:
+        return runtime
+    try:
+        from .local.runtime import LocalRuntime as _LocalRuntime
+    except ImportError as exc:
+        raise ImportError(
+            'Local mode is unavailable: install the local extra with pip install "hai-agents[local]" '
+            "and ensure your hai-agents build ships hai_agents.local."
+        ) from exc
+    return _LocalRuntime.ensure_started(spawn_env=spawn_env, **local_kwargs)
+
 
 class Client(BaseClient):
     def run_session(
@@ -75,6 +97,26 @@ class Client(BaseClient):
     def session(self, id: str) -> SessionHandle:
         """Wrap an existing session id in a handle."""
         return SessionHandle(self, id)
+
+    @classmethod
+    def local(
+        cls,
+        *,
+        runtime: typing.Optional["LocalRuntime"] = None,
+        spawn_env: typing.Optional[typing.Dict[str, str]] = None,
+        **local_kwargs: typing.Any,
+    ) -> "Client":
+        """A Client targeting a local hai-agent-runtime, starting one if needed.
+
+        ``local_kwargs`` are forwarded to ``LocalRuntime.ensure_started`` (``binary_path``,
+        ``version``, ``cache_dir``, ``port``, ``download``, ``timeout_s``). The client
+        authenticates with the runtime's generated local bearer — never the cloud
+        ``HAI_API_KEY``, which only passes through to the runtime for model-gateway calls.
+        """
+        runtime = _ensure_local_runtime(runtime, spawn_env=spawn_env, **local_kwargs)
+        client = cls(base_url=runtime.base_url, api_key=runtime.api_key)
+        client._local_runtime = runtime  # keep the manager reachable for lifecycle calls
+        return client
 
     @property
     def sessions(self) -> SessionsClient:
@@ -132,6 +174,28 @@ class AsyncClient(AsyncBaseClient):
     def session(self, id: str) -> AsyncSessionHandle:
         """Wrap an existing session id in a handle."""
         return AsyncSessionHandle(self, id)
+
+    @classmethod
+    def local(
+        cls,
+        *,
+        runtime: typing.Optional["LocalRuntime"] = None,
+        spawn_env: typing.Optional[typing.Dict[str, str]] = None,
+        **local_kwargs: typing.Any,
+    ) -> "AsyncClient":
+        """An AsyncClient targeting a local hai-agent-runtime, starting one if needed.
+
+        ``local_kwargs`` are forwarded to ``LocalRuntime.ensure_started`` (``binary_path``,
+        ``version``, ``cache_dir``, ``port``, ``download``, ``timeout_s``). The client
+        authenticates with the runtime's generated local bearer — never the cloud
+        ``HAI_API_KEY``, which only passes through to the runtime for model-gateway calls.
+        ``LocalRuntime.ensure_started`` is intentionally synchronous — it runs once at
+        construction.
+        """
+        runtime = _ensure_local_runtime(runtime, spawn_env=spawn_env, **local_kwargs)
+        client = cls(base_url=runtime.base_url, api_key=runtime.api_key)
+        client._local_runtime = runtime  # keep the manager reachable for lifecycle calls
+        return client
 
     @property
     def sessions(self) -> AsyncSessionsClient:
