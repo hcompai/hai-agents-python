@@ -20,6 +20,7 @@ import pytest
 import hai_agents.types as types_module
 from hai_agents.core.http_client import get_request_body
 from hai_agents.types import (
+    Environment_Android,
     Environment_Desktop,
     Environment_Web,
     OnePasswordConfig,
@@ -40,6 +41,7 @@ FIELD_DROPPED_ENTIRELY = {
     ("BrowserTextMode", "type"),
     ("Browser", "kind"),
     ("Desktop", "kind"),
+    ("Android", "kind"),
 }
 
 MINIMAL_KWARGS: dict[str, dict[str, typing.Any]] = {
@@ -95,6 +97,7 @@ def test_generated_model_honors_spec_default(schema_name, prop_name, expected_de
     [
         (Environment_Web(id="browser", start_url="https://x.test"), "kind", "web"),
         (Environment_Desktop(id="box", host="user_device"), "kind", "desktop"),
+        (Environment_Android(id="phone"), "kind", "android"),
         (OnePasswordConfig(op_vault_id="vault_1"), "provider", "onepassword"),
         (ToolResultEvent(tool_req={"tool_name": "click"}, result="ok"), "kind", "tool_result"),
         (UserMessageEvent(message="hi"), "type", "user_message"),

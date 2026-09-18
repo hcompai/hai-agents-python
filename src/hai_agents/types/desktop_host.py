@@ -2,4 +2,4 @@
 
 import typing
 
-DesktopHost = typing.Union[typing.Literal["user_device"], typing.Any]
+DesktopHost = typing.Union[typing.Literal["user_device", "cloud"], typing.Any]

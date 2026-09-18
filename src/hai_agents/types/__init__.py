@@ -34,6 +34,7 @@ if typing.TYPE_CHECKING:
     from .agent_started_data import AgentStartedData
     from .agent_started_event import AgentStartedEvent
     from .agent_subagents_item import AgentSubagentsItem
+    from .android import Android
     from .answer_event import AnswerEvent
     from .answer_event_answer import AnswerEventAnswer
     from .answer_outcome import AnswerOutcome
@@ -49,7 +50,7 @@ if typing.TYPE_CHECKING:
     from .cron_timing_type import CronTimingType
     from .desktop import Desktop
     from .desktop_host import DesktopHost
-    from .environment import Environment, Environment_Desktop, Environment_Web
+    from .environment import Environment, Environment_Android, Environment_Desktop, Environment_Web
     from .environment_kind import EnvironmentKind
     from .environment_page import EnvironmentPage
     from .error_event import ErrorEvent
@@ -181,6 +182,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "AgentStartedData": ".agent_started_data",
     "AgentStartedEvent": ".agent_started_event",
     "AgentSubagentsItem": ".agent_subagents_item",
+    "Android": ".android",
     "AnswerEvent": ".answer_event",
     "AnswerEventAnswer": ".answer_event_answer",
     "AnswerOutcome": ".answer_outcome",
@@ -201,6 +203,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "Environment": ".environment",
     "EnvironmentKind": ".environment_kind",
     "EnvironmentPage": ".environment_page",
+    "Environment_Android": ".environment",
     "Environment_Desktop": ".environment",
     "Environment_Web": ".environment",
     "ErrorEvent": ".error_event",
@@ -352,6 +355,7 @@ __all__ = [
     "AgentStartedData",
     "AgentStartedEvent",
     "AgentSubagentsItem",
+    "Android",
     "AnswerEvent",
     "AnswerEventAnswer",
     "AnswerOutcome",
@@ -372,6 +376,7 @@ __all__ = [
     "Environment",
     "EnvironmentKind",
     "EnvironmentPage",
+    "Environment_Android",
     "Environment_Desktop",
     "Environment_Web",
     "ErrorEvent",
