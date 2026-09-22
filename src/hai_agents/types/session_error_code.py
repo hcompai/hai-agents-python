@@ -3,5 +3,6 @@
 import typing
 
 SessionErrorCode = typing.Union[
-    typing.Literal["environment_error", "no_answer", "answer_validation", "timeout", "internal"], typing.Any
+    typing.Literal["environment_error", "no_answer", "answer_validation", "timeout", "insufficient_credit", "internal"],
+    typing.Any,
 ]

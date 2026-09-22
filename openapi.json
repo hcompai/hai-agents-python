@@ -7406,6 +7406,7 @@
           "no_answer",
           "answer_validation",
           "timeout",
+          "insufficient_credit",
           "internal"
         ],
         "title": "SessionErrorCode",
