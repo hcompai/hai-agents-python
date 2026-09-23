@@ -67,6 +67,40 @@ print(result.answer)
 
 `result` is a `SessionRunResult`: `id`, `status`, `answer`, the accumulated `events`, and `final_changes`.
 
+## Where things run — `RuntimeConfig`
+
+An agent task has three parts, and each can run in a different place: the **agent** (the reasoning loop), the **environment** it drives, and the **model** (inference). `RuntimeConfig` is one object where you set those three toggles and get an ordinary `Client` back — no manual wiring.
+
+```python
+from hai_agents_runtime import RuntimeConfig, Inference
+
+# Everything in H's cloud (the default) — identical to Client().
+client = RuntimeConfig.cloud().client()
+
+# Agent and screen on this machine, H's cloud model.
+client = RuntimeConfig.local().client()
+
+# Same, but point the model at one you host yourself (localhost is fine).
+client = RuntimeConfig.local().with_(
+    inference=Inference.self_hosted("https://gpu.internal/v1")
+).client()
+
+result = client.run_session(agent="h/web-surfer-pro", messages="…")
+```
+
+Presets are just shorthand — override any toggle with `.with_()`. The inference toggle is either H's cloud (`Inference.cloud()`) or a model you host by URL (`Inference.self_hosted(url)`).
+
+Running the agent on the user's own machine (`RuntimeConfig.local()`) needs the **local agent runtime**, shipped as an opt-in extra so the base install stays lean:
+
+```bash
+pip install "hai-agents[local-agent]"       # compiled sagent binary (public)
+pip install "hai-agents[local-agent-src]"   # sagent source, internal only (private index)
+```
+
+If neither is installed, building a `user_device` `RuntimeConfig` fails at construction with a message naming the extra to add.
+
+> `hai_agents_runtime` is experimental and may change while the three toggles are pre-release.
+
 ## How a session works
 
 A session is one run of an agent against a task. It moves through a small set of states: `pending`, `running`, and then a settled state such as `completed`, `idle`, `failed`, `timed_out`, or `interrupted`.

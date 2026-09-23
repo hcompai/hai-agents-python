@@ -41,6 +41,13 @@ cli = [
 # `pip install "hai-agents[local]"` valid documentation and lets a real
 # dependency land later without a breaking install-instruction change.
 local = []
+# The local AGENT RUNTIME (the sagent binary) is an opt-in extra, so the base
+# install stays lean for callers who only use cloud or a self-hosted URL.
+# Compiled binary, fetched on first use from the public artifact store:
+local-agent = ["hai-agents[local]"]
+# Or the sagent Python source, served only from H's private CodeArtifact index
+# (internal users; others get an install error). Configure that index, then:
+local-agent-src = ["hai-agents[local]"]
 desktop = [
   "hai-drivers[desktop]>=0.1.0",
 ]
@@ -61,7 +68,7 @@ Issues = "https://github.com/hcompai/hai-agents-python/issues"
 Documentation = "https://hub.hcompany.ai/computer-use-agents"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/hai_agents", "src/hai_agents_cli", "src/hai_agents_common", "src/hai_agents_local", "src/hai_agents_tools"]
+packages = ["src/hai_agents", "src/hai_agents_cli", "src/hai_agents_common", "src/hai_agents_local", "src/hai_agents_runtime", "src/hai_agents_tools"]
 
 [dependency-groups]
 dev = [
