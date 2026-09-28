@@ -11,6 +11,7 @@ if typing.TYPE_CHECKING:
         CreateEnvironmentRequest_Android,
         CreateEnvironmentRequest_Desktop,
         CreateEnvironmentRequest_Web,
+        CreateEnvironmentRequest_Workstation,
     )
     from .list_environments_request_sort_item import ListEnvironmentsRequestSortItem
     from .patch_environment_host import PatchEnvironmentHost
@@ -20,12 +21,14 @@ if typing.TYPE_CHECKING:
         UpdateEnvironmentRequestBody_Android,
         UpdateEnvironmentRequestBody_Desktop,
         UpdateEnvironmentRequestBody_Web,
+        UpdateEnvironmentRequestBody_Workstation,
     )
 _dynamic_imports: typing.Dict[str, str] = {
     "CreateEnvironmentRequest": ".create_environment_request",
     "CreateEnvironmentRequest_Android": ".create_environment_request",
     "CreateEnvironmentRequest_Desktop": ".create_environment_request",
     "CreateEnvironmentRequest_Web": ".create_environment_request",
+    "CreateEnvironmentRequest_Workstation": ".create_environment_request",
     "ListEnvironmentsRequestSortItem": ".list_environments_request_sort_item",
     "PatchEnvironmentHost": ".patch_environment_host",
     "PatchEnvironmentMode": ".patch_environment_mode",
@@ -35,6 +38,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "UpdateEnvironmentRequestBody_Android": ".update_environment_request_body",
     "UpdateEnvironmentRequestBody_Desktop": ".update_environment_request_body",
     "UpdateEnvironmentRequestBody_Web": ".update_environment_request_body",
+    "UpdateEnvironmentRequestBody_Workstation": ".update_environment_request_body",
 }
 
 
@@ -64,6 +68,7 @@ __all__ = [
     "CreateEnvironmentRequest_Android",
     "CreateEnvironmentRequest_Desktop",
     "CreateEnvironmentRequest_Web",
+    "CreateEnvironmentRequest_Workstation",
     "ListEnvironmentsRequestSortItem",
     "PatchEnvironmentHost",
     "PatchEnvironmentMode",
@@ -73,4 +78,5 @@ __all__ = [
     "UpdateEnvironmentRequestBody_Android",
     "UpdateEnvironmentRequestBody_Desktop",
     "UpdateEnvironmentRequestBody_Web",
+    "UpdateEnvironmentRequestBody_Workstation",
 ]

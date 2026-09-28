@@ -1677,6 +1677,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Android"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Workstation"
                   }
                 ],
                 "discriminator": {
@@ -1684,7 +1687,8 @@
                   "mapping": {
                     "web": "#/components/schemas/Browser",
                     "desktop": "#/components/schemas/Desktop",
-                    "android": "#/components/schemas/Android"
+                    "android": "#/components/schemas/Android",
+                    "workstation": "#/components/schemas/Workstation"
                   }
                 },
                 "title": "Create"
@@ -1948,6 +1952,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Android"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Workstation"
                   }
                 ],
                 "discriminator": {
@@ -1955,7 +1962,8 @@
                   "mapping": {
                     "web": "#/components/schemas/Browser",
                     "desktop": "#/components/schemas/Desktop",
-                    "android": "#/components/schemas/Android"
+                    "android": "#/components/schemas/Android",
+                    "workstation": "#/components/schemas/Workstation"
                   }
                 },
                 "title": "Update"
@@ -4949,6 +4957,75 @@
         "title": "AnswerOutcome",
         "description": "Agent's self-assessment of how the task concluded, reported with the final answer."
       },
+      "AttachmentData": {
+        "properties": {
+          "origin": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "user"
+            ],
+            "title": "Origin"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "origin",
+          "name",
+          "path",
+          "media_type",
+          "size_bytes",
+          "url"
+        ],
+        "title": "AttachmentData"
+      },
+      "AttachmentEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "AttachmentEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AttachmentData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "AttachmentEvent",
+        "description": "A file passed between the user and the agent's environment; ``data.url`` downloads it."
+      },
       "Browser": {
         "properties": {
           "id": {
@@ -5531,6 +5608,9 @@
           },
           {
             "$ref": "#/components/schemas/Android"
+          },
+          {
+            "$ref": "#/components/schemas/Workstation"
           }
         ],
         "discriminator": {
@@ -5538,7 +5618,8 @@
           "mapping": {
             "android": "#/components/schemas/Android",
             "desktop": "#/components/schemas/Desktop",
-            "web": "#/components/schemas/Browser"
+            "web": "#/components/schemas/Browser",
+            "workstation": "#/components/schemas/Workstation"
           }
         }
       },
@@ -5547,7 +5628,8 @@
         "enum": [
           "web",
           "desktop",
-          "android"
+          "android",
+          "workstation"
         ],
         "title": "EnvironmentKind",
         "description": "Environment family."
@@ -5640,6 +5722,61 @@
         ],
         "title": "Feedback",
         "description": "Feedback on the semantic success of the trajectory."
+      },
+      "FileContent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "base64",
+              "url"
+            ],
+            "title": "Type",
+            "description": "'base64' when sending the file, 'url' once the platform has stored it.",
+            "default": "base64"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Base64 payload when type is 'base64', download URL when type is 'url'."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "File name, without its directory."
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Type",
+            "description": "MIME type, e.g. 'application/pdf'; guessed if omitted."
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes",
+            "description": "Size of the file in bytes, set by the platform."
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "name"
+        ],
+        "title": "FileContent",
+        "description": "A file attached to a user message: sent as base64, stored and read back as a platform URL."
       },
       "FileEntry": {
         "properties": {
@@ -6139,6 +6276,12 @@
             "title": "Input Tokens",
             "description": "Input tokens consumed."
           },
+          "cached_tokens": {
+            "type": "integer",
+            "title": "Cached Tokens",
+            "description": "Input tokens served from the prompt cache, billed at a discount.",
+            "default": 0
+          },
           "output_tokens": {
             "type": "integer",
             "title": "Output Tokens",
@@ -6220,6 +6363,12 @@
             "type": "integer",
             "title": "Input Tokens",
             "description": "Input tokens consumed."
+          },
+          "cached_tokens": {
+            "type": "integer",
+            "title": "Cached Tokens",
+            "description": "Input tokens served from the prompt cache, billed at a discount.",
+            "default": 0
           },
           "output_tokens": {
             "type": "integer",
@@ -7069,6 +7218,46 @@
         "title": "RequestStartEvent",
         "description": "The platform requested the agent to start."
       },
+      "RunnerSessionData": {
+        "properties": {
+          "runner_session_id": {
+            "type": "string",
+            "title": "Runner Session Id"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "runner_session_id"
+        ],
+        "title": "RunnerSessionData"
+      },
+      "RunnerSessionEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "RunnerSessionEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunnerSessionData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "RunnerSessionEvent",
+        "description": "A session-manager session hosting one of this session's environments became addressable by id."
+      },
       "ScheduleRecord": {
         "properties": {
           "id": {
@@ -7447,6 +7636,12 @@
                 "$ref": "#/components/schemas/FileTransferEvent"
               },
               {
+                "$ref": "#/components/schemas/AttachmentEvent"
+              },
+              {
+                "$ref": "#/components/schemas/RunnerSessionEvent"
+              },
+              {
                 "$ref": "#/components/schemas/AgentEvent"
               }
             ],
@@ -7459,11 +7654,13 @@
                 "AgentEvent": "#/components/schemas/AgentEvent",
                 "AgentRunStatusChangeEvent": "#/components/schemas/AgentRunStatusChangeEvent",
                 "AgentStartedEvent": "#/components/schemas/AgentStartedEvent",
+                "AttachmentEvent": "#/components/schemas/AttachmentEvent",
                 "FileTransferEvent": "#/components/schemas/FileTransferEvent",
                 "LiveViewUrlEvent": "#/components/schemas/LiveViewUrlEvent",
                 "MetricsUpdateEvent": "#/components/schemas/MetricsUpdateEvent",
                 "RequestStartDispatchedEvent": "#/components/schemas/RequestStartDispatchedEvent",
-                "RequestStartEvent": "#/components/schemas/RequestStartEvent"
+                "RequestStartEvent": "#/components/schemas/RequestStartEvent",
+                "RunnerSessionEvent": "#/components/schemas/RunnerSessionEvent"
               }
             }
           },
@@ -8270,6 +8467,14 @@
             "title": "Images",
             "description": "Optional images attached to the message, as base64 data URIs."
           },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileContent"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Optional files attached to the message: up to 10, 7 MB in total. They are saved under /workspace/files on a workstation or code sandbox, and ~/Downloads on a cloud browser."
+          },
           "caller_id": {
             "type": "string",
             "title": "Caller Id",
@@ -8763,6 +8968,35 @@
         ],
         "title": "WebhookWithSecret",
         "description": "Create response: the only time the signing secret is returned."
+      },
+      "Workstation": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id",
+            "description": "Catalog identifier for this environment."
+          },
+          "kind": {
+            "type": "string",
+            "const": "workstation",
+            "title": "Kind",
+            "default": "workstation"
+          },
+          "host": {
+            "type": "string",
+            "const": "cloud",
+            "title": "Host",
+            "description": "Where the workstation runs: on H Company infrastructure.",
+            "default": "cloud"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "Workstation",
+        "description": "A desktop computer with a browser, office apps and a shell, which the agent drives from that shell."
       },
       "WriteFileRequest": {
         "properties": {

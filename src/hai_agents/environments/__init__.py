@@ -11,6 +11,7 @@ if typing.TYPE_CHECKING:
         CreateEnvironmentRequest_Android,
         CreateEnvironmentRequest_Desktop,
         CreateEnvironmentRequest_Web,
+        CreateEnvironmentRequest_Workstation,
         ListEnvironmentsRequestSortItem,
         PatchEnvironmentHost,
         PatchEnvironmentMode,
@@ -20,12 +21,14 @@ if typing.TYPE_CHECKING:
         UpdateEnvironmentRequestBody_Android,
         UpdateEnvironmentRequestBody_Desktop,
         UpdateEnvironmentRequestBody_Web,
+        UpdateEnvironmentRequestBody_Workstation,
     )
 _dynamic_imports: typing.Dict[str, str] = {
     "CreateEnvironmentRequest": ".types",
     "CreateEnvironmentRequest_Android": ".types",
     "CreateEnvironmentRequest_Desktop": ".types",
     "CreateEnvironmentRequest_Web": ".types",
+    "CreateEnvironmentRequest_Workstation": ".types",
     "ListEnvironmentsRequestSortItem": ".types",
     "PatchEnvironmentHost": ".types",
     "PatchEnvironmentMode": ".types",
@@ -35,6 +38,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "UpdateEnvironmentRequestBody_Android": ".types",
     "UpdateEnvironmentRequestBody_Desktop": ".types",
     "UpdateEnvironmentRequestBody_Web": ".types",
+    "UpdateEnvironmentRequestBody_Workstation": ".types",
 }
 
 
@@ -64,6 +68,7 @@ __all__ = [
     "CreateEnvironmentRequest_Android",
     "CreateEnvironmentRequest_Desktop",
     "CreateEnvironmentRequest_Web",
+    "CreateEnvironmentRequest_Workstation",
     "ListEnvironmentsRequestSortItem",
     "PatchEnvironmentHost",
     "PatchEnvironmentMode",
@@ -73,4 +78,5 @@ __all__ = [
     "UpdateEnvironmentRequestBody_Android",
     "UpdateEnvironmentRequestBody_Desktop",
     "UpdateEnvironmentRequestBody_Web",
+    "UpdateEnvironmentRequestBody_Workstation",
 ]

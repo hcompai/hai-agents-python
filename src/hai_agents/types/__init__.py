@@ -38,6 +38,9 @@ if typing.TYPE_CHECKING:
     from .answer_event import AnswerEvent
     from .answer_event_answer import AnswerEventAnswer
     from .answer_outcome import AnswerOutcome
+    from .attachment_data import AttachmentData
+    from .attachment_data_origin import AttachmentDataOrigin
+    from .attachment_event import AttachmentEvent
     from .browser import Browser
     from .browser_host import BrowserHost
     from .browser_mode import BrowserMode, BrowserMode_Text, BrowserMode_Visual
@@ -50,12 +53,20 @@ if typing.TYPE_CHECKING:
     from .cron_timing_type import CronTimingType
     from .desktop import Desktop
     from .desktop_host import DesktopHost
-    from .environment import Environment, Environment_Android, Environment_Desktop, Environment_Web
+    from .environment import (
+        Environment,
+        Environment_Android,
+        Environment_Desktop,
+        Environment_Web,
+        Environment_Workstation,
+    )
     from .environment_kind import EnvironmentKind
     from .environment_page import EnvironmentPage
     from .error_event import ErrorEvent
     from .error_event_kind import ErrorEventKind
     from .feedback import Feedback
+    from .file_content import FileContent
+    from .file_content_type import FileContentType
     from .file_entry import FileEntry
     from .file_transfer_data import FileTransferData
     from .file_transfer_data_direction import FileTransferDataDirection
@@ -97,6 +108,8 @@ if typing.TYPE_CHECKING:
     from .request_start_dispatched_data import RequestStartDispatchedData
     from .request_start_dispatched_event import RequestStartDispatchedEvent
     from .request_start_event import RequestStartEvent
+    from .runner_session_data import RunnerSessionData
+    from .runner_session_event import RunnerSessionEvent
     from .schedule_record import ScheduleRecord
     from .schedule_run_record import ScheduleRunRecord
     from .schedule_run_record_status import ScheduleRunRecordStatus
@@ -113,11 +126,13 @@ if typing.TYPE_CHECKING:
         SessionEventZero_AgentEvent,
         SessionEventZero_AgentRunStatusChangeEvent,
         SessionEventZero_AgentStartedEvent,
+        SessionEventZero_AttachmentEvent,
         SessionEventZero_FileTransferEvent,
         SessionEventZero_LiveViewUrlEvent,
         SessionEventZero_MetricsUpdateEvent,
         SessionEventZero_RequestStartDispatchedEvent,
         SessionEventZero_RequestStartEvent,
+        SessionEventZero_RunnerSessionEvent,
     )
     from .session_request import SessionRequest
     from .session_request_agent import SessionRequestAgent
@@ -154,6 +169,8 @@ if typing.TYPE_CHECKING:
     from .webhook_record_last_delivery_status import WebhookRecordLastDeliveryStatus
     from .webhook_with_secret import WebhookWithSecret
     from .webhook_with_secret_last_delivery_status import WebhookWithSecretLastDeliveryStatus
+    from .workstation import Workstation
+    from .workstation_host import WorkstationHost
     from .write_file_response import WriteFileResponse
 _dynamic_imports: typing.Dict[str, str] = {
     "ActiveStateChangeData": ".active_state_change_data",
@@ -186,6 +203,9 @@ _dynamic_imports: typing.Dict[str, str] = {
     "AnswerEvent": ".answer_event",
     "AnswerEventAnswer": ".answer_event_answer",
     "AnswerOutcome": ".answer_outcome",
+    "AttachmentData": ".attachment_data",
+    "AttachmentDataOrigin": ".attachment_data_origin",
+    "AttachmentEvent": ".attachment_event",
     "Browser": ".browser",
     "BrowserHost": ".browser_host",
     "BrowserMode": ".browser_mode",
@@ -206,9 +226,12 @@ _dynamic_imports: typing.Dict[str, str] = {
     "Environment_Android": ".environment",
     "Environment_Desktop": ".environment",
     "Environment_Web": ".environment",
+    "Environment_Workstation": ".environment",
     "ErrorEvent": ".error_event",
     "ErrorEventKind": ".error_event_kind",
     "Feedback": ".feedback",
+    "FileContent": ".file_content",
+    "FileContentType": ".file_content_type",
     "FileEntry": ".file_entry",
     "FileTransferData": ".file_transfer_data",
     "FileTransferDataDirection": ".file_transfer_data_direction",
@@ -250,6 +273,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "RequestStartDispatchedData": ".request_start_dispatched_data",
     "RequestStartDispatchedEvent": ".request_start_dispatched_event",
     "RequestStartEvent": ".request_start_event",
+    "RunnerSessionData": ".runner_session_data",
+    "RunnerSessionEvent": ".runner_session_event",
     "ScheduleRecord": ".schedule_record",
     "ScheduleRunRecord": ".schedule_run_record",
     "ScheduleRunRecordStatus": ".schedule_run_record_status",
@@ -265,11 +290,13 @@ _dynamic_imports: typing.Dict[str, str] = {
     "SessionEventZero_AgentEvent": ".session_event_zero",
     "SessionEventZero_AgentRunStatusChangeEvent": ".session_event_zero",
     "SessionEventZero_AgentStartedEvent": ".session_event_zero",
+    "SessionEventZero_AttachmentEvent": ".session_event_zero",
     "SessionEventZero_FileTransferEvent": ".session_event_zero",
     "SessionEventZero_LiveViewUrlEvent": ".session_event_zero",
     "SessionEventZero_MetricsUpdateEvent": ".session_event_zero",
     "SessionEventZero_RequestStartDispatchedEvent": ".session_event_zero",
     "SessionEventZero_RequestStartEvent": ".session_event_zero",
+    "SessionEventZero_RunnerSessionEvent": ".session_event_zero",
     "SessionRequest": ".session_request",
     "SessionRequestAgent": ".session_request_agent",
     "SessionRequestMessages": ".session_request_messages",
@@ -303,6 +330,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "WebhookRecordLastDeliveryStatus": ".webhook_record_last_delivery_status",
     "WebhookWithSecret": ".webhook_with_secret",
     "WebhookWithSecretLastDeliveryStatus": ".webhook_with_secret_last_delivery_status",
+    "Workstation": ".workstation",
+    "WorkstationHost": ".workstation_host",
     "WriteFileResponse": ".write_file_response",
 }
 
@@ -359,6 +388,9 @@ __all__ = [
     "AnswerEvent",
     "AnswerEventAnswer",
     "AnswerOutcome",
+    "AttachmentData",
+    "AttachmentDataOrigin",
+    "AttachmentEvent",
     "Browser",
     "BrowserHost",
     "BrowserMode",
@@ -379,9 +411,12 @@ __all__ = [
     "Environment_Android",
     "Environment_Desktop",
     "Environment_Web",
+    "Environment_Workstation",
     "ErrorEvent",
     "ErrorEventKind",
     "Feedback",
+    "FileContent",
+    "FileContentType",
     "FileEntry",
     "FileTransferData",
     "FileTransferDataDirection",
@@ -423,6 +458,8 @@ __all__ = [
     "RequestStartDispatchedData",
     "RequestStartDispatchedEvent",
     "RequestStartEvent",
+    "RunnerSessionData",
+    "RunnerSessionEvent",
     "ScheduleRecord",
     "ScheduleRunRecord",
     "ScheduleRunRecordStatus",
@@ -438,11 +475,13 @@ __all__ = [
     "SessionEventZero_AgentEvent",
     "SessionEventZero_AgentRunStatusChangeEvent",
     "SessionEventZero_AgentStartedEvent",
+    "SessionEventZero_AttachmentEvent",
     "SessionEventZero_FileTransferEvent",
     "SessionEventZero_LiveViewUrlEvent",
     "SessionEventZero_MetricsUpdateEvent",
     "SessionEventZero_RequestStartDispatchedEvent",
     "SessionEventZero_RequestStartEvent",
+    "SessionEventZero_RunnerSessionEvent",
     "SessionRequest",
     "SessionRequestAgent",
     "SessionRequestMessages",
@@ -476,5 +515,7 @@ __all__ = [
     "WebhookRecordLastDeliveryStatus",
     "WebhookWithSecret",
     "WebhookWithSecretLastDeliveryStatus",
+    "Workstation",
+    "WorkstationHost",
     "WriteFileResponse",
 ]

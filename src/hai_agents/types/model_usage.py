@@ -21,6 +21,11 @@ class ModelUsage(UniversalBaseModel):
     Input tokens consumed.
     """
 
+    cached_tokens: typing.Optional[int] = pydantic.Field(default=None)
+    """
+    Input tokens served from the prompt cache, billed at a discount.
+    """
+
     output_tokens: int = pydantic.Field()
     """
     Output tokens produced.

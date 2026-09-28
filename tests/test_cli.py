@@ -5,7 +5,7 @@ import json
 from typer.testing import CliRunner
 
 import hai_agents_cli.app as app_module
-from hai_agents.polling import SessionRunResult
+from hai_agents.polling import MAX_REQUEST_BYTES, SessionRunResult
 from hai_agents_cli.app import app
 from hai_agents_common import credentials
 
@@ -110,7 +110,9 @@ def test_run_rejects_oversized_payload_before_sending(monkeypatch) -> None:
     client = _RunClient(capture=captured)
     monkeypatch.setattr(app_module, "_client", lambda state: client)
 
-    result = runner.invoke(app, ["run", "x" * (6 * 1024 * 1024), "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
+    result = runner.invoke(
+        app, ["run", "x" * (MAX_REQUEST_BYTES + 1), "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"}
+    )
 
     assert result.exit_code != 0
     assert "over the" in _error_text(result)
@@ -120,7 +122,7 @@ def test_run_rejects_oversized_payload_before_sending(monkeypatch) -> None:
 def test_run_validates_payload_before_agent_selection(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
 
-    result = runner.invoke(app, ["run", "x" * (6 * 1024 * 1024)], env={"HAI_API_KEY": "hk-test"})
+    result = runner.invoke(app, ["run", "x" * (MAX_REQUEST_BYTES + 1)], env={"HAI_API_KEY": "hk-test"})
 
     assert result.exit_code != 0
     assert "over the" in _error_text(result)
