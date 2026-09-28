@@ -4,6 +4,7 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .file_content import FileContent
 from .user_message_event_type import UserMessageEventType
 
 
@@ -21,6 +22,11 @@ class UserMessageEvent(UniversalBaseModel):
     images: typing.Optional[typing.List[str]] = pydantic.Field(default=None)
     """
     Optional images attached to the message, as base64 data URIs.
+    """
+
+    files: typing.Optional[typing.List[FileContent]] = pydantic.Field(default=None)
+    """
+    Optional files attached to the message: up to 10, 7 MB in total. They are saved under /workspace/files on a workstation or code sandbox, and ~/Downloads on a cloud browser.
     """
 
     caller_id: typing.Optional[str] = None

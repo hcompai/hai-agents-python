@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import concurrent.futures
 import inspect
 import json
+import os
+import pathlib
 import time
 import typing
 from dataclasses import dataclass
@@ -21,6 +24,7 @@ from .types.session_request_agent import SessionRequestAgent
 from .types.session_request_messages import SessionRequestMessages
 from .types.session_changes import SessionChanges
 from .types.session_changes_answer import SessionChangesAnswer
+from .types.file_content import FileContent
 from .types.session_event import SessionEvent
 from .types.trajectory_status import TrajectoryStatus
 
@@ -37,8 +41,8 @@ TERMINAL_SESSION_STATUSES = frozenset({"completed", "failed", "timed_out", "inte
 # user message, which a one-shot wait will never send.
 SETTLED_SESSION_STATUSES = TERMINAL_SESSION_STATUSES | {"idle"}
 
-# Server rejects request bodies above this size; enforced client-side for a clear early error.
-MAX_REQUEST_BYTES = 5 * 1024 * 1024
+# The API gateway rejects request bodies above this size; enforced client-side for a clear early error.
+MAX_REQUEST_BYTES = 10_000_000
 
 
 class CreateSessionParams(typing_extensions.TypedDict, total=False):
@@ -167,9 +171,19 @@ def assert_request_under_limit(payload: typing.Any, max_bytes: int = MAX_REQUEST
     size = _request_bytes(payload)
     if size > max_bytes:
         raise ValueError(
-            f"Request payload is {size / 1024 / 1024:.2f}MB, over the "
-            f"{max_bytes / 1024 / 1024:.2f}MB limit. Downscale images before sending."
+            f"Request payload is {size / 1e6:.2f}MB, over the {max_bytes / 1e6:.2f}MB limit. "
+            "Downscale images or attach smaller files."
         )
+
+
+def file_from_path(
+    path: typing.Union[str, os.PathLike[str]], *, media_type: typing.Optional[str] = None
+) -> FileContent:
+    """A file to attach to a user message; the platform guesses ``media_type`` from the name when omitted."""
+    file = pathlib.Path(path)
+    return FileContent(
+        type="base64", source=base64.b64encode(file.read_bytes()).decode("ascii"), name=file.name, media_type=media_type
+    )
 
 
 def _attach_tool_definitions(create_params: typing.Dict[str, typing.Any], tools: typing.Sequence[Tool]) -> None:
@@ -804,6 +818,7 @@ class SessionHandle(typing.Generic[AnswerT]):
     def send_message(self, message: typing.Any) -> None:
         if isinstance(message, str):
             message = SendSessionMessagesRequestBody_UserMessage(message=message)
+        assert_request_under_limit(message)
         self._client.sessions.send_session_messages(self.id, request=message)
 
     def pause(self) -> None:
@@ -872,6 +887,7 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
     async def send_message(self, message: typing.Any) -> None:
         if isinstance(message, str):
             message = SendSessionMessagesRequestBody_UserMessage(message=message)
+        assert_request_under_limit(message)
         await self._client.sessions.send_session_messages(self.id, request=message)
 
     async def pause(self) -> None:

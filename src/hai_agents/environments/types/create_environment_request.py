@@ -11,6 +11,7 @@ from ...types.browser_host import BrowserHost
 from ...types.browser_mode import BrowserMode
 from ...types.browser_network import BrowserNetwork
 from ...types.desktop_host import DesktopHost
+from ...types.workstation_host import WorkstationHost
 
 
 class CreateEnvironmentRequest_Web(UniversalBaseModel):
@@ -72,7 +73,27 @@ class CreateEnvironmentRequest_Android(UniversalBaseModel):
             extra = pydantic.Extra.allow
 
 
+class CreateEnvironmentRequest_Workstation(UniversalBaseModel):
+    kind: typing.Literal["workstation"] = "workstation"
+    id: str
+    host: typing.Optional[WorkstationHost] = None
+
+    if IS_PYDANTIC_V2:
+        model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
+    else:
+
+        class Config:
+            frozen = True
+            smart_union = True
+            extra = pydantic.Extra.allow
+
+
 CreateEnvironmentRequest = typing_extensions.Annotated[
-    typing.Union[CreateEnvironmentRequest_Web, CreateEnvironmentRequest_Desktop, CreateEnvironmentRequest_Android],
+    typing.Union[
+        CreateEnvironmentRequest_Web,
+        CreateEnvironmentRequest_Desktop,
+        CreateEnvironmentRequest_Android,
+        CreateEnvironmentRequest_Workstation,
+    ],
     pydantic.Field(discriminator="kind"),
 ]
