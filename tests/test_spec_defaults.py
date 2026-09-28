@@ -42,6 +42,7 @@ FIELD_DROPPED_ENTIRELY = {
     ("Browser", "kind"),
     ("Desktop", "kind"),
     ("Android", "kind"),
+    ("Workstation", "kind"),
 }
 
 MINIMAL_KWARGS: dict[str, dict[str, typing.Any]] = {
@@ -51,6 +52,7 @@ MINIMAL_KWARGS: dict[str, dict[str, typing.Any]] = {
     "ErrorEvent": {"error": "boom", "origin": "loop"},
     "ToolResultBatch": {"results": []},
     "CronTiming": {"expression": "0 9 * * *", "timezone": "Europe/Paris"},
+    "Workstation": {"id": "workstation"},
 }
 
 
@@ -72,7 +74,9 @@ def test_spec_declares_the_known_discriminator_defaults():
 
 def test_dropped_fields_are_actually_absent():
     """A regeneration that restores a skipped field must force it back under test, not stay skipped."""
-    for schema_name, prop_name in FIELD_DROPPED_ENTIRELY:
+    for schema_name, prop_name, _ in _spec_const_defaults():
+        if (schema_name, prop_name) not in FIELD_DROPPED_ENTIRELY:
+            continue
         model = getattr(types_module, schema_name)
         assert prop_name not in model.model_fields, (
             f"{schema_name}.{prop_name} is back on the generated model; drop it from "
