@@ -17,3 +17,16 @@ def test_core_model_round_trips() -> None:
     assert status.status == "completed"
     assert status.steps == 3
     assert status.model_dump(exclude_none=True)["status"] == "completed"
+
+
+def test_base_import_never_loads_local_mode() -> None:
+    """Remote-only users must not pay for process/download machinery at import."""
+    import subprocess
+    import sys
+
+    code = (
+        "import sys, hai_agents; "
+        "loaded = sorted(m for m in sys.modules if m.startswith('hai_agents.local')); "
+        "assert not loaded, loaded"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
