@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sys
 from typing import TYPE_CHECKING, Literal
 
@@ -97,6 +98,10 @@ class PyautoguiDesktopBridge(LocalBridge["DesktopDriverInterface"]):
             image_format=self.image_format,
             quality=self.quality,
         )
+
+    async def interrupt_driver(self) -> None:
+        if self._driver is not None:
+            await asyncio.to_thread(self._driver.close)
 
     def driver_interface(self) -> type:
         # Runtime import: hai-drivers is absent unless installed with hai-agents[desktop].
