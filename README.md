@@ -113,9 +113,15 @@ currently accept that override.
 Closing the client shuts down a runtime it started; an attached runtime remains
 owned by its caller. `cancel()` ends the agent session. For a cloud workstation,
 an explicit `session_id` attaches to a caller-owned environment, which the caller
-must eventually release. Automatically provisioned cloud environments are torn
-down with their agent adapter. Keeping those environments across cancellation is
-still an open lifecycle requirement. The candidate source runtime accepts base64
+must eventually release. In the candidate shared recipe, automatically provisioned
+cloud workstations survive agent cancellation and expire through the environment
+manager after 30 minutes without commands (the runner's fixed deadline still
+applies). Reattach using the `RunnerSessionEvent` ID in a new agent session;
+cancellation does not revive the old agent session. The existing environment
+manager API can release the workstation earlier. A manager that cannot confirm
+the requested expiry is rejected and the newly created runner is deleted. This
+is temporary compute retention, not a durable-storage or pause/resume guarantee.
+The candidate source runtime accepts base64
 message attachments and exposes files shared by the agent through
 `sessions.get_session_resource(id, "local", key)`. Download them before closing
 the runtime: local shared resources expire with the retained session. The limits
