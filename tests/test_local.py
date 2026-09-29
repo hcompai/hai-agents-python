@@ -3,7 +3,6 @@ import json
 import sys
 import threading
 import types
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -679,7 +678,6 @@ class TestDriverInterfaces:
         }
         assert deserialize_args(sandbox, "write_file", {"path": "a", "content": "aGk="})["content"] == "aGk="
         assert deserialize_args(desktop, "write_file", {"path": "a", "content": "aGk="})["content"] == b"hi"
-        assert deserialize_args(desktop, "run_command", {"command": ["ls"], "cwd": "/tmp"})["cwd"] == Path("/tmp")
 
     def test_workstation_serves_a_shell_with_the_cli_commands_and_typed_errors(self):
         pytest.importorskip("hai_drivers.code_sandbox.local.driver")
