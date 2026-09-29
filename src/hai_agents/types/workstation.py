@@ -17,9 +17,14 @@ class Workstation(UniversalBaseModel):
     Catalog identifier for this environment.
     """
 
-    host: typing.Optional[WorkstationHost] = pydantic.Field(default="cloud")
+    host: typing.Optional[WorkstationHost] = pydantic.Field(default=None)
     """
-    Where the workstation runs: on H Company infrastructure.
+    Where the workstation runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.
+    """
+
+    session_id: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    Connect to an existing workstation session by id instead of starting a new one.
     """
 
     if IS_PYDANTIC_V2:

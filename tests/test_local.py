@@ -365,6 +365,9 @@ class TestAutoStart:
 
         monkeypatch.setattr(SessionsClient, "create_session", create_while_stop_lands)
         Client(api_key=API_KEY).sessions.create_session(agent=dict(self._TWO_ENV_AGENT), messages="hi")
+        deadline = _time.monotonic() + 3.0
+        while not cancelled and _time.monotonic() < deadline:
+            _time.sleep(0.02)
         assert cancelled == ["sess-mid"]
 
     def test_no_bridges_and_no_stamping_when_disabled(self, monkeypatch):
