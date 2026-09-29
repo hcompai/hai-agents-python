@@ -67,6 +67,57 @@ print(result.answer)
 
 `result` is a `SessionRunResult`: `id`, `status`, `answer`, the accumulated `events`, and `final_changes`.
 
+## Candidate local-agent support
+
+The placement branch adds `Client(mode="local")` and the same option on
+`AsyncClient`. Agent placement and environment placement are separate: the client
+selects where the agent runs; each agent environment selects `host="user_device"`
+or `host="cloud"`. `Client()` continues to use the hosted Agents API.
+
+For development, install the candidate SDK and use a prepared HAI source checkout:
+
+```python
+from hai_agents import Client
+
+with Client(
+    mode="local",
+    local_options={
+        "command": ["/path/to/hai/.venv/bin/python", "-m", "hai_agent_runtime"],
+        "download": False,
+    },
+) as client:
+    session = client.sessions.create_session(
+        agent={
+            "name": "local-example",
+            "description": "Local workstation example",
+            "instructions": "Answer the user's task using the workstation tools.",
+            "environments": [
+                {"id": "workstation", "kind": "workstation", "host": "user_device"}
+            ],
+        },
+        messages=[{"type": "user_message", "message": "Print hello using the shell."}],
+        max_steps=8,
+        max_time_s=120,
+    )
+    # Poll or steer the session here, before leaving the client context.
+```
+
+The source runtime must support the `shared` recipe. The current pinned binary
+0.1.8 does not; candidate source or an explicitly supplied compatible
+`local_options["binary_path"]` is required until a compatible release is pinned.
+The runtime inherits `HAI_API_KEY` for hosted inference. Local agent execution
+does not by itself imply local inference: `Inference.self_hosted(url, model=...)`
+selects a model endpoint for a newly started local runtime. Hosted agents do not
+currently accept that override.
+
+Closing the client shuts down a runtime it started; an attached runtime remains
+owned by its caller. `cancel()` ends the agent session. For a cloud workstation,
+an explicit `session_id` attaches to a caller-owned environment, which the caller
+must eventually release. Automatically provisioned cloud environments are torn
+down with their agent adapter. Keeping those environments across cancellation is
+still an open lifecycle requirement. Local resource-upload endpoints are not yet
+implemented; driver-level file transfer is a separate capability.
+
 ## How a session works
 
 A session is one run of an agent against a task. It moves through a small set of states: `pending`, `running`, and then a settled state such as `completed`, `idle`, `failed`, `timed_out`, or `interrupted`.
