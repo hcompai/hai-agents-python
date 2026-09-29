@@ -1,7 +1,9 @@
 import asyncio
+import json
 import sys
 import threading
 import types
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -9,11 +11,18 @@ import pytest
 
 from hai_agents import Client
 from hai_agents.sessions.client import SessionsClient
-from hai_agents_local import BridgeManager, LocalBridge, PyautoguiDesktopBridge, SeleniumBrowserBridge
+from hai_agents.types import Desktop, Workstation
+from hai_agents_local import (
+    BridgeManager,
+    LocalBridge,
+    PyautoguiDesktopBridge,
+    SeleniumBrowserBridge,
+    WorkstationBridge,
+)
 from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR
 from hai_agents_local.errors import AuthError, RateLimitedError, SessionNotFoundError
 from hai_agents_local.routing import localize_agent
-from hai_agents_local.transport import Command, serialize_result
+from hai_agents_local.transport import Command, deserialize_args, serialize_result
 
 API_KEY = "test-key"
 
@@ -98,15 +107,16 @@ class TestLocalizeAgent:
         assert env.session_id == bridge.session_id
         assert env.model_dump()["kind"] == "web"
 
-    def test_bare_desktop_model_gets_a_desktop_bridge_and_kind_tag(self):
-        from hai_agents.types.desktop import Desktop
-
-        agent = {"name": "x", "environments": [Desktop(id="box", host="user_device")]}
+    @pytest.mark.parametrize(
+        ("model", "bridge_type"), [(Desktop, PyautoguiDesktopBridge), (Workstation, WorkstationBridge)]
+    )
+    def test_bare_env_model_gets_its_bridge_and_kind_tag(self, model, bridge_type):
+        agent = {"name": "x", "environments": [model(id="box", host="user_device")]}
         localized, [bridge] = localize_agent(agent, api_key=API_KEY)
-        assert isinstance(bridge, PyautoguiDesktopBridge)
+        assert isinstance(bridge, bridge_type)
         env = localized["environments"][0]
         assert env.session_id == bridge.session_id
-        assert env.model_dump()["kind"] == "desktop"
+        assert env.model_dump()["kind"] == bridge_type.environment_kind
 
     def test_bridge_mints_a_fresh_session_id(self):
         bridge = PyautoguiDesktopBridge(api_key=API_KEY)
@@ -649,6 +659,42 @@ class TestDriverInterfaces:
         commands = PyautoguiDesktopBridge(api_key="k").commands
         assert {"click", "write", "run_command", "read_file", "screenshot_b64"} <= commands
         assert not any(name.startswith("_") for name in commands)
+
+    def test_args_decode_by_the_interface_types(self):
+        pytest.importorskip("hai_drivers.code_sandbox.local.driver")
+        for bridge in (
+            SeleniumBrowserBridge(api_key="k"),
+            PyautoguiDesktopBridge(api_key="k"),
+            WorkstationBridge(api_key="k"),
+        ):
+            interface = bridge.driver_interface()
+            for name in bridge.commands:
+                if callable(getattr(interface, name)):
+                    deserialize_args(interface, name, {"unused": 0})
+        sandbox = WorkstationBridge(api_key="k").driver_interface()
+        desktop = PyautoguiDesktopBridge(api_key="k").driver_interface()
+        assert deserialize_args(sandbox, "write_bytes", {"path": "a", "content": "aGk="}) == {
+            "path": "a",
+            "content": b"hi",
+        }
+        assert deserialize_args(sandbox, "write_file", {"path": "a", "content": "aGk="})["content"] == "aGk="
+        assert deserialize_args(desktop, "write_file", {"path": "a", "content": "aGk="})["content"] == b"hi"
+        assert deserialize_args(desktop, "run_command", {"command": ["ls"], "cwd": "/tmp"})["cwd"] == Path("/tmp")
+
+    def test_workstation_serves_a_shell_with_the_cli_commands_and_typed_errors(self):
+        pytest.importorskip("hai_drivers.code_sandbox.local.driver")
+        bridge = WorkstationBridge(api_key="k")
+        bridge._driver = bridge.create_driver()
+        try:
+            result, error = bridge._dispatch(
+                "execute", {"command": "echo $COORDINATE_SYSTEM; command -v desk web click"}
+            )
+            assert error is None and result["exit_code"] == 0
+            assert result["stdout"].split()[0] == "0-1000" and len(result["stdout"].split()) == 4
+            _, error = bridge._dispatch("read_file", {"path": "missing.txt"})
+            assert "code_sandbox_file_failure" in json.loads(error)
+        finally:
+            bridge._driver.close()
 
 
 class ServingBridge(FakeBridge):

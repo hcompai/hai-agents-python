@@ -56,7 +56,7 @@ skills_app = typer.Typer(no_args_is_help=True, help="Browse available skills.")
 mcp_app = typer.Typer(no_args_is_help=True, help="Manage the hai-agents MCP server.")
 local_app = typer.Typer(
     no_args_is_help=True,
-    help="Manually run the local browser/desktop bridge. Only needed when the session is started "
+    help="Manually run the local browser, desktop or workstation bridge. Only needed when the session is started "
     "elsewhere (the web app, another machine, or an agent referenced by name); sessions created "
     "from the Python SDK with an inline agent start it automatically.",
 )
@@ -635,6 +635,17 @@ def local_desktop(
     )
 
 
+@local_app.command("workstation")
+def local_workstation(
+    ctx: typer.Context,
+    session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
+) -> None:
+    """Serve workstation commands: a shell on this machine, running as you, that drives its screen and a Chrome."""
+    from hai_agents_local import WorkstationBridge
+
+    _run_bridge(_state(ctx), WorkstationBridge, session_id)
+
+
 @local_app.command("stop")
 def local_stop() -> None:
     """Stop any in-flight local browser/desktop turn on this machine (same effect as double-Esc)."""
@@ -703,7 +714,7 @@ async def _serve_bridge(bridge: Any) -> None:
 
 def _arm_kill_switch(bridge: Any) -> Any:
     """Arm the double-Esc listener for desktop serving; a desktop turn steals focus, so Ctrl-C may be out of reach."""
-    if bridge.environment_kind != "desktop" or not (sys.stdin.isatty() and sys.stdout.isatty()):
+    if bridge.environment_kind not in ("desktop", "workstation") or not (sys.stdin.isatty() and sys.stdout.isatty()):
         return None
     from hai_agents_local.killswitch import KILL_SWITCH_ARMED_HINT, KILL_SWITCH_UNAVAILABLE_HINT, arm_esc_listener
 

@@ -127,10 +127,10 @@ class LocalBridge(ABC, Generic[DriverT]):
                 await self._poll_loop(exchange)
         finally:
             driver, self._driver = self._driver, None
-            destroy = getattr(driver, "destroy", None)
-            if callable(destroy):
+            release = getattr(driver, "destroy", None) or getattr(driver, "close", None)
+            if callable(release):
                 try:
-                    destroy()
+                    release()
                 except Exception:
                     logger.warning("driver teardown failed", exc_info=True)
 
@@ -268,14 +268,21 @@ class LocalBridge(ABC, Generic[DriverT]):
         attr = getattr(self._driver, name)
         started = time.monotonic()
         try:
-            result = self._call_driver_method(attr, deserialize_args(name, args)) if callable(attr) else attr
+            if callable(attr):
+                result = self._call_driver_method(attr, deserialize_args(self.driver_interface(), name, args))
+            else:
+                result = attr
             logger.info("command %s dispatched in %.2fs", name, time.monotonic() - started)
             return serialize_result(result), None
         except NotImplementedError:
             return None, f"command {name!r} is not supported by this driver"
         except Exception as exc:
             logger.warning("command %s raised: %s", name, exc)
-            return None, str(exc)
+            return None, self.error_text(exc)
+
+    def error_text(self, exc: Exception) -> str:
+        """The error reported to the platform for a command that raised ``exc``."""
+        return str(exc)
 
     @staticmethod
     def _call_driver_method(method: Callable[..., Any], args: dict[str, Any]) -> Any:

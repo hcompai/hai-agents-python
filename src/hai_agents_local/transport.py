@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import typing
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Dict, List, Union
@@ -46,13 +47,21 @@ def serialize_result(value: object) -> Json:
     return value  # type: ignore[return-value]
 
 
-def deserialize_args(name: str, args: dict[str, Any]) -> dict[str, Any]:
-    """Undo the JSON encodings the driver signatures cannot accept directly."""
-    if name == "write_file" and isinstance(args.get("content"), str):
-        args = {**args, "content": base64.b64decode(args["content"])}
-    if name == "run_command" and args.get("cwd") is not None:
-        args = {**args, "cwd": Path(args["cwd"])}
-    return args
+def deserialize_args(interface: type, name: str, args: dict[str, Any]) -> dict[str, Any]:
+    """Undo the JSON encodings of the args that ``interface`` types as bytes or Path."""
+    if not args:
+        return args
+    hints = typing.get_type_hints(getattr(interface, name))
+    return {key: _decode(hints.get(key), value) for key, value in args.items()}
+
+
+def _decode(hint: Any, value: Any) -> Any:
+    kinds = {hint, *typing.get_args(hint)}
+    if isinstance(value, str) and bytes in kinds:
+        return base64.b64decode(value)
+    if isinstance(value, str) and Path in kinds:
+        return Path(value)
+    return value
 
 
 class CommandExchange:
