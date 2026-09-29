@@ -61,7 +61,7 @@ def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) 
     if overrides and "user_device" in json.dumps(overrides, default=str):
         logger.warning(
             "session overrides mention user_device, but auto-started bridges are derived from the agent "
-            "spec only; serve override-injected environments manually with `hai local browser|desktop`"
+            "spec only; serve override-injected environments manually with `hai local browser|desktop|workstation`"
         )
 
 
@@ -69,7 +69,7 @@ def _localize(client_wrapper: typing.Any, kwargs: typing.Dict[str, typing.Any]) 
     """Spawn bridges for unclaimed user_device environments in an inline agent and stamp their session ids.
 
     String agent references are left alone: registered agents must carry an explicit session_id on their
-    user_device environments, served manually with `hai local browser|desktop`.
+    user_device environments, served manually with `hai local browser|desktop|workstation`.
     """
     agent = kwargs.get("agent")
     if agent is None or isinstance(agent, str) or not auto_bridges_enabled():
