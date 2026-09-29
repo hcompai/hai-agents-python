@@ -679,16 +679,19 @@ class TestDriverInterfaces:
         assert deserialize_args(sandbox, "write_file", {"path": "a", "content": "aGk="})["content"] == "aGk="
         assert deserialize_args(desktop, "write_file", {"path": "a", "content": "aGk="})["content"] == b"hi"
 
-    def test_workstation_serves_a_shell_with_the_cli_commands(self):
+    def test_workstation_serves_a_shell_in_its_session_folder_with_the_cli_commands(self, tmp_path, monkeypatch):
         pytest.importorskip("hai_drivers.code_sandbox.local.driver")
+        monkeypatch.setenv("HOME", str(tmp_path))
         bridge = WorkstationBridge(api_key="k")
         bridge._driver = bridge.create_driver()
         try:
             result, error = bridge._dispatch(
-                "execute", {"command": "echo $COORDINATE_SYSTEM; command -v desk web click"}
+                "execute", {"command": "pwd -P; echo $COORDINATE_SYSTEM; command -v desk web click"}
             )
             assert error is None and result["exit_code"] == 0
-            assert result["stdout"].split()[0] == "0-1000" and len(result["stdout"].split()) == 4
+            out = result["stdout"].split()
+            assert out[0] == str((tmp_path / "hai" / bridge.session_id).resolve())
+            assert out[1] == "0-1000" and len(out) == 5
         finally:
             bridge._driver.close()
 

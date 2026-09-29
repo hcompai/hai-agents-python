@@ -639,11 +639,14 @@ def local_desktop(
 def local_workstation(
     ctx: typer.Context,
     session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
+    workspace: str | None = typer.Option(
+        None, "--workspace", help="Folder the shell starts in. Defaults to ~/hai/<session id>."
+    ),
 ) -> None:
     """Serve workstation commands: a shell on this machine, running as you, that drives its screen and a Chrome."""
     from hai_agents_local import WorkstationBridge
 
-    _run_bridge(_state(ctx), WorkstationBridge, session_id)
+    _run_bridge(_state(ctx), WorkstationBridge, session_id, workspace=workspace)
 
 
 @local_app.command("stop")
