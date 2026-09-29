@@ -110,6 +110,9 @@ class LocalBridge(ABC, Generic[DriverT]):
         """Signal the poll loop to stop; safe to call from a signal handler."""
         self._stop_event.set()
 
+    async def interrupt_driver(self) -> None:
+        """Stop run-owned work; drivers without owned processes need no special action."""
+
     async def run(self) -> None:
         """Serve commands until stopped; raises AuthError on a bad key."""
         # An asyncio.Event binds to the loop it is first awaited on; a restarted bridge runs on a new loop.
@@ -256,7 +259,19 @@ class LocalBridge(ABC, Generic[DriverT]):
                 self._results.move_to_end(cmd.command_uid)
                 result, error = self._results[cmd.command_uid]
             else:
-                result, error = await asyncio.to_thread(self._dispatch, cmd.name, cmd.args)
+                dispatch = asyncio.create_task(asyncio.to_thread(self._dispatch, cmd.name, cmd.args))
+                stopped = asyncio.create_task(self._stop_event.wait())
+                try:
+                    await asyncio.wait((dispatch, stopped), return_when=asyncio.FIRST_COMPLETED)
+                    if self._stop_event.is_set():
+                        await self.interrupt_driver()
+                        await dispatch
+                        return
+                    result, error = await dispatch
+                finally:
+                    stopped.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await stopped
                 self._results[cmd.command_uid] = (result, error)
                 while len(self._results) > RESULT_CACHE_SIZE:
                     self._results.popitem(last=False)

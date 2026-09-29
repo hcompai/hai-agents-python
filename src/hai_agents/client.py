@@ -7,11 +7,13 @@ subclasses add the object-oriented sugar (``run_session``, ``start_session``,
 
 from __future__ import annotations
 
+import asyncio
 import typing
 
 import typing_extensions
 
 from .base_client import AsyncBaseClient, BaseClient
+from .inference import Inference
 from .polling import (
     AnswerT,
     AsyncSessionHandle,
@@ -29,6 +31,76 @@ from .tools import ToolInput, as_tools
 
 
 class Client(BaseClient):
+    def __init__(
+        self,
+        *,
+        mode: typing.Literal["local", "remote"] = "remote",
+        inference: typing.Optional[Inference] = None,
+        auto_bridges: bool = True,
+        runtime: typing.Any = None,
+        local_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        **kwargs: typing.Any,
+    ) -> None:
+        if mode not in {"local", "remote"}:
+            raise ValueError("mode must be local or remote")
+        self._auto_bridges = auto_bridges
+        self.mode = mode
+        self.local_runtime = None
+        self._owns_runtime = mode == "local" and runtime is None
+        self._owns_http = kwargs.get("httpx_client") is None
+        if mode == "remote":
+            if runtime is not None or local_options is not None:
+                raise ValueError("runtime and local_options require mode='local'")
+            if inference is not None and inference.base_url is not None:
+                raise ValueError("self-hosted inference currently requires a local agent")
+        else:
+            if "base_url" in kwargs or "api_key" in kwargs:
+                raise ValueError(
+                    "local API credentials come from runtime; pass inference credentials via local_options"
+                )
+            if runtime is not None and (local_options is not None or inference is not None):
+                raise ValueError("an attached runtime owns its inference and launch configuration")
+            if runtime is None:
+                from .local.runtime import LocalRuntime
+
+                options = dict(local_options or {})
+                options["required_recipe"] = "shared"
+                options["spawn_env"] = {"HAI_AGENT_RUNTIME_RECIPE": "shared", **options.get("spawn_env", {})}
+                if inference is not None:
+                    options["spawn_env"] = inference.runtime_env(options.get("spawn_env"))
+                    options["inherit_env"] = False
+                runtime = LocalRuntime.ensure_started(**options)
+            if inference is not None and not runtime.owned:
+                raise ValueError("inference selection cannot reconfigure an existing runtime; choose a free local port")
+            runtime.require_recipe("shared")
+            self.local_runtime = runtime
+            kwargs.update(base_url=runtime.base_url, api_key=runtime.api_key)
+        try:
+            super().__init__(**kwargs)
+        except BaseException:
+            if self._owns_runtime and self.local_runtime is not None and self.local_runtime.owned:
+                self.local_runtime.shutdown()
+            raise
+
+    def close(self) -> None:
+        """Release this client's connections and any runtime it started; borrowed runtimes stay alive."""
+        try:
+            if self._sessions is not None and hasattr(self._sessions, "close"):
+                self._sessions.close()
+        finally:
+            try:
+                if self._owns_runtime and self.local_runtime is not None and self.local_runtime.owned:
+                    self.local_runtime.shutdown()
+            finally:
+                if self._owns_http:
+                    self._client_wrapper.httpx_client.httpx_client.close()
+
+    def __enter__(self) -> "Client":
+        return self
+
+    def __exit__(self, *exc: typing.Any) -> None:
+        self.close()
+
     def run_session(
         self,
         *,
@@ -78,6 +150,8 @@ class Client(BaseClient):
 
     @property
     def sessions(self) -> SessionsClient:
+        if not self._auto_bridges:
+            return super().sessions
         if self._sessions is None:
             from hai_agents_local.sessions import LocalSessionsClient
 
@@ -86,6 +160,76 @@ class Client(BaseClient):
 
 
 class AsyncClient(AsyncBaseClient):
+    def __init__(
+        self,
+        *,
+        mode: typing.Literal["local", "remote"] = "remote",
+        inference: typing.Optional[Inference] = None,
+        auto_bridges: bool = True,
+        runtime: typing.Any = None,
+        local_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        **kwargs: typing.Any,
+    ) -> None:
+        if mode not in {"local", "remote"}:
+            raise ValueError("mode must be local or remote")
+        self._auto_bridges = auto_bridges
+        self.mode = mode
+        self.local_runtime = None
+        self._owns_runtime = mode == "local" and runtime is None
+        self._owns_http = kwargs.get("httpx_client") is None
+        if mode == "remote":
+            if runtime is not None or local_options is not None:
+                raise ValueError("runtime and local_options require mode='local'")
+            if inference is not None and inference.base_url is not None:
+                raise ValueError("self-hosted inference currently requires a local agent")
+        else:
+            if "base_url" in kwargs or "api_key" in kwargs:
+                raise ValueError(
+                    "local API credentials come from runtime; pass inference credentials via local_options"
+                )
+            if runtime is not None and (local_options is not None or inference is not None):
+                raise ValueError("an attached runtime owns its inference and launch configuration")
+            if runtime is None:
+                from .local.runtime import LocalRuntime
+
+                options = dict(local_options or {})
+                options["required_recipe"] = "shared"
+                options["spawn_env"] = {"HAI_AGENT_RUNTIME_RECIPE": "shared", **options.get("spawn_env", {})}
+                if inference is not None:
+                    options["spawn_env"] = inference.runtime_env(options.get("spawn_env"))
+                    options["inherit_env"] = False
+                runtime = LocalRuntime.ensure_started(**options)
+            if inference is not None and not runtime.owned:
+                raise ValueError("inference selection cannot reconfigure an existing runtime; choose a free local port")
+            runtime.require_recipe("shared")
+            self.local_runtime = runtime
+            kwargs.update(base_url=runtime.base_url, api_key=runtime.api_key)
+        try:
+            super().__init__(**kwargs)
+        except BaseException:
+            if self._owns_runtime and self.local_runtime is not None and self.local_runtime.owned:
+                self.local_runtime.shutdown()
+            raise
+
+    async def aclose(self) -> None:
+        """Release this client's connections and any runtime it started; borrowed runtimes stay alive."""
+        try:
+            if self._sessions is not None and hasattr(self._sessions, "aclose"):
+                await self._sessions.aclose()
+        finally:
+            try:
+                if self._owns_runtime and self.local_runtime is not None and self.local_runtime.owned:
+                    await asyncio.to_thread(self.local_runtime.shutdown)
+            finally:
+                if self._owns_http:
+                    await self._client_wrapper.httpx_client.httpx_client.aclose()
+
+    async def __aenter__(self) -> "AsyncClient":
+        return self
+
+    async def __aexit__(self, *exc: typing.Any) -> None:
+        await self.aclose()
+
     async def run_session(
         self,
         *,
@@ -135,6 +279,8 @@ class AsyncClient(AsyncBaseClient):
 
     @property
     def sessions(self) -> AsyncSessionsClient:
+        if not self._auto_bridges:
+            return super().sessions
         if self._sessions is None:
             from hai_agents_local.sessions import LocalAsyncSessionsClient
 
