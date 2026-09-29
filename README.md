@@ -115,8 +115,11 @@ owned by its caller. `cancel()` ends the agent session. For a cloud workstation,
 an explicit `session_id` attaches to a caller-owned environment, which the caller
 must eventually release. Automatically provisioned cloud environments are torn
 down with their agent adapter. Keeping those environments across cancellation is
-still an open lifecycle requirement. Local resource-upload endpoints are not yet
-implemented; driver-level file transfer is a separate capability.
+still an open lifecycle requirement. The candidate source runtime accepts base64
+message attachments and exposes files shared by the agent through
+`sessions.get_session_resource(id, "local", key)`. Download them before closing
+the runtime: local shared resources expire with the retained session. The limits
+are 50 MiB per file, 64 MiB and 128 shared files per session.
 
 ## How a session works
 
