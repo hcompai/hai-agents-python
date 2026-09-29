@@ -127,6 +127,15 @@ message attachments and exposes files shared by the agent through
 the runtime: local shared resources expire with the retained session. The limits
 are 50 MiB per file, 64 MiB and 128 shared files per session.
 
+## Runtime release maintenance
+
+The SDK runtime manifest is maintained independently of schema generation. After
+publishing and verifying a compatible runtime, run `scripts/bump_runtime.py` with
+`--version` and one `--sha PLATFORM=SHA256` for every platform already in the
+manifest. Partial updates are rejected so a new URL cannot retain an old digest.
+The generator preserves this SDK-owned file. The release workflow still opens
+legacy CLI pin PRs; retarget it only after the SDK/CLI migration has shipped.
+
 ## How a session works
 
 A session is one run of an agent against a task. It moves through a small set of states: `pending`, `running`, and then a settled state such as `completed`, `idle`, `failed`, `timed_out`, or `interrupted`.

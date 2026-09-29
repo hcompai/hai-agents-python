@@ -1,8 +1,8 @@
 """Pinned hai-agent-runtime version and per-platform artifact digests.
 
 This module is the SDK's single runtime pin: a runtime release bumps
-PINNED_RUNTIME_VERSION and MANIFEST here (via the retargeted
-release-hai-agent-runtime.yaml pin PR) and nothing else. Artifacts live under an
+PINNED_RUNTIME_VERSION and MANIFEST here with scripts/bump_runtime.py.
+The release workflow targets the legacy CLI until the consumer migration ships. Artifacts live under an
 immutable version-scoped CDN prefix, so an edge can never serve stale bytes.
 Cross-ref: eng_plans/14-06-2026-holodesktop-binary-versioning-autoupdate.
 """
