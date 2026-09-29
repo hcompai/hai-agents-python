@@ -866,3 +866,84 @@ class TestDoctor:
         assert not by_name["login"].ok and by_name["login"].fix is not None
         assert "platform" not in by_name
         assert {"browser", "desktop"} <= set(by_name)
+
+
+async def test_stopping_workstation_interrupts_running_command_and_skips_queue(tmp_path):
+    import asyncio
+
+    from hai_drivers.code_sandbox.local.driver import LocalCodeSandbox
+
+    bridge = WorkstationBridge(api_key="test", workspace=str(tmp_path))
+    bridge._driver = LocalCodeSandbox(str(tmp_path))
+
+    class Exchange:
+        async def post_result(self, *args, **kwargs):
+            pytest.fail("A stopped execution must not report a successful tool result")
+
+    commands = [
+        Command(id="one", command_uid="one", name="execute", args={"command": "echo $$ > pid; sleep 60"}),
+        Command(id="two", command_uid="two", name="execute", args={"command": "touch queued"}),
+    ]
+    dispatch = asyncio.create_task(bridge._process_commands(Exchange(), commands))
+    try:
+        async with asyncio.timeout(5):
+            while not (tmp_path / "pid").exists():
+                await asyncio.sleep(0.01)
+        bridge.request_stop()
+        await asyncio.wait_for(dispatch, 5)
+        assert not (tmp_path / "queued").exists()
+    finally:
+        await asyncio.to_thread(bridge._driver.close)
+        await dispatch
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asynchronous", [False, True])
+async def test_cancel_reaches_api_when_local_stop_cannot_be_confirmed(monkeypatch, asynchronous):
+    from hai_agents import AsyncClient
+    from hai_agents.sessions.client import AsyncSessionsClient
+
+    cancelled = []
+
+    def refuse_stop(ids):
+        raise TimeoutError("local command still running")
+
+    def cancel(self, session_id, **kwargs):
+        cancelled.append(session_id)
+
+    async def async_cancel(self, session_id, **kwargs):
+        cancel(self, session_id, **kwargs)
+
+    monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", refuse_stop)
+    monkeypatch.setattr(SessionsClient, "cancel_session", cancel)
+    monkeypatch.setattr(AsyncSessionsClient, "cancel_session", async_cancel)
+    client = (AsyncClient if asynchronous else Client)(api_key=API_KEY)
+    sessions = client.sessions
+    sessions._owned_bridges = {"run": ["device"]}
+    with pytest.raises(TimeoutError, match="still running"):
+        if asynchronous:
+            await sessions.cancel_session("run")
+        else:
+            sessions.cancel_session("run")
+    assert cancelled == ["run"]
+    assert sessions._owned_bridges == {"run": ["device"]}, "An unconfirmed stop must remain retryable"
+
+
+def test_manager_reports_unconfirmed_stop_and_allows_retry(monkeypatch):
+    import hai_agents_local.manager as manager_module
+
+    class StubbornBridge(ServingBridge):
+        def request_stop(self):
+            pass
+
+    monkeypatch.setattr(manager_module, "STOP_JOIN_TIMEOUT_S", 0.01)
+    manager = BridgeManager()
+    bridge = StubbornBridge(api_key=API_KEY)
+    manager.ensure([bridge])
+    try:
+        with pytest.raises(TimeoutError, match="confirm stop"):
+            manager.stop([bridge.session_id])
+    finally:
+        bridge.request_stop = lambda: ServingBridge.request_stop(bridge)
+        manager.stop([bridge.session_id])
+    assert not manager._runners

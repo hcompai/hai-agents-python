@@ -97,16 +97,24 @@ class BridgeManager:
 
     def stop(self, session_ids: Sequence[str]) -> None:
         with self._lock:
-            stopping = [self._runners.pop(sid) for sid in session_ids if sid in self._runners]
+            stopping = [self._runners[sid] for sid in session_ids if sid in self._runners]
+        failures = []
         for runner in stopping:
-            runner.stop()
+            try:
+                runner.stop()
+            except TimeoutError as error:
+                failures.append(str(error))
+            else:
+                with self._lock:
+                    if self._runners.get(runner.bridge.session_id) is runner:
+                        del self._runners[runner.bridge.session_id]
+        if failures:
+            raise TimeoutError("; ".join(failures))
 
     def stop_all(self) -> None:
         with self._lock:
-            stopping = list(self._runners.values())
-            self._runners.clear()
-        for runner in stopping:
-            runner.stop()
+            session_ids = list(self._runners)
+        self.stop(session_ids)
 
 
 class _Runner:
@@ -152,6 +160,8 @@ class _Runner:
         # A bridge's loss handler runs on its own runner thread; a thread cannot join itself.
         if threading.current_thread() is not self.thread:
             self.thread.join(timeout=STOP_JOIN_TIMEOUT_S)
+            if self.thread.is_alive():
+                raise TimeoutError(f"Could not confirm stop of local {self.bridge.environment_kind} bridge")
 
 
 # Process-wide manager behind ensure_bridges/stop_bridges; cleaned up at interpreter exit.
