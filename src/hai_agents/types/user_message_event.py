@@ -26,7 +26,7 @@ class UserMessageEvent(UniversalBaseModel):
 
     files: typing.Optional[typing.List[FileContent]] = pydantic.Field(default=None)
     """
-    Optional files attached to the message: up to 10, 7 MB in total. They are saved under /workspace/files on a workstation or code sandbox, and ~/Downloads on a cloud browser.
+    Optional files attached to the message: up to 10, 7 MB in total. They are saved under files/ in the workspace of a workstation or code sandbox, and ~/Downloads on a cloud browser.
     """
 
     caller_id: typing.Optional[str] = None

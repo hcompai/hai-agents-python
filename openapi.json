@@ -8473,7 +8473,7 @@
             },
             "type": "array",
             "title": "Files",
-            "description": "Optional files attached to the message: up to 10, 7 MB in total. They are saved under /workspace/files on a workstation or code sandbox, and ~/Downloads on a cloud browser."
+            "description": "Optional files attached to the message: up to 10, 7 MB in total. They are saved under files/ in the workspace of a workstation or code sandbox, and ~/Downloads on a cloud browser."
           },
           "caller_id": {
             "type": "string",
@@ -8985,10 +8985,25 @@
           },
           "host": {
             "type": "string",
-            "const": "cloud",
+            "enum": [
+              "user_device",
+              "cloud"
+            ],
             "title": "Host",
-            "description": "Where the workstation runs: on H Company infrastructure.",
+            "description": "Where the workstation runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.",
             "default": "cloud"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Connect to an existing workstation session by id instead of starting a new one."
           }
         },
         "type": "object",

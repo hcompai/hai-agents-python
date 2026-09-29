@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from .bridge import LocalBridge, TokenSource
 from .browser import SeleniumBrowserBridge
 from .desktop import PyautoguiDesktopBridge
+from .workstation import WorkstationBridge
 
 if TYPE_CHECKING:
     from hai_agents.types.agent import Agent
@@ -19,6 +20,7 @@ EnvironmentLike = Union[str, BaseModel, Mapping[str, Any]]
 BRIDGE_TYPES: dict[str, type[LocalBridge]] = {
     SeleniumBrowserBridge.environment_kind: SeleniumBrowserBridge,
     PyautoguiDesktopBridge.environment_kind: PyautoguiDesktopBridge,
+    WorkstationBridge.environment_kind: WorkstationBridge,
 }
 
 
@@ -61,7 +63,7 @@ def _localize_environment(
         raise ValueError(
             f"the agent tree has multiple user_device {kind} environments, but this machine can only "
             f"serve one local {kind}; give the extra environments an explicit session_id and serve each "
-            "from its own machine with `hai local browser|desktop --session-id <id>`"
+            "from its own machine with `hai local browser|desktop|workstation --session-id <id>`"
         )
     bridge = BRIDGE_TYPES[kind](_read(env, "id"), api_key=api_key, base_url=base_url)
     bridges.append(bridge)
@@ -81,10 +83,14 @@ def _local_kind(env: EnvironmentLike) -> str | None:
 
 
 def _model_kind(env: EnvironmentLike) -> str | None:
-    """The generated Browser/Desktop models carry no kind field; the class says which branch it is."""
-    from hai_agents.types import Desktop
+    """The generated environment models carry no kind field; the class says which branch it is."""
+    from hai_agents.types import Desktop, Workstation
 
-    return "desktop" if isinstance(env, Desktop) else None
+    if isinstance(env, Desktop):
+        return "desktop"
+    if isinstance(env, Workstation):
+        return "workstation"
+    return None
 
 
 def _any_replaced(localized: Sequence[Any], original: Sequence[Any]) -> bool:
