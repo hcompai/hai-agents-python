@@ -3,6 +3,7 @@
 import typing
 
 import pydantic
+
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .image_content_type import ImageContentType
 

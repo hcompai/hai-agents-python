@@ -278,11 +278,7 @@ class LocalBridge(ABC, Generic[DriverT]):
             return None, f"command {name!r} is not supported by this driver"
         except Exception as exc:
             logger.warning("command %s raised: %s", name, exc)
-            return None, self.error_text(exc)
-
-    def error_text(self, exc: Exception) -> str:
-        """The error reported to the platform for a command that raised ``exc``."""
-        return str(exc)
+            return None, str(exc)
 
     @staticmethod
     def _call_driver_method(method: Callable[..., Any], args: dict[str, Any]) -> Any:

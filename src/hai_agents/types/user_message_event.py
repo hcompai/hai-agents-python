@@ -3,6 +3,7 @@
 import typing
 
 import pydantic
+
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .file_content import FileContent
 from .user_message_event_type import UserMessageEventType

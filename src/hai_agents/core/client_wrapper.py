@@ -3,6 +3,7 @@
 import typing
 
 import httpx
+
 from .http_client import AsyncHttpClient, HttpClient
 from .logging import LogConfig, Logger
 

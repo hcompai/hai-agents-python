@@ -48,8 +48,3 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         from hai_drivers.code_sandbox.interface import ManagedCodeSandboxInterface
 
         return ManagedCodeSandboxInterface
-
-    def error_text(self, exc: Exception) -> str:
-        from hai_drivers.code_sandbox.interface import command_error_text
-
-        return command_error_text(exc)

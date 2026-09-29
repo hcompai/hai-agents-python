@@ -6,6 +6,7 @@ import os
 import typing
 
 import httpx
+
 from .core.api_error import ApiError
 from .core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from .core.logging import LogConfig, Logger

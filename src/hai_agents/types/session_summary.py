@@ -4,6 +4,7 @@ import datetime as dt
 import typing
 
 import pydantic
+
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .trajectory_status import TrajectoryStatus
 from .user_message_event import UserMessageEvent

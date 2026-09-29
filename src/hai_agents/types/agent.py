@@ -5,6 +5,7 @@ from __future__ import annotations
 import typing
 
 import pydantic
+
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel, update_forward_refs
 from .agent_environments_item import AgentEnvironmentsItem
 from .agent_skills_item import AgentSkillsItem

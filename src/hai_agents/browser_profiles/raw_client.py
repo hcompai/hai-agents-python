@@ -3,6 +3,8 @@
 import typing
 from json.decoder import JSONDecodeError
 
+from pydantic import ValidationError
+
 from ..core.api_error import ApiError
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.http_response import AsyncHttpResponse, HttpResponse
@@ -15,7 +17,6 @@ from ..types.browser_profile_list import BrowserProfileList
 from ..types.browser_profile_read import BrowserProfileRead
 from ..types.http_validation_error import HttpValidationError
 from ..types.initiate_upload_response import InitiateUploadResponse
-from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)

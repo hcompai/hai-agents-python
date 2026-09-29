@@ -679,7 +679,7 @@ class TestDriverInterfaces:
         assert deserialize_args(sandbox, "write_file", {"path": "a", "content": "aGk="})["content"] == "aGk="
         assert deserialize_args(desktop, "write_file", {"path": "a", "content": "aGk="})["content"] == b"hi"
 
-    def test_workstation_serves_a_shell_with_the_cli_commands_and_typed_errors(self):
+    def test_workstation_serves_a_shell_with_the_cli_commands(self):
         pytest.importorskip("hai_drivers.code_sandbox.local.driver")
         bridge = WorkstationBridge(api_key="k")
         bridge._driver = bridge.create_driver()
@@ -689,8 +689,6 @@ class TestDriverInterfaces:
             )
             assert error is None and result["exit_code"] == 0
             assert result["stdout"].split()[0] == "0-1000" and len(result["stdout"].split()) == 4
-            _, error = bridge._dispatch("read_file", {"path": "missing.txt"})
-            assert "code_sandbox_file_failure" in json.loads(error)
         finally:
             bridge._driver.close()
 

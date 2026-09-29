@@ -127,9 +127,10 @@ else:
     from pydantic.typing import is_literal_type as is_literal_type  # type: ignore[no-redef, assignment]
     from pydantic.typing import is_union as is_union  # type: ignore[no-redef]
 
+from typing_extensions import TypeAlias
+
 from .datetime_utils import serialize_datetime
 from .serialization import convert_and_respect_annotation_metadata
-from typing_extensions import TypeAlias
 
 T = TypeVar("T")
 Model = TypeVar("Model", bound=pydantic.BaseModel)
