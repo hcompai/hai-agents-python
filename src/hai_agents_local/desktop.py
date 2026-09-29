@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import threading
 from typing import TYPE_CHECKING, Literal
 
 from .bridge import LocalBridge, TokenSource
@@ -29,6 +30,7 @@ def ensure_macos_input_permissions(prompt: bool = True) -> None:
     from ApplicationServices import AXIsProcessTrustedWithOptions, kAXTrustedCheckOptionPrompt
     from Quartz import CGPreflightScreenCaptureAccess, CGRequestScreenCaptureAccess
 
+    prompt = prompt and threading.current_thread() is threading.main_thread()
     missing = []
     if not AXIsProcessTrustedWithOptions({kAXTrustedCheckOptionPrompt: prompt}):
         missing.append("Accessibility (moves the mouse and types)")

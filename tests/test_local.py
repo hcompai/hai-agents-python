@@ -475,12 +475,13 @@ class TestMacosPermissionPreflight:
         import sys as _sys
         import types
 
-        calls = {"ax_prompts": [], "screen_requests": 0}
+        calls = {"ax_prompts": [], "ax_main_thread": [], "screen_requests": 0}
         apps = types.ModuleType("ApplicationServices")
         apps.kAXTrustedCheckOptionPrompt = "AXTrustedCheckOptionPrompt"
 
         def ax_check(options):
             calls["ax_prompts"].append(options["AXTrustedCheckOptionPrompt"])
+            calls["ax_main_thread"].append(threading.current_thread() is threading.main_thread())
             return ax
 
         def screen_request():
@@ -520,6 +521,44 @@ class TestMacosPermissionPreflight:
             ensure_macos_input_permissions(prompt=False)
         assert calls["ax_prompts"] == [False]
         assert calls["screen_requests"] == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("granted", [False, True])
+    async def test_async_session_prompts_before_worker_startup(self, monkeypatch, granted):
+        from hai_agents import AsyncClient
+        from hai_agents.sessions.client import AsyncSessionsClient
+
+        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        monkeypatch.setattr(sys, "platform", "darwin")
+        calls = self._fake_frameworks(monkeypatch, ax=granted, screen=granted)
+        requested = []
+
+        def start(bridges):
+            assert threading.current_thread() is not threading.main_thread()
+            for bridge in bridges:
+                bridge.preflight()  # The manager re-checks before starting its driver thread.
+            return []
+
+        async def create(self, **kwargs):
+            requested.append(kwargs)
+            return types.SimpleNamespace(id=None)
+
+        monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", start)
+        monkeypatch.setattr("hai_agents_local.sessions._ensure_stop_watcher", lambda: None)
+        monkeypatch.setattr(AsyncSessionsClient, "create_session", create)
+        async with AsyncClient(api_key=API_KEY) as client:
+            request = client.sessions.create_session(
+                agent={"name": "qa", "environments": [{"id": "desktop", "kind": "desktop", "host": "user_device"}]},
+                messages="test",
+            )
+            if granted:
+                await request
+            else:
+                with pytest.raises(PermissionError):
+                    await request
+        assert calls["ax_prompts"] == ([True, False] if granted else [True])
+        assert calls["ax_main_thread"] == ([True, False] if granted else [True])
+        assert bool(requested) is granted
 
 
 class TestBridgeProtocol:

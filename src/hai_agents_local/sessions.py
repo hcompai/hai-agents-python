@@ -278,6 +278,9 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
         bridges = _localize(wrapper, kwargs)
         if bridges:
             _apply_runaway_budgets(kwargs)
+        # Native permission prompts must run before bridge startup moves to a worker.
+        for bridge in bridges:
+            bridge.preflight()
         stop_watcher = _ensure_stop_watcher() if bridges else None
         watcher = _LossWatcher(bridges)
         started = await asyncio.to_thread(ensure_bridges, bridges)
