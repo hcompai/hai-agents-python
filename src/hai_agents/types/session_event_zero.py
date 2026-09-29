@@ -7,7 +7,6 @@ import typing
 
 import pydantic
 import typing_extensions
-
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .active_state_change_data import ActiveStateChangeData
 from .agent_completion_data import AgentCompletionData

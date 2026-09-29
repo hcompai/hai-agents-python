@@ -3,8 +3,6 @@
 import typing
 from json.decoder import JSONDecodeError
 
-from pydantic import ValidationError
-
 from ..core.api_error import ApiError
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.http_response import AsyncHttpResponse, HttpResponse
@@ -14,6 +12,7 @@ from ..core.request_options import RequestOptions
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.http_validation_error import HttpValidationError
 from ..types.token_quota_status import TokenQuotaStatus
+from pydantic import ValidationError
 
 
 class RawQuotaClient:

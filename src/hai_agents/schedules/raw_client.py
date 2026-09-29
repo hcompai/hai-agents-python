@@ -3,8 +3,6 @@
 import typing
 from json.decoder import JSONDecodeError
 
-from pydantic import ValidationError
-
 from ..core.api_error import ApiError
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.http_response import AsyncHttpResponse, HttpResponse
@@ -24,6 +22,7 @@ from ..types.schedule_run_record import ScheduleRunRecord
 from ..types.session_request import SessionRequest
 from .types.list_schedule_runs_request_sort_item import ListScheduleRunsRequestSortItem
 from .types.list_schedules_request_sort_item import ListSchedulesRequestSortItem
+from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)

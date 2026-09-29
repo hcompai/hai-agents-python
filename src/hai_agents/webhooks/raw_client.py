@@ -3,8 +3,6 @@
 import typing
 from json.decoder import JSONDecodeError
 
-from pydantic import ValidationError
-
 from ..core.api_error import ApiError
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.http_response import AsyncHttpResponse, HttpResponse
@@ -20,6 +18,7 @@ from ..types.webhook_ping_result import WebhookPingResult
 from ..types.webhook_record import WebhookRecord
 from ..types.webhook_with_secret import WebhookWithSecret
 from .types.list_webhooks_request_sort_item import ListWebhooksRequestSortItem
+from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)

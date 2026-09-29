@@ -5,8 +5,6 @@ import datetime as dt
 import typing
 from json.decoder import JSONDecodeError
 
-from pydantic import ValidationError
-
 from ..core.api_error import ApiError
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.datetime_utils import serialize_datetime
@@ -34,6 +32,7 @@ from .types.list_sessions_request_owner import ListSessionsRequestOwner
 from .types.list_sessions_request_sort_item import ListSessionsRequestSortItem
 from .types.send_session_messages_request_body import SendSessionMessagesRequestBody
 from .types.send_session_tool_results_request_body import SendSessionToolResultsRequestBody
+from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)

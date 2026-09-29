@@ -3,7 +3,6 @@
 import typing
 
 import pydantic
-
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .file_transfer_data_direction import FileTransferDataDirection
 

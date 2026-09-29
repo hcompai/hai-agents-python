@@ -3,8 +3,6 @@
 import typing
 from json.decoder import JSONDecodeError
 
-from pydantic import ValidationError
-
 from ..core.api_error import ApiError
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.http_response import AsyncHttpResponse, HttpResponse
@@ -19,6 +17,7 @@ from ..types.one_password_config import OnePasswordConfig
 from ..types.vault_config_list import VaultConfigList
 from ..types.vault_config_read import VaultConfigRead
 from ..types.vault_health import VaultHealth
+from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)

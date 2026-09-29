@@ -4,7 +4,6 @@ import datetime as dt
 import typing
 
 import pydantic
-
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .schedule_run_record_status import ScheduleRunRecordStatus
 

@@ -3,8 +3,6 @@
 import typing
 from json.decoder import JSONDecodeError
 
-from pydantic import ValidationError
-
 from ..core.api_error import ApiError
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.http_response import AsyncHttpResponse, HttpResponse
@@ -17,6 +15,7 @@ from ..types.http_validation_error import HttpValidationError
 from ..types.page_skill import PageSkill
 from ..types.skill import Skill
 from .types.list_skills_request_sort_item import ListSkillsRequestSortItem
+from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)

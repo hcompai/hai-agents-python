@@ -6,7 +6,6 @@ import typing
 
 import pydantic
 import typing_extensions
-
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .browser_host import BrowserHost
 from .browser_mode import BrowserMode

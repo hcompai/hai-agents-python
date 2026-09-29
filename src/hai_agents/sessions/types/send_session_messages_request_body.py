@@ -6,7 +6,6 @@ import typing
 
 import pydantic
 import typing_extensions
-
 from ...core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from ...types.file_content import FileContent
 from ...types.user_message_event import UserMessageEvent
