@@ -27,6 +27,7 @@ if typing.TYPE_CHECKING:
         AgentEventData_PolicyEvent,
         AgentEventData_ToolResult,
     )
+    from .agent_reasoning_effort import AgentReasoningEffort
     from .agent_run_status_change_data import AgentRunStatusChangeData
     from .agent_run_status_change_data_status import AgentRunStatusChangeDataStatus
     from .agent_run_status_change_event import AgentRunStatusChangeEvent
@@ -192,6 +193,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "AgentEventData_ObservationEvent": ".agent_event_data",
     "AgentEventData_PolicyEvent": ".agent_event_data",
     "AgentEventData_ToolResult": ".agent_event_data",
+    "AgentReasoningEffort": ".agent_reasoning_effort",
     "AgentRunStatusChangeData": ".agent_run_status_change_data",
     "AgentRunStatusChangeDataStatus": ".agent_run_status_change_data_status",
     "AgentRunStatusChangeEvent": ".agent_run_status_change_event",
@@ -377,6 +379,7 @@ __all__ = [
     "AgentEventData_ObservationEvent",
     "AgentEventData_PolicyEvent",
     "AgentEventData_ToolResult",
+    "AgentReasoningEffort",
     "AgentRunStatusChangeData",
     "AgentRunStatusChangeDataStatus",
     "AgentRunStatusChangeEvent",
