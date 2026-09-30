@@ -737,4 +737,5 @@ __all__ = [
 ]
 
 from .inference import Inference
+
 __all__.append("Inference")
