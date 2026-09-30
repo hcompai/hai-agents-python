@@ -69,8 +69,9 @@ print(result.answer)
 
 ## Candidate local-agent support
 
-The placement branch adds `Client(mode="local")` and the same option on
-`AsyncClient`. Agent placement and environment placement are separate: the client
+The placement branch adds `Client(mode="local")` and `await AsyncClient.local()`
+for nonblocking asynchronous startup. `AsyncClient(mode="local", runtime=...)` accepts
+an already prepared runtime. Agent placement and environment placement are separate: the client
 selects where the agent runs; each agent environment selects `host="user_device"`
 or `host="cloud"`. `Client()` continues to use the hosted Agents API.
 

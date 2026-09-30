@@ -764,13 +764,24 @@ class TestManager:
         yield manager
         manager.stop_all()
 
-    def test_startup_failure_surfaces_to_caller_without_firing_on_crash(self, manager):
+    @pytest.mark.parametrize("cleanup_fails", [False, True])
+    def test_startup_failure_surfaces_to_caller_without_firing_on_crash(self, manager, monkeypatch, cleanup_fails):
         crashed = threading.Event()
 
         class FailingBridge(ServingBridge):
             async def run(self):
                 raise AuthError("bad key")
 
+        if cleanup_fails:
+            from hai_agents_local.manager import _Runner
+
+            original_stop = _Runner.stop
+
+            def failed_cleanup(runner):
+                original_stop(runner)
+                raise TimeoutError("cleanup also failed")
+
+            monkeypatch.setattr(_Runner, "stop", failed_cleanup)
         bridge = FailingBridge(api_key="k")
         bridge.on_crash = crashed.set
         with pytest.raises(RuntimeError) as exc_info:
@@ -989,3 +1000,37 @@ def test_manager_reports_unconfirmed_stop_and_allows_retry(monkeypatch):
         bridge.request_stop = lambda: ServingBridge.request_stop(bridge)
         manager.stop([bridge.session_id])
     assert not manager._runners
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asynchronous", [False, True])
+async def test_failed_api_cancel_keeps_interpreter_exit_retry(monkeypatch, asynchronous):
+    from hai_agents import AsyncClient
+    from hai_agents.sessions.client import AsyncSessionsClient
+    from hai_agents_local import sessions as module
+
+    retried = []
+    monkeypatch.setattr(module, "_exit_cancels", {"run": lambda: retried.append("run")})
+
+    def cancel(*args, **kwargs):
+        raise RuntimeError("remote cancel unavailable")
+
+    async def async_cancel(*args, **kwargs):
+        cancel()
+
+    monkeypatch.setattr(SessionsClient, "cancel_session", cancel)
+    monkeypatch.setattr(AsyncSessionsClient, "cancel_session", async_cancel)
+    client = (AsyncClient if asynchronous else Client)(api_key=API_KEY)
+    try:
+        with pytest.raises(RuntimeError, match="remote cancel unavailable"):
+            if asynchronous:
+                await client.sessions.cancel_session("run")
+            else:
+                client.sessions.cancel_session("run")
+        module._cancel_sessions_at_exit()
+        assert retried == ["run"]
+    finally:
+        if asynchronous:
+            await client.aclose()
+        else:
+            client.close()

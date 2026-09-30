@@ -77,7 +77,7 @@ async def test_client_close_releases_only_owned_runtime_and_http(monkeypatch, as
     http = httpx.AsyncClient() if asynchronous else httpx.Client()
     client_type = AsyncClient if asynchronous else Client
     options = {"runtime": runtime, "httpx_client": http} if borrowed else {}
-    client = client_type(mode="local", **options)
+    client = await AsyncClient.local() if asynchronous and not borrowed else client_type(mode="local", **options)
     if asynchronous:
         await client.aclose()
     else:
@@ -147,3 +147,68 @@ def test_idle_probe_uses_runtime_http_and_closes_its_pool(tmp_path, monkeypatch,
         assert stopped == []
     assert requests
     assert all(client.is_closed for client in clients)
+
+
+@pytest.mark.asyncio
+async def test_async_local_startup_keeps_loop_responsive_and_cancellation_cleans_child(monkeypatch):
+    import asyncio
+    import threading
+    from types import SimpleNamespace
+
+    entered, release = threading.Event(), threading.Event()
+    stopped = []
+    runtime = SimpleNamespace(owned=True, shutdown=lambda: stopped.append(True))
+
+    def start(**kwargs):
+        entered.set()
+        assert release.wait(5)
+        return runtime
+
+    monkeypatch.setattr(LocalRuntime, "ensure_started", start)
+    startup = asyncio.create_task(AsyncClient.local())
+    try:
+        assert await asyncio.to_thread(entered.wait, 1), "startup blocked the event loop"
+        startup.cancel()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await startup
+        assert stopped == [True]
+    finally:
+        release.set()
+        if not startup.done():
+            await startup
+
+
+def test_state_cleanup_waits_for_startup_and_preserves_replacement(tmp_path):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from hai_agents.local import runtime as module
+
+    token_file = write_owner_only(token_file_path(18795, cache_dir=tmp_path), "old-token")
+    runtime = LocalRuntime(
+        base_url="http://127.0.0.1:18795",
+        api_key="old-token",
+        pid=123,
+        version=None,
+        log_path=None,
+        owned=True,
+        cache_dir=tmp_path,
+        port=18795,
+        token_file=token_file,
+    )
+    entered = threading.Event()
+
+    def cleanup():
+        entered.set()
+        runtime._cleanup_state_files()
+
+    with ThreadPoolExecutor() as pool:
+        with module._startup_lock(tmp_path, 18795, 1):
+            cleaning = pool.submit(cleanup)
+            assert entered.wait(1)
+            with pytest.raises(TimeoutError):
+                cleaning.result(timeout=0.05)
+            write_owner_only(token_file, "replacement-token")
+        cleaning.result(timeout=2)
+    assert token_file.read_text() == "replacement-token"

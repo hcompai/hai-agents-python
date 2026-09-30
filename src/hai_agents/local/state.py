@@ -84,7 +84,7 @@ def read_pid(port: int, *, cache_dir: typing.Optional[_PathInput] = None) -> typ
 
 
 def unlink_if_content(path: pathlib.Path, content: str) -> None:
-    """Remove our state file, but never one a concurrent spawner already replaced."""
+    """Remove matching state; callers must hold the startup lock against concurrent replacement."""
     with contextlib.suppress(OSError):
         if path.read_text(encoding="utf-8").strip() == content:
             path.unlink(missing_ok=True)

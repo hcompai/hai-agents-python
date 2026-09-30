@@ -35,7 +35,10 @@ class BridgeManager:
                 if self._ensure_one(bridge):
                     started.append(bridge.session_id)
         except BaseException:
-            self.stop(started)
+            try:
+                self.stop(started)
+            except Exception:
+                logger.exception("Failed to clean up bridges after startup failure")
             raise
         return started
 
@@ -71,7 +74,10 @@ class BridgeManager:
                 with self._lock:
                     if self._runners.get(bridge.session_id) is runner:
                         del self._runners[bridge.session_id]
-                runner.stop()
+                try:
+                    runner.stop()
+                except Exception:
+                    logger.exception("Failed to clean up bridge after startup failure")
             raise
         return started
 
