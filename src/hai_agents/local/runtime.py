@@ -131,22 +131,29 @@ class LocalRuntime:
             return attached
 
         resolved_port = port if port is not None else int(os.environ.get(PORT_ENV, "").strip() or DEFAULT_PORT)
+        base_url = f"http://{LOOPBACK_HOST}:{resolved_port}"
+        attached = cls._attach(base_url=base_url, cache_dir=resolved_cache)
+        if attached is not None:
+            attached.require_recipe(required_recipe)
+            return attached
+
+        if command is not None and (not command or binary_path is not None):
+            raise ValueError("command must be nonempty and cannot be combined with binary_path")
+        # Downloads are atomically installed and can outlast the process health budget.
+        # Keep them outside the port lock; recheck attachment before spawning.
+        cmd = (
+            list(command)
+            if command is not None
+            else cls._resolve_command(
+                binary_path=binary_path, version=version, cache_dir=resolved_cache, download=download
+            )
+        )
         with _startup_lock(resolved_cache, resolved_port, timeout_s):
-            base_url = f"http://{LOOPBACK_HOST}:{resolved_port}"
             attached = cls._attach(base_url=base_url, cache_dir=resolved_cache)
             if attached is not None:
                 attached.require_recipe(required_recipe)
                 return attached
 
-            if command is not None and (not command or binary_path is not None):
-                raise ValueError("command must be nonempty and cannot be combined with binary_path")
-            cmd = (
-                list(command)
-                if command is not None
-                else cls._resolve_command(
-                    binary_path=binary_path, version=version, cache_dir=resolved_cache, download=download
-                )
-            )
             if _cancel_event is not None and _cancel_event.is_set():
                 raise RuntimeUnhealthyError("runtime startup cancelled")
             explicit_token = (
@@ -380,10 +387,10 @@ class LocalRuntime:
         """Stop the owned runtime only when it hosts no active sessions; True when it was stopped."""
         from ..client import Client  # runtime-time import: client.py imports this module lazily too
 
-        client = Client(base_url=self.base_url, api_key=self.api_key)
-        page = client.sessions.list_sessions(status=list(self.ACTIVE_SESSION_STATUSES), size=1)
-        if page.items:
-            return False
+        with Client(base_url=self.base_url, api_key=self.api_key, auto_bridges=False) as client:
+            page = client.sessions.list_sessions(status=list(self.ACTIVE_SESSION_STATUSES), size=1)
+            if page.items:
+                return False
         self.shutdown()
         return True
 

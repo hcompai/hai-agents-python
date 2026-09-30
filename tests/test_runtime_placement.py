@@ -89,3 +89,61 @@ async def test_client_close_releases_only_owned_runtime_and_http(monkeypatch, as
         await http.aclose()
     else:
         http.close()
+
+
+def test_binary_resolution_does_not_hold_the_port_startup_lock(tmp_path, monkeypatch):
+    from hai_agents.local import runtime as module
+    from hai_agents.local.errors import BinaryNotFoundError
+
+    monkeypatch.delenv("HAI_AGENT_LOCAL_BASE_URL", raising=False)
+    monkeypatch.setattr(LocalRuntime, "_attach", lambda **kwargs: None)
+
+    def resolve(**kwargs):
+        # A competing client can acquire this actual lock while resolution/download is pending.
+        with module._startup_lock(tmp_path, 18795, 0.1):
+            raise BinaryNotFoundError("candidate not installed")
+
+    monkeypatch.setattr(LocalRuntime, "_resolve_command", resolve)
+    with pytest.raises(BinaryNotFoundError, match="candidate not installed"):
+        LocalRuntime.ensure_started(cache_dir=tmp_path, port=18795)
+
+
+@pytest.mark.parametrize("status", [200, 400])
+def test_idle_probe_uses_runtime_http_and_closes_its_pool(tmp_path, monkeypatch, status):
+    from hai_agents.core.api_error import ApiError
+
+    clients, requests, stopped = [], [], []
+    original_client = httpx.Client
+
+    def respond(request):
+        requests.append(request)
+        assert request.url.path == "/api/v2/sessions"
+        assert request.headers["Authorization"] == "Bearer local-token"
+        return httpx.Response(status, json={"items": [], "total": 0, "page": 1, "size": 1})
+
+    def http_client(**kwargs):
+        client = original_client(transport=httpx.MockTransport(respond), **kwargs)
+        clients.append(client)
+        return client
+
+    monkeypatch.setattr(httpx, "Client", http_client)
+    runtime = LocalRuntime(
+        base_url="http://127.0.0.1:18795",
+        api_key="local-token",
+        pid=123,
+        version=None,
+        log_path=None,
+        owned=True,
+        cache_dir=tmp_path,
+        port=18795,
+    )
+    monkeypatch.setattr(runtime, "shutdown", lambda: stopped.append(True))
+    if status == 200:
+        assert runtime.shutdown_if_idle()
+        assert stopped == [True]
+    else:
+        with pytest.raises(ApiError):
+            runtime.shutdown_if_idle()
+        assert stopped == []
+    assert requests
+    assert all(client.is_closed for client in clients)
