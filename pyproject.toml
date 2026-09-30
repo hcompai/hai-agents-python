@@ -44,7 +44,7 @@ browser = [
   "hai-drivers[web]>=0.1.3",
 ]
 workstation = [
-  "hai-drivers[browser-cli,desktop-cli]>=0.1.6",
+  "hai-drivers[browser-cli,cua-cli,desktop-cli]>=0.1.8",
 ]
 all = [
   "hai-agents[browser,cli,desktop,workstation]",
