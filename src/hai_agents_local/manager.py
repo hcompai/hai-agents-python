@@ -56,8 +56,12 @@ class BridgeManager:
                 runner = _Runner(bridge)
                 self._runners[bridge.session_id] = runner
         for other in displaced:
-            other.stop()
-            other.notify_lost()
+            try:
+                other.stop()
+            except TimeoutError:
+                logger.exception("Displaced bridge did not stop in time")
+            finally:
+                other.notify_lost()
         try:
             if not runner.bridge.ready.wait(READY_TIMEOUT_S):
                 hint = f" ({bridge.startup_hint})" if bridge.startup_hint is not None else ""
