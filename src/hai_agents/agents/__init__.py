@@ -9,12 +9,14 @@ if typing.TYPE_CHECKING:
     from .types import (
         ListAgentsRequestSortItem,
         PatchAgentEnvironmentsItem,
+        PatchAgentReasoningEffort,
         PatchAgentSkillsItem,
         PatchAgentSubagentsItem,
     )
 _dynamic_imports: typing.Dict[str, str] = {
     "ListAgentsRequestSortItem": ".types",
     "PatchAgentEnvironmentsItem": ".types",
+    "PatchAgentReasoningEffort": ".types",
     "PatchAgentSkillsItem": ".types",
     "PatchAgentSubagentsItem": ".types",
 }
@@ -41,4 +43,10 @@ def __dir__():
     return sorted(lazy_attrs)
 
 
-__all__ = ["ListAgentsRequestSortItem", "PatchAgentEnvironmentsItem", "PatchAgentSkillsItem", "PatchAgentSubagentsItem"]
+__all__ = [
+    "ListAgentsRequestSortItem",
+    "PatchAgentEnvironmentsItem",
+    "PatchAgentReasoningEffort",
+    "PatchAgentSkillsItem",
+    "PatchAgentSubagentsItem",
+]

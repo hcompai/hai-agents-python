@@ -4520,6 +4520,24 @@
             "title": "Model",
             "description": "Model that serves the agent. Defaults to the platform model if omitted."
           },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "disabled",
+                  "low",
+                  "medium",
+                  "xhigh"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort",
+            "description": "How much the model thinks before each step: more is slower and more careful. Null uses the model's default. Models without effort levels only honor 'disabled'."
+          },
           "instructions": {
             "anyOf": [
               {
@@ -6690,6 +6708,23 @@
               }
             ],
             "title": "Model"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "disabled",
+                  "low",
+                  "medium",
+                  "xhigh"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
           },
           "instructions": {
             "anyOf": [

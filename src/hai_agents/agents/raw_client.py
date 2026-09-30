@@ -14,6 +14,7 @@ from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.agent import Agent
 from ..types.agent_environments_item import AgentEnvironmentsItem
+from ..types.agent_reasoning_effort import AgentReasoningEffort
 from ..types.agent_skills_item import AgentSkillsItem
 from ..types.agent_subagents_item import AgentSubagentsItem
 from ..types.http_validation_error import HttpValidationError
@@ -21,6 +22,7 @@ from ..types.page_agent import PageAgent
 from ..types.tool_definition import ToolDefinition
 from .types.list_agents_request_sort_item import ListAgentsRequestSortItem
 from .types.patch_agent_environments_item import PatchAgentEnvironmentsItem
+from .types.patch_agent_reasoning_effort import PatchAgentReasoningEffort
 from .types.patch_agent_skills_item import PatchAgentSkillsItem
 from .types.patch_agent_subagents_item import PatchAgentSubagentsItem
 from pydantic import ValidationError
@@ -120,6 +122,7 @@ class RawAgentsClient:
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
         model: typing.Optional[str] = OMIT,
+        reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
@@ -143,6 +146,9 @@ class RawAgentsClient:
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
+
+        reasoning_effort : typing.Optional[AgentReasoningEffort]
+            How much the model thinks before each step: more is slower and more careful. Null uses the model's default. Models without effort levels only honor 'disabled'.
 
         instructions : typing.Optional[str]
             Instructions appended to the agent's system prompt to steer behavior.
@@ -177,6 +183,7 @@ class RawAgentsClient:
                     object_=environments, annotation=typing.Sequence[AgentEnvironmentsItem], direction="write"
                 ),
                 "model": model,
+                "reasoning_effort": reasoning_effort,
                 "instructions": instructions,
                 "subagents": convert_and_respect_annotation_metadata(
                     object_=subagents,
@@ -298,6 +305,7 @@ class RawAgentsClient:
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
         model: typing.Optional[str] = OMIT,
+        reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
@@ -323,6 +331,9 @@ class RawAgentsClient:
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
+
+        reasoning_effort : typing.Optional[AgentReasoningEffort]
+            How much the model thinks before each step: more is slower and more careful. Null uses the model's default. Models without effort levels only honor 'disabled'.
 
         instructions : typing.Optional[str]
             Instructions appended to the agent's system prompt to steer behavior.
@@ -357,6 +368,7 @@ class RawAgentsClient:
                     object_=environments, annotation=typing.Sequence[AgentEnvironmentsItem], direction="write"
                 ),
                 "model": model,
+                "reasoning_effort": reasoning_effort,
                 "instructions": instructions,
                 "subagents": convert_and_respect_annotation_metadata(
                     object_=subagents,
@@ -459,6 +471,7 @@ class RawAgentsClient:
         description: typing.Optional[str] = OMIT,
         environments: typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]] = OMIT,
         model: typing.Optional[str] = OMIT,
+        reasoning_effort: typing.Optional[PatchAgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[PatchAgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[PatchAgentSkillsItem]] = OMIT,
@@ -478,6 +491,8 @@ class RawAgentsClient:
         environments : typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]]
 
         model : typing.Optional[str]
+
+        reasoning_effort : typing.Optional[PatchAgentReasoningEffort]
 
         instructions : typing.Optional[str]
 
@@ -508,6 +523,7 @@ class RawAgentsClient:
                     direction="write",
                 ),
                 "model": model,
+                "reasoning_effort": reasoning_effort,
                 "instructions": instructions,
                 "subagents": convert_and_respect_annotation_metadata(
                     object_=subagents,
@@ -650,6 +666,7 @@ class AsyncRawAgentsClient:
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
         model: typing.Optional[str] = OMIT,
+        reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
@@ -673,6 +690,9 @@ class AsyncRawAgentsClient:
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
+
+        reasoning_effort : typing.Optional[AgentReasoningEffort]
+            How much the model thinks before each step: more is slower and more careful. Null uses the model's default. Models without effort levels only honor 'disabled'.
 
         instructions : typing.Optional[str]
             Instructions appended to the agent's system prompt to steer behavior.
@@ -707,6 +727,7 @@ class AsyncRawAgentsClient:
                     object_=environments, annotation=typing.Sequence[AgentEnvironmentsItem], direction="write"
                 ),
                 "model": model,
+                "reasoning_effort": reasoning_effort,
                 "instructions": instructions,
                 "subagents": convert_and_respect_annotation_metadata(
                     object_=subagents,
@@ -828,6 +849,7 @@ class AsyncRawAgentsClient:
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
         model: typing.Optional[str] = OMIT,
+        reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
@@ -853,6 +875,9 @@ class AsyncRawAgentsClient:
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
+
+        reasoning_effort : typing.Optional[AgentReasoningEffort]
+            How much the model thinks before each step: more is slower and more careful. Null uses the model's default. Models without effort levels only honor 'disabled'.
 
         instructions : typing.Optional[str]
             Instructions appended to the agent's system prompt to steer behavior.
@@ -887,6 +912,7 @@ class AsyncRawAgentsClient:
                     object_=environments, annotation=typing.Sequence[AgentEnvironmentsItem], direction="write"
                 ),
                 "model": model,
+                "reasoning_effort": reasoning_effort,
                 "instructions": instructions,
                 "subagents": convert_and_respect_annotation_metadata(
                     object_=subagents,
@@ -989,6 +1015,7 @@ class AsyncRawAgentsClient:
         description: typing.Optional[str] = OMIT,
         environments: typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]] = OMIT,
         model: typing.Optional[str] = OMIT,
+        reasoning_effort: typing.Optional[PatchAgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[PatchAgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[PatchAgentSkillsItem]] = OMIT,
@@ -1008,6 +1035,8 @@ class AsyncRawAgentsClient:
         environments : typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]]
 
         model : typing.Optional[str]
+
+        reasoning_effort : typing.Optional[PatchAgentReasoningEffort]
 
         instructions : typing.Optional[str]
 
@@ -1038,6 +1067,7 @@ class AsyncRawAgentsClient:
                     direction="write",
                 ),
                 "model": model,
+                "reasoning_effort": reasoning_effort,
                 "instructions": instructions,
                 "subagents": convert_and_respect_annotation_metadata(
                     object_=subagents,

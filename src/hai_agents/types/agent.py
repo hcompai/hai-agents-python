@@ -7,6 +7,7 @@ import typing
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel, update_forward_refs
 from .agent_environments_item import AgentEnvironmentsItem
+from .agent_reasoning_effort import AgentReasoningEffort
 from .agent_skills_item import AgentSkillsItem
 from .tool_definition import ToolDefinition
 
@@ -34,6 +35,11 @@ class Agent(UniversalBaseModel):
     model: typing.Optional[str] = pydantic.Field(default=None)
     """
     Model that serves the agent. Defaults to the platform model if omitted.
+    """
+
+    reasoning_effort: typing.Optional[AgentReasoningEffort] = pydantic.Field(default=None)
+    """
+    How much the model thinks before each step: more is slower and more careful. Null uses the model's default. Models without effort levels only honor 'disabled'.
     """
 
     instructions: typing.Optional[str] = pydantic.Field(default=None)
