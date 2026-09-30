@@ -811,7 +811,8 @@ class TestManager:
             manager.ensure([NeverReadyBridge(api_key="k")])
         assert manager._runners == {}
 
-    def test_newer_session_takes_over_the_kind_and_notifies_the_displaced(self, manager):
+    @pytest.mark.parametrize("stop_times_out", [False, True])
+    def test_newer_session_takes_over_the_kind_and_notifies_the_displaced(self, manager, monkeypatch, stop_times_out):
         first = ServingBridge(api_key="k")
         second = ServingBridge(api_key="k")
         browser = BrowserServingBridge(api_key="k")
@@ -820,6 +821,14 @@ class TestManager:
         second.on_crash = second_lost.set
         manager.ensure([first, browser])
         first_runner = manager._runners[first.session_id]
+        if stop_times_out:
+            original_stop = first_runner.stop
+
+            def timed_out_stop():
+                original_stop()
+                raise TimeoutError("displaced bridge timeout")
+
+            monkeypatch.setattr(first_runner, "stop", timed_out_stop)
         manager.ensure([second])
         assert first.session_id not in manager._runners
         assert not first_runner.thread.is_alive()
