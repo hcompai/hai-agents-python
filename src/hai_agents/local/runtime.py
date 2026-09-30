@@ -402,12 +402,14 @@ class LocalRuntime:
         self._cleanup_state_files()
 
     def _cleanup_state_files(self) -> None:
-        if self._token_file is not None:
-            unlink_if_content(self._token_file, self.api_key)
-            self._token_file = None
-        if self._pid_file is not None:
-            unlink_if_content(self._pid_file, str(self.pid))
-            self._pid_file = None
+        # Serialize compare-and-unlink with publication of a replacement runtime's state.
+        with _startup_lock(self._cache_dir, self._port, SPAWN_TIMEOUT_S):
+            if self._token_file is not None:
+                unlink_if_content(self._token_file, self.api_key)
+                self._token_file = None
+            if self._pid_file is not None:
+                unlink_if_content(self._pid_file, str(self.pid))
+                self._pid_file = None
 
 
 @contextlib.contextmanager

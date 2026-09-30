@@ -207,14 +207,13 @@ class LocalSessionsClient(SessionsClient):
         # Stop local execution even if the remote cancellation cannot be delivered.
         owned = getattr(self, "_owned_bridges", {}).get(str(session_id), [])
         try:
-            try:
-                if owned:
-                    stop_bridges(owned)
-                    self._owned_bridges.pop(str(session_id), None)
-            finally:
-                response = super().cancel_session(session_id, **kwargs)
+            if owned:
+                stop_bridges(owned)
+                self._owned_bridges.pop(str(session_id), None)
         finally:
-            _deregister_exit_cancel(str(session_id))
+            response = super().cancel_session(session_id, **kwargs)
+        # Keep the exit retry registered until cancellation is confirmed.
+        _deregister_exit_cancel(str(session_id))
         return response
 
     @functools.wraps(SessionsClient.create_session)
@@ -262,14 +261,12 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
     async def cancel_session(self, session_id: str, **kwargs: typing.Any) -> typing.Any:
         owned = getattr(self, "_owned_bridges", {}).get(str(session_id), [])
         try:
-            try:
-                if owned:
-                    await asyncio.to_thread(stop_bridges, owned)
-                    self._owned_bridges.pop(str(session_id), None)
-            finally:
-                response = await super().cancel_session(session_id, **kwargs)
+            if owned:
+                await asyncio.to_thread(stop_bridges, owned)
+                self._owned_bridges.pop(str(session_id), None)
         finally:
-            _deregister_exit_cancel(str(session_id))
+            response = await super().cancel_session(session_id, **kwargs)
+        _deregister_exit_cancel(str(session_id))
         return response
 
     @functools.wraps(AsyncSessionsClient.create_session)

@@ -8,6 +8,7 @@ subclasses add the object-oriented sugar (``run_session``, ``start_session``,
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import typing
 
 import typing_extensions
@@ -190,15 +191,7 @@ class AsyncClient(AsyncBaseClient):
             if runtime is not None and (local_options is not None or inference is not None):
                 raise ValueError("an attached runtime owns its inference and launch configuration")
             if runtime is None:
-                from .local.runtime import LocalRuntime
-
-                options = dict(local_options or {})
-                options["required_recipe"] = "shared"
-                options["spawn_env"] = {"HAI_AGENT_RUNTIME_RECIPE": "shared", **options.get("spawn_env", {})}
-                if inference is not None:
-                    options["spawn_env"] = inference.runtime_env(options.get("spawn_env"))
-                    options["inherit_env"] = False
-                runtime = LocalRuntime.ensure_started(**options)
+                raise ValueError("Use await AsyncClient.local() to start a runtime without blocking the event loop")
             if inference is not None and not runtime.owned:
                 raise ValueError("inference selection cannot reconfigure an existing runtime; choose a free local port")
             runtime.require_recipe("shared")
@@ -209,6 +202,41 @@ class AsyncClient(AsyncBaseClient):
         except BaseException:
             if self._owns_runtime and self.local_runtime is not None and self.local_runtime.owned:
                 self.local_runtime.shutdown()
+            raise
+
+    @classmethod
+    async def local(
+        cls,
+        *,
+        inference: typing.Optional[Inference] = None,
+        local_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        **kwargs: typing.Any,
+    ) -> "AsyncClient":
+        """Start or attach off the event loop; the returned client owns any runtime it starts."""
+        from .local.runtime import LocalRuntime
+
+        options = dict(local_options or {})
+        options["required_recipe"] = "shared"
+        options["spawn_env"] = {"HAI_AGENT_RUNTIME_RECIPE": "shared", **options.get("spawn_env", {})}
+        if inference is not None:
+            options["spawn_env"] = inference.runtime_env(options.get("spawn_env"))
+            options["inherit_env"] = False
+        runtime = await LocalRuntime.ensure_started_async(**options)
+        construction = None
+        try:
+            if inference is not None and not runtime.owned:
+                raise ValueError("inference selection cannot reconfigure an existing runtime; choose a free local port")
+            construction = asyncio.create_task(asyncio.to_thread(cls, mode="local", runtime=runtime, **kwargs))
+            client = await asyncio.shield(construction)
+            client._owns_runtime = True
+            return client
+        except BaseException:
+            if construction is not None:
+                with contextlib.suppress(Exception):
+                    client = await construction
+                    await client.aclose()
+            if runtime.owned:
+                await asyncio.to_thread(runtime.shutdown)
             raise
 
     async def aclose(self) -> None:
