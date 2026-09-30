@@ -24,7 +24,8 @@ def test_self_hosted_inference_does_not_receive_hosted_key(monkeypatch):
     assert "HAI_AGENT_RUNTIME_BASE_URL" not in Inference.cloud().runtime_env()
 
 
-def test_attachment_authenticates_and_checks_recipe_before_use(tmp_path, monkeypatch):
+@pytest.mark.parametrize("probe_error", [None, httpx.ConnectError("offline"), httpx.ReadTimeout("timeout")])
+def test_attachment_authenticates_and_checks_recipe_before_use(tmp_path, monkeypatch, probe_error):
     from hai_agents.local import runtime as module
 
     write_owner_only(token_file_path(18795, cache_dir=tmp_path), "local-token")
@@ -44,7 +45,13 @@ def test_attachment_authenticates_and_checks_recipe_before_use(tmp_path, monkeyp
     with pytest.raises(LocalRuntimeError):
         attached.force_kill()
     assert token_file_path(18795, cache_dir=tmp_path).exists()
-    monkeypatch.setattr(module.httpx, "get", lambda *a, **k: httpx.Response(401))
+
+    def failed_probe(*args, **kwargs):
+        if probe_error is not None:
+            raise probe_error
+        return httpx.Response(401)
+
+    monkeypatch.setattr(module.httpx, "get", failed_probe)
     with pytest.raises(LocalRuntimeError, match="authenticated"):
         LocalRuntime.attach(cache_dir=tmp_path)
 
@@ -212,3 +219,29 @@ def test_state_cleanup_waits_for_startup_and_preserves_replacement(tmp_path):
             write_owner_only(token_file, "replacement-token")
         cleaning.result(timeout=2)
     assert token_file.read_text() == "replacement-token"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asynchronous", [False, True])
+@pytest.mark.parametrize("borrowed", [False, True])
+async def test_failed_client_recipe_check_releases_only_started_runtime(monkeypatch, asynchronous, borrowed):
+    stopped = []
+
+    class Runtime:
+        owned = True
+
+        def require_recipe(self, recipe):
+            raise BinaryIncompatibleError("recipe changed")
+
+        def shutdown(self):
+            stopped.append(True)
+
+    runtime = Runtime()
+    monkeypatch.setattr(LocalRuntime, "ensure_started", lambda **options: runtime)
+    with pytest.raises(BinaryIncompatibleError, match="recipe changed"):
+        if asynchronous and not borrowed:
+            await AsyncClient.local()
+        else:
+            client_type = AsyncClient if asynchronous else Client
+            client_type(mode="local", **({"runtime": runtime} if borrowed else {}))
+    assert stopped == ([] if borrowed else [True])

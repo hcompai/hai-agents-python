@@ -271,13 +271,16 @@ class LocalRuntime:
                 f"{AUTH_TOKEN_ENV} is not set and {token_file_path(port, cache_dir=cache_dir)} does not exist, "
                 "so this client cannot authenticate. Export the token or stop that runtime."
             )
-        response = httpx.get(
-            f"{base_url}/api/v2/sessions",
-            headers={"Authorization": f"Bearer {token}"},
-            params={"size": 1},
-            timeout=2.0,
-            follow_redirects=False,
-        )
+        try:
+            response = httpx.get(
+                f"{base_url}/api/v2/sessions",
+                headers={"Authorization": f"Bearer {token}"},
+                params={"size": 1},
+                timeout=2.0,
+                follow_redirects=False,
+            )
+        except httpx.HTTPError as exc:
+            raise LocalRuntimeError("runtime attachment failed authenticated session probe") from exc
         if response.status_code != 200:
             raise LocalRuntimeError("runtime attachment failed authenticated session probe")
         reported = payload.get("version")

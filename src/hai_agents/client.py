@@ -73,10 +73,11 @@ class Client(BaseClient):
                 runtime = LocalRuntime.ensure_started(**options)
             if inference is not None and not runtime.owned:
                 raise ValueError("inference selection cannot reconfigure an existing runtime; choose a free local port")
-            runtime.require_recipe("shared")
             self.local_runtime = runtime
-            kwargs.update(base_url=runtime.base_url, api_key=runtime.api_key)
         try:
+            if self.local_runtime is not None:
+                self.local_runtime.require_recipe("shared")
+                kwargs.update(base_url=self.local_runtime.base_url, api_key=self.local_runtime.api_key)
             super().__init__(**kwargs)
         except BaseException:
             if self._owns_runtime and self.local_runtime is not None and self.local_runtime.owned:
@@ -194,10 +195,11 @@ class AsyncClient(AsyncBaseClient):
                 raise ValueError("Use await AsyncClient.local() to start a runtime without blocking the event loop")
             if inference is not None and not runtime.owned:
                 raise ValueError("inference selection cannot reconfigure an existing runtime; choose a free local port")
-            runtime.require_recipe("shared")
             self.local_runtime = runtime
-            kwargs.update(base_url=runtime.base_url, api_key=runtime.api_key)
         try:
+            if self.local_runtime is not None:
+                self.local_runtime.require_recipe("shared")
+                kwargs.update(base_url=self.local_runtime.base_url, api_key=self.local_runtime.api_key)
             super().__init__(**kwargs)
         except BaseException:
             if self._owns_runtime and self.local_runtime is not None and self.local_runtime.owned:
