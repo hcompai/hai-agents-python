@@ -882,11 +882,16 @@ class TestManager:
         assert manager._runners[bridge.session_id].thread.is_alive()
         manager.stop([bridge.session_id])
 
-    def test_closed_channel_is_a_clean_stop(self, manager, monkeypatch, caplog):
+    @pytest.mark.parametrize("closed_on", ["/commands", "/result"])
+    def test_closed_channel_is_a_clean_stop(self, manager, monkeypatch, caplog, closed_on):
         original = httpx.AsyncClient
+        command = {"id": "c1", "command_uid": "u1", "name": "noop", "args": {}}
 
         def respond(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(410 if request.url.path.startswith("/api/v1/commands/") else 200, json={})
+            path = request.url.path
+            if path.endswith(closed_on):
+                return httpx.Response(410, json={})
+            return httpx.Response(200, json=[command] if path.endswith("/commands") else {})
 
         monkeypatch.setattr(
             httpx, "AsyncClient", lambda **kwargs: original(transport=httpx.MockTransport(respond), **kwargs)
