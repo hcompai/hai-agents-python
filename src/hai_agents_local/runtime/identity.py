@@ -26,7 +26,8 @@ def verify(token: str, request: httpx.Request, response: httpx.Response) -> None
     received = response.headers.get(PROOF_HEADER, "")
     if not sent or not hmac.compare_digest(received.encode(), expected.encode()):
         raise LocalRuntimeError(
-            f"{request.url.scheme}://{request.url.netloc.decode()} is not the runtime this client started or attached to"
+            f"{request.url.scheme}://{request.url.netloc.decode()} did not prove it is the runtime this client "
+            "started or attached to: another process holds the port, or the runtime predates identity proofs"
         )
 
 
