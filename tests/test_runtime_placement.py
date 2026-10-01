@@ -318,6 +318,41 @@ def test_state_cleanup_waits_for_startup_and_preserves_replacement(tmp_path):
     assert token_file.read_text() == "replacement-token"
 
 
+def test_idle_shutdown_waits_for_a_concurrent_startup(tmp_path, runtime_server):
+    import subprocess
+    import sys
+    from concurrent.futures import ThreadPoolExecutor
+
+    from hai_agents_local.runtime import runtime as module
+
+    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True)
+    token_file = write_owner_only(token_file_path(runtime_server.port, cache_dir=tmp_path), runtime_server.token)
+    runtime = LocalRuntime(
+        base_url=f"http://127.0.0.1:{runtime_server.port}",
+        api_key=runtime_server.token,
+        pid=proc.pid,
+        version=None,
+        log_path=None,
+        owned=True,
+        cache_dir=tmp_path,
+        port=runtime_server.port,
+        proc=proc,
+        token_file=token_file,
+    )
+    try:
+        with ThreadPoolExecutor() as pool:
+            with module._startup_lock(tmp_path, runtime_server.port, 1):
+                stopping = pool.submit(runtime.shutdown_if_idle)
+                with pytest.raises(TimeoutError):
+                    stopping.result(timeout=0.2)
+                assert proc.poll() is None and not runtime_server.requests
+            assert stopping.result(timeout=10)
+        assert proc.poll() is not None and not token_file.exists()
+    finally:
+        proc.kill()
+        proc.wait()
+
+
 def test_spawner_never_overwrites_the_live_runtime_token(tmp_path, monkeypatch, runtime_server):
     import sys
 
