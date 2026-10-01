@@ -7,15 +7,25 @@ import hashlib
 import http.server
 import secrets
 import socket
+import time
 import typing
 import urllib.parse
 import webbrowser
 
 import httpx
 
+from hai_agents_common.credentials import API_KEYS_PAGE
+
 from .login_pages import ERROR_HTML, SUCCESS_HTML
 
 SIGN_IN_TIMEOUT_S = 180
+KEY_FALLBACK = (
+    f"Browser sign-in works with Google accounts. Otherwise create a key at {API_KEYS_PAGE} and run `hai login --key`."
+)
+
+
+class PortalError(RuntimeError):
+    """A portal request failed; the message is the portal's own explanation."""
 
 
 def login_and_mint(portal: str, label: str, on_open: typing.Callable[[str], None]) -> str:
@@ -32,24 +42,39 @@ def login_and_mint(portal: str, label: str, on_open: typing.Callable[[str], None
     code = _await_code(redirect_uri)
 
     with httpx.Client(timeout=20.0) as client:
-        token = client.post(
-            f"{portal}/api/auth/desktop/exchange",
-            json={"code": code, "code_verifier": verifier, "redirect_uri": redirect_uri},
-        )
-        token.raise_for_status()
+        try:
+            token = _ok(
+                client.post(
+                    f"{portal}/api/auth/desktop/exchange",
+                    json={"code": code, "code_verifier": verifier, "redirect_uri": redirect_uri},
+                )
+            )
+        except PortalError as exc:
+            raise PortalError(f"sign-in failed: {exc} {KEY_FALLBACK}") from None
         client.headers["Authorization"] = f"Bearer {token.json()['access_token']}"
 
-        me = client.get(f"{portal}/api/auth/me")
-        me.raise_for_status()
-        org_id = me.json().get("org_id") or (me.json().get("organization") or {}).get("id")
+        me = _ok(client.get(f"{portal}/api/auth/me")).json()
+        org_id = me.get("org_id") or (me.get("organization") or {}).get("id")
         if not org_id:
-            owned = client.get(f"{portal}/api/organizations/owned")
-            owned.raise_for_status()
-            if not owned.json():
+            owned = _ok(client.get(f"{portal}/api/organizations/owned")).json()
+            if not owned:
                 raise RuntimeError("no organization is available to mint a key against.")
-            org_id = owned.json()[0]["id"]
+            org_id = owned[0]["id"]
 
         return _mint_key(client, portal, org_id, label)["key"]
+
+
+def _ok(response: httpx.Response) -> httpx.Response:
+    """The response, or a PortalError carrying the portal's `detail` instead of a bare status line."""
+    if response.is_success:
+        return response
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    detail = body.get("detail") if isinstance(body, dict) else None
+    reason = str(detail or response.text.strip()[:200] or response.reason_phrase).rstrip(".")
+    raise PortalError(f"{response.request.method} {response.url.path} returned {response.status_code}: {reason}.")
 
 
 def _pkce_pair() -> tuple[str, str]:
@@ -89,14 +114,17 @@ def _await_code(redirect_uri: str) -> str:
     server = http.server.HTTPServer(("127.0.0.1", port), _CallbackHandler)
     server.auth_code = None  # type: ignore[attr-defined]
     server.auth_error = None  # type: ignore[attr-defined]
-    server.timeout = SIGN_IN_TIMEOUT_S
+    deadline = time.monotonic() + SIGN_IN_TIMEOUT_S
     try:
         while server.auth_code is None and server.auth_error is None:  # type: ignore[attr-defined]
+            server.timeout = deadline - time.monotonic()
+            if server.timeout <= 0:
+                raise RuntimeError(f"no browser sign-in within {SIGN_IN_TIMEOUT_S}s. {KEY_FALLBACK}")
             server.handle_request()
     finally:
         server.server_close()
     if server.auth_error is not None:  # type: ignore[attr-defined]
-        raise RuntimeError(f"portal returned an error: {server.auth_error}")  # type: ignore[attr-defined]
+        raise PortalError(f"sign-in failed: {server.auth_error}. {KEY_FALLBACK}")  # type: ignore[attr-defined]
     return server.auth_code  # type: ignore[attr-defined]
 
 
@@ -108,25 +136,13 @@ def _free_redirect_uri() -> str:
     return f"http://127.0.0.1:{port}/"
 
 
-def _is_name_collision(exc: httpx.HTTPStatusError) -> bool:
-    return exc.response.status_code == 400 and "already_exists" in exc.response.text
-
-
 def _mint_key(client: httpx.Client, portal: str, org_id: str, label: str) -> dict[str, typing.Any]:
     """Mint a key; on a name collision, reclaim the stale per-machine key and remint once."""
     keys_url = f"{portal}/api/organizations/{org_id}/keys/"
-    try:
-        response = client.post(keys_url, json={"name": label})
-        response.raise_for_status()
-        return response.json()
-    except httpx.HTTPStatusError as exc:
-        if not _is_name_collision(exc):
-            raise
-    existing = client.get(keys_url)
-    existing.raise_for_status()
-    stale = next((k for k in existing.json() if k.get("name") == label), None)
+    response = client.post(keys_url, json={"name": label})
+    if not (response.status_code == 400 and "already_exists" in response.text):
+        return _ok(response).json()
+    stale = next((k for k in _ok(client.get(keys_url)).json() if k.get("name") == label), None)
     if stale is not None:
         client.delete(f"{keys_url}{stale['id']}")
-    response = client.post(keys_url, json={"name": label})
-    response.raise_for_status()
-    return response.json()
+    return _ok(client.post(keys_url, json={"name": label})).json()

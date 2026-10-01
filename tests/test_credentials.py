@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import httpx
 import pytest
 from typer.testing import CliRunner
 
 import hai_agents_cli.app as app_module
+from hai_agents.core.api_error import ApiError
+from hai_agents_cli import auth
 from hai_agents_cli.app import app
 from hai_agents_common import credentials
 
@@ -13,7 +16,8 @@ runner = CliRunner()
 @pytest.fixture(autouse=True)
 def isolated_env(tmp_path, monkeypatch):
     """Point credential resolution at empty temp files and a clean environment."""
-    monkeypatch.delenv("HAI_API_KEY", raising=False)
+    for var in (credentials.API_KEY_VAR, credentials.BASE_URL_VAR, credentials.PORTAL_URL_VAR):
+        monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr(credentials, "LOCAL_ENV_PATH", tmp_path / "local.env")
     monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", tmp_path / "global.env")
 
@@ -79,6 +83,44 @@ def test_login_short_circuits_when_signed_in(monkeypatch):
 
     assert result.exit_code == 0
     assert "Already signed in" in result.output
+
+
+def test_login_portal_follows_the_platform_region(monkeypatch):
+    assert credentials.portal_base() == "https://portal.api.eu.hcompany.ai"
+    assert credentials.portal_base("https://agp.hcompany.ai/") == "https://portal.production.hcompany.ai"
+    with pytest.raises(RuntimeError, match=credentials.PORTAL_URL_VAR):
+        credentials.portal_base("https://agp.example.test")
+
+    monkeypatch.setenv(credentials.PORTAL_URL_VAR, "https://portal.example.test")
+    assert credentials.portal_base("https://agp.example.test") == "https://portal.example.test"
+
+
+def test_portal_failure_shows_the_portal_reason():
+    request = httpx.Request("POST", "https://portal.example.test/api/auth/desktop/exchange")
+    response = httpx.Response(401, json={"title": "invalid_desktop_code", "detail": "User not found."}, request=request)
+
+    with pytest.raises(auth.PortalError, match="returned 401: User not found"):
+        auth._ok(response)
+
+
+@pytest.mark.parametrize(("status", "saved"), [(None, True), (401, False)])
+def test_login_key_validates_then_stores(monkeypatch, status, saved):
+    class _Sessions:
+        def get_session_quota(self):
+            if status:
+                raise ApiError(status_code=status, body={"detail": "Invalid API key"})
+
+    monkeypatch.setattr(app_module, "make_client", lambda **_: type("C", (), {"sessions": _Sessions()})())
+    monkeypatch.setattr(app_module.credentials, "current_api_key", lambda *_: "hk-existing")
+
+    result = runner.invoke(app, ["login", "--key"], input="hk-pasted\n")
+    monkeypatch.delenv(credentials.API_KEY_VAR, raising=False)
+
+    stored = credentials.GLOBAL_ENV_PATH.read_text() if credentials.GLOBAL_ENV_PATH.exists() else ""
+    assert (result.exit_code == 0) is saved
+    assert ("hk-pasted" in stored) is saved
+    if not saved:
+        assert "rejected this key" in _error_text(result)
 
 
 def _error_text(result) -> str:

@@ -81,25 +81,57 @@ def configure(
 
 @app.command()
 def login(
+    ctx: typer.Context,
     force: bool = typer.Option(False, "--force", help="Re-authenticate and rotate the stored key."),
+    key: bool = typer.Option(
+        False,
+        "--key",
+        help=f"Store an existing API key (from {credentials.API_KEYS_PAGE}) instead of signing in through the browser. "
+        "Reads it from a hidden prompt, or from stdin when piped.",
+    ),
 ) -> None:
     """Sign in through the browser and store an API key in ~/.config/hai/.env."""
+    state = _state(ctx)
+    if key:
+        _store_pasted_key(state.base_url)
+        return
     if credentials.current_api_key() and not force:
         console.print("Already signed in. Pass --force to rotate the key.")
         return
     if not sys.stdin.isatty():
-        _raise_cli_error(RuntimeError("login needs an interactive terminal and a browser."))
+        _raise_cli_error(RuntimeError(f"login needs an interactive terminal and a browser. {auth.KEY_FALLBACK}"))
 
     label = f"hai CLI ({socket.gethostname()})"
     try:
-        key = auth.login_and_mint(
-            credentials.portal_base(),
+        minted = auth.login_and_mint(
+            credentials.portal_base(state.base_url),
             label,
             lambda url: console.print(f"Opening your browser. If it does not open, visit:\n  {url}", style="dim"),
         )
     except Exception as exc:
         _raise_cli_error(exc)
-    path = credentials.save_api_key(key)
+    path = credentials.save_api_key(minted)
+    console.print(f"Signed in. Wrote {credentials.API_KEY_VAR} to {path}.")
+
+
+def _store_pasted_key(base_url: str | None) -> None:
+    pasted = typer.prompt("API key", hide_input=True) if sys.stdin.isatty() else sys.stdin.readline()
+    pasted = pasted.strip()
+    if not pasted:
+        _raise_cli_error(RuntimeError(f"no key given; create one at {credentials.API_KEYS_PAGE}."))
+    try:
+        make_client(api_key=pasted, base_url=base_url).sessions.get_session_quota()
+    except ApiError as exc:
+        if exc.status_code in (401, 403):
+            _raise_cli_error(
+                RuntimeError(
+                    f"the platform rejected this key ({exc.status_code}); check it at {credentials.API_KEYS_PAGE}."
+                )
+            )
+        _raise_cli_error(exc)
+    except Exception as exc:
+        _raise_cli_error(exc)
+    path = credentials.save_api_key(pasted)
     console.print(f"Signed in. Wrote {credentials.API_KEY_VAR} to {path}.")
 
 
