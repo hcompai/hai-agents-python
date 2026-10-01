@@ -166,7 +166,7 @@ def test_only_the_runtime_holding_the_token_ever_receives_it(tmp_path, runtime_s
     write_owner_only(token_file_path(runtime_server.port, cache_dir=tmp_path), "local-token")
     runtime_server.proof_token = proof_token
     if proof_token != "local-token":
-        with pytest.raises(LocalRuntimeError, match="not the runtime"):
+        with pytest.raises(LocalRuntimeError, match="did not prove"):
             LocalRuntime.attach(port=runtime_server.port, cache_dir=tmp_path)
         assert runtime_server.requests and not any("authorization" in seen for seen in runtime_server.requests)
         return
@@ -178,7 +178,7 @@ def test_only_the_runtime_holding_the_token_ever_receives_it(tmp_path, runtime_s
     with Client.local(runtime=attached) as client:
         assert client.sessions.list_sessions().items == []
         runtime_server.proof_token = "squatter-token"
-        with pytest.raises(LocalRuntimeError, match="not the runtime"):
+        with pytest.raises(LocalRuntimeError, match="did not prove"):
             client.sessions.list_sessions()
 
 
@@ -192,7 +192,7 @@ async def test_bridge_never_serves_an_unproven_runtime(runtime_server):
         agent, api_key="local-token", base_url=f"http://127.0.0.1:{runtime_server.port}", verify_runtime=True
     )
     bridge.create_driver = lambda: pytest.fail("a driver started for an unproven runtime")
-    with pytest.raises(LocalRuntimeError, match="not the runtime"):
+    with pytest.raises(LocalRuntimeError, match="did not prove"):
         await bridge.run()
 
 
@@ -323,7 +323,7 @@ def test_spawner_never_overwrites_the_live_runtime_token(tmp_path, monkeypatch, 
 
     token_file = write_owner_only(token_file_path(runtime_server.port, cache_dir=tmp_path), runtime_server.token)
     monkeypatch.setattr(LocalRuntime, "_attach", lambda **kwargs: None)
-    with pytest.raises(LocalRuntimeError, match="is not the runtime"):
+    with pytest.raises(LocalRuntimeError, match="did not prove"):
         LocalRuntime.ensure_started(
             command=[sys.executable, "-c", "import time; time.sleep(30)"],
             cache_dir=tmp_path,
