@@ -43,6 +43,14 @@ def _apply_runaway_budgets(kwargs: typing.Dict[str, typing.Any]) -> None:
     kwargs.setdefault("max_time_s", DEFAULT_LOCAL_MAX_TIME_S)
 
 
+def _stop_bridges_keeping_error(session_ids: typing.Sequence[str]) -> None:
+    """Stop bridges inside an except block; a stop failure is logged so the handled error still propagates."""
+    try:
+        stop_bridges(session_ids)
+    except Exception:
+        logger.warning("could not confirm local bridges stopped after a failed session create", exc_info=True)
+
+
 def _token_source(client_wrapper: typing.Any) -> TokenSource:
     return getattr(client_wrapper, "_async_token", None) or client_wrapper._get_api_key
 
@@ -273,7 +281,7 @@ class LocalSessionsClient(SessionsClient):
         try:
             session = super().create_session(**kwargs)
         except BaseException:
-            stop_bridges(started)
+            _stop_bridges_keeping_error(started)
             raise
         if bridges:
             cancel = _cancel_action(self._cancel_remote, bridges, session)
@@ -343,7 +351,7 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
         try:
             session = await super().create_session(**kwargs)
         except BaseException:
-            await asyncio.to_thread(stop_bridges, started)
+            await asyncio.to_thread(_stop_bridges_keeping_error, started)
             raise
         if bridges:
             cancel = _cancel_action(self._cancel_remote, bridges, session)

@@ -193,8 +193,13 @@ class TestAutoStart:
     def test_create_session_failure_stops_newly_started_bridges(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
         stopped: list = []
+
+        def stop_stuck(ids):
+            stopped.extend(ids)
+            raise TimeoutError("bridge did not stop")
+
         monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: ["new-sid"])
-        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", stopped.extend)
+        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", stop_stuck)
         monkeypatch.setattr(
             SessionsClient, "create_session", lambda self, **kw: (_ for _ in ()).throw(RuntimeError("api down"))
         )
