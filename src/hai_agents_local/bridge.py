@@ -17,7 +17,7 @@ from typing import Any, AsyncIterator, ClassVar, Generic, TypeVar, Union
 import httpx
 
 from .config import default_base_url
-from .errors import RateLimitedError, SessionNotFoundError
+from .errors import ChannelClosedError, RateLimitedError, SessionNotFoundError
 from .runtime import identity
 from .transport import Command, CommandExchange, Json, deserialize_args, serialize_result
 
@@ -210,6 +210,9 @@ class LocalBridge(ABC, Generic[DriverT]):
                 ):
                     # Instant empty polls are paced so a misbehaving server cannot cause a busy loop.
                     break
+            except ChannelClosedError:
+                logger.info("channel %s closed; the session ended", self.session_id)
+                return
             except SessionNotFoundError:
                 # Channel was garbage-collected server-side; recreate on the next iteration so
                 # rate limits and transient errors during recreation hit the handlers below.

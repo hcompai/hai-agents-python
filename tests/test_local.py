@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import sys
 import threading
 import types
@@ -880,6 +881,25 @@ class TestManager:
         assert not crashed.wait(0.5)
         assert manager._runners[bridge.session_id].thread.is_alive()
         manager.stop([bridge.session_id])
+
+    def test_closed_channel_is_a_clean_stop(self, manager, monkeypatch, caplog):
+        original = httpx.AsyncClient
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(410 if request.url.path.startswith("/api/v1/commands/") else 200, json={})
+
+        monkeypatch.setattr(
+            httpx, "AsyncClient", lambda **kwargs: original(transport=httpx.MockTransport(respond), **kwargs)
+        )
+        bridge = FakeBridge(api_key="k", base_url="http://runtime.test")
+        crashed = threading.Event()
+        bridge.on_crash = crashed.set
+        manager.ensure([bridge])
+        runner = manager._runners[bridge.session_id]
+        runner.thread.join(5.0)
+        assert not runner.thread.is_alive() and runner.error is None
+        assert not crashed.is_set()
+        assert not [record for record in caplog.records if record.levelno >= logging.ERROR]
 
     def test_crash_after_ready_fires_on_crash(self, manager):
         crashed = threading.Event()
