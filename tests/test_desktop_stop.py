@@ -8,8 +8,14 @@ import sys
 from types import SimpleNamespace
 
 import pytest
+
+pytest.importorskip("hai_drivers.desktop.utils")
+try:
+    from hai_drivers.desktop.utils import DesktopCommandRunner
+except ImportError:
+    pytest.skip("installed hai-drivers lacks DesktopCommandRunner", allow_module_level=True)
+
 from hai_drivers.desktop.scaled import ScaledDesktopDriver
-from hai_drivers.desktop.utils import DesktopCommandRunner
 
 from hai_agents_local.desktop import PyautoguiDesktopBridge
 from hai_agents_local.transport import Command

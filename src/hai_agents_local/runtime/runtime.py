@@ -29,8 +29,10 @@ from .errors import (
 from .install import DOWNLOAD_SHA256_ENV, DOWNLOAD_URL_ENV, install_runtime, installed_binary, pinned_artifact
 from .manifest import PINNED_RUNTIME_VERSION
 from .process import (
+    KILL_WAIT_S,
     LOOPBACK_HOST,
     SPAWN_TIMEOUT_S,
+    TERM_GRACE_S,
     probe_health,
     responds,
     spawn,
@@ -58,6 +60,8 @@ PORT_ENV = "HAI_AGENT_RUNTIME_PORT"
 AUTH_TOKEN_ENV = "HAI_AGENT_RUNTIME_API_TOKEN"
 CLIENT_TIMEOUT_S = 60.0
 IDLE_PROBE_PAGE_SIZE = 50
+# Beyond the holder's health budget: its authenticated probe, then a failed child's graceful stop.
+STARTUP_LOCK_GRACE_S = TERM_GRACE_S + KILL_WAIT_S + 5.0
 
 _PathInput = typing.Union[str, "os.PathLike[str]"]
 
@@ -150,11 +154,12 @@ class LocalRuntime:
 
         resolved_port = port if port is not None else int(os.environ.get(PORT_ENV, "").strip() or DEFAULT_PORT)
         base_url = f"http://{LOOPBACK_HOST}:{resolved_port}"
+        lock_wait_s = timeout_s + STARTUP_LOCK_GRACE_S
         try:
             attached = cls._attach(base_url=base_url, cache_dir=resolved_cache)
         except LocalRuntimeError:
             # A concurrent spawner publishes its token only after its child is proven; decide once it has.
-            with _startup_lock(resolved_cache, resolved_port, timeout_s):
+            with _startup_lock(resolved_cache, resolved_port, lock_wait_s):
                 attached = cls._attach(base_url=base_url, cache_dir=resolved_cache)
         if attached is not None:
             attached.require_recipe(required_recipe)
@@ -171,7 +176,7 @@ class LocalRuntime:
                 binary_path=binary_path, version=version, cache_dir=resolved_cache, download=download
             )
         )
-        with _startup_lock(resolved_cache, resolved_port, timeout_s):
+        with _startup_lock(resolved_cache, resolved_port, lock_wait_s):
             attached = cls._attach(base_url=base_url, cache_dir=resolved_cache)
             if attached is not None:
                 attached.require_recipe(required_recipe)
@@ -411,6 +416,15 @@ class LocalRuntime:
 
     def shutdown_if_idle(self, ignore: typing.Collection[str] = ()) -> bool:
         """Stop the owned runtime unless it hosts an active session outside ``ignore``; True when it was stopped."""
+        # Serialized with spawns and locked attaches only: a client that attached without the lock
+        # can still start a session between the listing and the stop.
+        with _startup_lock(self._cache_dir, self._port, SPAWN_TIMEOUT_S + STARTUP_LOCK_GRACE_S):
+            if self._hosts_active_session(ignore):
+                return False
+            self.shutdown()
+        return True
+
+    def _hosts_active_session(self, ignore: typing.Collection[str]) -> bool:
         with self.http_client() as http:
             sessions = BaseClient(base_url=self.base_url, api_key=self.api_key, httpx_client=http).sessions
             page, seen = 1, 0
@@ -419,13 +433,11 @@ class LocalRuntime:
                     status=list(self.ACTIVE_SESSION_STATUSES), page=page, size=IDLE_PROBE_PAGE_SIZE
                 )
                 if any(item.id not in ignore for item in listed.items):
-                    return False
+                    return True
                 seen += len(listed.items)
                 if not listed.items or seen >= listed.total:
-                    break
+                    return False
                 page += 1
-        self.shutdown()
-        return True
 
     def force_kill(self) -> None:
         """Stop only the process this manager spawned; never trust a saved PID to claim ownership."""
@@ -436,7 +448,7 @@ class LocalRuntime:
 
     def _cleanup_state_files(self) -> None:
         # Serialize compare-and-unlink with publication of a replacement runtime's state.
-        with _startup_lock(self._cache_dir, self._port, SPAWN_TIMEOUT_S):
+        with _startup_lock(self._cache_dir, self._port, SPAWN_TIMEOUT_S + STARTUP_LOCK_GRACE_S):
             if self._token_file is not None:
                 unlink_if_content(self._token_file, self.api_key)
                 self._token_file = None
@@ -445,9 +457,17 @@ class LocalRuntime:
                 self._pid_file = None
 
 
+_held_startup_locks = threading.local()
+
+
 @contextlib.contextmanager
 def _startup_lock(cache_dir: pathlib.Path, port: int, timeout_s: float):
     path = cache_dir / "state" / f"startup-{port}.lock"
+    # Reentrant per thread: a second open file description would block on this thread's own flock.
+    held: typing.Set[pathlib.Path] = _held_startup_locks.__dict__.setdefault("paths", set())
+    if path in held:
+        yield
+        return
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     fd = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
     with os.fdopen(fd, "r+b") as handle:
@@ -468,9 +488,11 @@ def _startup_lock(cache_dir: pathlib.Path, port: int, timeout_s: float):
                 if time.monotonic() >= deadline:
                     raise LocalRuntimeError("timed out waiting for local runtime startup lock")
                 time.sleep(0.05)
+        held.add(path)
         try:
             yield
         finally:
+            held.discard(path)
             if os.name == "posix":
                 fcntl.flock(handle, fcntl.LOCK_UN)
             else:
