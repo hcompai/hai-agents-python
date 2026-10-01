@@ -101,7 +101,7 @@ def login(
     if credentials.current_api_key() and not force:
         console.print("Already signed in. Pass --force to rotate the key.")
         return
-    if not sys.stdin.isatty():
+    if not _interactive():
         _raise_cli_error(RuntimeError(f"login needs an interactive terminal and a browser. {auth.KEY_FALLBACK}"))
 
     label = f"hai CLI ({socket.gethostname()})"
@@ -113,8 +113,14 @@ def login(
         )
     except Exception as exc:
         _raise_cli_error(exc)
-    path = credentials.save_api_key(minted)
-    console.print(f"Signed in. Wrote {credentials.API_KEY_VAR} to {path}.")
+    path = credentials.save_api_key(minted.key)
+    # Names only, never ids: a key minted into the wrong account must be visible at a glance.
+    where = f" in organization {escape(minted.organization)}" if minted.organization else ""
+    console.print(f"Signed in as {escape(minted.email)}{where}. Wrote {credentials.API_KEY_VAR} to {path}.")
+
+
+def _interactive() -> bool:
+    return sys.stdin.isatty()
 
 
 def _store_pasted_key(base_url: str | None) -> None:

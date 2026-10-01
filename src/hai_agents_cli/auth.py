@@ -1,8 +1,14 @@
-"""Browser sign-in: RFC 8252 loopback redirect + PKCE, then mint an API key."""
+"""Browser sign-in: RFC 8252 loopback redirect + PKCE, then mint an API key.
+
+No provider is named: the portal signs our PKCE state and sends the browser to
+the platform login page, so any account type finishes back on our loopback.
+"""
 
 from __future__ import annotations
 
 import base64
+import contextlib
+import dataclasses
 import hashlib
 import http.server
 import secrets
@@ -19,22 +25,27 @@ from hai_agents_common.credentials import API_KEYS_PAGE
 from .login_pages import ERROR_HTML, SUCCESS_HTML
 
 SIGN_IN_TIMEOUT_S = 180
-KEY_FALLBACK = (
-    f"Browser sign-in works with Google accounts. Otherwise create a key at {API_KEYS_PAGE} and run `hai login --key`."
-)
+KEY_FALLBACK = f"Without a browser, create a key at {API_KEYS_PAGE} and run `hai login --key`."
 
 
 class PortalError(RuntimeError):
     """A portal request failed; the message is the portal's own explanation."""
 
 
-def login_and_mint(portal: str, label: str, on_open: typing.Callable[[str], None]) -> str:
+@dataclasses.dataclass(frozen=True)
+class SignedIn:
+    key: str
+    email: str
+    organization: typing.Optional[str]  # name only, never an id
+
+
+def login_and_mint(portal: str, label: str, on_open: typing.Callable[[str], None]) -> SignedIn:
     """Run the full browser sign-in and return a freshly minted API key."""
     verifier, challenge = _pkce_pair()
     redirect_uri = _free_redirect_uri()
     authorize_url = (
-        f"{portal}/api/auth/authorize?provider=google"
-        f"&redirect_uri={urllib.parse.quote(redirect_uri, safe='')}"
+        f"{portal}/api/auth/authorize"
+        f"?redirect_uri={urllib.parse.quote(redirect_uri, safe='')}"
         f"&code_challenge={challenge}&code_challenge_method=S256"
     )
     on_open(authorize_url)
@@ -51,17 +62,38 @@ def login_and_mint(portal: str, label: str, on_open: typing.Callable[[str], None
             )
         except PortalError as exc:
             raise PortalError(f"sign-in failed: {exc} {KEY_FALLBACK}") from None
-        client.headers["Authorization"] = f"Bearer {token.json()['access_token']}"
+        body = token.json()
+        client.headers["Authorization"] = f"Bearer {body['access_token']}"
+        return _mint_for_signed_in_user(client, portal, label, session_id=body.get("session_id"))
 
-        me = _ok(client.get(f"{portal}/api/auth/me")).json()
-        org_id = me.get("org_id") or (me.get("organization") or {}).get("id")
-        if not org_id:
-            owned = _ok(client.get(f"{portal}/api/organizations/owned")).json()
-            if not owned:
-                raise RuntimeError("no organization is available to mint a key against.")
-            org_id = owned[0]["id"]
 
-        return _mint_key(client, portal, org_id, label)["key"]
+def _mint_for_signed_in_user(
+    client: httpx.Client, portal: str, label: str, session_id: typing.Optional[str] = None
+) -> SignedIn:
+    """Mint a key for the signed-in user, then revoke the web session: the key is the credential."""
+    me = _ok(client.get(f"{portal}/api/auth/me")).json()
+    email = me.get("email") or (me.get("user") or {}).get("email") or "unknown"
+    org_id = me.get("org_id") or (me.get("organization") or {}).get("id")
+    if not org_id:
+        owned = _ok(client.get(f"{portal}/api/organizations/owned")).json()
+        if not owned:
+            raise RuntimeError("no organization is available to mint a key against.")
+        org_id = owned[0]["id"]
+    key = _mint_key(client, portal, org_id, label)["key"]
+    organization = _organization_name(client, portal, org_id)
+    if session_id:
+        with contextlib.suppress(httpx.HTTPError):
+            client.delete(f"{portal}/api/auth/sessions/{session_id}")
+    return SignedIn(key=key, email=str(email), organization=organization)
+
+
+def _organization_name(client: httpx.Client, portal: str, org_id: str) -> typing.Optional[str]:
+    with contextlib.suppress(httpx.HTTPError, ValueError, TypeError):
+        orgs = client.get(f"{portal}/api/organizations/").json()
+        for org in orgs if isinstance(orgs, list) else []:
+            if isinstance(org, dict) and str(org.get("id")) == str(org_id) and org.get("name"):
+                return str(org["name"])
+    return None
 
 
 def _ok(response: httpx.Response) -> httpx.Response:

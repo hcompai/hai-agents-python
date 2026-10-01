@@ -125,3 +125,77 @@ def test_login_key_validates_then_stores(monkeypatch, status, saved):
 
 def _error_text(result) -> str:
     return "\n".join(part for part in (result.output, result.stderr, str(result.exception)) if part)
+
+
+def test_browser_sign_in_lets_the_platform_pick_the_method(monkeypatch):
+    """No provider hint: the portal sends the browser to the platform login page, where every method works."""
+    opened: list[str] = []
+    monkeypatch.setattr(auth.webbrowser, "open", lambda url: opened.append(url))
+
+    def _abort(redirect_uri, *args):
+        raise RuntimeError("stop before serving the loopback")
+
+    monkeypatch.setattr(auth, "_await_code", _abort)
+    with pytest.raises(RuntimeError, match="stop before"):
+        auth.login_and_mint("https://portal.test", "lbl", lambda url: None)
+
+    assert len(opened) == 1
+    query = httpx.URL(opened[0]).params
+    assert httpx.URL(opened[0]).path == "/api/auth/authorize"
+    assert "provider" not in query
+    assert query["code_challenge_method"] == "S256" and query["redirect_uri"].startswith("http://127.0.0.1:")
+
+
+def test_minting_names_the_identity_and_revokes_the_web_session():
+    calls: list = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        calls.append((request.method, request.url.path))
+        if request.url.path == "/api/auth/me":
+            return httpx.Response(200, json={"user": {"email": "me@example.com"}, "org_id": "org-1"})
+        if request.url.path == "/api/organizations/":
+            return httpx.Response(200, json=[{"id": "org-1", "name": "Acme"}])
+        if request.url.path == "/api/organizations/org-1/keys/":
+            return httpx.Response(200, json={"id": "k1", "key": "hk-minted"})
+        if request.url.path == "/api/auth/sessions/web-session":
+            return httpx.Response(204)
+        return httpx.Response(404, json={"detail": "unexpected"})
+
+    with httpx.Client(transport=httpx.MockTransport(handle), headers={"Authorization": "Bearer jwt"}) as client:
+        signed_in = auth._mint_for_signed_in_user(client, "https://portal.test", "lbl", session_id="web-session")
+
+    assert signed_in == auth.SignedIn(key="hk-minted", email="me@example.com", organization="Acme")
+    assert ("DELETE", "/api/auth/sessions/web-session") in calls
+    assert calls.index(("POST", "/api/organizations/org-1/keys/")) < calls.index(
+        ("DELETE", "/api/auth/sessions/web-session")
+    )
+
+
+def test_minting_survives_a_failed_session_revoke():
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/auth/me":
+            return httpx.Response(200, json={"email": "me@example.com", "org_id": "org-1"})
+        if request.url.path == "/api/organizations/org-1/keys/":
+            return httpx.Response(200, json={"id": "k1", "key": "hk-minted"})
+        if request.url.path == "/api/organizations/":
+            return httpx.Response(404, json={"detail": "nope"})
+        raise httpx.ConnectError("portal gone")
+
+    with httpx.Client(transport=httpx.MockTransport(handle)) as client:
+        signed_in = auth._mint_for_signed_in_user(client, "https://portal.test", "lbl", session_id="s")
+
+    assert signed_in.key == "hk-minted" and signed_in.organization is None
+
+
+def test_identity_line_never_shows_an_org_id(monkeypatch):
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+    monkeypatch.setattr(
+        app_module.auth, "login_and_mint", lambda *a, **k: auth.SignedIn("hk-x", "me@example.com", None)
+    )
+
+    result = runner.invoke(app, ["login"])
+    monkeypatch.delenv(credentials.API_KEY_VAR, raising=False)
+
+    assert result.exit_code == 0, _error_text(result)
+    assert "Signed in as me@example.com." in result.output
+    assert "organization" not in result.output
