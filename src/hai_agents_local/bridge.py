@@ -18,6 +18,7 @@ import httpx
 
 from .config import default_base_url
 from .errors import RateLimitedError, SessionNotFoundError
+from .runtime import identity
 from .transport import Command, CommandExchange, Json, deserialize_args, serialize_result
 
 logger = logging.getLogger(__name__)
@@ -69,9 +70,12 @@ class LocalBridge(ABC, Generic[DriverT]):
         api_key: TokenSource,
         base_url: str | None = None,
         session_id: str | None = None,
+        verify_runtime: bool = False,
     ) -> None:
         if not api_key:
             raise ValueError("api_key is required")
+        if verify_runtime and not isinstance(api_key, str):
+            raise ValueError("verify_runtime needs api_key to be the local runtime's token string")
         if session_id is not None:
             try:
                 uuid.UUID(session_id)
@@ -81,6 +85,7 @@ class LocalBridge(ABC, Generic[DriverT]):
         self.api_key = api_key
         self.base_url = base_url or default_base_url()
         self.session_id = session_id or str(uuid.uuid4())
+        self.verify_runtime = verify_runtime
         self.ready = threading.Event()
         self.on_crash: Callable[[], None] | None = None
         self._driver: DriverT | None = None
@@ -117,9 +122,16 @@ class LocalBridge(ABC, Generic[DriverT]):
         """Serve commands until stopped; raises AuthError on a bad key."""
         # An asyncio.Event binds to the loop it is first awaited on; a restarted bridge runs on a new loop.
         self._stop_event = asyncio.Event()
+        options: dict[str, Any] = {
+            "headers": {"Accept": "application/json"},
+            "auth": _BearerAuth(self.api_key),
+            "follow_redirects": True,
+        }
         try:
-            async with httpx.AsyncClient(
-                headers={"Accept": "application/json"}, auth=_BearerAuth(self.api_key), follow_redirects=True
+            async with (
+                identity.async_http_client(self.api_key, **options)
+                if self.verify_runtime
+                else httpx.AsyncClient(**options)
             ) as client:
                 exchange = CommandExchange(client, self.base_url)
                 if not await self._open_channel(exchange):

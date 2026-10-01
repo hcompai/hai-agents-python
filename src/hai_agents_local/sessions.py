@@ -12,6 +12,9 @@ import logging
 import threading
 import typing
 
+import httpx
+
+from hai_agents.base_client import BaseClient
 from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
 
 from .bridge import LocalBridge, TokenSource
@@ -30,6 +33,7 @@ logger = logging.getLogger(__name__)
 # hits these. Explicit values, including None for unbounded, are respected.
 DEFAULT_LOCAL_MAX_STEPS = 150
 DEFAULT_LOCAL_MAX_TIME_S = 1800.0
+REMOTE_CANCEL_TIMEOUT_S = 60.0
 
 
 def _apply_runaway_budgets(kwargs: typing.Dict[str, typing.Any]) -> None:
@@ -68,7 +72,9 @@ def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) 
         )
 
 
-def _localize(client_wrapper: typing.Any, kwargs: typing.Dict[str, typing.Any]) -> typing.List[LocalBridge]:
+def _localize(
+    client_wrapper: typing.Any, runtime: typing.Optional[LocalRuntime], kwargs: typing.Dict[str, typing.Any]
+) -> typing.List[LocalBridge]:
     """Spawn bridges for unclaimed user_device environments in an inline agent and stamp their session ids.
 
     String agent references are left alone: registered agents must carry an explicit session_id on their
@@ -78,9 +84,12 @@ def _localize(client_wrapper: typing.Any, kwargs: typing.Dict[str, typing.Any]) 
     if agent is None or isinstance(agent, str) or not auto_bridges_enabled():
         return []
     _warn_if_overrides_target_user_device(kwargs)
-    localized, bridges = localize_agent(
-        agent, api_key=_token_source(client_wrapper), base_url=client_wrapper.get_base_url()
+    credentials: typing.Dict[str, typing.Any] = (
+        {"api_key": runtime.api_key, "base_url": runtime.base_url, "verify_runtime": True}
+        if runtime is not None
+        else {"api_key": _token_source(client_wrapper), "base_url": client_wrapper.get_base_url()}
     )
+    localized, bridges = localize_agent(agent, **credentials)
     kwargs["agent"] = localized
     return bridges
 
@@ -114,8 +123,11 @@ class _LossWatcher:
         return False
 
 
+RemoteCancel = typing.Callable[[str], None]
+
+
 def _cancel_action(
-    client_wrapper: typing.Any, bridges: typing.Sequence[LocalBridge], session: typing.Any
+    cancel_remote: RemoteCancel, bridges: typing.Sequence[LocalBridge], session: typing.Any
 ) -> typing.Optional[typing.Callable[[], None]]:
     """A bridge that dies mid-session leaves the agent without local control; cancel the session then."""
     session_id = getattr(session, "id", None)
@@ -126,7 +138,7 @@ def _cancel_action(
         logger.error("local bridge for session %s crashed; cancelling the session", session_id)
         _deregister_exit_cancel(session_id)
         try:
-            _cancel_remote_session(client_wrapper, session_id)
+            cancel_remote(session_id)
         except Exception:
             logger.exception("failed to cancel session %s after its local bridge crashed", session_id)
         finally:
@@ -135,12 +147,15 @@ def _cancel_action(
     return cancel
 
 
-def _cancel_remote_session(client_wrapper: typing.Any, session_id: str) -> None:
-    from hai_agents.client import Client
-
-    api_key = _resolve_token(_token_source(client_wrapper))
-    client = Client(api_key=api_key, base_url=client_wrapper.get_base_url())
-    client.sessions.cancel_session(session_id)
+def _cancel_remote_session(client_wrapper: typing.Any, runtime: typing.Optional[LocalRuntime], session_id: str) -> None:
+    """Cancel over a fresh connection, so it works from any thread and at interpreter exit."""
+    if runtime is not None:
+        http, base_url, api_key = runtime.http_client(), runtime.base_url, runtime.api_key
+    else:
+        http = httpx.Client(timeout=REMOTE_CANCEL_TIMEOUT_S, follow_redirects=True)
+        base_url, api_key = client_wrapper.get_base_url(), _resolve_token(_token_source(client_wrapper))
+    with http:
+        BaseClient(base_url=base_url, api_key=api_key, httpx_client=http).sessions.cancel_session(session_id)
 
 
 # Sessions that depend on this process's bridges, cancelled at interpreter exit: the bridges die
@@ -159,11 +174,11 @@ def _ensure_stop_watcher() -> StopWatcher:
         return _stop_watcher
 
 
-def _register_exit_cancel(client_wrapper: typing.Any, session_id: str) -> None:
+def _register_exit_cancel(cancel_remote: RemoteCancel, session_id: str) -> None:
     def cancel_quietly() -> None:
         # Best effort: the session may have finished long ago; the platform rejects the cancel then.
         try:
-            _cancel_remote_session(client_wrapper, session_id)
+            cancel_remote(session_id)
             logger.info("cancelled session %s at exit: its local bridge lives in this process", session_id)
         except Exception as exc:
             logger.debug("exit-time cancel of session %s skipped: %s", session_id, exc)
@@ -202,6 +217,7 @@ class LocalSessionsClient(SessionsClient):
         super().__init__(client_wrapper=client_wrapper)
         self._runtime = runtime
         self._auto_bridges = auto_bridges
+        self._cancel_remote: RemoteCancel = functools.partial(_cancel_remote_session, client_wrapper, runtime)
         self._owned_bridges: typing.Dict[str, typing.List[str]] = {}
 
     def close(self) -> None:
@@ -229,8 +245,7 @@ class LocalSessionsClient(SessionsClient):
 
     @functools.wraps(SessionsClient.create_session)
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
-        wrapper = self._raw_client._client_wrapper
-        bridges = _localize(wrapper, kwargs) if self._auto_bridges else []
+        bridges = _localize(self._raw_client._client_wrapper, self._runtime, kwargs) if self._auto_bridges else []
         if bridges:
             _apply_runaway_budgets(kwargs)
         stop_watcher = _ensure_stop_watcher() if bridges else None
@@ -242,12 +257,12 @@ class LocalSessionsClient(SessionsClient):
             stop_bridges(started)
             raise
         if bridges:
-            cancel = _cancel_action(wrapper, bridges, session)
+            cancel = _cancel_action(self._cancel_remote, bridges, session)
             if cancel is not None:
                 if watcher.attach(cancel):
                     cancel()
                 else:
-                    _register_exit_cancel(wrapper, session.id)
+                    _register_exit_cancel(self._cancel_remote, session.id)
                     if stop_watcher is not None and not stop_watcher.active:
                         # A stop was filed while bridges or the session were starting; apply it now.
                         _panic_stop()
@@ -263,6 +278,7 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
         super().__init__(client_wrapper=client_wrapper)
         self._runtime = runtime
         self._auto_bridges = auto_bridges
+        self._cancel_remote: RemoteCancel = functools.partial(_cancel_remote_session, client_wrapper, runtime)
         self._owned_bridges: typing.Dict[str, typing.List[str]] = {}
 
     async def aclose(self) -> None:
@@ -288,8 +304,7 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
 
     @functools.wraps(AsyncSessionsClient.create_session)
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:
-        wrapper = self._raw_client._client_wrapper
-        bridges = _localize(wrapper, kwargs) if self._auto_bridges else []
+        bridges = _localize(self._raw_client._client_wrapper, self._runtime, kwargs) if self._auto_bridges else []
         if bridges:
             _apply_runaway_budgets(kwargs)
         # Native permission prompts must run before bridge startup moves to a worker.
@@ -304,13 +319,13 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
             await asyncio.to_thread(stop_bridges, started)
             raise
         if bridges:
-            cancel = _cancel_action(wrapper, bridges, session)
+            cancel = _cancel_action(self._cancel_remote, bridges, session)
             if cancel is not None:
                 if watcher.attach(cancel):
                     # cancel_session blocks on HTTP; keep it off the event loop thread.
                     await asyncio.to_thread(cancel)
                 else:
-                    _register_exit_cancel(wrapper, session.id)
+                    _register_exit_cancel(self._cancel_remote, session.id)
                     if stop_watcher is not None and not stop_watcher.active:
                         # A stop was filed while bridges or the session were starting; apply it now.
                         await asyncio.to_thread(_panic_stop)

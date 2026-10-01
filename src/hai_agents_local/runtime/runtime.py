@@ -19,6 +19,7 @@ import httpx
 
 from hai_agents.base_client import BaseClient
 
+from . import identity
 from .errors import (
     BinaryIncompatibleError,
     BinaryNotFoundError,
@@ -31,6 +32,7 @@ from .process import (
     LOOPBACK_HOST,
     SPAWN_TIMEOUT_S,
     probe_health,
+    responds,
     spawn,
     terminate,
     wait_healthy,
@@ -72,6 +74,18 @@ def _warn_on_version_skew(version: typing.Optional[str]) -> None:
 
 def _port_of(base_url: str) -> int:
     return urlsplit(base_url).port or DEFAULT_PORT
+
+
+def _authenticated_probe(base_url: str, token: str) -> int:
+    """Status of a proven, bearer-authenticated session listing; call only after /health proved the server."""
+    with identity.http_client(token, timeout=2.0) as client:
+        response = client.get(
+            f"{base_url}/api/v2/sessions",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"size": 1},
+            follow_redirects=False,
+        )
+    return response.status_code
 
 
 class LocalRuntime:
@@ -178,21 +192,14 @@ class LocalRuntime:
                     log_path=log_path,
                 )
                 payload = wait_healthy(
-                    base_url, proc, timeout_s=timeout_s, log_path=log_path, cancel_event=_cancel_event
+                    base_url, proc, token=token, timeout_s=timeout_s, log_path=log_path, cancel_event=_cancel_event
                 )
-                response = httpx.get(
-                    f"{base_url}/api/v2/sessions",
-                    headers={"Authorization": f"Bearer {token}"},
-                    params={"size": 1},
-                    timeout=2.0,
-                    follow_redirects=False,
-                    trust_env=False,
-                )
+                status = _authenticated_probe(base_url, token)
                 if required_recipe is not None and payload.get("recipe") != required_recipe:
                     raise BinaryIncompatibleError(
                         f"runtime must support recipe {required_recipe!r}; use a compatible source command or binary"
                     )
-                if response.status_code != 200 or proc.poll() is not None:
+                if status != 200 or proc.poll() is not None:
                     raise RuntimeUnhealthyError("spawned runtime failed authenticated readiness probe")
                 pid_file = write_owner_only(pid_file_path(resolved_port, cache_dir=resolved_cache), str(proc.pid))
             except BaseException:
@@ -239,7 +246,7 @@ class LocalRuntime:
         """Fail closed when an old binary or a differently configured daemon answers."""
         if recipe is None:
             return
-        payload = probe_health(self.base_url)
+        payload = probe_health(self.base_url, self.api_key)
         if payload is None or payload.get("recipe") != recipe:
             raise BinaryIncompatibleError(
                 f"runtime must support recipe {recipe!r}; use a compatible source command or binary"
@@ -263,30 +270,25 @@ class LocalRuntime:
         if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"} or parsed.username:
             raise LocalRuntimeError("local runtime attachment requires a loopback HTTP URL")
         port = _port_of(base_url)
-        payload = probe_health(base_url)
-        if payload is None:
-            return None
         token = os.environ.get(AUTH_TOKEN_ENV, "").strip() or read_state_file(
             token_file_path(port, cache_dir=cache_dir)
         )
         if not token:
+            if not responds(base_url):
+                return None
             raise LocalRuntimeError(
                 f"an agent runtime is answering at {base_url} but no credentials were found: "
                 f"{AUTH_TOKEN_ENV} is not set and {token_file_path(port, cache_dir=cache_dir)} does not exist, "
                 "so this client cannot authenticate. Export the token or stop that runtime."
             )
+        payload = probe_health(base_url, token)
+        if payload is None:
+            return None
         try:
-            response = httpx.get(
-                f"{base_url}/api/v2/sessions",
-                headers={"Authorization": f"Bearer {token}"},
-                params={"size": 1},
-                timeout=2.0,
-                follow_redirects=False,
-                trust_env=False,
-            )
+            status = _authenticated_probe(base_url, token)
         except httpx.HTTPError as exc:
             raise LocalRuntimeError("runtime attachment failed authenticated session probe") from exc
-        if response.status_code != 200:
+        if status != 200:
             raise LocalRuntimeError("runtime attachment failed authenticated session probe")
         reported = payload.get("version")
         reported_version = reported if isinstance(reported, str) else None
@@ -368,20 +370,20 @@ class LocalRuntime:
         return [str(installed)]
 
     def http_client(self, timeout: typing.Optional[float] = None) -> httpx.Client:
-        """An HTTP client for this runtime's API."""
-        return httpx.Client(
-            timeout=CLIENT_TIMEOUT_S if timeout is None else timeout, follow_redirects=True, trust_env=False
+        """An HTTP client for this runtime's API that rejects responses this runtime did not prove."""
+        return identity.http_client(
+            self.api_key, timeout=CLIENT_TIMEOUT_S if timeout is None else timeout, follow_redirects=True
         )
 
     def async_http_client(self, timeout: typing.Optional[float] = None) -> httpx.AsyncClient:
-        """An asynchronous HTTP client for this runtime's API."""
-        return httpx.AsyncClient(
-            timeout=CLIENT_TIMEOUT_S if timeout is None else timeout, follow_redirects=True, trust_env=False
+        """``http_client`` for asyncio callers."""
+        return identity.async_http_client(
+            self.api_key, timeout=CLIENT_TIMEOUT_S if timeout is None else timeout, follow_redirects=True
         )
 
     def health(self) -> typing.Dict[str, typing.Any]:
         """The /health JSON body; raises RuntimeUnhealthyError when the runtime is not answering."""
-        payload = probe_health(self.base_url)
+        payload = probe_health(self.base_url, self.api_key)
         if payload is None:
             raise RuntimeUnhealthyError(f"hai-agent-runtime at {self.base_url} is not answering /health")
         return payload

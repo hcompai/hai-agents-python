@@ -13,6 +13,7 @@ import typing
 
 import httpx
 
+from . import identity
 from .errors import RuntimeStartTimeoutError, RuntimeUnhealthyError
 
 logger = logging.getLogger(__name__)
@@ -24,10 +25,20 @@ TERM_GRACE_S = 2.0
 LOG_TAIL_CHARS = 4000
 
 
-def probe_health(base_url: str) -> typing.Optional[typing.Dict[str, typing.Any]]:
-    """The /health JSON body on a 200 ({} for non-JSON bodies); None when unreachable/unhealthy."""
+def responds(base_url: str) -> bool:
+    """Whether any HTTP server answers at `base_url`, proven or not."""
     try:
-        response = httpx.get(f"{base_url}/health", timeout=2.0, trust_env=False)
+        httpx.get(f"{base_url}/health", timeout=2.0, trust_env=False)
+    except httpx.HTTPError:
+        return False
+    return True
+
+
+def probe_health(base_url: str, token: str) -> typing.Optional[typing.Dict[str, typing.Any]]:
+    """The proven /health JSON body on a 200 ({} for non-JSON bodies); None when unreachable/unhealthy."""
+    try:
+        with identity.http_client(token, timeout=2.0) as client:
+            response = client.get(f"{base_url}/health")
     except httpx.HTTPError:
         return None
     if response.status_code != 200:
@@ -63,16 +74,17 @@ def wait_healthy(
     base_url: str,
     proc: subprocess.Popen,
     *,
+    token: str,
     timeout_s: float,
     log_path: pathlib.Path,
     cancel_event: typing.Optional[threading.Event] = None,
 ) -> typing.Dict[str, typing.Any]:
-    """Poll /health until 200; raises RuntimeUnhealthyError (child exited) or RuntimeStartTimeoutError."""
+    """Poll /health until a proven 200; raises LocalRuntimeError if another server answers, or the child fails."""
     deadline = time.monotonic() + timeout_s
     while True:
         if cancel_event is not None and cancel_event.is_set():
             raise RuntimeUnhealthyError("runtime startup cancelled")
-        payload = probe_health(base_url)
+        payload = probe_health(base_url, token)
         if payload is not None:
             logger.info("hai-agent-runtime ready (pid %d)", proc.pid)
             return payload

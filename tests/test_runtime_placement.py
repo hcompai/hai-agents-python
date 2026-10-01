@@ -1,11 +1,89 @@
 """Placement boundaries: authentication, compatibility and executor ownership."""
 
+import hashlib
+import hmac
+import json
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit
+
 import httpx
 import pytest
 
 from hai_agents import AsyncClient, Client
 from hai_agents_local.runtime import BinaryIncompatibleError, Inference, LocalRuntime, LocalRuntimeError
 from hai_agents_local.runtime.state import token_file_path, write_owner_only
+
+
+class RuntimeServer(ThreadingHTTPServer):
+    """A loopback stand-in for the runtime: answers every response with an HMAC proof keyed by `proof_token`."""
+
+    def __init__(self, token):
+        super().__init__(("127.0.0.1", 0), _RuntimeHandler)
+        self.token = token
+        self.proof_token = token
+        self.requests = []
+        self.active = []
+        self.cancelled = []
+
+    @property
+    def port(self):
+        return self.server_address[1]
+
+
+class _RuntimeHandler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        self._route()
+
+    def do_DELETE(self):
+        self._route()
+
+    def _route(self):
+        server = self.server
+        server.requests.append({name.lower() for name in self.headers})
+        path = urlsplit(self.path).path
+        if path == "/health":
+            return self._reply(200, {"recipe": "shared", "version": "test"})
+        if self.headers.get("Authorization") != f"Bearer {server.token}":
+            return self._reply(401, {"error": "unauthorized"})
+        if self.command == "GET" and path == "/api/v2/sessions":
+            items = [{"id": sid, "status": "running", "created_at": "2026-01-01T00:00:00Z"} for sid in server.active]
+            return self._reply(200, {"items": items, "total": len(items), "page": 1})
+        if self.command == "DELETE" and path.startswith("/api/v2/sessions/"):
+            session_id = path.rsplit("/", 1)[1]
+            server.cancelled.append(session_id)
+            if session_id not in server.active:
+                return self._reply(404, {"detail": "Session not found"})
+            server.active.remove(session_id)
+            return self._reply(204, None)
+        self._reply(404, {"detail": "Not Found"})
+
+    def _reply(self, status, body):
+        payload = b"" if body is None else json.dumps(body).encode()
+        self.send_response(status)
+        challenge = self.headers.get("X-Hai-Runtime-Challenge")
+        if challenge and self.server.proof_token:
+            proof = hmac.new(self.server.proof_token.encode(), challenge.encode(), hashlib.sha256).hexdigest()
+            self.send_header("X-Hai-Runtime-Proof", proof)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+
+@pytest.fixture
+def runtime_server(monkeypatch):
+    monkeypatch.delenv("HAI_AGENT_RUNTIME_API_TOKEN", raising=False)
+    monkeypatch.delenv("HAI_AGENT_LOCAL_BASE_URL", raising=False)
+    server = RuntimeServer("local-token")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield server
+    server.shutdown()
+    server.server_close()
 
 
 class FakeRuntime:
@@ -68,36 +146,39 @@ def test_self_hosted_inference_does_not_receive_hosted_key(monkeypatch):
     assert "HAI_AGENT_RUNTIME_BASE_URL" not in Inference.cloud().runtime_env()
 
 
-@pytest.mark.parametrize("probe_error", [None, httpx.ConnectError("offline"), httpx.ReadTimeout("timeout")])
-def test_attachment_authenticates_and_checks_recipe_before_use(tmp_path, monkeypatch, probe_error):
-    from hai_agents_local.runtime import runtime as module
-
-    write_owner_only(token_file_path(18795, cache_dir=tmp_path), "local-token")
-    monkeypatch.delenv("HAI_AGENT_RUNTIME_API_TOKEN", raising=False)
-    monkeypatch.setattr(module, "probe_health", lambda url: {"version": "old", "recipe": "desktop"})
-    calls = []
-
-    def get(url, **kwargs):
-        calls.append(kwargs["headers"])
-        return httpx.Response(200)
-
-    monkeypatch.setattr(module.httpx, "get", get)
-    attached = LocalRuntime.attach(cache_dir=tmp_path)
-    assert calls == [{"Authorization": "Bearer local-token"}]
+@pytest.mark.parametrize("proof_token", ["local-token", "squatter-token", None])
+def test_only_the_runtime_holding_the_token_ever_receives_it(tmp_path, runtime_server, proof_token):
+    write_owner_only(token_file_path(runtime_server.port, cache_dir=tmp_path), "local-token")
+    runtime_server.proof_token = proof_token
+    if proof_token != "local-token":
+        with pytest.raises(LocalRuntimeError, match="not the runtime"):
+            LocalRuntime.attach(port=runtime_server.port, cache_dir=tmp_path)
+        assert runtime_server.requests and not any("authorization" in seen for seen in runtime_server.requests)
+        return
+    attached = LocalRuntime.attach(port=runtime_server.port, cache_dir=tmp_path)
     with pytest.raises(BinaryIncompatibleError):
-        attached.require_recipe("shared")
+        attached.require_recipe("desktop")
     with pytest.raises(LocalRuntimeError):
         attached.force_kill()
-    assert token_file_path(18795, cache_dir=tmp_path).exists()
+    with Client.local(runtime=attached) as client:
+        assert client.sessions.list_sessions().items == []
+        runtime_server.proof_token = "squatter-token"
+        with pytest.raises(LocalRuntimeError, match="not the runtime"):
+            client.sessions.list_sessions()
 
-    def failed_probe(*args, **kwargs):
-        if probe_error is not None:
-            raise probe_error
-        return httpx.Response(401)
 
-    monkeypatch.setattr(module.httpx, "get", failed_probe)
-    with pytest.raises(LocalRuntimeError, match="authenticated"):
-        LocalRuntime.attach(cache_dir=tmp_path)
+@pytest.mark.asyncio
+async def test_bridge_never_serves_an_unproven_runtime(runtime_server):
+    from hai_agents_local.routing import localize_agent
+
+    runtime_server.proof_token = "squatter-token"
+    agent = {"environments": [{"id": "workstation", "kind": "workstation", "host": "user_device"}]}
+    _, [bridge] = localize_agent(
+        agent, api_key="local-token", base_url=f"http://127.0.0.1:{runtime_server.port}", verify_runtime=True
+    )
+    bridge.create_driver = lambda: pytest.fail("a driver started for an unproven runtime")
+    with pytest.raises(LocalRuntimeError, match="not the runtime"):
+        await bridge.run()
 
 
 @pytest.mark.parametrize("url", ["https://remote.example", "http://user:pass@localhost:80"])
@@ -141,45 +222,28 @@ def test_binary_resolution_does_not_hold_the_port_startup_lock(tmp_path, monkeyp
         LocalRuntime.ensure_started(cache_dir=tmp_path, port=18795)
 
 
-@pytest.mark.parametrize("status", [200, 400])
-def test_idle_probe_uses_runtime_http_and_closes_its_pool(tmp_path, monkeypatch, status):
-    from hai_agents.core.api_error import ApiError
-
-    clients, requests, stopped = [], [], []
-    original_client = httpx.Client
-
-    def respond(request):
-        requests.append(request)
-        assert request.url.path == "/api/v2/sessions"
-        assert request.headers["Authorization"] == "Bearer local-token"
-        return httpx.Response(status, json={"items": [], "total": 0, "page": 1, "size": 1})
-
-    def http_client(**kwargs):
-        client = original_client(transport=httpx.MockTransport(respond), **kwargs)
-        clients.append(client)
-        return client
-
-    monkeypatch.setattr(httpx, "Client", http_client)
+def _owned_runtime(server, cache_dir, monkeypatch, stopped):
     runtime = LocalRuntime(
-        base_url="http://127.0.0.1:18795",
-        api_key="local-token",
+        base_url=f"http://127.0.0.1:{server.port}",
+        api_key=server.token,
         pid=123,
         version=None,
         log_path=None,
         owned=True,
-        cache_dir=tmp_path,
-        port=18795,
+        cache_dir=cache_dir,
+        port=server.port,
     )
     monkeypatch.setattr(runtime, "shutdown", lambda: stopped.append(True))
-    if status == 200:
-        assert runtime.shutdown_if_idle()
-        assert stopped == [True]
-    else:
-        with pytest.raises(ApiError):
-            runtime.shutdown_if_idle()
-        assert stopped == []
-    assert requests
-    assert all(client.is_closed for client in clients)
+    return runtime
+
+
+@pytest.mark.parametrize("active", [[], ["other-client-run"]])
+def test_idle_probe_stops_only_an_unused_runtime(tmp_path, monkeypatch, runtime_server, active):
+    stopped = []
+    runtime_server.active = list(active)
+    runtime = _owned_runtime(runtime_server, tmp_path, monkeypatch, stopped)
+    assert runtime.shutdown_if_idle() is (not active)
+    assert stopped == ([] if active else [True])
 
 
 @pytest.mark.asyncio
