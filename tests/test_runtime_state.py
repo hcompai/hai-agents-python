@@ -1,8 +1,8 @@
 """Behavioural tests for the runtime pid file's on-disk hardening.
 
-The pid file's contents drive a privileged operation: ``holo stop --force`` reads it and
+The pid file's contents drive a privileged operation: a forced stop reads it and
 ``os.killpg(..., SIGKILL)`` the pid it finds. It therefore earns the same protections as the bearer
-token — owner-only permissions and a refusal to follow a symlink planted at its path — so it can never
+token (owner-only permissions and a refusal to replace a symlink planted at its path), so it can never
 be steered into killing an arbitrary process group.
 """
 
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from hai_agents.local.state import pid_file_path, write_owner_only
+from hai_agents_local.runtime.state import pid_file_path, write_owner_only
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX file-mode semantics")

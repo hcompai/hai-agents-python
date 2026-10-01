@@ -69,9 +69,9 @@ print(result.answer)
 
 ## Candidate local-agent support
 
-The placement branch adds `Client(mode="local")` and `await AsyncClient.local()`
-for nonblocking asynchronous startup. `AsyncClient(mode="local", runtime=...)` accepts
-an already prepared runtime. Agent placement and environment placement are separate: the client
+`Client.local()` and `await AsyncClient.local()` start a local agent runtime or,
+with `runtime=...`, use an already prepared one.
+Agent placement and environment placement are separate: the client
 selects where the agent runs; each agent environment selects `host="user_device"`
 or `host="cloud"`. `Client()` continues to use the hosted Agents API.
 
@@ -80,8 +80,7 @@ For development, install the candidate SDK and use a prepared HAI source checkou
 ```python
 from hai_agents import Client
 
-with Client(
-    mode="local",
+with Client.local(
     local_options={
         "command": ["/path/to/hai/.venv/bin/python", "-m", "hai_agent_runtime"],
         "download": False,
@@ -107,12 +106,13 @@ The source runtime must support the `shared` recipe. The current pinned binary
 0.1.8 does not; candidate source or an explicitly supplied compatible
 `local_options["binary_path"]` is required until a compatible release is pinned.
 The runtime inherits `HAI_API_KEY` for hosted inference. Local agent execution
-does not by itself imply local inference: `Inference.self_hosted(url, model=...)`
-selects a model endpoint for a newly started local runtime. Hosted agents do not
-currently accept that override.
+does not by itself imply local inference:
+`Client.local(inference=Inference.self_hosted(url, model=...))`, with `Inference`
+from `hai_agents_local.runtime`, selects a model endpoint for a newly started
+local runtime. Hosted agents do not currently accept that override.
 
-Closing the client shuts down a runtime it started; an attached runtime remains
-owned by its caller. `cancel()` ends the agent session. For a cloud workstation,
+Closing the client shuts down a runtime it started, unless sessions from other
+clients are still active there. An attached runtime remains owned by its caller. `cancel()` ends the agent session. For a cloud workstation,
 an explicit `session_id` attaches to a caller-owned environment, which the caller
 must eventually release. In the candidate shared recipe, automatically provisioned
 cloud workstations survive agent cancellation and expire through the environment
@@ -134,7 +134,7 @@ The SDK runtime manifest is maintained independently of schema generation. After
 publishing and verifying a compatible runtime, run `scripts/bump_runtime.py` with
 `--version` and one `--sha PLATFORM=SHA256` for every platform already in the
 manifest. Partial updates are rejected so a new URL cannot retain an old digest.
-The generator preserves this SDK-owned file. The release workflow still opens
+Schema generation never touches it. The release workflow still opens
 legacy CLI pin PRs; retarget it only after the SDK/CLI migration has shipped.
 
 ## How a session works

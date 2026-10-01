@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Union
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from .errors import AuthError, RateLimitedError, SessionNotFoundError
+from .errors import AuthError, ChannelClosedError, RateLimitedError, SessionNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,8 @@ class CommandExchange:
             raise RateLimitedError(_retry_after(resp))
         if resp.status_code == HTTPStatus.CONFLICT:
             return
+        if resp.status_code == HTTPStatus.GONE:
+            raise ChannelClosedError(f"channel {session_id!r} is closed")
         resp.raise_for_status()
 
     async def fetch_commands(
@@ -107,6 +109,8 @@ class CommandExchange:
                     return None
                 case HTTPStatus.NOT_FOUND:
                     raise SessionNotFoundError(f"channel {session_id!r} not found")
+                case HTTPStatus.GONE:
+                    raise ChannelClosedError(f"channel {session_id!r} is closed")
                 case HTTPStatus.UNAUTHORIZED | HTTPStatus.FORBIDDEN:
                     raise AuthError(f"auth error ({resp.status_code})")
                 case HTTPStatus.TOO_MANY_REQUESTS:

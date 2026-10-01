@@ -11,7 +11,7 @@ from pathlib import Path
 # Stdlib only on purpose: this runs as `python scripts/bump_runtime.py` in a
 # checkout with no dependencies installed, so a third-party import would break
 # the bump step.
-RUNTIME_INSTALL = Path(__file__).parents[1] / "src" / "hai_agents" / "local" / "manifest.py"
+RUNTIME_INSTALL = Path(__file__).parents[1] / "src" / "hai_agents_local" / "runtime" / "manifest.py"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _MANIFEST_FILENAME_RE = re.compile(r'"hai-agent-runtime-([^".]+)\.zip"')
 

@@ -735,7 +735,3 @@ __all__ = [
     "wait_for_session",
     "webhooks",
 ]
-
-from .inference import Inference
-
-__all__.append("Inference")

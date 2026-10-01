@@ -54,8 +54,11 @@ class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
         api_key: TokenSource,
         base_url: str | None = None,
         session_id: str | None = None,
+        verify_runtime: bool = False,
     ) -> None:
-        super().__init__(environment_id, api_key=api_key, base_url=base_url, session_id=session_id)
+        super().__init__(
+            environment_id, api_key=api_key, base_url=base_url, session_id=session_id, verify_runtime=verify_runtime
+        )
         self.debugging_port = debugging_port
 
     def create_driver(self) -> SeleniumWebDriver:
@@ -117,6 +120,6 @@ class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
 
 def _debugger_listening(port: int) -> bool:
     try:
-        return httpx.get(f"http://127.0.0.1:{port}/json/version", timeout=2.0).status_code == 200
+        return httpx.get(f"http://127.0.0.1:{port}/json/version", timeout=2.0, trust_env=False).status_code == 200
     except httpx.HTTPError:
         return False

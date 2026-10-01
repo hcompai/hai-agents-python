@@ -3,7 +3,7 @@
 A spawner persists the generated bearer token and the runtime pid under the SDK
 cache dir so a second process can attach (token) or force-kill (pid) without any
 IPC. Both files drive privileged actions, so they are 0600 from the first byte
-and refuse pre-planted symlinks (port of holo_desktop launcher._write_owner_only).
+and refuse pre-planted symlinks.
 """
 
 from __future__ import annotations
@@ -11,11 +11,12 @@ from __future__ import annotations
 import contextlib
 import os
 import pathlib
+import tempfile
 import typing
 
 CACHE_DIR_ENV = "HAI_AGENT_LOCAL_CACHE_DIR"
 DEFAULT_CACHE_DIR = pathlib.Path.home() / ".hai" / "agent-runtime"
-# HoloDesktop's AGENT_API_DEFAULT_PORT: the shared well-known local runtime port.
+# The shared well-known local runtime port.
 DEFAULT_PORT = 18795
 
 _PathInput = typing.Union[str, "os.PathLike[str]"]
@@ -51,16 +52,22 @@ def runtime_log_path(port: int, *, cache_dir: typing.Optional[_PathInput] = None
 
 
 def write_owner_only(path: pathlib.Path, content: str) -> pathlib.Path:
-    """Write `content` to `path` owner-only (0600), refusing a pre-existing symlink at the path."""
+    """Atomically publish `content` at `path` owner-only (0600), refusing a pre-existing symlink at the path."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with contextlib.suppress(OSError):
         path.parent.chmod(0o700)  # owner-only state dir; no-op on Windows
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(path, flags, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        if os.name == "posix":
-            os.fchmod(fd, 0o600)  # enforce owner-only even if the file pre-existed
-        fh.write(content)
+    if path.is_symlink():
+        raise OSError(f"refusing to replace the symlink at {path}")
+    # mkstemp creates the staging file 0600 with O_EXCL, so readers only ever see complete content.
+    fd, staged = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(content)
+        os.replace(staged, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(staged)
+        raise
     return path
 
 

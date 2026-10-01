@@ -1,9 +1,9 @@
-"""Local-mode runtime management: install/find/start a hai-agent-runtime binary.
+"""Local agent runtime management: install, find, start, attach to and verify a hai-agent-runtime binary.
 
-Never imported by the base ``hai_agents`` package; ``Client.local`` pulls it in
-lazily so remote-only users pay nothing for it.
+Imported lazily by ``Client.local`` so remote-only users pay nothing for it.
 """
 
+from .acquire import acquire_runtime, acquire_runtime_async
 from .errors import (
     BinaryIncompatibleError,
     BinaryNotFoundError,
@@ -12,14 +12,18 @@ from .errors import (
     RuntimeStartTimeoutError,
     RuntimeUnhealthyError,
 )
+from .inference import Inference
 from .runtime import LocalRuntime
 
 __all__ = [
     "BinaryIncompatibleError",
     "BinaryNotFoundError",
     "DownloadVerificationError",
+    "Inference",
     "LocalRuntime",
     "LocalRuntimeError",
     "RuntimeStartTimeoutError",
     "RuntimeUnhealthyError",
+    "acquire_runtime",
+    "acquire_runtime_async",
 ]

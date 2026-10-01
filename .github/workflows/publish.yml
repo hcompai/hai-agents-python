@@ -37,8 +37,33 @@ jobs:
           name: dist
           path: dist/
 
-  publish:
+  runtime-pin:
     needs: build
+    runs-on: macos-14
+    timeout-minutes: 10
+    steps:
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.1.0
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - name: Pinned runtime downloads, verifies and serves the shared recipe
+        env:
+          HAI_AGENT_RUNTIME_FAKE: "1"
+        run: |
+          uv venv -q && uv pip install -q dist/*.whl
+          .venv/bin/python -c '
+          import tempfile
+          from hai_agents_local.runtime import LocalRuntime
+          LocalRuntime.ensure_started(required_recipe="shared", cache_dir=tempfile.mkdtemp(), port=18799,
+                                      spawn_env={"HAI_AGENT_RUNTIME_RECIPE": "shared"}).shutdown()
+          '
+
+  publish:
+    needs: [build, runtime-pin]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: release
