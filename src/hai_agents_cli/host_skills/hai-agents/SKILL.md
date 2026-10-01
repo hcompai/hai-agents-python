@@ -13,12 +13,13 @@ Use it for open-ended work on the live web: finding and extracting information a
 
 ## Tools
 
-- `list_agents()` — agents the caller can run (their org's plus the public `h/` ones). Pick the `agent` name from here.
-- `run_agent(task, agent, max_steps?, max_time_s?, idempotency_key?)` — start a run. Returns either the final answer or a session handle `{ session_id, status, answer, done }`.
-- `wait_for_session(session_id, wait=True)` — long-poll a running session for its answer; `wait=False` returns the current snapshot without blocking.
-- `send_message(session_id, message)` — steer a running session with a follow-up.
-- `cancel_session(session_id)` — stop a run you no longer need.
-- `share_session(session_id)` — get a public read-only URL for the run.
+- `list_agents(page?, size?)`: agents the caller can run (their org's plus the public `h/` ones). Pick the `agent` name from here.
+- `run_agent(task, agent, max_steps?, max_time_s?, idempotency_key?)`: start a run. Returns either the final answer or a session handle `{ session_id, status, answer, done }`.
+- `wait_for_session(session_id, wait=True)`: long-poll a running session for its answer; `wait=False` returns the current snapshot without blocking.
+- `send_message(session_id, message)`: steer a running session with a follow-up.
+- `cancel_session(session_id)`: stop a run you no longer need.
+- `share_session(session_id)`: get a public read-only URL for the run.
+- `list_files(session_id, path="~/Downloads", ...)`, `read_file(session_id, path)`, `write_file(session_id, path, content_base64)`: files on the agent's browser machine, e.g. its downloads. These take the browser session id issued by env-manager, not the id `run_agent` returns.
 
 ## Long-running tasks
 
@@ -28,7 +29,7 @@ MCP clients cap a single tool call at roughly a minute, but agent runs often tak
 2. If `done` is false, call `wait_for_session(session_id)` to keep long-polling.
 3. Repeat `wait_for_session` until `done` is true, then surface the answer.
 
-This loop is the whole protocol: a run that finishes fast returns straight from `run_agent`; a long one is just more `wait_for_session` calls. Treat the work as long-running — do not give the user a final answer while a session is still in flight, and if a run fails or times out, refine the `task` with more specifics and retry, or surface the failure.
+This loop is the whole protocol: a run that finishes fast returns straight from `run_agent`; a long one is just more `wait_for_session` calls. Treat the work as long-running: do not give the user a final answer while a session is still in flight, and if a run fails or times out, refine the `task` with more specifics and retry, or surface the failure.
 
 ## Examples
 

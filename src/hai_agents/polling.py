@@ -57,6 +57,9 @@ class CreateSessionParams(typing_extensions.TypedDict, total=False):
     idle_timeout_s: typing.Optional[int]
     group_id: typing.Optional[str]
     parent_session_id: typing.Optional[str]
+    delete_after_min: typing.Optional[int]
+    delete_screenshot_after_min: typing.Optional[int]
+    queue: typing.Optional[bool]
 
 
 AnswerT = typing_extensions.TypeVar("AnswerT", default=SessionChangesAnswer)
@@ -408,6 +411,8 @@ def wait_for_session(
 ) -> SessionRunResult[AnswerT]:
     """Poll a session until it settles (terminal, or idle awaiting the next message), running custom tools along the way.
 
+    Without ``tools``, a session awaiting tool results also ends the wait, since nothing here will answer it.
+
     Status is read from ``/status`` (authoritative); ``/changes`` only feeds
     events and the final answer, since it 204s whenever no new events exist past
     ``from_index`` -- even after the session has finished.
@@ -444,7 +449,7 @@ def wait_for_session(
                 next_from_index += len(batch)
 
         status = client.sessions.get_session_status(id)
-        if is_settled_session_status(status.status):
+        if is_settled_session_status(status.status) or (status.status == "awaiting_tool_results" and not tools_by_name):
             if include_events:
                 while True:
                     if deadline is not None and time.monotonic() >= deadline:
@@ -594,7 +599,7 @@ async def async_wait_for_session(
                 next_from_index += len(batch)
 
         status = await client.sessions.get_session_status(id)
-        if is_settled_session_status(status.status):
+        if is_settled_session_status(status.status) or (status.status == "awaiting_tool_results" and not tools_by_name):
             if include_events:
                 while True:
                     if deadline is not None and time.monotonic() >= deadline:
