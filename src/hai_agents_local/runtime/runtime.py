@@ -407,6 +407,7 @@ class LocalRuntime:
     # Statuses that mean the runtime still holds live session state a shutdown would destroy.
     # ("idle" sessions await user input but keep runtime state.)
     ACTIVE_SESSION_STATUSES: typing.ClassVar[typing.Tuple[str, ...]] = (
+        "queued",
         "pending",
         "running",
         "paused",
