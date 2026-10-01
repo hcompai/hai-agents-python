@@ -17,6 +17,7 @@ from rich.table import Column, Table
 
 from hai_agents import Client, assert_request_under_limit, is_settled_session_status, wait_for_session
 from hai_agents.core.api_error import ApiError
+from hai_agents.environment import HaiAgentsEnvironment
 from hai_agents.sessions import SendSessionMessagesRequestBody_UserMessage
 from hai_agents.types import PageSessionSummary
 from hai_agents_common import credentials
@@ -39,13 +40,15 @@ H_GLYPH = "\n".join(
     )
 )
 
+CLEAN_STATUSES = ("completed", "idle")
+
 console = Console()
 err_console = Console(stderr=True)
 
 app = typer.Typer(
     name="hai",
     help="Run H Company agents from your terminal.",
-    epilog=f'\b\n{H_GLYPH}\n\nExamples:\n  hai run "Find the H Agent API quickstart"\n'
+    epilog=f'\b\n{H_GLYPH}\n\n\b\nExamples:\n  hai run "Find the H Agent API quickstart"\n'
     "  hai sessions share <session-id>",
     no_args_is_help=True,
     rich_markup_mode=None,
@@ -175,7 +178,7 @@ def whoami(ctx: typer.Context) -> None:
         _print_json(data)
         return
     table = Table("Field", "Value", show_header=False)
-    table.add_row("Endpoint", data["base_url"] or "(SDK default)")
+    table.add_row("Endpoint", data["base_url"] or HaiAgentsEnvironment.EU.value)
     table.add_row("Authenticated", "yes" if authenticated else "no")
     table.add_row("Key source", data["source"] or "(none)")
     console.print(table)
@@ -454,10 +457,10 @@ def watch(
                 final = client.sessions.get_session_changes(
                     session_id, from_index=0, include_events=False, wait_for_seconds=0
                 )
-                _print_watch_result(state, current, final)
-                return
+                break
         except Exception as exc:
             _raise_cli_error(exc)
+    _print_watch_result(state, current, final)
 
 
 @agents_app.command("list")
@@ -814,15 +817,36 @@ def _print_run_result(result, json_output: bool, agent_view_url: str | None = No
         "session_id": result.id,
         "status": _status_text(result.status),
         "answer": result.answer,
+        "outcome": result.outcome,
+        "error": result.error,
+        "error_code": result.error_code,
         "agent_view_url": agent_view_url,
     }
     if json_output:
         _print_json(payload)
-        return
-    console.print(f"[bold]Session:[/bold] {result.id}")
-    console.print(f"[bold]Status:[/bold] {_status_text(result.status)}")
-    if result.answer is not None:
-        console.print(escape(result.answer))
+    else:
+        console.print(f"[bold]Session:[/bold] {result.id}")
+        _print_outcome(result.status, result.answer, result.outcome, result.error, result.error_code)
+    _exit_unless_clean(result.status)
+
+
+def _print_outcome(status, answer, outcome: str | None, error: str | None, error_code: str | None) -> None:
+    console.print(f"[bold]Status:[/bold] {_status_text(status)}")
+    if outcome:
+        console.print(f"[bold]Outcome:[/bold] {escape(outcome)}")
+    if status == "awaiting_tool_results":
+        console.print("The agent is waiting on client-side tools the CLI cannot run; drive it from the SDK with tools.")
+    if error:
+        console.print(
+            f"[bold]Error:[/bold] {escape(error)}" + (f" [dim]({escape(error_code)})[/dim]" if error_code else "")
+        )
+    if answer is not None:
+        console.print(escape(answer if isinstance(answer, str) else json.dumps(to_jsonable(answer), indent=2)))
+
+
+def _exit_unless_clean(status) -> None:
+    if status not in CLEAN_STATUSES:
+        raise typer.Exit(1)
 
 
 def _print_ack(action: str, json_output: bool) -> None:
@@ -840,14 +864,15 @@ def _print_json(value) -> None:
 def _print_watch_result(state: AppState, status_result, final) -> None:
     if state.json_output:
         print(json.dumps(to_jsonable(final if final is not None else status_result), sort_keys=True))
-        return
-    console.print(f"[bold]Status:[/bold] {_status_text(status_result.status)}")
-    error = status_result.error or (final.error if final is not None else None)
-    if error:
-        console.print(f"[bold]Error:[/bold] {escape(error)}")
-    answer = final.answer if final is not None else None
-    if answer is not None:
-        console.print(escape(answer))
+    else:
+        _print_outcome(
+            status_result.status,
+            final.answer if final is not None else None,
+            status_result.outcome,
+            status_result.error or (final.error if final is not None else None),
+            status_result.error_code,
+        )
+    _exit_unless_clean(status_result.status)
 
 
 def _status_text(status) -> str:

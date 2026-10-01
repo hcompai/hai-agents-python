@@ -7,6 +7,7 @@ import tomllib
 
 import hai_agents
 from hai_agents import AsyncClient, Client
+from hai_agents.polling import CreateSessionParams
 from hai_agents.sessions import SendSessionMessagesRequestBody_UserMessage
 
 
@@ -36,6 +37,12 @@ def test_session_method_contracts_still_match() -> None:
     ]:
         assert hasattr(sync_sessions, method_name)
         assert hasattr(async_sessions, method_name)
+
+
+def test_create_session_params_mirror_create_session() -> None:
+    create = Client(api_key="hk-test", base_url="https://example.test").sessions.create_session
+
+    assert set(CreateSessionParams.__annotations__) == _params(create) - {"self", "request_options"}
 
 
 def test_message_request_body_still_has_message_field() -> None:

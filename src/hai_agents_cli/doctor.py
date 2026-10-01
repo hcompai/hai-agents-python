@@ -7,6 +7,7 @@ import socket
 import sys
 from dataclasses import dataclass
 
+from hai_agents.environment import HaiAgentsEnvironment
 from hai_agents_common import credentials
 
 DEFAULT_CHROME_DEBUG_PORT = 9222
@@ -32,7 +33,7 @@ def check_login(api_key: str | None) -> CheckResult:
 
 
 def check_platform(api_key: str | None, base_url: str | None) -> CheckResult:
-    endpoint = credentials.resolve_base_url(base_url) or "(SDK default)"
+    endpoint = credentials.resolve_base_url(base_url) or HaiAgentsEnvironment.EU.value
     try:
         client = credentials.make_client(api_key=api_key, base_url=base_url)
         client.agents.list_agents(page=1, size=1)

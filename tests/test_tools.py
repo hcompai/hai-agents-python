@@ -103,6 +103,14 @@ def _awaiting_changes(*calls):
     return SimpleNamespace(new_events=[event], answer=None)
 
 
+def test_wait_without_tools_stops_when_session_awaits_tool_results():
+    sessions = _FakeSessions(polls=[(_awaiting_changes(_pending("c1", "get_weather")), "awaiting_tool_results")])
+
+    result = wait_for_session(SimpleNamespace(sessions=sessions), "sess_1")
+
+    assert result.status == "awaiting_tool_results"
+
+
 def test_run_session_dispatches_pending_calls_and_posts_results():
     sessions = _FakeSessions(
         polls=[
