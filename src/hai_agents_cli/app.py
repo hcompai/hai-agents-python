@@ -86,14 +86,20 @@ def configure(
 def login(
     ctx: typer.Context,
     force: bool = typer.Option(False, "--force", help="Re-authenticate and rotate the stored key."),
+    email: str | None = typer.Option(
+        None,
+        "--email",
+        metavar="EMAIL",
+        help="Sign in with this email and a password (asked on a hidden prompt) instead of the browser.",
+    ),
     key: bool = typer.Option(
         False,
         "--key",
-        help=f"Store an existing API key (from {credentials.API_KEYS_PAGE}) instead of signing in through the browser. "
+        help=f"Store an existing API key (from {credentials.API_KEYS_PAGE}) instead of signing in. "
         "Reads it from a hidden prompt, or from stdin when piped.",
     ),
 ) -> None:
-    """Sign in through the browser and store an API key in ~/.config/hai/.env."""
+    """Sign in with Google in the browser or with email and password, and store an API key in ~/.config/hai/.env."""
     state = _state(ctx)
     if key:
         _store_pasted_key(state.base_url)
@@ -101,20 +107,44 @@ def login(
     if credentials.current_api_key() and not force:
         console.print("Already signed in. Pass --force to rotate the key.")
         return
-    if not sys.stdin.isatty():
-        _raise_cli_error(RuntimeError(f"login needs an interactive terminal and a browser. {auth.KEY_FALLBACK}"))
+    if not _interactive():
+        _raise_cli_error(RuntimeError(f"login needs an interactive terminal. {auth.KEY_FALLBACK}"))
 
+    portal = credentials.portal_base(state.base_url)
     label = f"hai CLI ({socket.gethostname()})"
     try:
-        minted = auth.login_and_mint(
-            credentials.portal_base(state.base_url),
-            label,
-            lambda url: console.print(f"Opening your browser. If it does not open, visit:\n  {url}", style="dim"),
-        )
+        if email is None:
+            email = _ask_sign_in_method()
+        if email is None:
+            minted = auth.login_and_mint(
+                portal,
+                label,
+                lambda url: console.print(f"Opening your browser. If it does not open, visit:\n  {url}", style="dim"),
+            )
+        else:
+            password = typer.prompt("Password", hide_input=True)
+            minted = auth.login_with_password(
+                portal, label, email, password, ask_code=lambda: typer.prompt("Authentication code")
+            )
     except Exception as exc:
         _raise_cli_error(exc)
-    path = credentials.save_api_key(minted)
-    console.print(f"Signed in. Wrote {credentials.API_KEY_VAR} to {path}.")
+    path = credentials.save_api_key(minted.key)
+    # Names only, never ids: a key minted into the wrong account must be visible at a glance.
+    where = f" in organization {escape(minted.organization)}" if minted.organization else ""
+    console.print(f"Signed in as {escape(minted.email)}{where}. Wrote {credentials.API_KEY_VAR} to {path}.")
+
+
+def _interactive() -> bool:
+    return sys.stdin.isatty()
+
+
+def _ask_sign_in_method() -> str | None:
+    """The email to sign in with, or None to sign in with Google in the browser."""
+    console.print("How do you sign in to H?\n  1. Google account, in your browser\n  2. Email and password")
+    choice = typer.prompt("Sign-in method", default="1").strip()
+    if choice == "2":
+        return typer.prompt("Email").strip()
+    return None
 
 
 def _store_pasted_key(base_url: str | None) -> None:

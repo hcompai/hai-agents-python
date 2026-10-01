@@ -305,7 +305,7 @@ hai sessions watch <session-id>
 hai mcp install
 ```
 
-`hai login` signs in through the browser with Google and stores a key in `~/.config/hai/.env`. Without a Google account or a browser, create a key at [platform.hcompany.ai/settings/api-keys](https://platform.hcompany.ai/settings/api-keys) and run `hai login --key`. `hai mcp install` adds the hai-agents MCP server to Cursor, VS Code, Claude Code, and other MCP clients. Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`, then `~/.config/hai/.env`. Run `hai --help` for the full command set.
+`hai login` signs in with Google in the browser or with email and password (`hai login --email you@example.com` skips the question) and stores a key in `~/.config/hai/.env`. To use a key you already created at [platform.hcompany.ai/settings/api-keys](https://platform.hcompany.ai/settings/api-keys), run `hai login --key`. `hai mcp install` adds the hai-agents MCP server to Cursor, VS Code, Claude Code, and other MCP clients. Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`, then `~/.config/hai/.env`. Run `hai --help` for the full command set.
 
 ## Documentation
 
