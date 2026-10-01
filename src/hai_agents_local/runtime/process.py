@@ -21,7 +21,9 @@ logger = logging.getLogger(__name__)
 LOOPBACK_HOST = "127.0.0.1"
 SPAWN_TIMEOUT_S = 45.0
 HEALTH_POLL_INTERVAL_S = 0.25
-TERM_GRACE_S = 2.0
+# Exceeds the runtime's own shutdown teardown (10 s), which releases cloud environments.
+TERM_GRACE_S = 15.0
+KILL_WAIT_S = 2.0
 LOG_TAIL_CHARS = 4000
 
 
@@ -155,6 +157,6 @@ def terminate(proc: subprocess.Popen) -> None:
         pass
     if _signal(proc, force=True):
         try:
-            proc.wait(timeout=TERM_GRACE_S)
+            proc.wait(timeout=KILL_WAIT_S)
         except subprocess.TimeoutExpired:
             logger.warning("hai-agent-runtime (pid %d) did not exit after forced kill", proc.pid)
