@@ -322,7 +322,7 @@ class LocalRuntime:
         Inheriting os.environ passes the model-gateway HAI_API_KEY / HAI_BASE_URL through to the
         binary (without them local sessions cannot run inference) and forwards caller flags such as
         HAI_AGENT_RUNTIME_MODEL/FAKE/FAST/RUNS_DIR. inherit_env=False takes spawn_env as the
-        complete base environment instead — for callers that must *remove* inherited keys, which an
+        complete base environment instead, for callers that must *remove* inherited keys, which an
         overlay cannot express (e.g. stripping HAI_API_KEY for self-hosted base URLs). The
         generated local bearer and the cloud HAI_API_KEY are different credentials: the token below
         is the only local bearer, and the cloud key is never used to authenticate against the local
