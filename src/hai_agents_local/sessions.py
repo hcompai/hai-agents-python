@@ -15,12 +15,14 @@ import typing
 import httpx
 
 from hai_agents.base_client import BaseClient
+from hai_agents.core.api_error import ApiError
+from hai_agents.core.request_options import RequestOptions
 from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
 
 from .bridge import LocalBridge, TokenSource
 from .config import auto_bridges_enabled
 from .killswitch import StopWatcher
-from .manager import ensure_bridges, stop_bridges
+from .manager import ensure_bridges, serving_bridges, stop_bridges
 from .routing import localize_agent
 
 if typing.TYPE_CHECKING:
@@ -209,6 +211,17 @@ def _cancel_sessions_at_exit() -> None:
 
 atexit.register(_cancel_sessions_at_exit)
 
+# The session already ended or is gone: nothing left to stop.
+STOPPED_CANCEL_STATUSES = frozenset({404, 409})
+
+
+def _live_sessions(owned_bridges: typing.Dict[str, typing.List[str]]) -> typing.List[str]:
+    """Forget sessions whose bridges all stopped, since each such stop already ended or cancelled its session."""
+    for session_id, bridge_ids in list(owned_bridges.items()):
+        if not serving_bridges(bridge_ids):
+            del owned_bridges[session_id]
+    return list(owned_bridges)
+
 
 class LocalSessionsClient(SessionsClient):
     def __init__(
@@ -222,26 +235,30 @@ class LocalSessionsClient(SessionsClient):
 
     def close(self) -> None:
         failures = []
-        for session_id in list(self._owned_bridges):
+        for session_id in _live_sessions(self._owned_bridges):
             try:
                 self.cancel_session(session_id)
+            except ApiError as error:
+                if error.status_code not in STOPPED_CANCEL_STATUSES:
+                    failures.append(error)
+                else:
+                    _deregister_exit_cancel(session_id)
             except Exception as error:
                 failures.append(error)
         if failures:
             raise RuntimeError("Could not confirm all client-owned sessions stopped") from failures[0]
 
-    def cancel_session(self, session_id: str, **kwargs: typing.Any) -> typing.Any:
+    def cancel_session(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         # Stop local execution even if the remote cancellation cannot be delivered.
-        owned = self._owned_bridges.get(str(session_id), [])
+        owned = self._owned_bridges.get(str(id), [])
         try:
             if owned:
                 stop_bridges(owned)
-                self._owned_bridges.pop(str(session_id), None)
+                self._owned_bridges.pop(str(id), None)
         finally:
-            response = super().cancel_session(session_id, **kwargs)
+            super().cancel_session(id, request_options=request_options)
         # Keep the exit retry registered until cancellation is confirmed.
-        _deregister_exit_cancel(str(session_id))
-        return response
+        _deregister_exit_cancel(str(id))
 
     @functools.wraps(SessionsClient.create_session)
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
@@ -283,24 +300,28 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
 
     async def aclose(self) -> None:
         failures = []
-        for session_id in list(self._owned_bridges):
+        for session_id in _live_sessions(self._owned_bridges):
             try:
                 await self.cancel_session(session_id)
+            except ApiError as error:
+                if error.status_code not in STOPPED_CANCEL_STATUSES:
+                    failures.append(error)
+                else:
+                    _deregister_exit_cancel(session_id)
             except Exception as error:
                 failures.append(error)
         if failures:
             raise RuntimeError("Could not confirm all client-owned sessions stopped") from failures[0]
 
-    async def cancel_session(self, session_id: str, **kwargs: typing.Any) -> typing.Any:
-        owned = self._owned_bridges.get(str(session_id), [])
+    async def cancel_session(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
+        owned = self._owned_bridges.get(str(id), [])
         try:
             if owned:
                 await asyncio.to_thread(stop_bridges, owned)
-                self._owned_bridges.pop(str(session_id), None)
+                self._owned_bridges.pop(str(id), None)
         finally:
-            response = await super().cancel_session(session_id, **kwargs)
-        _deregister_exit_cancel(str(session_id))
-        return response
+            await super().cancel_session(id, request_options=request_options)
+        _deregister_exit_cancel(str(id))
 
     @functools.wraps(AsyncSessionsClient.create_session)
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:

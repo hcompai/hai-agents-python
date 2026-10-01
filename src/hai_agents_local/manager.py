@@ -126,6 +126,11 @@ class BridgeManager:
             session_ids = list(self._runners)
         self.stop(session_ids)
 
+    def serving(self, session_ids: Sequence[str]) -> list[str]:
+        """The given bridges that are still running."""
+        with self._lock:
+            return [sid for sid in session_ids if sid in self._runners and self._runners[sid].thread.is_alive()]
+
 
 class _Runner:
     def __init__(self, bridge: LocalBridge) -> None:
@@ -181,6 +186,10 @@ atexit.register(_default_manager.stop_all)
 
 def ensure_bridges(bridges: Sequence[LocalBridge]) -> list[str]:
     return _default_manager.ensure(bridges)
+
+
+def serving_bridges(session_ids: Sequence[str]) -> list[str]:
+    return _default_manager.serving(session_ids)
 
 
 def stop_bridges(session_ids: Sequence[str] | None = None) -> None:

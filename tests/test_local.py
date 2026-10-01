@@ -1063,3 +1063,34 @@ async def test_failed_api_cancel_keeps_interpreter_exit_retry(monkeypatch, async
             await client.aclose()
         else:
             client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asynchronous", [False, True])
+async def test_close_cancels_only_sessions_still_served(monkeypatch, asynchronous):
+    from hai_agents import AsyncClient
+
+    cancelled = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        session_id = request.url.path.rsplit("/", 1)[1]
+        cancelled.append(session_id)
+        return httpx.Response(404 if session_id == "evicted" else 204)
+
+    monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", lambda ids: None)
+    monkeypatch.setattr(
+        "hai_agents_local.sessions.serving_bridges", lambda ids: [i for i in ids if i != "ended-bridge"]
+    )
+    transport = httpx.MockTransport(respond)
+    http = httpx.AsyncClient(transport=transport) if asynchronous else httpx.Client(transport=transport)
+    client = (AsyncClient if asynchronous else Client)(api_key=API_KEY, base_url="http://api.test", httpx_client=http)
+    sessions = client.sessions
+    sessions._owned_bridges = {"live": ["live-bridge"], "ended": ["ended-bridge"], "evicted": ["evicted-bridge"]}
+    if asynchronous:
+        await sessions.cancel_session(id="unbridged")
+        await sessions.aclose()
+    else:
+        sessions.cancel_session(id="unbridged")
+        sessions.close()
+    assert cancelled == ["unbridged", "live", "evicted"]
+    assert sessions._owned_bridges == {}
