@@ -232,6 +232,8 @@ class LocalSessionsClient(SessionsClient):
         self._auto_bridges = auto_bridges
         self._cancel_remote: RemoteCancel = functools.partial(_cancel_remote_session, client_wrapper, runtime)
         self._owned_bridges: typing.Dict[str, typing.List[str]] = {}
+        # Sessions this client created on a local runtime; they never keep that runtime alive past close().
+        self.own_session_ids: typing.Set[str] = set()
 
     def close(self) -> None:
         failures = []
@@ -283,6 +285,8 @@ class LocalSessionsClient(SessionsClient):
                     if stop_watcher is not None and not stop_watcher.active:
                         # A stop was filed while bridges or the session were starting; apply it now.
                         _panic_stop()
+        if self._runtime is not None:
+            self.own_session_ids.add(str(session.id))
         if started:
             self._owned_bridges[str(session.id)] = started
         return session
@@ -297,6 +301,8 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
         self._auto_bridges = auto_bridges
         self._cancel_remote: RemoteCancel = functools.partial(_cancel_remote_session, client_wrapper, runtime)
         self._owned_bridges: typing.Dict[str, typing.List[str]] = {}
+        # Sessions this client created on a local runtime; they never keep that runtime alive past close().
+        self.own_session_ids: typing.Set[str] = set()
 
     async def aclose(self) -> None:
         failures = []
@@ -350,6 +356,8 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
                     if stop_watcher is not None and not stop_watcher.active:
                         # A stop was filed while bridges or the session were starting; apply it now.
                         await asyncio.to_thread(_panic_stop)
+        if self._runtime is not None:
+            self.own_session_ids.add(str(session.id))
         if started:
             self._owned_bridges[str(session.id)] = started
         return session

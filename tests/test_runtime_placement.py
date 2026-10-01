@@ -107,6 +107,21 @@ class FakeRuntime:
         self.stopped = True
 
 
+def _owned_runtime(server, cache_dir, monkeypatch, stopped):
+    runtime = LocalRuntime(
+        base_url=f"http://127.0.0.1:{server.port}",
+        api_key=server.token,
+        pid=123,
+        version=None,
+        log_path=None,
+        owned=True,
+        cache_dir=cache_dir,
+        port=server.port,
+    )
+    monkeypatch.setattr(runtime, "shutdown", lambda: stopped.append(True))
+    return runtime
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("asynchronous", [False, True])
 async def test_local_client_without_auto_bridges_leaves_execution_to_the_product(monkeypatch, asynchronous):
@@ -190,18 +205,34 @@ def test_local_attach_rejects_remote_or_credential_urls(tmp_path, monkeypatch, u
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("asynchronous", [False, True])
-@pytest.mark.parametrize("borrowed", [False, True])
-async def test_client_close_releases_only_owned_runtime(monkeypatch, asynchronous, borrowed):
-    runtime = FakeRuntime()
+@pytest.mark.parametrize("runtime_use", ["borrowed", "idle", "shared"])
+async def test_close_stops_only_an_owned_runtime_no_other_client_uses(
+    tmp_path, monkeypatch, runtime_server, asynchronous, runtime_use
+):
+    from types import SimpleNamespace
+
+    from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
+
+    stopped = []
+    runtime_server.active = ["mine", "another-client-run"] if runtime_use == "shared" else ["mine"]
+    runtime = _owned_runtime(runtime_server, tmp_path, monkeypatch, stopped)
     monkeypatch.setattr(LocalRuntime, "ensure_started", lambda **options: runtime)
-    options = {"runtime": runtime} if borrowed else {}
+    monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kwargs: SimpleNamespace(id="mine"))
+
+    async def async_create(self, **kwargs):
+        return SimpleNamespace(id="mine")
+
+    monkeypatch.setattr(AsyncSessionsClient, "create_session", async_create)
+    options = {"runtime": runtime} if runtime_use == "borrowed" else {}
     if asynchronous:
-        client = await AsyncClient.local(**options)
+        client = await AsyncClient.local(auto_bridges=False, **options)
+        await client.sessions.create_session(agent="h/agent", messages="hi")
         await client.aclose()
     else:
-        client = Client.local(**options)
+        client = Client.local(auto_bridges=False, **options)
+        client.sessions.create_session(agent="h/agent", messages="hi")
         client.close()
-    assert runtime.stopped is (not borrowed)
+    assert stopped == ([True] if runtime_use == "idle" else [])
     assert client._client_wrapper.httpx_client.httpx_client.is_closed
 
 
@@ -220,30 +251,6 @@ def test_binary_resolution_does_not_hold_the_port_startup_lock(tmp_path, monkeyp
     monkeypatch.setattr(LocalRuntime, "_resolve_command", resolve)
     with pytest.raises(BinaryNotFoundError, match="candidate not installed"):
         LocalRuntime.ensure_started(cache_dir=tmp_path, port=18795)
-
-
-def _owned_runtime(server, cache_dir, monkeypatch, stopped):
-    runtime = LocalRuntime(
-        base_url=f"http://127.0.0.1:{server.port}",
-        api_key=server.token,
-        pid=123,
-        version=None,
-        log_path=None,
-        owned=True,
-        cache_dir=cache_dir,
-        port=server.port,
-    )
-    monkeypatch.setattr(runtime, "shutdown", lambda: stopped.append(True))
-    return runtime
-
-
-@pytest.mark.parametrize("active", [[], ["other-client-run"]])
-def test_idle_probe_stops_only_an_unused_runtime(tmp_path, monkeypatch, runtime_server, active):
-    stopped = []
-    runtime_server.active = list(active)
-    runtime = _owned_runtime(runtime_server, tmp_path, monkeypatch, stopped)
-    assert runtime.shutdown_if_idle() is (not active)
-    assert stopped == ([] if active else [True])
 
 
 @pytest.mark.asyncio

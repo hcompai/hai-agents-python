@@ -61,7 +61,7 @@ class Client(BaseClient):
         return client
 
     def close(self) -> None:
-        """Stop sessions this client bridged; a local client also releases its runtime and connections."""
+        """Stop sessions this client bridged; a local client also stops its runtime once no other client uses it."""
         try:
             if self._sessions is not None:
                 self._sessions.close()
@@ -69,7 +69,7 @@ class Client(BaseClient):
             if self.local_runtime is not None:
                 try:
                     if self._owns_runtime:
-                        self.local_runtime.shutdown()
+                        self.local_runtime.shutdown_if_idle(getattr(self._sessions, "own_session_ids", ()))
                 finally:
                     self._client_wrapper.httpx_client.httpx_client.close()
 
@@ -168,7 +168,7 @@ class AsyncClient(AsyncBaseClient):
         return client
 
     async def aclose(self) -> None:
-        """Stop sessions this client bridged; a local client also releases its runtime and connections."""
+        """Stop sessions this client bridged; a local client also stops its runtime once no other client uses it."""
         try:
             if self._sessions is not None:
                 await self._sessions.aclose()
@@ -176,7 +176,9 @@ class AsyncClient(AsyncBaseClient):
             if self.local_runtime is not None:
                 try:
                     if self._owns_runtime:
-                        await asyncio.to_thread(self.local_runtime.shutdown)
+                        await asyncio.to_thread(
+                            self.local_runtime.shutdown_if_idle, getattr(self._sessions, "own_session_ids", ())
+                        )
                 finally:
                     await self._client_wrapper.httpx_client.httpx_client.aclose()
 

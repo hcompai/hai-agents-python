@@ -111,8 +111,8 @@ does not by itself imply local inference:
 from `hai_agents_local.runtime`, selects a model endpoint for a newly started
 local runtime. Hosted agents do not currently accept that override.
 
-Closing the client shuts down a runtime it started; an attached runtime remains
-owned by its caller. `cancel()` ends the agent session. For a cloud workstation,
+Closing the client shuts down a runtime it started, unless sessions from other
+clients are still active there. An attached runtime remains owned by its caller. `cancel()` ends the agent session. For a cloud workstation,
 an explicit `session_id` attaches to a caller-owned environment, which the caller
 must eventually release. In the candidate shared recipe, automatically provisioned
 cloud workstations survive agent cancellation and expire through the environment

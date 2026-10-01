@@ -57,6 +57,7 @@ BASE_URL_ENV = "HAI_AGENT_LOCAL_BASE_URL"
 PORT_ENV = "HAI_AGENT_RUNTIME_PORT"
 AUTH_TOKEN_ENV = "HAI_AGENT_RUNTIME_API_TOKEN"
 CLIENT_TIMEOUT_S = 60.0
+IDLE_PROBE_PAGE_SIZE = 50
 
 _PathInput = typing.Union[str, "os.PathLike[str]"]
 
@@ -408,13 +409,21 @@ class LocalRuntime:
         "awaiting_tool_results",
     )
 
-    def shutdown_if_idle(self) -> bool:
-        """Stop the owned runtime only when it hosts no active sessions; True when it was stopped."""
+    def shutdown_if_idle(self, ignore: typing.Collection[str] = ()) -> bool:
+        """Stop the owned runtime unless it hosts an active session outside ``ignore``; True when it was stopped."""
         with self.http_client() as http:
-            client = BaseClient(base_url=self.base_url, api_key=self.api_key, httpx_client=http)
-            page = client.sessions.list_sessions(status=list(self.ACTIVE_SESSION_STATUSES), size=1)
-            if page.items:
-                return False
+            sessions = BaseClient(base_url=self.base_url, api_key=self.api_key, httpx_client=http).sessions
+            page, seen = 1, 0
+            while True:
+                listed = sessions.list_sessions(
+                    status=list(self.ACTIVE_SESSION_STATUSES), page=page, size=IDLE_PROBE_PAGE_SIZE
+                )
+                if any(item.id not in ignore for item in listed.items):
+                    return False
+                seen += len(listed.items)
+                if not listed.items or seen >= listed.total:
+                    break
+                page += 1
         self.shutdown()
         return True
 
