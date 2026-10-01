@@ -27,7 +27,7 @@ LOG_TAIL_CHARS = 4000
 def probe_health(base_url: str) -> typing.Optional[typing.Dict[str, typing.Any]]:
     """The /health JSON body on a 200 ({} for non-JSON bodies); None when unreachable/unhealthy."""
     try:
-        response = httpx.get(f"{base_url}/health", timeout=2.0)
+        response = httpx.get(f"{base_url}/health", timeout=2.0, trust_env=False)
     except httpx.HTTPError:
         return None
     if response.status_code != 200:

@@ -186,6 +186,7 @@ class LocalRuntime:
                     params={"size": 1},
                     timeout=2.0,
                     follow_redirects=False,
+                    trust_env=False,
                 )
                 if required_recipe is not None and payload.get("recipe") != required_recipe:
                     raise BinaryIncompatibleError(
@@ -281,6 +282,7 @@ class LocalRuntime:
                 params={"size": 1},
                 timeout=2.0,
                 follow_redirects=False,
+                trust_env=False,
             )
         except httpx.HTTPError as exc:
             raise LocalRuntimeError("runtime attachment failed authenticated session probe") from exc
@@ -367,11 +369,15 @@ class LocalRuntime:
 
     def http_client(self, timeout: typing.Optional[float] = None) -> httpx.Client:
         """An HTTP client for this runtime's API."""
-        return httpx.Client(timeout=CLIENT_TIMEOUT_S if timeout is None else timeout, follow_redirects=True)
+        return httpx.Client(
+            timeout=CLIENT_TIMEOUT_S if timeout is None else timeout, follow_redirects=True, trust_env=False
+        )
 
     def async_http_client(self, timeout: typing.Optional[float] = None) -> httpx.AsyncClient:
         """An asynchronous HTTP client for this runtime's API."""
-        return httpx.AsyncClient(timeout=CLIENT_TIMEOUT_S if timeout is None else timeout, follow_redirects=True)
+        return httpx.AsyncClient(
+            timeout=CLIENT_TIMEOUT_S if timeout is None else timeout, follow_redirects=True, trust_env=False
+        )
 
     def health(self) -> typing.Dict[str, typing.Any]:
         """The /health JSON body; raises RuntimeUnhealthyError when the runtime is not answering."""
