@@ -149,7 +149,12 @@ class LocalRuntime:
 
         resolved_port = port if port is not None else int(os.environ.get(PORT_ENV, "").strip() or DEFAULT_PORT)
         base_url = f"http://{LOOPBACK_HOST}:{resolved_port}"
-        attached = cls._attach(base_url=base_url, cache_dir=resolved_cache)
+        try:
+            attached = cls._attach(base_url=base_url, cache_dir=resolved_cache)
+        except LocalRuntimeError:
+            # A concurrent spawner publishes its token only after its child is proven; decide once it has.
+            with _startup_lock(resolved_cache, resolved_port, timeout_s):
+                attached = cls._attach(base_url=base_url, cache_dir=resolved_cache)
         if attached is not None:
             attached.require_recipe(required_recipe)
             return attached
@@ -177,14 +182,9 @@ class LocalRuntime:
                 (spawn_env or {}).get(AUTH_TOKEN_ENV, os.environ.get(AUTH_TOKEN_ENV, "") if inherit_env else "").strip()
             )
             token = explicit_token or secrets.token_urlsafe(32)
-            # Publish the token before the health wait so a client racing our probe can authenticate.
-            token_file = (
-                None
-                if explicit_token
-                else write_owner_only(token_file_path(resolved_port, cache_dir=resolved_cache), token)
-            )
             log_path = runtime_log_path(resolved_port, cache_dir=resolved_cache)
             proc = None
+            token_file = None
             try:
                 proc = spawn(
                     cmd,
@@ -201,6 +201,9 @@ class LocalRuntime:
                     )
                 if status != 200 or proc.poll() is not None:
                     raise RuntimeUnhealthyError("spawned runtime failed authenticated readiness probe")
+                # Published only once the child proved it owns the port, so another runtime's file is never replaced.
+                if not explicit_token:
+                    token_file = write_owner_only(token_file_path(resolved_port, cache_dir=resolved_cache), token)
                 pid_file = write_owner_only(pid_file_path(resolved_port, cache_dir=resolved_cache), str(proc.pid))
             except BaseException:
                 # Covers KeyboardInterrupt mid-spawn: never leak the child or its token file.

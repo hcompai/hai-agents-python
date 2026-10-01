@@ -311,6 +311,21 @@ def test_state_cleanup_waits_for_startup_and_preserves_replacement(tmp_path):
     assert token_file.read_text() == "replacement-token"
 
 
+def test_spawner_never_overwrites_the_live_runtime_token(tmp_path, monkeypatch, runtime_server):
+    import sys
+
+    token_file = write_owner_only(token_file_path(runtime_server.port, cache_dir=tmp_path), runtime_server.token)
+    monkeypatch.setattr(LocalRuntime, "_attach", lambda **kwargs: None)
+    with pytest.raises(LocalRuntimeError, match="is not the runtime"):
+        LocalRuntime.ensure_started(
+            command=[sys.executable, "-c", "import time; time.sleep(30)"],
+            cache_dir=tmp_path,
+            port=runtime_server.port,
+            timeout_s=5,
+        )
+    assert token_file.read_text() == runtime_server.token
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("asynchronous", [False, True])
 async def test_attached_runtime_with_another_recipe_is_rejected_and_left_running(asynchronous):
