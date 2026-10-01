@@ -20,6 +20,9 @@ from .killswitch import StopWatcher
 from .manager import ensure_bridges, stop_bridges
 from .routing import localize_agent
 
+if typing.TYPE_CHECKING:
+    from .runtime import LocalRuntime
+
 logger = logging.getLogger(__name__)
 
 # Runaway guards for sessions whose caller passes no budget: a local session left running (its
@@ -193,9 +196,17 @@ atexit.register(_cancel_sessions_at_exit)
 
 
 class LocalSessionsClient(SessionsClient):
+    def __init__(
+        self, *, client_wrapper: typing.Any, runtime: typing.Optional[LocalRuntime] = None, auto_bridges: bool = True
+    ) -> None:
+        super().__init__(client_wrapper=client_wrapper)
+        self._runtime = runtime
+        self._auto_bridges = auto_bridges
+        self._owned_bridges: typing.Dict[str, typing.List[str]] = {}
+
     def close(self) -> None:
         failures = []
-        for session_id in list(getattr(self, "_owned_bridges", {})):
+        for session_id in list(self._owned_bridges):
             try:
                 self.cancel_session(session_id)
             except Exception as error:
@@ -205,7 +216,7 @@ class LocalSessionsClient(SessionsClient):
 
     def cancel_session(self, session_id: str, **kwargs: typing.Any) -> typing.Any:
         # Stop local execution even if the remote cancellation cannot be delivered.
-        owned = getattr(self, "_owned_bridges", {}).get(str(session_id), [])
+        owned = self._owned_bridges.get(str(session_id), [])
         try:
             if owned:
                 stop_bridges(owned)
@@ -219,7 +230,7 @@ class LocalSessionsClient(SessionsClient):
     @functools.wraps(SessionsClient.create_session)
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
         wrapper = self._raw_client._client_wrapper
-        bridges = _localize(wrapper, kwargs)
+        bridges = _localize(wrapper, kwargs) if self._auto_bridges else []
         if bridges:
             _apply_runaway_budgets(kwargs)
         stop_watcher = _ensure_stop_watcher() if bridges else None
@@ -241,16 +252,22 @@ class LocalSessionsClient(SessionsClient):
                         # A stop was filed while bridges or the session were starting; apply it now.
                         _panic_stop()
         if started:
-            if not hasattr(self, "_owned_bridges"):
-                self._owned_bridges = {}
             self._owned_bridges[str(session.id)] = started
         return session
 
 
 class LocalAsyncSessionsClient(AsyncSessionsClient):
+    def __init__(
+        self, *, client_wrapper: typing.Any, runtime: typing.Optional[LocalRuntime] = None, auto_bridges: bool = True
+    ) -> None:
+        super().__init__(client_wrapper=client_wrapper)
+        self._runtime = runtime
+        self._auto_bridges = auto_bridges
+        self._owned_bridges: typing.Dict[str, typing.List[str]] = {}
+
     async def aclose(self) -> None:
         failures = []
-        for session_id in list(getattr(self, "_owned_bridges", {})):
+        for session_id in list(self._owned_bridges):
             try:
                 await self.cancel_session(session_id)
             except Exception as error:
@@ -259,7 +276,7 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
             raise RuntimeError("Could not confirm all client-owned sessions stopped") from failures[0]
 
     async def cancel_session(self, session_id: str, **kwargs: typing.Any) -> typing.Any:
-        owned = getattr(self, "_owned_bridges", {}).get(str(session_id), [])
+        owned = self._owned_bridges.get(str(session_id), [])
         try:
             if owned:
                 await asyncio.to_thread(stop_bridges, owned)
@@ -272,7 +289,7 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
     @functools.wraps(AsyncSessionsClient.create_session)
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:
         wrapper = self._raw_client._client_wrapper
-        bridges = _localize(wrapper, kwargs)
+        bridges = _localize(wrapper, kwargs) if self._auto_bridges else []
         if bridges:
             _apply_runaway_budgets(kwargs)
         # Native permission prompts must run before bridge startup moves to a worker.
@@ -298,7 +315,5 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
                         # A stop was filed while bridges or the session were starting; apply it now.
                         await asyncio.to_thread(_panic_stop)
         if started:
-            if not hasattr(self, "_owned_bridges"):
-                self._owned_bridges = {}
             self._owned_bridges[str(session.id)] = started
         return session

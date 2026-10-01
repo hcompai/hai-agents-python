@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from hai_agents.local.state import pid_file_path, write_owner_only
+from hai_agents_local.runtime.state import pid_file_path, write_owner_only
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX file-mode semantics")

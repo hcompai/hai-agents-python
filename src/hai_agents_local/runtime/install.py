@@ -1,8 +1,7 @@
 """Verified download and atomic install of the hai-agent-runtime binary.
 
-Port of holo_desktop.agent_client.runtime_install with the TTY prompt and rich
-progress removed: the SDK is a library, so consent is the caller's
-``download=True`` and progress is plain logging.
+The SDK is a library, so consent is the caller's ``download=True`` and progress
+is plain logging.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Inference placement, independent of agent and environment placement."""
+"""Inference placement for a local agent runtime, independent of environment placement."""
 
 from __future__ import annotations
 

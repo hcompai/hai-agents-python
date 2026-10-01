@@ -3,16 +3,60 @@
 import httpx
 import pytest
 
-from hai_agents import AsyncClient, Client, Inference
-from hai_agents.local.errors import BinaryIncompatibleError, LocalRuntimeError
-from hai_agents.local.runtime import LocalRuntime
-from hai_agents.local.state import token_file_path, write_owner_only
-from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
+from hai_agents import AsyncClient, Client
+from hai_agents_local.runtime import BinaryIncompatibleError, Inference, LocalRuntime, LocalRuntimeError
+from hai_agents_local.runtime.state import token_file_path, write_owner_only
 
 
-def test_both_clients_respect_product_owned_execution():
-    assert type(Client(api_key="test", auto_bridges=False).sessions) is SessionsClient
-    assert type(AsyncClient(api_key="test", auto_bridges=False).sessions) is AsyncSessionsClient
+class FakeRuntime:
+    base_url = "http://127.0.0.1:18795"
+    api_key = "local-token"
+    owned = True
+
+    def __init__(self):
+        self.stopped = False
+
+    def require_recipe(self, recipe):
+        assert recipe == "shared"
+
+    def http_client(self, timeout=None):
+        return httpx.Client()
+
+    def async_http_client(self, timeout=None):
+        return httpx.AsyncClient()
+
+    def shutdown(self):
+        self.stopped = True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asynchronous", [False, True])
+async def test_local_client_without_auto_bridges_leaves_execution_to_the_product(monkeypatch, asynchronous):
+    from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
+
+    monkeypatch.setenv("HAI_AUTO_BRIDGE", "1")
+    served = []
+    monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: served.extend(bridges) or [])
+    requested = []
+
+    def create(self, **kwargs):
+        requested.append(kwargs)
+        return type("Session", (), {"id": "run"})()
+
+    async def async_create(self, **kwargs):
+        return create(self, **kwargs)
+
+    monkeypatch.setattr(SessionsClient, "create_session", create)
+    monkeypatch.setattr(AsyncSessionsClient, "create_session", async_create)
+    agent = {"name": "qa", "environments": [{"id": "desktop", "kind": "desktop", "host": "user_device"}]}
+    if asynchronous:
+        async with await AsyncClient.local(runtime=FakeRuntime(), auto_bridges=False) as client:
+            await client.sessions.create_session(agent=agent, messages="test")
+    else:
+        with Client.local(runtime=FakeRuntime(), auto_bridges=False) as client:
+            client.sessions.create_session(agent=agent, messages="test")
+    assert served == []
+    assert requested[0]["agent"] == agent
 
 
 def test_self_hosted_inference_does_not_receive_hosted_key(monkeypatch):
@@ -26,7 +70,7 @@ def test_self_hosted_inference_does_not_receive_hosted_key(monkeypatch):
 
 @pytest.mark.parametrize("probe_error", [None, httpx.ConnectError("offline"), httpx.ReadTimeout("timeout")])
 def test_attachment_authenticates_and_checks_recipe_before_use(tmp_path, monkeypatch, probe_error):
-    from hai_agents.local import runtime as module
+    from hai_agents_local.runtime import runtime as module
 
     write_owner_only(token_file_path(18795, cache_dir=tmp_path), "local-token")
     monkeypatch.delenv("HAI_AGENT_RUNTIME_API_TOKEN", raising=False)
@@ -66,41 +110,23 @@ def test_local_attach_rejects_remote_or_credential_urls(tmp_path, monkeypatch, u
 @pytest.mark.asyncio
 @pytest.mark.parametrize("asynchronous", [False, True])
 @pytest.mark.parametrize("borrowed", [False, True])
-async def test_client_close_releases_only_owned_runtime_and_http(monkeypatch, asynchronous, borrowed):
-    class Runtime:
-        base_url = "http://127.0.0.1:18795"
-        api_key = "local-token"
-        owned = True
-        stopped = False
-
-        def require_recipe(self, recipe):
-            assert recipe == "shared"
-
-        def shutdown(self):
-            self.stopped = True
-
-    runtime = Runtime()
+async def test_client_close_releases_only_owned_runtime(monkeypatch, asynchronous, borrowed):
+    runtime = FakeRuntime()
     monkeypatch.setattr(LocalRuntime, "ensure_started", lambda **options: runtime)
-    http = httpx.AsyncClient() if asynchronous else httpx.Client()
-    client_type = AsyncClient if asynchronous else Client
-    options = {"runtime": runtime, "httpx_client": http} if borrowed else {}
-    client = await AsyncClient.local() if asynchronous and not borrowed else client_type(mode="local", **options)
+    options = {"runtime": runtime} if borrowed else {}
     if asynchronous:
+        client = await AsyncClient.local(**options)
         await client.aclose()
     else:
+        client = Client.local(**options)
         client.close()
     assert runtime.stopped is (not borrowed)
-    if borrowed:
-        assert not http.is_closed
-    if asynchronous:
-        await http.aclose()
-    else:
-        http.close()
+    assert client._client_wrapper.httpx_client.httpx_client.is_closed
 
 
 def test_binary_resolution_does_not_hold_the_port_startup_lock(tmp_path, monkeypatch):
-    from hai_agents.local import runtime as module
-    from hai_agents.local.errors import BinaryNotFoundError
+    from hai_agents_local.runtime import BinaryNotFoundError
+    from hai_agents_local.runtime import runtime as module
 
     monkeypatch.delenv("HAI_AGENT_LOCAL_BASE_URL", raising=False)
     monkeypatch.setattr(LocalRuntime, "_attach", lambda **kwargs: None)
@@ -190,7 +216,7 @@ def test_state_cleanup_waits_for_startup_and_preserves_replacement(tmp_path):
     import threading
     from concurrent.futures import ThreadPoolExecutor
 
-    from hai_agents.local import runtime as module
+    from hai_agents_local.runtime import runtime as module
 
     token_file = write_owner_only(token_file_path(18795, cache_dir=tmp_path), "old-token")
     runtime = LocalRuntime(
@@ -223,25 +249,15 @@ def test_state_cleanup_waits_for_startup_and_preserves_replacement(tmp_path):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("asynchronous", [False, True])
-@pytest.mark.parametrize("borrowed", [False, True])
-async def test_failed_client_recipe_check_releases_only_started_runtime(monkeypatch, asynchronous, borrowed):
-    stopped = []
-
-    class Runtime:
-        owned = True
-
+async def test_attached_runtime_with_another_recipe_is_rejected_and_left_running(asynchronous):
+    class Runtime(FakeRuntime):
         def require_recipe(self, recipe):
             raise BinaryIncompatibleError("recipe changed")
 
-        def shutdown(self):
-            stopped.append(True)
-
     runtime = Runtime()
-    monkeypatch.setattr(LocalRuntime, "ensure_started", lambda **options: runtime)
     with pytest.raises(BinaryIncompatibleError, match="recipe changed"):
-        if asynchronous and not borrowed:
-            await AsyncClient.local()
+        if asynchronous:
+            await AsyncClient.local(runtime=runtime)
         else:
-            client_type = AsyncClient if asynchronous else Client
-            client_type(mode="local", **({"runtime": runtime} if borrowed else {}))
-    assert stopped == ([] if borrowed else [True])
+            Client.local(runtime=runtime)
+    assert not runtime.stopped

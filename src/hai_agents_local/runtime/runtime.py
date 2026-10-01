@@ -17,6 +17,8 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from hai_agents.base_client import BaseClient
+
 from .errors import (
     BinaryIncompatibleError,
     BinaryNotFoundError,
@@ -52,6 +54,7 @@ BINARY_VERSION_ENV = "HAI_AGENT_LOCAL_BINARY_VERSION"
 BASE_URL_ENV = "HAI_AGENT_LOCAL_BASE_URL"
 PORT_ENV = "HAI_AGENT_RUNTIME_PORT"
 AUTH_TOKEN_ENV = "HAI_AGENT_RUNTIME_API_TOKEN"
+CLIENT_TIMEOUT_S = 60.0
 
 _PathInput = typing.Union[str, "os.PathLike[str]"]
 
@@ -312,7 +315,7 @@ class LocalRuntime:
         binary (without them local sessions cannot run inference) and forwards caller flags such as
         HAI_AGENT_RUNTIME_MODEL/FAKE/FAST/RUNS_DIR. inherit_env=False takes spawn_env as the
         complete base environment instead — for callers that must *remove* inherited keys, which an
-        overlay cannot express (HoloDesktop strips HAI_API_KEY for self-hosted base URLs). The
+        overlay cannot express (e.g. stripping HAI_API_KEY for self-hosted base URLs). The
         generated local bearer and the cloud HAI_API_KEY are different credentials: the token below
         is the only local bearer, and the cloud key is never used to authenticate against the local
         runtime. Port and token are set last in both modes so caller input never clobbers them.
@@ -362,6 +365,14 @@ class LocalRuntime:
         logger.info("resolved hai-agent-runtime from fresh download v%s: %s", pinned, installed)
         return [str(installed)]
 
+    def http_client(self, timeout: typing.Optional[float] = None) -> httpx.Client:
+        """An HTTP client for this runtime's API."""
+        return httpx.Client(timeout=CLIENT_TIMEOUT_S if timeout is None else timeout, follow_redirects=True)
+
+    def async_http_client(self, timeout: typing.Optional[float] = None) -> httpx.AsyncClient:
+        """An asynchronous HTTP client for this runtime's API."""
+        return httpx.AsyncClient(timeout=CLIENT_TIMEOUT_S if timeout is None else timeout, follow_redirects=True)
+
     def health(self) -> typing.Dict[str, typing.Any]:
         """The /health JSON body; raises RuntimeUnhealthyError when the runtime is not answering."""
         payload = probe_health(self.base_url)
@@ -388,9 +399,8 @@ class LocalRuntime:
 
     def shutdown_if_idle(self) -> bool:
         """Stop the owned runtime only when it hosts no active sessions; True when it was stopped."""
-        from ..client import Client  # runtime-time import: client.py imports this module lazily too
-
-        with Client(base_url=self.base_url, api_key=self.api_key, auto_bridges=False) as client:
+        with self.http_client() as http:
+            client = BaseClient(base_url=self.base_url, api_key=self.api_key, httpx_client=http)
             page = client.sessions.list_sessions(status=list(self.ACTIVE_SESSION_STATUSES), size=1)
             if page.items:
                 return False

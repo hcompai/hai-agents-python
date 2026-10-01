@@ -3,7 +3,7 @@
 A spawner persists the generated bearer token and the runtime pid under the SDK
 cache dir so a second process can attach (token) or force-kill (pid) without any
 IPC. Both files drive privileged actions, so they are 0600 from the first byte
-and refuse pre-planted symlinks (port of holo_desktop launcher._write_owner_only).
+and refuse pre-planted symlinks.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import typing
 
 CACHE_DIR_ENV = "HAI_AGENT_LOCAL_CACHE_DIR"
 DEFAULT_CACHE_DIR = pathlib.Path.home() / ".hai" / "agent-runtime"
-# HoloDesktop's AGENT_API_DEFAULT_PORT: the shared well-known local runtime port.
+# The shared well-known local runtime port.
 DEFAULT_PORT = 18795
 
 _PathInput = typing.Union[str, "os.PathLike[str]"]

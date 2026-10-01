@@ -8,13 +8,11 @@ subclasses add the object-oriented sugar (``run_session``, ``start_session``,
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import typing
 
 import typing_extensions
 
 from .base_client import AsyncBaseClient, BaseClient
-from .inference import Inference
 from .polling import (
     AnswerT,
     AsyncSessionHandle,
@@ -30,74 +28,52 @@ from .polling import run_session as _run_session
 from .sessions.client import AsyncSessionsClient, SessionsClient
 from .tools import ToolInput, as_tools
 
+if typing.TYPE_CHECKING:
+    from hai_agents_local.runtime import Inference, LocalRuntime
+
 
 class Client(BaseClient):
-    def __init__(
-        self,
-        *,
-        mode: typing.Literal["local", "remote"] = "remote",
-        inference: typing.Optional[Inference] = None,
-        auto_bridges: bool = True,
-        runtime: typing.Any = None,
-        local_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
-        **kwargs: typing.Any,
-    ) -> None:
-        if mode not in {"local", "remote"}:
-            raise ValueError("mode must be local or remote")
-        self._auto_bridges = auto_bridges
-        self.mode = mode
-        self.local_runtime = None
-        self._owns_runtime = mode == "local" and runtime is None
-        self._owns_http = kwargs.get("httpx_client") is None
-        if mode == "remote":
-            if runtime is not None or local_options is not None:
-                raise ValueError("runtime and local_options require mode='local'")
-            if inference is not None and inference.base_url is not None:
-                raise ValueError("self-hosted inference currently requires a local agent")
-        else:
-            if "base_url" in kwargs or "api_key" in kwargs:
-                raise ValueError(
-                    "local API credentials come from runtime; pass inference credentials via local_options"
-                )
-            if runtime is not None and (local_options is not None or inference is not None):
-                raise ValueError("an attached runtime owns its inference and launch configuration")
-            if runtime is None:
-                from .local.runtime import LocalRuntime
+    local_runtime: typing.Optional[LocalRuntime] = None
+    _owns_runtime = False
+    _auto_bridges = True
 
-                options = dict(local_options or {})
-                options["required_recipe"] = "shared"
-                options["spawn_env"] = {"HAI_AGENT_RUNTIME_RECIPE": "shared", **options.get("spawn_env", {})}
-                if inference is not None:
-                    options["spawn_env"] = inference.runtime_env(options.get("spawn_env"))
-                    options["inherit_env"] = False
-                runtime = LocalRuntime.ensure_started(**options)
-            if inference is not None and not runtime.owned:
-                raise ValueError("inference selection cannot reconfigure an existing runtime; choose a free local port")
-            self.local_runtime = runtime
+    @classmethod
+    def local(
+        cls,
+        *,
+        runtime: typing.Optional[LocalRuntime] = None,
+        inference: typing.Optional[Inference] = None,
+        local_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        auto_bridges: bool = True,
+        timeout: typing.Optional[float] = None,
+    ) -> Client:
+        """A client on a local agent runtime: ``runtime`` if given, else one this client starts and owns."""
+        from hai_agents_local.runtime import acquire_runtime
+
+        runtime, owned = acquire_runtime(runtime, inference=inference, local_options=local_options)
         try:
-            if self.local_runtime is not None:
-                self.local_runtime.require_recipe("shared")
-                kwargs.update(base_url=self.local_runtime.base_url, api_key=self.local_runtime.api_key)
-            super().__init__(**kwargs)
+            client = cls(base_url=runtime.base_url, api_key=runtime.api_key, httpx_client=runtime.http_client(timeout))
         except BaseException:
-            if self._owns_runtime and self.local_runtime is not None and self.local_runtime.owned:
-                self.local_runtime.shutdown()
+            if owned:
+                runtime.shutdown()
             raise
+        client.local_runtime, client._owns_runtime, client._auto_bridges = runtime, owned, auto_bridges
+        return client
 
     def close(self) -> None:
-        """Release this client's connections and any runtime it started; borrowed runtimes stay alive."""
+        """Stop sessions this client bridged; a local client also releases its runtime and connections."""
         try:
-            if self._sessions is not None and hasattr(self._sessions, "close"):
+            if self._sessions is not None:
                 self._sessions.close()
         finally:
-            try:
-                if self._owns_runtime and self.local_runtime is not None and self.local_runtime.owned:
-                    self.local_runtime.shutdown()
-            finally:
-                if self._owns_http:
+            if self.local_runtime is not None:
+                try:
+                    if self._owns_runtime:
+                        self.local_runtime.shutdown()
+                finally:
                     self._client_wrapper.httpx_client.httpx_client.close()
 
-    def __enter__(self) -> "Client":
+    def __enter__(self) -> Client:
         return self
 
     def __exit__(self, *exc: typing.Any) -> None:
@@ -152,109 +128,59 @@ class Client(BaseClient):
 
     @property
     def sessions(self) -> SessionsClient:
-        if not self._auto_bridges:
-            return super().sessions
         if self._sessions is None:
             from hai_agents_local.sessions import LocalSessionsClient
 
-            self._sessions = LocalSessionsClient(client_wrapper=self._client_wrapper)
+            self._sessions = LocalSessionsClient(
+                client_wrapper=self._client_wrapper, runtime=self.local_runtime, auto_bridges=self._auto_bridges
+            )
         return self._sessions
 
 
 class AsyncClient(AsyncBaseClient):
-    def __init__(
-        self,
-        *,
-        mode: typing.Literal["local", "remote"] = "remote",
-        inference: typing.Optional[Inference] = None,
-        auto_bridges: bool = True,
-        runtime: typing.Any = None,
-        local_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
-        **kwargs: typing.Any,
-    ) -> None:
-        if mode not in {"local", "remote"}:
-            raise ValueError("mode must be local or remote")
-        self._auto_bridges = auto_bridges
-        self.mode = mode
-        self.local_runtime = None
-        self._owns_runtime = mode == "local" and runtime is None
-        self._owns_http = kwargs.get("httpx_client") is None
-        if mode == "remote":
-            if runtime is not None or local_options is not None:
-                raise ValueError("runtime and local_options require mode='local'")
-            if inference is not None and inference.base_url is not None:
-                raise ValueError("self-hosted inference currently requires a local agent")
-        else:
-            if "base_url" in kwargs or "api_key" in kwargs:
-                raise ValueError(
-                    "local API credentials come from runtime; pass inference credentials via local_options"
-                )
-            if runtime is not None and (local_options is not None or inference is not None):
-                raise ValueError("an attached runtime owns its inference and launch configuration")
-            if runtime is None:
-                raise ValueError("Use await AsyncClient.local() to start a runtime without blocking the event loop")
-            if inference is not None and not runtime.owned:
-                raise ValueError("inference selection cannot reconfigure an existing runtime; choose a free local port")
-            self.local_runtime = runtime
-        try:
-            if self.local_runtime is not None:
-                self.local_runtime.require_recipe("shared")
-                kwargs.update(base_url=self.local_runtime.base_url, api_key=self.local_runtime.api_key)
-            super().__init__(**kwargs)
-        except BaseException:
-            if self._owns_runtime and self.local_runtime is not None and self.local_runtime.owned:
-                self.local_runtime.shutdown()
-            raise
+    local_runtime: typing.Optional[LocalRuntime] = None
+    _owns_runtime = False
+    _auto_bridges = True
 
     @classmethod
     async def local(
         cls,
         *,
+        runtime: typing.Optional[LocalRuntime] = None,
         inference: typing.Optional[Inference] = None,
         local_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
-        **kwargs: typing.Any,
-    ) -> "AsyncClient":
-        """Start or attach off the event loop; the returned client owns any runtime it starts."""
-        from .local.runtime import LocalRuntime
+        auto_bridges: bool = True,
+        timeout: typing.Optional[float] = None,
+    ) -> AsyncClient:
+        """A client on a local agent runtime: ``runtime`` if given, else one this client starts and owns."""
+        from hai_agents_local.runtime import acquire_runtime_async
 
-        options = dict(local_options or {})
-        options["required_recipe"] = "shared"
-        options["spawn_env"] = {"HAI_AGENT_RUNTIME_RECIPE": "shared", **options.get("spawn_env", {})}
-        if inference is not None:
-            options["spawn_env"] = inference.runtime_env(options.get("spawn_env"))
-            options["inherit_env"] = False
-        runtime = await LocalRuntime.ensure_started_async(**options)
-        construction = None
+        runtime, owned = await acquire_runtime_async(runtime, inference=inference, local_options=local_options)
         try:
-            if inference is not None and not runtime.owned:
-                raise ValueError("inference selection cannot reconfigure an existing runtime; choose a free local port")
-            construction = asyncio.create_task(asyncio.to_thread(cls, mode="local", runtime=runtime, **kwargs))
-            client = await asyncio.shield(construction)
-            client._owns_runtime = True
-            return client
+            client = cls(
+                base_url=runtime.base_url, api_key=runtime.api_key, httpx_client=runtime.async_http_client(timeout)
+            )
         except BaseException:
-            if construction is not None:
-                with contextlib.suppress(Exception):
-                    client = await construction
-                    await client.aclose()
-            if runtime.owned:
+            if owned:
                 await asyncio.to_thread(runtime.shutdown)
             raise
+        client.local_runtime, client._owns_runtime, client._auto_bridges = runtime, owned, auto_bridges
+        return client
 
     async def aclose(self) -> None:
-        """Release this client's connections and any runtime it started; borrowed runtimes stay alive."""
+        """Stop sessions this client bridged; a local client also releases its runtime and connections."""
         try:
-            if self._sessions is not None and hasattr(self._sessions, "aclose"):
+            if self._sessions is not None:
                 await self._sessions.aclose()
         finally:
-            try:
-                if self._owns_runtime and self.local_runtime is not None and self.local_runtime.owned:
-                    await asyncio.to_thread(self.local_runtime.shutdown)
-            finally:
-                if self._owns_http:
+            if self.local_runtime is not None:
+                try:
+                    if self._owns_runtime:
+                        await asyncio.to_thread(self.local_runtime.shutdown)
+                finally:
                     await self._client_wrapper.httpx_client.httpx_client.aclose()
 
-    async def __aenter__(self) -> "AsyncClient":
+    async def __aenter__(self) -> AsyncClient:
         return self
 
     async def __aexit__(self, *exc: typing.Any) -> None:
@@ -309,10 +235,10 @@ class AsyncClient(AsyncBaseClient):
 
     @property
     def sessions(self) -> AsyncSessionsClient:
-        if not self._auto_bridges:
-            return super().sessions
         if self._sessions is None:
             from hai_agents_local.sessions import LocalAsyncSessionsClient
 
-            self._sessions = LocalAsyncSessionsClient(client_wrapper=self._client_wrapper)
+            self._sessions = LocalAsyncSessionsClient(
+                client_wrapper=self._client_wrapper, runtime=self.local_runtime, auto_bridges=self._auto_bridges
+            )
         return self._sessions

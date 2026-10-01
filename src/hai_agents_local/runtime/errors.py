@@ -1,4 +1,4 @@
-"""Error types for hai_agents.local."""
+"""Error types for hai_agents_local.runtime."""
 
 from __future__ import annotations
 
