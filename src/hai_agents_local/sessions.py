@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import atexit
 import concurrent.futures
+import contextlib
 import functools
 import inspect
 import json
@@ -225,15 +226,32 @@ atexit.register(_cancel_sessions_at_exit)
 STOPPED_CANCEL_STATUSES = frozenset({404, 409})
 
 
-def _live_sessions(owned_bridges: typing.Dict[str, typing.List[str]]) -> typing.List[str]:
-    """Forget sessions whose bridges all stopped, since each such stop already ended or cancelled its session."""
-    for session_id, bridge_ids in list(owned_bridges.items()):
-        if not serving_bridges(bridge_ids):
-            del owned_bridges[session_id]
-    return list(owned_bridges)
+class _CloseFailures:
+    """Cancel errors collected while closing; a session that already ended is not a failure."""
+
+    def __init__(self) -> None:
+        self._errors: typing.List[Exception] = []
+
+    @contextlib.contextmanager
+    def cancelling(self, session_id: str) -> typing.Iterator[None]:
+        try:
+            yield
+        except ApiError as error:
+            if error.status_code not in STOPPED_CANCEL_STATUSES:
+                self._errors.append(error)
+            else:
+                _deregister_exit_cancel(session_id)
+        except Exception as error:
+            self._errors.append(error)
+
+    def raise_any(self) -> None:
+        if self._errors:
+            raise RuntimeError("Could not confirm all client-owned sessions stopped") from self._errors[0]
 
 
-class LocalSessionsClient(SessionsClient):
+class _LocalSessionsState:
+    """Bridge and session bookkeeping shared by the sync and async local sessions clients."""
+
     def __init__(
         self, *, client_wrapper: typing.Any, runtime: typing.Optional[LocalRuntime] = None, auto_bridges: bool = True
     ) -> None:
@@ -245,20 +263,27 @@ class LocalSessionsClient(SessionsClient):
         # Sessions this client created on a local runtime; they never keep that runtime alive past close().
         self.own_session_ids: typing.Set[str] = set()
 
+    def _live_sessions(self) -> typing.List[str]:
+        """Forget sessions whose bridges all stopped, since each such stop already ended or cancelled its session."""
+        for session_id, bridge_ids in list(self._owned_bridges.items()):
+            if not serving_bridges(bridge_ids):
+                del self._owned_bridges[session_id]
+        return list(self._owned_bridges)
+
+    def _track(self, session: typing.Any, started: typing.List[str]) -> None:
+        if self._runtime is not None:
+            self.own_session_ids.add(str(session.id))
+        if started:
+            self._owned_bridges[str(session.id)] = started
+
+
+class LocalSessionsClient(_LocalSessionsState, SessionsClient):
     def close(self) -> None:
-        failures = []
-        for session_id in _live_sessions(self._owned_bridges):
-            try:
+        failures = _CloseFailures()
+        for session_id in self._live_sessions():
+            with failures.cancelling(session_id):
                 self.cancel_session(session_id)
-            except ApiError as error:
-                if error.status_code not in STOPPED_CANCEL_STATUSES:
-                    failures.append(error)
-                else:
-                    _deregister_exit_cancel(session_id)
-            except Exception as error:
-                failures.append(error)
-        if failures:
-            raise RuntimeError("Could not confirm all client-owned sessions stopped") from failures[0]
+        failures.raise_any()
 
     def cancel_session(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         # Stop local execution even if the remote cancellation cannot be delivered.
@@ -295,39 +320,17 @@ class LocalSessionsClient(SessionsClient):
                     if stop_watcher is not None and not stop_watcher.active:
                         # A stop was filed while bridges or the session were starting; apply it now.
                         _panic_stop()
-        if self._runtime is not None:
-            self.own_session_ids.add(str(session.id))
-        if started:
-            self._owned_bridges[str(session.id)] = started
+        self._track(session, started)
         return session
 
 
-class LocalAsyncSessionsClient(AsyncSessionsClient):
-    def __init__(
-        self, *, client_wrapper: typing.Any, runtime: typing.Optional[LocalRuntime] = None, auto_bridges: bool = True
-    ) -> None:
-        super().__init__(client_wrapper=client_wrapper)
-        self._runtime = runtime
-        self._auto_bridges = auto_bridges
-        self._cancel_remote: RemoteCancel = functools.partial(_cancel_remote_session, client_wrapper, runtime)
-        self._owned_bridges: typing.Dict[str, typing.List[str]] = {}
-        # Sessions this client created on a local runtime; they never keep that runtime alive past close().
-        self.own_session_ids: typing.Set[str] = set()
-
+class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
     async def aclose(self) -> None:
-        failures = []
-        for session_id in _live_sessions(self._owned_bridges):
-            try:
+        failures = _CloseFailures()
+        for session_id in self._live_sessions():
+            with failures.cancelling(session_id):
                 await self.cancel_session(session_id)
-            except ApiError as error:
-                if error.status_code not in STOPPED_CANCEL_STATUSES:
-                    failures.append(error)
-                else:
-                    _deregister_exit_cancel(session_id)
-            except Exception as error:
-                failures.append(error)
-        if failures:
-            raise RuntimeError("Could not confirm all client-owned sessions stopped") from failures[0]
+        failures.raise_any()
 
     async def cancel_session(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         owned = self._owned_bridges.get(str(id), [])
@@ -366,8 +369,5 @@ class LocalAsyncSessionsClient(AsyncSessionsClient):
                     if stop_watcher is not None and not stop_watcher.active:
                         # A stop was filed while bridges or the session were starting; apply it now.
                         await asyncio.to_thread(_panic_stop)
-        if self._runtime is not None:
-            self.own_session_ids.add(str(session.id))
-        if started:
-            self._owned_bridges[str(session.id)] = started
+        self._track(session, started)
         return session
