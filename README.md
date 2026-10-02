@@ -67,25 +67,17 @@ print(result.answer)
 
 `result` is a `SessionRunResult`: `id`, `status`, `answer`, the accumulated `events`, and `final_changes`.
 
-## Candidate local-agent support
+## Local agents
 
-`Client.local()` and `await AsyncClient.local()` start a local agent runtime or,
-with `runtime=...`, use an already prepared one.
-Agent placement and environment placement are separate: the client
-selects where the agent runs; each agent environment selects `host="user_device"`
-or `host="cloud"`. `Client()` continues to use the hosted Agents API.
-
-For development, install the candidate SDK and use a prepared HAI source checkout:
+`Client.local()` and `await AsyncClient.local()` run the agent on this machine through a local agent runtime,
+started on demand or passed in with `runtime=...`. Each environment picks `host="user_device"` or `host="cloud"`.
+`Client()` keeps using the hosted Agents API. Closing the client stops a runtime it started, unless other clients still
+have active sessions there.
 
 ```python
 from hai_agents import Client
 
-with Client.local(
-    local_options={
-        "command": ["/path/to/hai/.venv/bin/python", "-m", "hai_agent_runtime"],
-        "download": False,
-    },
-) as client:
+with Client.local(local_options={"binary_path": "/path/to/hai-agent-runtime"}) as client:
     session = client.sessions.create_session(
         agent={
             "name": "local-example",
@@ -102,40 +94,8 @@ with Client.local(
     # Poll or steer the session here, before leaving the client context.
 ```
 
-The source runtime must support the `shared` recipe. The current pinned binary
-0.1.8 does not; candidate source or an explicitly supplied compatible
-`local_options["binary_path"]` is required until a compatible release is pinned.
-The runtime inherits `HAI_API_KEY` for hosted inference. Local agent execution
-does not by itself imply local inference:
-`Client.local(inference=Inference.self_hosted(url, model=...))`, with `Inference`
-from `hai_agents_local.runtime`, selects a model endpoint for a newly started
-local runtime. Hosted agents do not currently accept that override.
-
-Closing the client shuts down a runtime it started, unless sessions from other
-clients are still active there. An attached runtime remains owned by its caller. `cancel()` ends the agent session. For a cloud workstation,
-an explicit `session_id` attaches to a caller-owned environment, which the caller
-must eventually release. In the candidate shared recipe, automatically provisioned
-cloud workstations survive agent cancellation and expire through the environment
-manager after 30 minutes without commands (the runner's fixed deadline still
-applies). Reattach using the `RunnerSessionEvent` ID in a new agent session;
-cancellation does not revive the old agent session. The existing environment
-manager API can release the workstation earlier. A manager that cannot confirm
-the requested expiry is rejected and the newly created runner is deleted. This
-is temporary compute retention, not a durable-storage or pause/resume guarantee.
-The candidate source runtime accepts base64
-message attachments and exposes files shared by the agent through
-`sessions.get_session_resource(id, "local", key)`. Download them before closing
-the runtime: local shared resources expire with the retained session. The limits
-are 50 MiB per file, 64 MiB and 128 shared files per session.
-
-## Runtime release maintenance
-
-The SDK runtime manifest is maintained independently of schema generation. After
-publishing and verifying a compatible runtime, run `scripts/bump_runtime.py` with
-`--version` and one `--sha PLATFORM=SHA256` for every platform already in the
-manifest. Partial updates are rejected so a new URL cannot retain an old digest.
-Schema generation never touches it. The release workflow still opens
-legacy CLI pin PRs; retarget it only after the SDK/CLI migration has shipped.
+Inference stays hosted (`HAI_API_KEY`) unless you pass `inference=Inference.self_hosted(url, model=...)`
+(`from hai_agents_local.runtime import Inference`).
 
 ## How a session works
 
