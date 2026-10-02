@@ -94,12 +94,14 @@ def _localize(
     if agent is None or isinstance(agent, str) or not auto_bridges_enabled():
         return []
     _warn_if_overrides_target_user_device(kwargs)
-    credentials: typing.Dict[str, typing.Any] = (
-        {"api_key": runtime.api_key, "base_url": runtime.base_url, "verify_runtime": True}
-        if runtime is not None
-        else {"api_key": _token_source(client_wrapper), "base_url": client_wrapper.get_base_url()}
-    )
-    localized, bridges = localize_agent(agent, **credentials)
+    if runtime is None:
+        localized, bridges = localize_agent(
+            agent, api_key=_token_source(client_wrapper), base_url=client_wrapper.get_base_url()
+        )
+    else:
+        localized, bridges = localize_agent(agent, api_key=runtime.api_key, base_url=runtime.base_url)
+        for bridge in bridges:
+            bridge.verify_runtime = True
     kwargs["agent"] = localized
     return bridges
 

@@ -62,6 +62,8 @@ class LocalBridge(ABC, Generic[DriverT]):
     environment_kind: ClassVar[str]
     startup_hint: ClassVar[str | None] = None
     """Appended to the manager's not-ready timeout error; names the common cause of a hung startup."""
+    verify_runtime: bool = False
+    """Reject responses not HMAC-proven with api_key; requires api_key to be the local runtime's token string."""
 
     def __init__(
         self,
@@ -70,12 +72,9 @@ class LocalBridge(ABC, Generic[DriverT]):
         api_key: TokenSource,
         base_url: str | None = None,
         session_id: str | None = None,
-        verify_runtime: bool = False,
     ) -> None:
         if not api_key:
             raise ValueError("api_key is required")
-        if verify_runtime and not isinstance(api_key, str):
-            raise ValueError("verify_runtime needs api_key to be the local runtime's token string")
         if session_id is not None:
             try:
                 uuid.UUID(session_id)
@@ -85,7 +84,6 @@ class LocalBridge(ABC, Generic[DriverT]):
         self.api_key = api_key
         self.base_url = base_url or default_base_url()
         self.session_id = session_id or str(uuid.uuid4())
-        self.verify_runtime = verify_runtime
         self.ready = threading.Event()
         self.on_crash: Callable[[], None] | None = None
         self._driver: DriverT | None = None

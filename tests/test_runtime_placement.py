@@ -183,14 +183,16 @@ def test_only_the_runtime_holding_the_token_ever_receives_it(tmp_path, runtime_s
 
 
 @pytest.mark.asyncio
-async def test_bridge_never_serves_an_unproven_runtime(runtime_server):
-    from hai_agents_local.routing import localize_agent
+async def test_bridge_never_serves_an_unproven_runtime(monkeypatch, runtime_server):
+    from types import SimpleNamespace
 
+    from hai_agents_local.sessions import _localize
+
+    monkeypatch.delenv("HAI_AUTO_BRIDGE", raising=False)
     runtime_server.proof_token = "squatter-token"
+    runtime = SimpleNamespace(api_key="local-token", base_url=f"http://127.0.0.1:{runtime_server.port}")
     agent = {"environments": [{"id": "workstation", "kind": "workstation", "host": "user_device"}]}
-    _, [bridge] = localize_agent(
-        agent, api_key="local-token", base_url=f"http://127.0.0.1:{runtime_server.port}", verify_runtime=True
-    )
+    [bridge] = _localize(None, runtime, {"agent": agent})
     bridge.create_driver = lambda: pytest.fail("a driver started for an unproven runtime")
     with pytest.raises(LocalRuntimeError, match="did not prove"):
         await bridge.run()

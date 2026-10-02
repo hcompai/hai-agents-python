@@ -25,42 +25,36 @@ BRIDGE_TYPES: dict[str, type[LocalBridge]] = {
 
 
 def localize_agent(
-    agent: AgentLike, *, api_key: TokenSource, base_url: str | None = None, verify_runtime: bool = False
+    agent: AgentLike, *, api_key: TokenSource, base_url: str | None = None
 ) -> tuple[AgentLike, list[LocalBridge]]:
     """Copy of the agent where every unclaimed user_device environment is stamped with the session id
     of a freshly built bridge, plus those bridges. Environments that already carry a session_id are
     assumed to be served elsewhere and left alone, as are string agent references."""
     bridges: list[LocalBridge] = []
-    return _localize_agent(agent, bridges, api_key, base_url, verify_runtime), bridges
+    return _localize_agent(agent, bridges, api_key, base_url), bridges
 
 
 def _localize_agent(
-    agent: AgentLike, bridges: list[LocalBridge], api_key: TokenSource, base_url: str | None, verify_runtime: bool
+    agent: AgentLike, bridges: list[LocalBridge], api_key: TokenSource, base_url: str | None
 ) -> AgentLike:
     if isinstance(agent, str):
         return agent
     changes: dict[str, Any] = {}
     environments = _read(agent, "environments")
     if isinstance(environments, (list, tuple)):
-        localized_envs = [
-            _localize_environment(env, bridges, api_key, base_url, verify_runtime) for env in environments
-        ]
+        localized_envs = [_localize_environment(env, bridges, api_key, base_url) for env in environments]
         if _any_replaced(localized_envs, environments):
             changes["environments"] = localized_envs
     subagents = _read(agent, "subagents")
     if isinstance(subagents, (list, tuple)):
-        localized_subs = [_localize_agent(sub, bridges, api_key, base_url, verify_runtime) for sub in subagents]
+        localized_subs = [_localize_agent(sub, bridges, api_key, base_url) for sub in subagents]
         if _any_replaced(localized_subs, subagents):
             changes["subagents"] = localized_subs
     return _replace(agent, **changes) if changes else agent
 
 
 def _localize_environment(
-    env: EnvironmentLike,
-    bridges: list[LocalBridge],
-    api_key: TokenSource,
-    base_url: str | None,
-    verify_runtime: bool,
+    env: EnvironmentLike, bridges: list[LocalBridge], api_key: TokenSource, base_url: str | None
 ) -> EnvironmentLike:
     kind = _local_kind(env)
     if kind is None or _read(env, "session_id"):
@@ -71,7 +65,7 @@ def _localize_environment(
             f"serve one local {kind}; give the extra environments an explicit session_id and serve each "
             "from its own machine with `hai local browser|desktop|workstation --session-id <id>`"
         )
-    bridge = BRIDGE_TYPES[kind](_read(env, "id"), api_key=api_key, base_url=base_url, verify_runtime=verify_runtime)
+    bridge = BRIDGE_TYPES[kind](_read(env, "id"), api_key=api_key, base_url=base_url)
     bridges.append(bridge)
     return _replace(env, kind=kind, session_id=bridge.session_id)
 

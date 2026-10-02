@@ -62,15 +62,12 @@ class PyautoguiDesktopBridge(LocalBridge["DesktopDriverInterface"]):
         api_key: TokenSource,
         base_url: str | None = None,
         session_id: str | None = None,
-        verify_runtime: bool = False,
         max_width: int | None = DEFAULT_MAX_WIDTH,
         max_height: int | None = None,
         image_format: ImageFormat | None = DEFAULT_IMAGE_FORMAT,
         quality: int = DEFAULT_QUALITY,
     ) -> None:
-        super().__init__(
-            environment_id, api_key=api_key, base_url=base_url, session_id=session_id, verify_runtime=verify_runtime
-        )
+        super().__init__(environment_id, api_key=api_key, base_url=base_url, session_id=session_id)
         self.max_width = max_width
         self.max_height = max_height
         self.image_format = image_format
