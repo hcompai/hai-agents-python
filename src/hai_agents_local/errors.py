@@ -9,6 +9,10 @@ class SessionNotFoundError(Exception):
     """The command channel disappeared server-side and must be recreated."""
 
 
+class ChannelClosedError(Exception):
+    """The session ended and the platform closed its command channel for good."""
+
+
 class RateLimitedError(Exception):
     """The platform asked the bridge to back off polling."""
 

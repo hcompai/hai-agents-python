@@ -117,6 +117,6 @@ class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
 
 def _debugger_listening(port: int) -> bool:
     try:
-        return httpx.get(f"http://127.0.0.1:{port}/json/version", timeout=2.0).status_code == 200
+        return httpx.get(f"http://127.0.0.1:{port}/json/version", timeout=2.0, trust_env=False).status_code == 200
     except httpx.HTTPError:
         return False

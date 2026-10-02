@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Union
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from .errors import AuthError, RateLimitedError, SessionNotFoundError
+from .errors import AuthError, ChannelClosedError, RateLimitedError, SessionNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,7 @@ class CommandExchange:
             raise RateLimitedError(_retry_after(resp))
         if resp.status_code == HTTPStatus.CONFLICT:
             return
+        _raise_if_gone(resp, session_id)
         resp.raise_for_status()
 
     async def fetch_commands(
@@ -102,6 +103,7 @@ class CommandExchange:
         url = f"{self._base}/api/v1/commands/{session_id}/commands"
         for attempt in range(max_retries + 1):
             resp = await self._client.get(url, params={"wait_for_seconds": wait_for_seconds}, timeout=read_timeout)
+            _raise_if_gone(resp, session_id)
             match resp.status_code:
                 case HTTPStatus.NO_CONTENT:
                     return None
@@ -129,7 +131,13 @@ class CommandExchange:
         if resp.status_code == HTTPStatus.CONFLICT:
             # Another delivery of the same command_uid already landed; the result is recorded.
             return
+        _raise_if_gone(resp, command_id)
         resp.raise_for_status()
+
+
+def _raise_if_gone(resp: httpx.Response, channel: str) -> None:
+    if resp.status_code == HTTPStatus.GONE:
+        raise ChannelClosedError(f"channel for {channel!r} is closed")
 
 
 def _retry_after(resp: httpx.Response) -> float:

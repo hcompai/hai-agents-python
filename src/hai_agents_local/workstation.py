@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import shutil
@@ -62,6 +63,11 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
                 "PATH": os.pathsep.join([os.path.dirname(desk), path]),
             },
         )
+
+    async def interrupt_driver(self) -> None:
+        # This bridge creates one sandbox per run; close owns only that run's children.
+        if self._driver is not None:
+            await asyncio.to_thread(self._driver.close)
 
     def driver_interface(self) -> type:
         from hai_drivers.code_sandbox.interface import ManagedCodeSandboxInterface

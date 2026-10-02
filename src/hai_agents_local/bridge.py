@@ -17,7 +17,8 @@ from typing import Any, AsyncIterator, ClassVar, Generic, TypeVar, Union
 import httpx
 
 from .config import default_base_url
-from .errors import RateLimitedError, SessionNotFoundError
+from .errors import ChannelClosedError, RateLimitedError, SessionNotFoundError
+from .runtime import identity
 from .transport import Command, CommandExchange, Json, deserialize_args, serialize_result
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,8 @@ class LocalBridge(ABC, Generic[DriverT]):
     environment_kind: ClassVar[str]
     startup_hint: ClassVar[str | None] = None
     """Appended to the manager's not-ready timeout error; names the common cause of a hung startup."""
+    verify_runtime: bool = False
+    """Reject responses not HMAC-proven with api_key; requires api_key to be the local runtime's token string."""
 
     def __init__(
         self,
@@ -110,13 +113,23 @@ class LocalBridge(ABC, Generic[DriverT]):
         """Signal the poll loop to stop; safe to call from a signal handler."""
         self._stop_event.set()
 
+    async def interrupt_driver(self) -> None:
+        """Stop run-owned work; drivers without owned processes need no special action."""
+
     async def run(self) -> None:
         """Serve commands until stopped; raises AuthError on a bad key."""
         # An asyncio.Event binds to the loop it is first awaited on; a restarted bridge runs on a new loop.
         self._stop_event = asyncio.Event()
+        options: dict[str, Any] = {
+            "headers": {"Accept": "application/json"},
+            "auth": _BearerAuth(self.api_key),
+            "follow_redirects": True,
+        }
         try:
-            async with httpx.AsyncClient(
-                headers={"Accept": "application/json"}, auth=_BearerAuth(self.api_key), follow_redirects=True
+            async with (
+                identity.async_http_client(self.api_key, **options)
+                if self.verify_runtime
+                else httpx.AsyncClient(**options)
             ) as client:
                 exchange = CommandExchange(client, self.base_url)
                 if not await self._open_channel(exchange):
@@ -195,6 +208,9 @@ class LocalBridge(ABC, Generic[DriverT]):
                 ):
                     # Instant empty polls are paced so a misbehaving server cannot cause a busy loop.
                     break
+            except ChannelClosedError:
+                logger.info("channel %s closed; the session ended", self.session_id)
+                return
             except SessionNotFoundError:
                 # Channel was garbage-collected server-side; recreate on the next iteration so
                 # rate limits and transient errors during recreation hit the handlers below.
@@ -256,7 +272,19 @@ class LocalBridge(ABC, Generic[DriverT]):
                 self._results.move_to_end(cmd.command_uid)
                 result, error = self._results[cmd.command_uid]
             else:
-                result, error = await asyncio.to_thread(self._dispatch, cmd.name, cmd.args)
+                dispatch = asyncio.create_task(asyncio.to_thread(self._dispatch, cmd.name, cmd.args))
+                stopped = asyncio.create_task(self._stop_event.wait())
+                try:
+                    await asyncio.wait((dispatch, stopped), return_when=asyncio.FIRST_COMPLETED)
+                    if self._stop_event.is_set():
+                        await self.interrupt_driver()
+                        await dispatch
+                        return
+                    result, error = await dispatch
+                finally:
+                    stopped.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await stopped
                 self._results[cmd.command_uid] = (result, error)
                 while len(self._results) > RESULT_CACHE_SIZE:
                     self._results.popitem(last=False)

@@ -7,6 +7,7 @@ subclasses add the object-oriented sugar (``run_session``, ``start_session``,
 
 from __future__ import annotations
 
+import asyncio
 import typing
 
 import typing_extensions
@@ -27,8 +28,57 @@ from .polling import run_session as _run_session
 from .sessions.client import AsyncSessionsClient, SessionsClient
 from .tools import ToolInput, as_tools
 
+if typing.TYPE_CHECKING:
+    from hai_agents_local.runtime import Inference, LocalRuntime
+
 
 class Client(BaseClient):
+    local_runtime: typing.Optional[LocalRuntime] = None
+    _owns_runtime = False
+    _auto_bridges = True
+
+    @classmethod
+    def local(
+        cls,
+        *,
+        runtime: typing.Optional[LocalRuntime] = None,
+        inference: typing.Optional[Inference] = None,
+        local_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        auto_bridges: bool = True,
+        timeout: typing.Optional[float] = None,
+    ) -> Client:
+        """A client on a local agent runtime: ``runtime`` if given, else one this client starts and owns."""
+        from hai_agents_local.runtime import acquire_runtime
+
+        runtime, owned = acquire_runtime(runtime, inference=inference, local_options=local_options)
+        try:
+            client = cls(base_url=runtime.base_url, api_key=runtime.api_key, httpx_client=runtime.http_client(timeout))
+        except BaseException:
+            if owned:
+                runtime.shutdown()
+            raise
+        client.local_runtime, client._owns_runtime, client._auto_bridges = runtime, owned, auto_bridges
+        return client
+
+    def close(self) -> None:
+        """Stop sessions this client bridged; a local client also stops its runtime once no other client uses it."""
+        try:
+            if self._sessions is not None:
+                self._sessions.close()
+        finally:
+            if self.local_runtime is not None:
+                try:
+                    if self._owns_runtime:
+                        self.local_runtime.shutdown_if_idle(getattr(self._sessions, "own_session_ids", ()))
+                finally:
+                    self._client_wrapper.httpx_client.httpx_client.close()
+
+    def __enter__(self) -> Client:
+        return self
+
+    def __exit__(self, *exc: typing.Any) -> None:
+        self.close()
+
     def run_session(
         self,
         *,
@@ -81,11 +131,63 @@ class Client(BaseClient):
         if self._sessions is None:
             from hai_agents_local.sessions import LocalSessionsClient
 
-            self._sessions = LocalSessionsClient(client_wrapper=self._client_wrapper)
+            self._sessions = LocalSessionsClient(
+                client_wrapper=self._client_wrapper, runtime=self.local_runtime, auto_bridges=self._auto_bridges
+            )
         return self._sessions
 
 
 class AsyncClient(AsyncBaseClient):
+    local_runtime: typing.Optional[LocalRuntime] = None
+    _owns_runtime = False
+    _auto_bridges = True
+
+    @classmethod
+    async def local(
+        cls,
+        *,
+        runtime: typing.Optional[LocalRuntime] = None,
+        inference: typing.Optional[Inference] = None,
+        local_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        auto_bridges: bool = True,
+        timeout: typing.Optional[float] = None,
+    ) -> AsyncClient:
+        """A client on a local agent runtime: ``runtime`` if given, else one this client starts and owns."""
+        from hai_agents_local.runtime import acquire_runtime_async
+
+        runtime, owned = await acquire_runtime_async(runtime, inference=inference, local_options=local_options)
+        try:
+            client = cls(
+                base_url=runtime.base_url, api_key=runtime.api_key, httpx_client=runtime.async_http_client(timeout)
+            )
+        except BaseException:
+            if owned:
+                await asyncio.to_thread(runtime.shutdown)
+            raise
+        client.local_runtime, client._owns_runtime, client._auto_bridges = runtime, owned, auto_bridges
+        return client
+
+    async def aclose(self) -> None:
+        """Stop sessions this client bridged; a local client also stops its runtime once no other client uses it."""
+        try:
+            if self._sessions is not None:
+                await self._sessions.aclose()
+        finally:
+            if self.local_runtime is not None:
+                try:
+                    if self._owns_runtime:
+                        await asyncio.to_thread(
+                            self.local_runtime.shutdown_if_idle, getattr(self._sessions, "own_session_ids", ())
+                        )
+                finally:
+                    await self._client_wrapper.httpx_client.httpx_client.aclose()
+
+    async def __aenter__(self) -> AsyncClient:
+        return self
+
+    async def __aexit__(self, *exc: typing.Any) -> None:
+        await self.aclose()
+
     async def run_session(
         self,
         *,
@@ -138,5 +240,7 @@ class AsyncClient(AsyncBaseClient):
         if self._sessions is None:
             from hai_agents_local.sessions import LocalAsyncSessionsClient
 
-            self._sessions = LocalAsyncSessionsClient(client_wrapper=self._client_wrapper)
+            self._sessions = LocalAsyncSessionsClient(
+                client_wrapper=self._client_wrapper, runtime=self.local_runtime, auto_bridges=self._auto_bridges
+            )
         return self._sessions

@@ -1,4 +1,4 @@
-"""Environment variables read by hai_agents.local."""
+"""Environment variables read by hai_agents_local."""
 
 from __future__ import annotations
 
