@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import contextlib
 import os
-from collections.abc import Callable
+import stat
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -27,6 +28,12 @@ API_KEYS_PAGE = "https://platform.hcompany.ai/settings/api-keys"
 
 LOCAL_ENV_PATH = Path(".env")
 GLOBAL_ENV_PATH = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")) / "hai" / ".env"
+
+# Detection, not prevention: a project `.env` is used as is, and the CLI says so every time.
+PROJECT_ENV_WARNING = (
+    f"Using {API_KEY_VAR} from {LOCAL_ENV_PATH}. Make sure this key is yours: a cloned or forked repo can ship "
+    "a .env that carries someone else's key on purpose, and your runs would then land in their account."
+)
 
 
 def portal_base(base_url: str | None = None) -> str:
@@ -105,10 +112,59 @@ def source(explicit: ApiKey | None = None) -> str | None:
         return "argument"
     if os.environ.get(API_KEY_VAR):
         return "environment"
-    for path in _env_paths():
-        if path.exists() and dotenv_values(path).get(API_KEY_VAR):
+    for path in _readable_env_paths():
+        if _values(path).get(API_KEY_VAR):
             return str(path)
     return None
+
+
+def key_file_rejection(path: Path) -> str | None:
+    """Why a key file must not be read, or None.
+
+    The global file must be private (`hai login` writes it 0600); a project `.env` only has to be a regular file.
+    """
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        return str(exc)
+    if not stat.S_ISREG(info.st_mode):
+        return "not a regular file (symlink?)"
+    if path == LOCAL_ENV_PATH or os.name == "nt":
+        return None
+    if info.st_uid != os.geteuid():
+        return "not owned by the current user"
+    if info.st_mode & 0o077:
+        return "readable by others; run `chmod 600` on it"
+    return None
+
+
+def key_file_warnings() -> list[str]:
+    """One line per key file that is present but ignored, for the CLI to show."""
+    warnings = []
+    for path in _env_paths():
+        if not os.path.lexists(path):
+            continue
+        reason = key_file_rejection(path)  # what the file is, before reading what it contains
+        if reason is None and path == LOCAL_ENV_PATH and not project_env_settings(path):
+            continue
+        if reason:
+            warnings.append(f"Ignoring {path}: {reason}")
+    return warnings
+
+
+def project_env_settings(path: Path) -> dict[str, str]:
+    """The `HAI_` variables a project `.env` sets; a `.env` without any is not a key file and is left alone."""
+    return {name: value for name, value in _values(path).items() if name.startswith("HAI_") and value}
+
+
+def _values(path: Path) -> dict[str, str | None]:
+    """The file's variables, or nothing when it cannot be read or is not text."""
+    try:
+        return dotenv_values(path)
+    except (OSError, UnicodeDecodeError):
+        return {}
 
 
 def _client_kwargs(api_key: ApiKey | None, base_url: str | None) -> dict[str, ApiKey | str]:
@@ -124,13 +180,20 @@ def _env_paths() -> tuple[Path, ...]:
     return (LOCAL_ENV_PATH, GLOBAL_ENV_PATH)
 
 
+def _readable_env_paths() -> Iterator[Path]:
+    for path in _env_paths():
+        if not os.path.lexists(path) or key_file_rejection(path) is not None:
+            continue
+        if path == LOCAL_ENV_PATH and not project_env_settings(path):
+            continue
+        yield path
+
+
 def _lookup(name: str) -> str | None:
     if os.environ.get(name):
         return os.environ[name]
-    for path in _env_paths():
-        if not path.exists():
-            continue
-        value = dotenv_values(path).get(name)
+    for path in _readable_env_paths():
+        value = _values(path).get(name)
         if value:
             return value
     return None
