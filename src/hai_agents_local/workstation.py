@@ -1,4 +1,4 @@
-"""Local workstation bridge: the agent's shell runs on this machine and drives it through the desk and web CLIs."""
+"""Local workstation bridge: the agent's shell runs on this machine and drives it through the desk, cua and web CLIs."""
 
 from __future__ import annotations
 
@@ -58,6 +58,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             str(self.workspace),
             environment_variables={
                 "COORDINATE_SYSTEM": "0-1000",
+                "CUA_SESSION": self.session_id,
                 "PATH": os.pathsep.join([os.path.dirname(desk), path]),
             },
         )
