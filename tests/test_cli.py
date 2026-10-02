@@ -43,8 +43,31 @@ def test_run_prints_json(monkeypatch) -> None:
         "answer": "done",
         "session_id": "sess_1",
         "status": "completed",
+        "outcome": None,
+        "error": None,
+        "error_code": None,
         "agent_view_url": "https://platform.example.test/agent-view/sess_1",
     }
+
+
+def test_run_failure_exits_nonzero_with_error_and_structured_answer(monkeypatch) -> None:
+    failed = SessionRunResult(
+        id="sess_1",
+        status="failed",
+        events=[],
+        next_from_index=0,
+        answer={"price": 42},
+        error="browser crashed",
+        error_code="env_error",
+    )
+    monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
+    monkeypatch.setattr(app_module, "wait_for_session", lambda client, id, **_: failed)
+
+    result = runner.invoke(app, ["run", "hello", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 1, result.output
+    assert "browser crashed" in result.output
+    assert '"price": 42' in result.output
 
 
 def test_run_prints_live_view_link(monkeypatch) -> None:

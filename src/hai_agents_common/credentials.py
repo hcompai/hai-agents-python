@@ -11,21 +11,34 @@ from urllib.parse import urljoin
 from dotenv import dotenv_values, set_key, unset_key
 
 from hai_agents import AsyncClient, Client
+from hai_agents.environment import HaiAgentsEnvironment
 
 ApiKey = str | Callable[[], str]
 
 API_KEY_VAR = "HAI_API_KEY"
 BASE_URL_VAR = "HAI_API_BASE_URL"
+PORTAL_URL_VAR = "HAI_PORTAL_URL"
 
-PORTAL_BASE = "https://portal.production.hcompany.ai"
+PORTALS = {
+    HaiAgentsEnvironment.EU.value: "https://portal.api.eu.hcompany.ai",
+    HaiAgentsEnvironment.US.value: "https://portal.production.hcompany.ai",
+}
+API_KEYS_PAGE = "https://platform.hcompany.ai/settings/api-keys"
 
 LOCAL_ENV_PATH = Path(".env")
 GLOBAL_ENV_PATH = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")) / "hai" / ".env"
 
 
-def portal_base() -> str:
-    """Portal origin used by `hai login`."""
-    return os.environ.get("HAI_PORTAL_URL") or PORTAL_BASE
+def portal_base(base_url: str | None = None) -> str:
+    """Portal origin used by `hai login`: `HAI_PORTAL_URL`, else the portal of the platform's region."""
+    if os.environ.get(PORTAL_URL_VAR):
+        return os.environ[PORTAL_URL_VAR]
+    platform = (resolve_base_url(base_url) or HaiAgentsEnvironment.EU.value).rstrip("/")
+    if platform not in PORTALS:
+        raise RuntimeError(
+            f"No portal is known for {platform}; set {PORTAL_URL_VAR} to the portal that issues its keys."
+        )
+    return PORTALS[platform]
 
 
 def current_api_key(explicit: ApiKey | None = None) -> ApiKey | None:
