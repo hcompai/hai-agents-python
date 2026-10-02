@@ -1,10 +1,4 @@
-"""Behavioural tests for the runtime pid file's on-disk hardening.
-
-The pid file's contents drive a privileged operation: a forced stop reads it and
-``os.killpg(..., SIGKILL)`` the pid it finds. It therefore earns the same protections as the bearer
-token (owner-only permissions and a refusal to replace a symlink planted at its path), so it can never
-be steered into killing an arbitrary process group.
-"""
+"""A forced stop SIGKILLs the pid file's process group, so the file is owner-only and refuses planted symlinks."""
 
 from __future__ import annotations
 
@@ -29,8 +23,6 @@ def test_pid_file_written_owner_only(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
 @pytest.mark.skipif(sys.platform == "win32", reason="O_NOFOLLOW is POSIX-only")
 def test_pid_file_write_refuses_symlink_at_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    # An attacker pre-plants a symlink at the pid path pointing at a file they want clobbered (and,
-    # later, read back by `holo stop --force`). The hardened write must refuse to follow it.
     victim = tmp_path / "victim"
     victim.write_text("untouched", encoding="utf-8")
     pid_path = pid_file_path(4242, cache_dir=tmp_path)

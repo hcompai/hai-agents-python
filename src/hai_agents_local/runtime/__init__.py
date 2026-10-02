@@ -1,7 +1,4 @@
-"""Local agent runtime management: install, find, start, attach to and verify a hai-agent-runtime binary.
-
-Imported lazily by ``Client.local`` so remote-only users pay nothing for it.
-"""
+"""Local agent runtime management, imported lazily by ``Client.local`` so remote-only users pay nothing for it."""
 
 from .acquire import acquire_runtime, acquire_runtime_async
 from .errors import (

@@ -10,7 +10,6 @@ import typing
 
 CACHE_DIR_ENV = "HAI_AGENT_LOCAL_CACHE_DIR"
 DEFAULT_CACHE_DIR = pathlib.Path.home() / ".hai" / "agent-runtime"
-# The shared well-known local runtime port.
 DEFAULT_PORT = 18795
 
 _PathInput = typing.Union[str, "os.PathLike[str]"]

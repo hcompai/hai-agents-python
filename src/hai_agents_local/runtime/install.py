@@ -1,8 +1,4 @@
-"""Verified download and atomic install of the hai-agent-runtime binary.
-
-The SDK is a library, so consent is the caller's ``download=True`` and progress
-is plain logging.
-"""
+"""Verified download and atomic install of the hai-agent-runtime binary; consent is the caller's ``download=True``."""
 
 from __future__ import annotations
 

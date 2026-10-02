@@ -53,12 +53,7 @@ def probe_health(base_url: str, token: str) -> typing.Optional[typing.Dict[str, 
 
 
 def spawn(cmd: typing.List[str], *, env: typing.Dict[str, str], log_path: pathlib.Path) -> subprocess.Popen:
-    """Start the runtime in its own process group with stderr to `log_path`.
-
-    stderr goes to a file, not a pipe: nobody drains a pipe after spawn, so the
-    buffer would fill and block. Own process group so we can reap grandchildren
-    (e.g. desktop helpers) the binary may spawn.
-    """
+    """Start the runtime in its own process group (to reap grandchildren); stderr to a file, as nobody drains a pipe."""
     log_path.parent.mkdir(parents=True, exist_ok=True)
     logger.info("spawning hai-agent-runtime: %s (stderr -> %s)", " ".join(cmd), log_path)
     with log_path.open("wb") as log_file:  # child inherits the fd; the parent handle can close right away
@@ -136,8 +131,7 @@ def _signal(proc: subprocess.Popen, *, force: bool) -> bool:
     if os.name == "posix":
         return _killpg_posix(proc.pid, signal.SIGKILL if force else signal.SIGTERM)
     try:
-        # Windows has no portable graceful process-group signal. /F is required
-        # to ensure an executable launched through a .cmd shim cannot outlive it.
+        # No portable graceful group signal on Windows; /F keeps a .cmd-shim child from outliving it.
         subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], check=True, capture_output=True)
     except (OSError, subprocess.CalledProcessError):
         return False

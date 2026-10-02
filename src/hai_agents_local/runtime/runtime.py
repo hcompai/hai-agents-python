@@ -167,8 +167,7 @@ class LocalRuntime:
 
         if command is not None and (not command or binary_path is not None):
             raise ValueError("command must be nonempty and cannot be combined with binary_path")
-        # Downloads are atomically installed and can outlast the process health budget.
-        # Keep them outside the port lock; recheck attachment before spawning.
+        # Downloads can outlast the lock budget: resolve outside it, then recheck attachment under it.
         cmd = (
             list(command)
             if command is not None
@@ -322,17 +321,7 @@ class LocalRuntime:
         spawn_env: typing.Optional[typing.Dict[str, str]],
         inherit_env: bool,
     ) -> typing.Dict[str, str]:
-        """Child env: inherited-plus-overlay by default, caller-verbatim with inherit_env=False.
-
-        Inheriting os.environ passes the model-gateway HAI_API_KEY / HAI_BASE_URL through to the
-        binary (without them local sessions cannot run inference) and forwards caller flags such as
-        HAI_AGENT_RUNTIME_MODEL/FAKE/FAST/RUNS_DIR. inherit_env=False takes spawn_env as the
-        complete base environment instead, for callers that must *remove* inherited keys, which an
-        overlay cannot express (e.g. stripping HAI_API_KEY for self-hosted base URLs). The
-        generated local bearer and the cloud HAI_API_KEY are different credentials: the token below
-        is the only local bearer, and the cloud key is never used to authenticate against the local
-        runtime. Port and token are set last in both modes so caller input never clobbers them.
-        """
+        """os.environ plus spawn_env, or spawn_env verbatim to drop inherited keys; port and token always win."""
         env = {**os.environ, **(spawn_env or {})} if inherit_env else dict(spawn_env or {})
         env[PORT_ENV] = str(port)
         env[AUTH_TOKEN_ENV] = token
@@ -397,8 +386,7 @@ class LocalRuntime:
         terminate(self._proc)
         self._cleanup_state_files()
 
-    # Statuses that mean the runtime still holds live session state a shutdown would destroy.
-    # ("idle" sessions await user input but keep runtime state.)
+    # Statuses whose runtime state a shutdown would destroy ("idle" awaits user input but keeps state).
     ACTIVE_SESSION_STATUSES: typing.ClassVar[typing.Tuple[str, ...]] = (
         "queued",
         "pending",
@@ -410,8 +398,7 @@ class LocalRuntime:
 
     def shutdown_if_idle(self, ignore: typing.Collection[str] = ()) -> bool:
         """Stop the owned runtime unless it hosts an active session outside ``ignore``; True when it was stopped."""
-        # Serialized with spawns and locked attaches only: a client that attached without the lock
-        # can still start a session between the listing and the stop.
+        # Only spawns and locked attaches are serialized; an unlocked attacher can still race the listing.
         with _startup_lock(self._cache_dir, self._port, SPAWN_TIMEOUT_S + STARTUP_LOCK_GRACE_S):
             try:
                 if self._hosts_active_session(ignore):
