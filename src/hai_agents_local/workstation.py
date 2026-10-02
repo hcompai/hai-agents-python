@@ -58,6 +58,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             str(self.workspace),
             environment_variables={
                 "COORDINATE_SYSTEM": "0-1000",
+                "CUA_CURSOR": os.environ.get("CUA_CURSOR", "off"),
                 "CUA_SESSION": self.session_id,
                 "PATH": os.pathsep.join([os.path.dirname(desk), path]),
             },
