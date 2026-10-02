@@ -779,6 +779,7 @@ def main() -> None:
 def _state(ctx: typer.Context) -> AppState:
     if not isinstance(ctx.obj, AppState):
         raise RuntimeError("CLI state was not initialized.")
+    _key_file_notices(ctx.obj)
     return ctx.obj
 
 
@@ -787,6 +788,20 @@ def _client(state: AppState) -> Client:
         return make_client(api_key=state.api_key, base_url=state.base_url)
     except RuntimeError as exc:
         _raise_cli_error(exc)
+
+
+_key_file_notices_shown: set[str] = set()
+
+
+def _key_file_notices(state: AppState) -> None:
+    """Stderr notices, once per process: ignored key files and the project `.env` warning."""
+    lines = credentials.key_file_warnings()
+    if credentials.source(state.api_key) == str(credentials.LOCAL_ENV_PATH):
+        lines.append(credentials.PROJECT_ENV_WARNING)
+    for line in lines:
+        if line not in _key_file_notices_shown:
+            _key_file_notices_shown.add(line)
+            err_console.print(escape(line), style="dim")
 
 
 def _select_agent(state: AppState, client: Client) -> str:

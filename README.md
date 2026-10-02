@@ -305,7 +305,7 @@ hai sessions watch <session-id>
 hai mcp install
 ```
 
-`hai login` signs in through the browser with Google and stores a key in `~/.config/hai/.env`. Without a Google account or a browser, create a key at [platform.hcompany.ai/settings/api-keys](https://platform.hcompany.ai/settings/api-keys) and run `hai login --key`. `hai mcp install` adds the hai-agents MCP server to Cursor, VS Code, Claude Code, and other MCP clients. Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`, then `~/.config/hai/.env`. Run `hai --help` for the full command set.
+`hai login` signs in through the browser with Google and stores a key in `~/.config/hai/.env`. Without a Google account or a browser, create a key at [platform.hcompany.ai/settings/api-keys](https://platform.hcompany.ai/settings/api-keys) and run `hai login --key`. `hai mcp install` adds the hai-agents MCP server to Cursor, VS Code, Claude Code, and other MCP clients. Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`, then `~/.config/hai/.env`. When the key comes from the local `.env`, every command says so on stderr: a cloned or forked repo can ship a `.env` carrying someone else's key, and your runs would land in their account. That is a warning, not a block; read it. The global file is only read when it is a regular file owned by you with mode 600, as `hai login` writes it. Run `hai --help` for the full command set.
 
 ## Documentation
 

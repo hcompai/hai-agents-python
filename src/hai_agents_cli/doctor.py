@@ -23,7 +23,14 @@ class CheckResult:
 
 def check_login(api_key: str | None) -> CheckResult:
     if credentials.current_api_key(api_key):
-        return CheckResult("login", True, f"API key found ({credentials.source(api_key)})")
+        source = credentials.source(api_key)
+        detail = f"API key found ({source})"
+        if source == str(credentials.LOCAL_ENV_PATH):
+            detail = f"{detail}. {credentials.PROJECT_ENV_WARNING}"
+        return CheckResult("login", True, detail)
+    ignored = credentials.key_file_warnings()
+    if ignored:
+        return CheckResult("login", False, "; ".join(ignored), fix="fix the file's owner and mode, or run `hai login`")
     return CheckResult(
         "login",
         False,
