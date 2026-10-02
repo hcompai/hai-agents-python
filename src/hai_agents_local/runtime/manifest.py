@@ -1,19 +1,14 @@
-"""Pinned hai-agent-runtime version and per-platform artifact digests.
-
-This module is the SDK's single runtime pin: a runtime release bumps
-PINNED_RUNTIME_VERSION and MANIFEST here with scripts/bump_runtime.py. Artifacts live under an
-immutable version-scoped CDN prefix, so an edge can never serve stale bytes.
-"""
+"""Pinned hai-agent-runtime artifacts, loaded from pin.json (updated by scripts/bump_runtime.py)."""
 
 from __future__ import annotations
 
 import dataclasses
+import json
+import pathlib
 import platform
 import sys
 import typing
 
-# TODO: pin a runtime release that serves the shared recipe, with its artifact hashes below.
-PINNED_RUNTIME_VERSION = "0.1.8"
 RUNTIME_CDN_BASE = "https://assets.hcompanyprod.fr/hai-agent-runtime"
 # Guard value: published manifest entries must never use it (every download would fail verification).
 PLACEHOLDER_SHA256 = "0" * 64
@@ -26,20 +21,16 @@ class RuntimeArtifact:
     sha256: str
 
 
-def _artifact(filename: str, sha256: str) -> RuntimeArtifact:
-    """A published release file resolved to its pinned, version-scoped CDN URL."""
-    return RuntimeArtifact(url=f"{RUNTIME_CDN_BASE}/{PINNED_RUNTIME_VERSION}/{filename}", sha256=sha256)
+_PIN = json.loads(pathlib.Path(__file__).with_name("pin.json").read_text(encoding="utf-8"))
 
+# TODO: pin a runtime release that serves the shared recipe.
+PINNED_RUNTIME_VERSION: str = _PIN["version"]
 
 MANIFEST: typing.Dict[str, RuntimeArtifact] = {
-    "darwin-arm64": _artifact(
-        "hai-agent-runtime-darwin-arm64.zip",
-        "1aed0055898116732aee031dc4a1235782b2909ee51e0367e2d50bb3be6671c9",
-    ),
-    "windows-x86_64": _artifact(
-        "hai-agent-runtime-windows-x86_64.zip",
-        "4e6b2bcd42af2bb6b22197fcde947327497f5c62fd60d48bc9037730d80dc691",
-    ),
+    platform_name: RuntimeArtifact(
+        url=f"{RUNTIME_CDN_BASE}/{PINNED_RUNTIME_VERSION}/hai-agent-runtime-{platform_name}.zip", sha256=sha256
+    )
+    for platform_name, sha256 in _PIN["sha256"].items()
 }
 
 UNIMPLEMENTED_PLATFORMS: typing.Dict[str, str] = {

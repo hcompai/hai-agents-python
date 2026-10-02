@@ -1,74 +1,39 @@
-"""Rewrite the pinned hai-agent-runtime version + per-platform sha256 in the SDK runtime manifest."""
+"""Pin a hai-agent-runtime release: its version plus a fresh sha256 for every platform in the pin file."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 
-# Stdlib only on purpose: this runs as `python scripts/bump_runtime.py` in a
-# checkout with no dependencies installed, so a third-party import would break
-# the bump step.
-RUNTIME_INSTALL = Path(__file__).parents[1] / "src" / "hai_agents_local" / "runtime" / "manifest.py"
-_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-_MANIFEST_FILENAME_RE = re.compile(r'"hai-agent-runtime-([^".]+)\.zip"')
+# Stdlib only: runs in a bare checkout with no dependencies installed.
+PIN_FILE = Path(__file__).parents[1] / "src" / "hai_agents_local" / "runtime" / "pin.json"
+_VERSION_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?")
+_SHA256_RE = re.compile(r"[0-9a-f]{64}")
+_PLACEHOLDER_SHA256 = "0" * 64
 
 
-@dataclass(frozen=True)
-class RuntimeBump:
-    version: str
-    shas: dict[str, str]  # platform key (e.g. darwin-arm64) -> sha256 hex
-
-    def __post_init__(self) -> None:
-        if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?", self.version):
-            raise ValueError("runtime version must be a release version, e.g. 0.1.13")
-        for platform, sha in self.shas.items():
-            if not _SHA256_RE.fullmatch(sha) or sha == "0" * 64:
-                raise ValueError(f"{platform}: {sha!r} is not a lowercase 64-char sha256")
-
-
-def _filename_for(platform: str) -> str:
-    return f"hai-agent-runtime-{platform}.zip"
-
-
-def _manifest_platforms(source: str) -> set[str]:
-    """Platform keys that have a published artifact literal in `source`."""
-    return set(_MANIFEST_FILENAME_RE.findall(source))
-
-
-def apply_bump(source: str, bump: RuntimeBump) -> str:
-    """Return `source` with PINNED_RUNTIME_VERSION and the manifest digests replaced; raises if any anchor is missing."""
-    published = _manifest_platforms(source)
-    extra = bump.shas.keys() - published
+def apply_bump(pin: dict, version: str, shas: dict[str, str]) -> dict:
+    """`pin` moved to `version`; raises unless `shas` holds a real digest for exactly the pinned platforms."""
+    if not _VERSION_RE.fullmatch(version):
+        raise ValueError("runtime version must be a release version, e.g. 0.1.13")
+    for platform, sha in shas.items():
+        if not _SHA256_RE.fullmatch(sha) or sha == _PLACEHOLDER_SHA256:
+            raise ValueError(f"{platform}: {sha!r} is not a lowercase 64-char sha256")
+    published = set(pin["sha256"])
+    extra = shas.keys() - published
     if extra:
         raise ValueError(f"no manifest entry for platform(s): {sorted(extra)}")
-    # The version is a single literal feeding every derived URL, so any published
-    # platform left without a fresh sha would keep a stale digest at the new
-    # version's URL and fail verification on download. Refuse the partial bump.
-    missing = published - bump.shas.keys()
+    # A platform left on its old digest would fail verification at the new version's URL.
+    missing = published - shas.keys()
     if missing:
         raise ValueError(f"missing sha for published platform(s): {sorted(missing)}")
-
-    updated, count = re.subn(
-        r'PINNED_RUNTIME_VERSION = "[^"]*"',
-        f'PINNED_RUNTIME_VERSION = "{bump.version}"',
-        source,
-    )
-    if count != 1:
-        raise ValueError(f"expected exactly one PINNED_RUNTIME_VERSION assignment, found {count}")
-
-    for platform, sha in bump.shas.items():
-        filename = _filename_for(platform)
-        pattern = re.compile(rf'("{re.escape(filename)}",\s*(?:#[^\n]*\n\s*)*")[0-9a-fA-F]{{64}}(")')
-        updated, count = pattern.subn(rf"\g<1>{sha}\g<2>", updated)
-        if count != 1:
-            raise ValueError(f"expected exactly one sha256 literal for {filename}, found {count}")
-    return updated
+    return {**pin, "version": version, "sha256": {platform: shas[platform] for platform in pin["sha256"]}}
 
 
-def _parse_args(argv: list[str]) -> RuntimeBump:
+def _parse_args(argv: list[str]) -> tuple[str, dict[str, str]]:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", required=True)
     parser.add_argument(
@@ -87,14 +52,14 @@ def _parse_args(argv: list[str]) -> RuntimeBump:
         if platform in shas:
             parser.error(f"duplicate --sha for {platform}")
         shas[platform] = sha.lower()
-    return RuntimeBump(version=args.version, shas=shas)
+    return args.version, shas
 
 
 def main(argv: list[str]) -> int:
-    bump = _parse_args(argv)
-    source = RUNTIME_INSTALL.read_text()
-    RUNTIME_INSTALL.write_text(apply_bump(source, bump))
-    print(f"bumped runtime to {bump.version} ({', '.join(sorted(bump.shas))})")
+    version, shas = _parse_args(argv)
+    pin = apply_bump(json.loads(PIN_FILE.read_text(encoding="utf-8")), version, shas)
+    PIN_FILE.write_text(json.dumps(pin, indent=2) + "\n", encoding="utf-8")
+    print(f"bumped runtime to {version} ({', '.join(sorted(shas))})")
     return 0
 
 

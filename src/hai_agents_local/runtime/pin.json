@@ -1,0 +1,7 @@
+{
+  "version": "0.1.8",
+  "sha256": {
+    "darwin-arm64": "1aed0055898116732aee031dc4a1235782b2909ee51e0367e2d50bb3be6671c9",
+    "windows-x86_64": "4e6b2bcd42af2bb6b22197fcde947327497f5c62fd60d48bc9037730d80dc691"
+  }
+}
