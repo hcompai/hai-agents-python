@@ -420,8 +420,11 @@ class LocalRuntime:
         # Serialized with spawns and locked attaches only: a client that attached without the lock
         # can still start a session between the listing and the stop.
         with _startup_lock(self._cache_dir, self._port, SPAWN_TIMEOUT_S + STARTUP_LOCK_GRACE_S):
-            if self._hosts_active_session(ignore):
-                return False
+            try:
+                if self._hosts_active_session(ignore):
+                    return False
+            except Exception:
+                logger.warning("idle probe failed on %s; stopping the owned runtime", self.base_url, exc_info=True)
             self.shutdown()
         return True
 

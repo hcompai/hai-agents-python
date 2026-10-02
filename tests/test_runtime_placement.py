@@ -353,6 +353,36 @@ def test_idle_shutdown_waits_for_a_concurrent_startup(tmp_path, runtime_server):
         proc.wait()
 
 
+def test_idle_shutdown_stops_an_owned_runtime_that_cannot_answer(tmp_path):
+    import socket
+    import subprocess
+    import sys
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True)
+    token_file = write_owner_only(token_file_path(port, cache_dir=tmp_path), "token")
+    runtime = LocalRuntime(
+        base_url=f"http://127.0.0.1:{port}",
+        api_key="token",
+        pid=proc.pid,
+        version=None,
+        log_path=None,
+        owned=True,
+        cache_dir=tmp_path,
+        port=port,
+        proc=proc,
+        token_file=token_file,
+    )
+    try:
+        assert runtime.shutdown_if_idle()
+        assert proc.poll() is not None and not token_file.exists()
+    finally:
+        proc.kill()
+        proc.wait()
+
+
 def test_spawner_never_overwrites_the_live_runtime_token(tmp_path, monkeypatch, runtime_server):
     import sys
 
