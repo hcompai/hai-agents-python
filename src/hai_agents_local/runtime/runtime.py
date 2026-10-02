@@ -390,13 +390,6 @@ class LocalRuntime:
             self.api_key, timeout=CLIENT_TIMEOUT_S if timeout is None else timeout, follow_redirects=True
         )
 
-    def health(self) -> typing.Dict[str, typing.Any]:
-        """The /health JSON body; raises RuntimeUnhealthyError when the runtime is not answering."""
-        payload = probe_health(self.base_url, self.api_key)
-        if payload is None:
-            raise RuntimeUnhealthyError(f"hai-agent-runtime at {self.base_url} is not answering /health")
-        return payload
-
     def shutdown(self) -> None:
         """Gracefully stop the runtime this LocalRuntime spawned (SIGTERM group, grace, SIGKILL group)."""
         if not self.owned or self._proc is None:
@@ -442,13 +435,6 @@ class LocalRuntime:
                 if not listed.items or seen >= listed.total:
                     return False
                 page += 1
-
-    def force_kill(self) -> None:
-        """Stop only the process this manager spawned; never trust a saved PID to claim ownership."""
-        if not self.owned or self._proc is None:
-            raise LocalRuntimeError("cannot force-kill a borrowed runtime from a persisted PID")
-        terminate(self._proc)
-        self._cleanup_state_files()
 
     def _cleanup_state_files(self) -> None:
         # Serialize compare-and-unlink with publication of a replacement runtime's state.

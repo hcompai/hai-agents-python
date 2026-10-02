@@ -1,10 +1,4 @@
-"""Owner-only on-disk discovery state for locally spawned hai-agent-runtime processes.
-
-A spawner persists the generated bearer token and the runtime pid under the SDK
-cache dir so a second process can attach (token) or force-kill (pid) without any
-IPC. Both files drive privileged actions, so they are 0600 from the first byte
-and refuse pre-planted symlinks.
-"""
+"""Owner-only (0600, symlink-refusing) token and pid files that let other local processes find a spawned runtime."""
 
 from __future__ import annotations
 
@@ -42,7 +36,7 @@ def token_file_path(port: int, *, cache_dir: typing.Optional[_PathInput] = None)
 
 
 def pid_file_path(port: int, *, cache_dir: typing.Optional[_PathInput] = None) -> pathlib.Path:
-    """Where a spawner publishes the runtime pid so force_kill() works from another process."""
+    """Where a spawner publishes the runtime pid for out-of-process stop tools."""
     return state_dir(cache_dir) / f"agent-pid-{port}"
 
 

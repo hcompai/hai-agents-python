@@ -174,7 +174,7 @@ def test_only_the_runtime_holding_the_token_ever_receives_it(tmp_path, runtime_s
     with pytest.raises(BinaryIncompatibleError):
         attached.require_recipe("desktop")
     with pytest.raises(LocalRuntimeError):
-        attached.force_kill()
+        attached.shutdown()
     with Client.local(runtime=attached) as client:
         assert client.sessions.list_sessions().items == []
         runtime_server.proof_token = "squatter-token"
