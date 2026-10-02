@@ -1,8 +1,10 @@
-"""Browser sign-in: RFC 8252 loopback redirect + PKCE, then mint an API key."""
+"""Sign in to the portal (browser + PKCE, or email + password with optional TOTP), then mint an API key."""
 
 from __future__ import annotations
 
 import base64
+import contextlib
+import dataclasses
 import hashlib
 import http.server
 import secrets
@@ -20,15 +22,24 @@ from .login_pages import ERROR_HTML, SUCCESS_HTML
 
 SIGN_IN_TIMEOUT_S = 180
 KEY_FALLBACK = (
-    f"Browser sign-in works with Google accounts. Otherwise create a key at {API_KEYS_PAGE} and run `hai login --key`."
+    "Browser sign-in needs a Google account; email and password accounts sign in with `hai login --email you@example.com`. "
+    f"Or create a key at {API_KEYS_PAGE} and run `hai login --key`."
 )
+SDK_AUTH_HEADERS = {"X-SDK-Auth": "true"}  # tokens in the JSON body instead of cookies
 
 
 class PortalError(RuntimeError):
     """A portal request failed; the message is the portal's own explanation."""
 
 
-def login_and_mint(portal: str, label: str, on_open: typing.Callable[[str], None]) -> str:
+@dataclasses.dataclass(frozen=True)
+class SignedIn:
+    key: str
+    email: str
+    organization: typing.Optional[str]  # name only, never an id
+
+
+def login_and_mint(portal: str, label: str, on_open: typing.Callable[[str], None]) -> SignedIn:
     """Run the full browser sign-in and return a freshly minted API key."""
     verifier, challenge = _pkce_pair()
     redirect_uri = _free_redirect_uri()
@@ -51,17 +62,72 @@ def login_and_mint(portal: str, label: str, on_open: typing.Callable[[str], None
             )
         except PortalError as exc:
             raise PortalError(f"sign-in failed: {exc} {KEY_FALLBACK}") from None
-        client.headers["Authorization"] = f"Bearer {token.json()['access_token']}"
+        body = token.json()
+        client.headers["Authorization"] = f"Bearer {body['access_token']}"
+        return _mint_for_signed_in_user(client, portal, label, session_id=body.get("session_id"))
 
-        me = _ok(client.get(f"{portal}/api/auth/me")).json()
-        org_id = me.get("org_id") or (me.get("organization") or {}).get("id")
-        if not org_id:
-            owned = _ok(client.get(f"{portal}/api/organizations/owned")).json()
-            if not owned:
-                raise RuntimeError("no organization is available to mint a key against.")
-            org_id = owned[0]["id"]
 
-        return _mint_key(client, portal, org_id, label)["key"]
+def login_with_password(
+    portal: str,
+    label: str,
+    email: str,
+    password: str,
+    ask_code: typing.Callable[[], str],
+    transport: typing.Optional[httpx.BaseTransport] = None,
+) -> SignedIn:
+    """Email + password login (TOTP code when asked), then mint a key."""
+    with httpx.Client(timeout=20.0, transport=transport) as client:
+        credentials = {"email": email.strip(), "password": password}
+        body = _ok(client.post(f"{portal}/api/auth/token", json=credentials, headers=SDK_AUTH_HEADERS)).json()
+        if body.get("mfa_required"):
+            body = _ok(
+                client.post(
+                    f"{portal}/api/auth/token-mfa",
+                    json={**credentials, "code": ask_code().strip()},
+                    headers=SDK_AUTH_HEADERS,
+                )
+            ).json()
+        client.headers["Authorization"] = f"Bearer {_body_field(body, 'access_token')}"
+        return _mint_for_signed_in_user(client, portal, label, session_id=_body_field(body, "session_id", None))
+
+
+def _body_field(body: typing.Mapping[str, typing.Any], name: str, default: typing.Any = ...) -> typing.Any:
+    """Body keys are cookie-prefixed per environment: ``access_token``, ``staging_access_token``, ..."""
+    for key, value in body.items():
+        if key.endswith(name) and isinstance(value, str) and value:
+            return value
+    if default is not ...:
+        return default
+    raise PortalError(f"the portal did not return {name} for this login.")
+
+
+def _mint_for_signed_in_user(
+    client: httpx.Client, portal: str, label: str, session_id: typing.Optional[str] = None
+) -> SignedIn:
+    """Mint a key for the signed-in user, then revoke the web session: the key is the credential."""
+    me = _ok(client.get(f"{portal}/api/auth/me")).json()
+    email = me.get("email") or (me.get("user") or {}).get("email") or "unknown"
+    org_id = me.get("org_id") or (me.get("organization") or {}).get("id")
+    if not org_id:
+        owned = _ok(client.get(f"{portal}/api/organizations/owned")).json()
+        if not owned:
+            raise RuntimeError("no organization is available to mint a key against.")
+        org_id = owned[0]["id"]
+    key = _mint_key(client, portal, org_id, label)["key"]
+    organization = _organization_name(client, portal, org_id)
+    if session_id:
+        with contextlib.suppress(httpx.HTTPError):
+            client.delete(f"{portal}/api/auth/sessions/{session_id}")
+    return SignedIn(key=key, email=str(email), organization=organization)
+
+
+def _organization_name(client: httpx.Client, portal: str, org_id: str) -> typing.Optional[str]:
+    with contextlib.suppress(httpx.HTTPError, ValueError, TypeError):
+        orgs = client.get(f"{portal}/api/organizations/").json()
+        for org in orgs if isinstance(orgs, list) else []:
+            if isinstance(org, dict) and str(org.get("id")) == str(org_id) and org.get("name"):
+                return str(org["name"])
+    return None
 
 
 def _ok(response: httpx.Response) -> httpx.Response:
