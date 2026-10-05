@@ -67,6 +67,36 @@ print(result.answer)
 
 `result` is a `SessionRunResult`: `id`, `status`, `answer`, the accumulated `events`, and `final_changes`.
 
+## Local agents
+
+`Client.local()` and `await AsyncClient.local()` run the agent on this machine through a local agent runtime,
+started on demand or passed in with `runtime=...`. Each environment picks `host="user_device"` or `host="cloud"`.
+`Client()` keeps using the hosted Agents API. Closing the client stops a runtime it started, unless other clients still
+have active sessions there.
+
+```python
+from hai_agents import Client
+
+with Client.local(local_options={"binary_path": "/path/to/hai-agent-runtime"}) as client:
+    session = client.sessions.create_session(
+        agent={
+            "name": "local-example",
+            "description": "Local workstation example",
+            "instructions": "Answer the user's task using the workstation tools.",
+            "environments": [
+                {"id": "workstation", "kind": "workstation", "host": "user_device"}
+            ],
+        },
+        messages=[{"type": "user_message", "message": "Print hello using the shell."}],
+        max_steps=8,
+        max_time_s=120,
+    )
+    # Poll or steer the session here, before leaving the client context.
+```
+
+Inference stays hosted (`HAI_API_KEY`) unless you pass `inference=Inference.self_hosted(url, model=...)`
+(`from hai_agents_local.runtime import Inference`).
+
 ## How a session works
 
 A session is one run of an agent against a task. It moves through a small set of states: `pending`, `running`, and then a settled state such as `completed`, `idle`, `failed`, `timed_out`, or `interrupted`.

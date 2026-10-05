@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import sys
+import threading
 from typing import TYPE_CHECKING, Literal
 
 from .bridge import LocalBridge, TokenSource
@@ -28,6 +30,7 @@ def ensure_macos_input_permissions(prompt: bool = True) -> None:
     from ApplicationServices import AXIsProcessTrustedWithOptions, kAXTrustedCheckOptionPrompt
     from Quartz import CGPreflightScreenCaptureAccess, CGRequestScreenCaptureAccess
 
+    prompt = prompt and threading.current_thread() is threading.main_thread()
     missing = []
     if not AXIsProcessTrustedWithOptions({kAXTrustedCheckOptionPrompt: prompt}):
         missing.append("Accessibility (moves the mouse and types)")
@@ -97,6 +100,10 @@ class PyautoguiDesktopBridge(LocalBridge["DesktopDriverInterface"]):
             image_format=self.image_format,
             quality=self.quality,
         )
+
+    async def interrupt_driver(self) -> None:
+        if self._driver is not None:
+            await asyncio.to_thread(self._driver.close)
 
     def driver_interface(self) -> type:
         # Runtime import: hai-drivers is absent unless installed with hai-agents[desktop].
