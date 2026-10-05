@@ -11,11 +11,11 @@ from urllib.parse import urljoin
 from dotenv import dotenv_values, set_key, unset_key
 
 from hai_agents import AsyncClient, Client
+from hai_agents.client import API_KEY_VAR, CREDENTIALS_PATH
 from hai_agents.environment import HaiAgentsEnvironment
 
 ApiKey = str | Callable[[], str]
 
-API_KEY_VAR = "HAI_API_KEY"
 BASE_URL_VAR = "HAI_API_BASE_URL"
 PORTAL_URL_VAR = "HAI_PORTAL_URL"
 
@@ -26,7 +26,7 @@ PORTALS = {
 API_KEYS_PAGE = "https://platform.hcompany.ai/settings/api-keys"
 
 LOCAL_ENV_PATH = Path(".env")
-GLOBAL_ENV_PATH = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")) / "hai" / ".env"
+GLOBAL_ENV_PATH = CREDENTIALS_PATH
 
 
 def portal_base(base_url: str | None = None) -> str:

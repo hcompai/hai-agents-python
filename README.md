@@ -45,6 +45,8 @@ Python 3.10 or newer is required. Get an API key at [platform.hcompany.ai/settin
 export HAI_API_KEY=hk-...
 ```
 
+With the `cli` extra, `hai login` stores a key once instead, and `Client()` picks it up.
+
 ## Quickstart
 
 Launch the built-in `h/web-surfer-pro` agent, which ships with its own browser, and describe the task in plain language. `run_session` polls until the agent finishes and returns the final answer.
@@ -63,7 +65,7 @@ print(result.status)
 print(result.answer)
 ```
 
-`Client()` reads `HAI_API_KEY` from the environment.
+`Client()` reads `HAI_API_KEY` from the environment, else the key `hai login` stored in `~/.config/hai/.env`.
 
 `result` is a `SessionRunResult`: `id`, `status`, `answer`, the accumulated `events`, and `final_changes`.
 
@@ -335,7 +337,7 @@ hai sessions watch <session-id>
 hai mcp install
 ```
 
-`hai login` signs in through the browser with Google and stores a key in `~/.config/hai/.env`. Without a Google account or a browser, create a key at [platform.hcompany.ai/settings/api-keys](https://platform.hcompany.ai/settings/api-keys) and run `hai login --key`. `hai mcp install` adds the hai-agents MCP server to Cursor, VS Code, Claude Code, and other MCP clients. Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`, then `~/.config/hai/.env`. Run `hai --help` for the full command set.
+`hai login` signs in with Google in the browser, or takes a key you paste from [platform.hcompany.ai/settings/api-keys](https://platform.hcompany.ai/settings/api-keys), and stores it in `~/.config/hai/.env`. Any other command does the same on first use in a terminal, so `hai login` is optional. Scripts and `--json` runs never prompt: pipe a key into `hai login --key` or set `HAI_API_KEY`. `hai mcp install` adds the hai-agents MCP server to Cursor, VS Code, Claude Code, and other MCP clients. Credentials resolve from `--api-key`, then `HAI_API_KEY`, then a local `.env`, then `~/.config/hai/.env`. Run `hai --help` for the full command set.
 
 ## Documentation
 

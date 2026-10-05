@@ -93,7 +93,7 @@ def login(
         "Reads it from a hidden prompt, or from stdin when piped.",
     ),
 ) -> None:
-    """Sign in through the browser and store an API key in ~/.config/hai/.env."""
+    """Sign in through the browser or with a pasted key, and store the key in ~/.config/hai/.env."""
     state = _state(ctx)
     if credentials.current_api_key() and not force:
         console.print("Already signed in. Pass --force to rotate the key.")
@@ -101,13 +101,43 @@ def login(
     if key:
         _store_pasted_key(state.base_url)
         return
-    if not sys.stdin.isatty():
-        _raise_cli_error(RuntimeError(f"login needs an interactive terminal and a browser. {auth.KEY_FALLBACK}"))
+    if not _interactive():
+        _raise_cli_error(RuntimeError(f"login needs an interactive terminal. {auth.KEY_FALLBACK}"))
+    _sign_in(state.base_url)
 
+
+def _interactive() -> bool:
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _sign_in_if_needed(state: AppState) -> None:
+    """Commands sign in on first use in a terminal, so a fresh install needs no `hai login` step."""
+    if credentials.current_api_key(state.api_key) or state.json_output or not _interactive():
+        return
+    console.print("No API key found, so let's sign you in first.")
+    _sign_in(state.base_url)
+
+
+def _sign_in(base_url: str | None) -> None:
+    console.print(
+        "How do you want to sign in?\n"
+        "  1. Google account, in your browser\n"
+        f"  2. Paste an API key from {credentials.API_KEYS_PAGE}"
+    )
+    choice = typer.prompt("Choice", default="1").strip()
+    if choice == "1":
+        _browser_sign_in(base_url)
+    elif choice == "2":
+        _store_pasted_key(base_url)
+    else:
+        _raise_cli_error(RuntimeError(f"Choice must be 1 or 2, got {choice!r}."))
+
+
+def _browser_sign_in(base_url: str | None) -> None:
     label = f"hai CLI ({socket.gethostname()})"
     try:
         minted = auth.login_and_mint(
-            credentials.portal_base(state.base_url),
+            credentials.portal_base(base_url),
             label,
             lambda url: console.print(f"Opening your browser. If it does not open, visit:\n  {url}", style="dim"),
         )
@@ -559,6 +589,7 @@ def mcp_install(
     else:
         _raise_cli_error(RuntimeError(f"Unknown client {client!r}. Run `hai mcp install list` to see supported ids."))
 
+    _sign_in_if_needed(state)
     try:
         resolved = credentials.resolve_api_key(state.api_key)
         key = resolved() if callable(resolved) else resolved
@@ -700,6 +731,7 @@ def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str
     import logging
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    _sign_in_if_needed(state)
     try:
         bridge = bridge_type(
             api_key=credentials.resolve_api_key(state.api_key),
@@ -784,6 +816,7 @@ def _state(ctx: typer.Context) -> AppState:
 
 
 def _client(state: AppState) -> Client:
+    _sign_in_if_needed(state)
     try:
         return make_client(api_key=state.api_key, base_url=state.base_url)
     except RuntimeError as exc:
