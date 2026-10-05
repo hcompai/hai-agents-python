@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import stat
+import sys
+
 import httpx
 import pytest
 from typer.testing import CliRunner
@@ -55,6 +58,27 @@ def test_save_then_clear_roundtrip(monkeypatch):
     credentials.clear_api_key()
     with pytest.raises(RuntimeError):
         credentials.resolve_api_key()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permissions")
+def test_saved_key_is_owner_only(tmp_path, monkeypatch):
+    directory = tmp_path / "hai"
+    monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", directory / ".env")
+    directory.mkdir(mode=0o755)
+    credentials.GLOBAL_ENV_PATH.write_text("OTHER=1\n")
+    credentials.GLOBAL_ENV_PATH.chmod(0o644)
+
+    credentials.save_api_key("hk-minted")
+
+    assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+    assert stat.S_IMODE(credentials.GLOBAL_ENV_PATH.stat().st_mode) == 0o600
+
+    credentials.GLOBAL_ENV_PATH.unlink()
+    directory.rmdir()
+    credentials.save_api_key("hk-fresh")
+
+    assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+    assert stat.S_IMODE(credentials.GLOBAL_ENV_PATH.stat().st_mode) == 0o600
 
 
 def test_absolute_share_url_prepends_base():
