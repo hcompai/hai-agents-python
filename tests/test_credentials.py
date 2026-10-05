@@ -111,7 +111,6 @@ def test_login_key_validates_then_stores(monkeypatch, status, saved):
                 raise ApiError(status_code=status, body={"detail": "Invalid API key"})
 
     monkeypatch.setattr(app_module, "make_client", lambda **_: type("C", (), {"sessions": _Sessions()})())
-    monkeypatch.setattr(app_module.credentials, "current_api_key", lambda *_: "hk-existing")
 
     result = runner.invoke(app, ["login", "--key"], input="hk-pasted\n")
     monkeypatch.delenv(credentials.API_KEY_VAR, raising=False)
@@ -125,3 +124,29 @@ def test_login_key_validates_then_stores(monkeypatch, status, saved):
 
 def _error_text(result) -> str:
     return "\n".join(part for part in (result.output, result.stderr, str(result.exception)) if part)
+
+
+def test_login_key_is_a_no_op_when_a_key_is_already_stored(monkeypatch):
+    """Pasted snippets start with `hai login --key`; a second paste must not ask again."""
+    monkeypatch.setattr(app_module.credentials, "current_api_key", lambda *_: "hk-existing")
+    monkeypatch.setattr(app_module, "make_client", lambda **_: pytest.fail("must not validate or store anything"))
+
+    result = runner.invoke(app, ["login", "--key"], input="hk-pasted\n")
+
+    assert result.exit_code == 0
+    assert "Already signed in" in result.output
+
+
+def test_login_key_force_replaces_a_stored_key(monkeypatch):
+    class _Sessions:
+        def get_session_quota(self):
+            pass
+
+    monkeypatch.setattr(app_module, "make_client", lambda **_: type("C", (), {"sessions": _Sessions()})())
+    credentials.save_api_key("hk-existing")
+
+    result = runner.invoke(app, ["login", "--key", "--force"], input="hk-new\n")
+    monkeypatch.delenv(credentials.API_KEY_VAR, raising=False)
+
+    assert result.exit_code == 0, _error_text(result)
+    assert "hk-new" in credentials.GLOBAL_ENV_PATH.read_text()
