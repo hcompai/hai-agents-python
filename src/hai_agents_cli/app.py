@@ -95,11 +95,11 @@ def login(
 ) -> None:
     """Sign in through the browser and store an API key in ~/.config/hai/.env."""
     state = _state(ctx)
-    if key:
-        _store_pasted_key(state.base_url)
-        return
     if credentials.current_api_key() and not force:
         console.print("Already signed in. Pass --force to rotate the key.")
+        return
+    if key:
+        _store_pasted_key(state.base_url)
         return
     if not sys.stdin.isatty():
         _raise_cli_error(RuntimeError(f"login needs an interactive terminal and a browser. {auth.KEY_FALLBACK}"))
@@ -118,7 +118,8 @@ def login(
 
 
 def _store_pasted_key(base_url: str | None) -> None:
-    pasted = typer.prompt("API key", hide_input=True) if sys.stdin.isatty() else sys.stdin.readline()
+    prompt = f"API key (create one at {credentials.API_KEYS_PAGE})"
+    pasted = typer.prompt(prompt, hide_input=True) if sys.stdin.isatty() else sys.stdin.readline()
     pasted = pasted.strip()
     if not pasted:
         _raise_cli_error(RuntimeError(f"no key given; create one at {credentials.API_KEYS_PAGE}."))
