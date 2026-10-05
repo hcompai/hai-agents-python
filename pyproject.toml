@@ -69,7 +69,7 @@ dev = [
   # Used only by tests/integration/ — read HAI_API_KEY_TEST when running locally.
   "python-dotenv>=1.2.3,<2",
   "rich>=15.0.0,<16",
-  "ruff==0.16.7",
+  "ruff==0.16.9",
   "typer>=0.27.2,<1",
 ]
 
