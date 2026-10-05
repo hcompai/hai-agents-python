@@ -238,6 +238,37 @@ async def test_close_stops_only_an_owned_runtime_no_other_client_uses(
     assert client._client_wrapper.httpx_client.httpx_client.is_closed
 
 
+def test_last_client_of_the_spawning_process_stops_the_runtime(tmp_path, monkeypatch, runtime_server):
+    from types import SimpleNamespace
+
+    from hai_agents.sessions.client import SessionsClient
+
+    stopped = []
+    spawned = _owned_runtime(runtime_server, tmp_path, monkeypatch, stopped)
+    spawned._proc = SimpleNamespace(poll=lambda: None)
+    write_owner_only(token_file_path(runtime_server.port, cache_dir=tmp_path), runtime_server.token)
+    attached = LocalRuntime.attach(port=runtime_server.port, cache_dir=tmp_path)
+    assert attached is not None and not attached.owned
+    starts = iter([spawned, attached, attached])
+    monkeypatch.setattr(LocalRuntime, "ensure_started", lambda **options: next(starts))
+    monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kwargs: SimpleNamespace(id="theirs"))
+
+    spawner = Client.local(auto_bridges=False)
+    later = Client.local(auto_bridges=False)
+    later.sessions.create_session(agent="h/agent", messages="hi")
+    runtime_server.active = ["theirs"]
+    spawner.close()
+    assert stopped == [], "the spawner must not kill a runtime another client of its process still uses"
+    later.close()
+    assert stopped == [True], "the last client of the spawning process stops the runtime"
+
+    spawned._proc = SimpleNamespace(poll=lambda: 0)
+    runtime_server.active = []
+    stranger = Client.local(auto_bridges=False)
+    stranger.close()
+    assert stopped == [True], "a runtime this process did not spawn is never stopped"
+
+
 def test_binary_resolution_does_not_hold_the_port_startup_lock(tmp_path, monkeypatch):
     from hai_agents_local.runtime import BinaryNotFoundError
     from hai_agents_local.runtime import runtime as module

@@ -379,6 +379,11 @@ class LocalRuntime:
             self.api_key, timeout=CLIENT_TIMEOUT_S if timeout is None else timeout, follow_redirects=True
         )
 
+    @property
+    def child_alive(self) -> bool:
+        """True while the process this LocalRuntime spawned is still running."""
+        return self._proc is not None and self._proc.poll() is None
+
     def shutdown(self) -> None:
         """Gracefully stop the runtime this LocalRuntime spawned (SIGTERM group, grace, SIGKILL group)."""
         if not self.owned or self._proc is None:
