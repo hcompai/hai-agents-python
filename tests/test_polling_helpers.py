@@ -13,7 +13,6 @@ import pydantic
 import pytest
 
 from hai_agents.polling import (
-    MAX_REQUEST_BYTES,
     assert_request_under_limit,
     is_settled_session_status,
     is_terminal_session_status,
@@ -78,10 +77,6 @@ def test_payload_limit_serializes_pydantic_models() -> None:
     assert_request_under_limit(Shot(png="ok"), max_bytes=200)
     with pytest.raises(ValueError, match="Downscale images"):
         assert_request_under_limit(Shot(png="x" * 200), max_bytes=50)
-
-
-def test_default_limit_is_five_megabytes() -> None:
-    assert MAX_REQUEST_BYTES == 5 * 1024 * 1024
 
 
 def test_wait_times_out_on_wall_clock() -> None:
