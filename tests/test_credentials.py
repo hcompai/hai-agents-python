@@ -24,7 +24,7 @@ def isolated_env(tmp_path, monkeypatch):
     """Point credential resolution at empty temp files and a clean environment."""
     for var in (credentials.API_KEY_VAR, credentials.BASE_URL_VAR, credentials.PORTAL_URL_VAR):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
     monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", sdk_client.credentials_path())
     credentials.GLOBAL_ENV_PATH.parent.mkdir(parents=True)
 
