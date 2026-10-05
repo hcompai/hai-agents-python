@@ -2,17 +2,22 @@
 
 Fern emits the API surface as ``BaseClient``/``AsyncBaseClient``; these thin
 subclasses add the object-oriented sugar (``run_session``, ``start_session``,
-``session``) that delegates to the hand-written polling helpers.
+``session``) that delegates to the hand-written polling helpers, and default
+``api_key`` to the key ``hai login`` stored.
 """
 
 from __future__ import annotations
 
 import asyncio
+import functools
+import os
 import typing
+from pathlib import Path
 
 import typing_extensions
 
 from .base_client import AsyncBaseClient, BaseClient
+from .core.api_error import ApiError
 from .polling import (
     AnswerT,
     AsyncSessionHandle,
@@ -31,8 +36,46 @@ from .tools import ToolInput, as_tools
 if typing.TYPE_CHECKING:
     from hai_agents_local.runtime import Inference, LocalRuntime
 
+API_KEY_VAR = "HAI_API_KEY"
+
+_P = typing_extensions.ParamSpec("_P")
+
+
+def credentials_path() -> Path:
+    """The global `.env` that `hai login` writes: `$XDG_CONFIG_HOME/hai/.env`, else `~/.config/hai/.env`."""
+    return Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")) / "hai" / ".env"
+
+
+def _stored_api_key() -> typing.Optional[str]:
+    """The `HAI_API_KEY` that `hai login` stored, if any."""
+    try:
+        lines = credentials_path().read_text(encoding="utf-8").splitlines()
+    except (OSError, RuntimeError, UnicodeDecodeError):
+        return None
+    for line in lines:
+        name, sep, value = line.strip().removeprefix("export ").partition("=")
+        if sep and name.strip() == API_KEY_VAR:
+            return value.strip().strip("'\"") or None
+    return None
+
+
+def _default_api_key(init: typing.Callable[_P, None]) -> typing.Callable[_P, None]:
+    """Resolve `api_key` as: argument, then `HAI_API_KEY`, then the key stored by `hai login`."""
+
+    @functools.wraps(init)
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> None:
+        if kwargs.get("api_key") is None:
+            api_key = os.getenv(API_KEY_VAR) or _stored_api_key()
+            if api_key is None:
+                raise ApiError(body=f"No API key found. Pass api_key, set {API_KEY_VAR}, or run `hai login`.")
+            kwargs["api_key"] = api_key
+        init(*args, **kwargs)
+
+    return wrapper
+
 
 class Client(BaseClient):
+    __init__ = _default_api_key(BaseClient.__init__)
     local_runtime: typing.Optional[LocalRuntime] = None
     _owns_runtime = False
     _auto_bridges = True
@@ -138,6 +181,7 @@ class Client(BaseClient):
 
 
 class AsyncClient(AsyncBaseClient):
+    __init__ = _default_api_key(AsyncBaseClient.__init__)
     local_runtime: typing.Optional[LocalRuntime] = None
     _owns_runtime = False
     _auto_bridges = True

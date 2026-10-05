@@ -11,11 +11,11 @@ from urllib.parse import urljoin
 from dotenv import dotenv_values, set_key, unset_key
 
 from hai_agents import AsyncClient, Client
+from hai_agents.client import API_KEY_VAR, credentials_path
 from hai_agents.environment import HaiAgentsEnvironment
 
 ApiKey = str | Callable[[], str]
 
-API_KEY_VAR = "HAI_API_KEY"
 BASE_URL_VAR = "HAI_API_BASE_URL"
 PORTAL_URL_VAR = "HAI_PORTAL_URL"
 
@@ -25,8 +25,7 @@ PORTALS = {
 }
 API_KEYS_PAGE = "https://platform.hcompany.ai/settings/api-keys"
 
-LOCAL_ENV_PATH = Path(".env")
-GLOBAL_ENV_PATH = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")) / "hai" / ".env"
+GLOBAL_ENV_PATH = credentials_path()
 
 
 def portal_base(base_url: str | None = None) -> str:
@@ -105,9 +104,8 @@ def source(explicit: ApiKey | None = None) -> str | None:
         return "argument"
     if os.environ.get(API_KEY_VAR):
         return "environment"
-    for path in _env_paths():
-        if path.exists() and dotenv_values(path).get(API_KEY_VAR):
-            return str(path)
+    if _stored(API_KEY_VAR):
+        return str(GLOBAL_ENV_PATH)
     return None
 
 
@@ -119,18 +117,11 @@ def _client_kwargs(api_key: ApiKey | None, base_url: str | None) -> dict[str, Ap
     return kwargs
 
 
-def _env_paths() -> tuple[Path, ...]:
-    # CWD `.env` overrides the global config `.env`.
-    return (LOCAL_ENV_PATH, GLOBAL_ENV_PATH)
-
-
 def _lookup(name: str) -> str | None:
-    if os.environ.get(name):
-        return os.environ[name]
-    for path in _env_paths():
-        if not path.exists():
-            continue
-        value = dotenv_values(path).get(name)
-        if value:
-            return value
-    return None
+    return os.environ.get(name) or _stored(name)
+
+
+def _stored(name: str) -> str | None:
+    if not GLOBAL_ENV_PATH.exists():
+        return None
+    return dotenv_values(GLOBAL_ENV_PATH).get(name) or None

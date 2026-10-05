@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import stat
 import sys
+from types import SimpleNamespace
 
 import httpx
 import pytest
 from typer.testing import CliRunner
 
+import hai_agents.client as sdk_client
 import hai_agents_cli.app as app_module
+from hai_agents import AsyncClient, Client
 from hai_agents.core.api_error import ApiError
 from hai_agents_cli import auth
 from hai_agents_cli.app import app
@@ -21,8 +24,9 @@ def isolated_env(tmp_path, monkeypatch):
     """Point credential resolution at empty temp files and a clean environment."""
     for var in (credentials.API_KEY_VAR, credentials.BASE_URL_VAR, credentials.PORTAL_URL_VAR):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setattr(credentials, "LOCAL_ENV_PATH", tmp_path / "local.env")
-    monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", tmp_path / "global.env")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", sdk_client.credentials_path())
+    credentials.GLOBAL_ENV_PATH.parent.mkdir(parents=True)
 
 
 def test_env_var_beats_dotenv(monkeypatch):
@@ -33,12 +37,11 @@ def test_env_var_beats_dotenv(monkeypatch):
     assert credentials.source() == "environment"
 
 
-def test_local_dotenv_overrides_global():
+def test_stored_key_is_found_and_reported():
     credentials.GLOBAL_ENV_PATH.write_text("HAI_API_KEY=hk-global\n")
-    credentials.LOCAL_ENV_PATH.write_text("HAI_API_KEY=hk-local\n")
 
-    assert credentials.resolve_api_key() == "hk-local"
-    assert credentials.source() == str(credentials.LOCAL_ENV_PATH)
+    assert credentials.resolve_api_key() == "hk-global"
+    assert credentials.source() == str(credentials.GLOBAL_ENV_PATH)
 
 
 def test_missing_key_raises_with_guidance():
@@ -144,6 +147,48 @@ def test_login_key_validates_then_stores(monkeypatch, status, saved):
     assert ("hk-pasted" in stored) is saved
     if not saved:
         assert "rejected this key" in _error_text(result)
+
+
+@pytest.mark.parametrize("client_type", [Client, AsyncClient])
+def test_sdk_client_falls_back_to_the_key_hai_login_stored(monkeypatch, client_type):
+    with pytest.raises(ApiError, match="hai login"):
+        client_type()
+
+    credentials.save_api_key("hk-stored")
+    monkeypatch.delenv(credentials.API_KEY_VAR)
+    assert client_type()._client_wrapper._get_api_key() == "hk-stored"
+
+    monkeypatch.setenv(credentials.API_KEY_VAR, "hk-env")
+    assert client_type()._client_wrapper._get_api_key() == "hk-env"
+    assert client_type(api_key="hk-arg")._client_wrapper._get_api_key() == "hk-arg"
+
+
+def test_commands_sign_in_on_first_use_then_run(monkeypatch):
+    listed = []
+    fake = SimpleNamespace(
+        sessions=SimpleNamespace(get_session_quota=lambda: None),
+        agents=SimpleNamespace(list_agents=lambda **_: listed.append(True) or SimpleNamespace(items=[])),
+    )
+    monkeypatch.setattr(app_module, "make_client", lambda **_: fake)
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+
+    result = runner.invoke(app, ["agents", "list"], input="2\nhk-pasted\n")
+    monkeypatch.delenv(credentials.API_KEY_VAR, raising=False)
+
+    assert result.exit_code == 0, _error_text(result)
+    assert "hk-pasted" in credentials.GLOBAL_ENV_PATH.read_text()
+    assert listed == [True]
+
+
+@pytest.mark.parametrize(("args", "interactive"), [(["agents", "list"], False), (["--json", "agents", "list"], True)])
+def test_scripts_never_get_a_sign_in_prompt(monkeypatch, args, interactive):
+    monkeypatch.setattr(app_module, "_interactive", lambda: interactive)
+
+    result = runner.invoke(app, args, input="2\nhk-pasted\n")
+
+    assert result.exit_code == 1
+    assert "No API key found" in _error_text(result)
+    assert not credentials.GLOBAL_ENV_PATH.exists()
 
 
 def _error_text(result) -> str:
