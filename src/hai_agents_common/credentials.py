@@ -25,7 +25,6 @@ PORTALS = {
 }
 API_KEYS_PAGE = "https://platform.hcompany.ai/settings/api-keys"
 
-LOCAL_ENV_PATH = Path(".env")
 GLOBAL_ENV_PATH = credentials_path()
 
 
@@ -105,9 +104,8 @@ def source(explicit: ApiKey | None = None) -> str | None:
         return "argument"
     if os.environ.get(API_KEY_VAR):
         return "environment"
-    for path in _env_paths():
-        if path.exists() and dotenv_values(path).get(API_KEY_VAR):
-            return str(path)
+    if _stored(API_KEY_VAR):
+        return str(GLOBAL_ENV_PATH)
     return None
 
 
@@ -119,18 +117,11 @@ def _client_kwargs(api_key: ApiKey | None, base_url: str | None) -> dict[str, Ap
     return kwargs
 
 
-def _env_paths() -> tuple[Path, ...]:
-    # CWD `.env` overrides the global config `.env`.
-    return (LOCAL_ENV_PATH, GLOBAL_ENV_PATH)
-
-
 def _lookup(name: str) -> str | None:
-    if os.environ.get(name):
-        return os.environ[name]
-    for path in _env_paths():
-        if not path.exists():
-            continue
-        value = dotenv_values(path).get(name)
-        if value:
-            return value
-    return None
+    return os.environ.get(name) or _stored(name)
+
+
+def _stored(name: str) -> str | None:
+    if not GLOBAL_ENV_PATH.exists():
+        return None
+    return dotenv_values(GLOBAL_ENV_PATH).get(name) or None

@@ -23,7 +23,6 @@ def isolated_env(tmp_path, monkeypatch):
     for var in (credentials.API_KEY_VAR, credentials.BASE_URL_VAR, credentials.PORTAL_URL_VAR):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    monkeypatch.setattr(credentials, "LOCAL_ENV_PATH", tmp_path / "local.env")
     monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", sdk_client.credentials_path())
     credentials.GLOBAL_ENV_PATH.parent.mkdir(parents=True)
 
@@ -36,12 +35,11 @@ def test_env_var_beats_dotenv(monkeypatch):
     assert credentials.source() == "environment"
 
 
-def test_local_dotenv_overrides_global():
+def test_stored_key_is_found_and_reported():
     credentials.GLOBAL_ENV_PATH.write_text("HAI_API_KEY=hk-global\n")
-    credentials.LOCAL_ENV_PATH.write_text("HAI_API_KEY=hk-local\n")
 
-    assert credentials.resolve_api_key() == "hk-local"
-    assert credentials.source() == str(credentials.LOCAL_ENV_PATH)
+    assert credentials.resolve_api_key() == "hk-global"
+    assert credentials.source() == str(credentials.GLOBAL_ENV_PATH)
 
 
 def test_missing_key_raises_with_guidance():
