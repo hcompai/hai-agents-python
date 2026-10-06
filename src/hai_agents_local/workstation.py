@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import sysconfig
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -35,9 +36,11 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         api_key: TokenSource,
         base_url: str | None = None,
         session_id: str | None = None,
+        environment_variables: Mapping[str, str] | None = None,
     ) -> None:
         super().__init__(environment_id, api_key=api_key, base_url=base_url, session_id=session_id)
         self.workspace = Path(workspace).expanduser() if workspace else Path.home() / "hai" / self.session_id
+        self.environment_variables = dict(environment_variables or {})
 
     def preflight(self) -> None:
         if sys.platform == "darwin":
@@ -57,6 +60,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         return LocalCodeSandbox(
             str(self.workspace),
             environment_variables={
+                **self.environment_variables,
                 "COORDINATE_SYSTEM": "0-1000",
                 "CUA_SESSION": self.session_id,
                 "PATH": os.pathsep.join([os.path.dirname(desk), path]),
