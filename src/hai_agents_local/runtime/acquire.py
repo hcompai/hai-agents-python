@@ -6,6 +6,8 @@ import asyncio
 import threading
 import typing
 
+from hai_agents.client import API_KEY_VAR, default_api_key
+
 from .inference import Inference
 from .runtime import LocalRuntime
 
@@ -61,6 +63,9 @@ def _launch_options(
     options = dict(local_options or {})
     options["required_recipe"] = SHARED_RECIPE
     options["spawn_env"] = {RECIPE_ENV: SHARED_RECIPE, **options.get("spawn_env", {})}
+    api_key = default_api_key()
+    if api_key is not None:
+        options["spawn_env"].setdefault(API_KEY_VAR, api_key)
     if inference is not None:
         options["spawn_env"] = inference.runtime_env(options["spawn_env"])
         options["inherit_env"] = False
