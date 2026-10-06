@@ -286,14 +286,14 @@ wheels = [
 
 [[package]]
 name = "cua-driver"
-version = "0.30.4"
+version = "0.34.0"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/1f/3c2e7d792e7e9141326bbea385c6505596a5114eb9ac88897ccb79730e8c/cua_driver-0.30.4-py3-none-macosx_13_0_universal2.whl", hash = "sha256:18fb6eb786eda51d027da9cf209a93b10d2f06a480ab9abfc892dc30e331fc03", size = 43518466, upload-time = "2026-09-28T21:41:42.927Z" },
-    { url = "https://files.pythonhosted.org/packages/93/7c/e50cb74829066b64077f70f171c9a62757b54f04108466825944df33d6ff/cua_driver-0.30.4-py3-none-manylinux_2_31_aarch64.whl", hash = "sha256:9d7c9bb3eb6df2b52a93f711aa375bdf2c7fbc02fa925f15599b2986e7183f08", size = 32611972, upload-time = "2026-09-28T21:41:45.947Z" },
-    { url = "https://files.pythonhosted.org/packages/72/6f/35d12b31be023205f8e1349aab70dd514007d6ccfc9641f21c6c18761236/cua_driver-0.30.4-py3-none-manylinux_2_31_x86_64.whl", hash = "sha256:e8cdf891b8299d5515e087167df1a628fb9104edd1fba053eaf620f5ddee864b", size = 32227932, upload-time = "2026-09-28T21:41:48.759Z" },
-    { url = "https://files.pythonhosted.org/packages/e4/ce/324d409cfe31d9b84275765996c869eb4324838b423b94111b087a868627/cua_driver-0.30.4-py3-none-win_amd64.whl", hash = "sha256:199efee24c2f0c1e6c925f712e74478a24a4605e931b7ec23181a5ec78e80f64", size = 28377116, upload-time = "2026-09-28T21:41:51.218Z" },
-    { url = "https://files.pythonhosted.org/packages/76/bb/7ebea434f2a84967e3bc7f50db8831f9de3724176dc6ab6c67147d29de34/cua_driver-0.30.4-py3-none-win_arm64.whl", hash = "sha256:3de51de33d78fb354e7fef89d1697c3b783b7c953ede0fdf5bc1ba2fe951423e", size = 26558544, upload-time = "2026-09-28T21:41:53.635Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/5b/1a26e1dd390df287b94fa7c4f8f2715da9adf67bd35a024f6ad580305473/cua_driver-0.34.0-py3-none-macosx_13_0_universal2.whl", hash = "sha256:4b3b0aeb5998741ddf06cb9dd42e88a679c7575d4860886e492f363a1104c2fd", size = 44421657, upload-time = "2026-10-05T22:34:08.933Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/10/acb96bde4395f6a7ed75f8578a2706ce98bdfc8fc484bed4399f58e9040c/cua_driver-0.34.0-py3-none-manylinux_2_31_aarch64.whl", hash = "sha256:e4519f6e933759ee1beb27c66d0093a2f80319c2d6c3fae5f2b80a182a63bd06", size = 33148119, upload-time = "2026-10-05T22:34:12.281Z" },
+    { url = "https://files.pythonhosted.org/packages/71/c8/ddfee7ec0d48026e07e7a615c9268d232c88774b38a66d5280572a595bb0/cua_driver-0.34.0-py3-none-manylinux_2_31_x86_64.whl", hash = "sha256:d918b9e37195e2822c2011ddbbe965c0c013a078508a3c668d95afd02502378a", size = 32828162, upload-time = "2026-10-05T22:34:15.397Z" },
+    { url = "https://files.pythonhosted.org/packages/32/86/91ca36a118e5594f9aa17b2fbbc4fe724201a53cd78ddd39001ff2184db0/cua_driver-0.34.0-py3-none-win_amd64.whl", hash = "sha256:ecb2272eb3ac70399498934f7fc7166a4c6618ce5edcfe93563df30dbd23f66a", size = 28898864, upload-time = "2026-10-05T22:34:18.718Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/f7/195da29b711d7cc3e5e5a1da1ccc51adfb1e0e1874373b11f985abec0516/cua_driver-0.34.0-py3-none-win_arm64.whl", hash = "sha256:2269e368727ba0c31784fc00e86f97832d99bcc1a1c1ba86205a1313c7a6ae4b", size = 26994412, upload-time = "2026-10-05T22:34:21.87Z" },
 ]
 
 [[package]]
@@ -584,7 +584,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "hai-agents", extras = ["browser", "cli", "desktop", "workstation"], marker = "extra == 'all'" },
-    { name = "hai-drivers", extras = ["browser-cli", "cua-cli", "desktop-cli"], marker = "extra == 'workstation'", specifier = ">=0.1.9" },
+    { name = "hai-drivers", extras = ["browser-cli", "cua-cli", "desktop-cli"], marker = "extra == 'workstation'", specifier = ">=0.1.10" },
     { name = "hai-drivers", extras = ["desktop"], marker = "extra == 'desktop'", specifier = ">=0.1.3" },
     { name = "hai-drivers", extras = ["web"], marker = "extra == 'browser'", specifier = ">=0.1.3" },
     { name = "httpx", specifier = ">=0.23.0,<0.29.0" },
@@ -608,7 +608,7 @@ dev = [
 
 [[package]]
 name = "hai-drivers"
-version = "0.1.9"
+version = "0.1.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdownify" },
@@ -616,7 +616,7 @@ dependencies = [
     { name = "pydantic" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/f9/b16a8889df2034ef68f81d7b0c943a5880e4abe677abbacb8e328f9fe7d6/hai_drivers-0.1.9-py3-none-any.whl", hash = "sha256:d664a96dc362705c93b357d70dc1e16c0d093deac9f1d9c576c8c15928533f96", size = 257381, upload-time = "2026-10-02T16:33:50.527Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/06/9e0974ad5c0de01f7a80fd387aea2dd334dad63be4afd7558b2bae8328d5/hai_drivers-0.1.10-py3-none-any.whl", hash = "sha256:d824866a98534d93e1aba343a6524785d6babc9ed994bb9188e97e512b129e25", size = 277218, upload-time = "2026-10-07T11:53:29.59Z" },
 ]
 
 [package.optional-dependencies]
