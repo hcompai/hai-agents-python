@@ -731,17 +731,23 @@ class TestDriverInterfaces:
         pytest.importorskip("hai_drivers.code_sandbox.local.driver")
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.delenv("CUA_CURSOR", raising=False)
-        bridge = WorkstationBridge(api_key="k")
+        bridge = WorkstationBridge(
+            api_key="k",
+            environment_variables={"RUN_CONFIG": "/run/config.json", "CUA_SESSION": "other", "PATH": "/nowhere"},
+        )
         bridge._driver = bridge.create_driver()
         try:
             result, error = bridge._dispatch(
                 "execute",
-                {"command": "pwd -P; echo $COORDINATE_SYSTEM $CUA_SESSION $CUA_CURSOR; command -v desk web cua click"},
+                {
+                    "command": "pwd -P; echo $COORDINATE_SYSTEM $CUA_SESSION $CUA_CURSOR $RUN_CONFIG;"
+                    " command -v desk web cua click"
+                },
             )
             assert error is None and result["exit_code"] == 0
             out = result["stdout"].split()
             assert out[0] == str((tmp_path / "hai" / bridge.session_id).resolve())
-            assert out[1:4] == ["0-1000", bridge.session_id, "off"] and len(out) == 8
+            assert out[1:5] == ["0-1000", bridge.session_id, "off", "/run/config.json"] and len(out) == 9
         finally:
             bridge._driver.close()
 
