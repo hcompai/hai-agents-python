@@ -161,6 +161,26 @@ def test_self_hosted_inference_does_not_receive_hosted_key(monkeypatch):
     assert "HAI_AGENT_RUNTIME_BASE_URL" not in Inference.cloud().runtime_env()
 
 
+@pytest.mark.parametrize(
+    ("inference", "forwarded"),
+    [(None, "hk-stored"), (Inference.self_hosted("http://127.0.0.1:8000/v1", model="my-model"), None)],
+)
+def test_spawned_runtime_infers_with_the_key_hai_login_stored(tmp_path, monkeypatch, inference, forwarded):
+    monkeypatch.delenv("HAI_API_KEY", raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    (tmp_path / "hai").mkdir()
+    (tmp_path / "hai" / ".env").write_text("HAI_API_KEY=hk-stored\n")
+    launches = []
+
+    def start(**options):
+        launches.append(options)
+        return FakeRuntime()
+
+    monkeypatch.setattr(LocalRuntime, "ensure_started", start)
+    Client.local(inference=inference, auto_bridges=False)
+    assert launches[0]["spawn_env"].get("HAI_API_KEY") == forwarded
+
+
 @pytest.mark.parametrize("proof_token", ["local-token", "squatter-token", None])
 def test_only_the_runtime_holding_the_token_ever_receives_it(tmp_path, runtime_server, proof_token):
     write_owner_only(token_file_path(runtime_server.port, cache_dir=tmp_path), "local-token")
