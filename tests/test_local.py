@@ -731,7 +731,10 @@ class TestDriverInterfaces:
         pytest.importorskip("hai_drivers.code_sandbox.local.driver")
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.delenv("CUA_CURSOR", raising=False)
-        bridge = WorkstationBridge(api_key="k", environment_variables={"RUN_CONFIG": "/run/config.json"})
+        bridge = WorkstationBridge(
+            api_key="k",
+            environment_variables={"RUN_CONFIG": "/run/config.json", "CUA_SESSION": "other", "PATH": "/nowhere"},
+        )
         bridge._driver = bridge.create_driver()
         try:
             result, error = bridge._dispatch(
