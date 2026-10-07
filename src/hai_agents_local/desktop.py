@@ -54,6 +54,7 @@ class PyautoguiDesktopBridge(LocalBridge["DesktopDriverInterface"]):
     """
 
     environment_kind = "desktop"
+    drives_desktop = True
 
     def __init__(
         self,

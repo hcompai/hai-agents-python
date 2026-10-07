@@ -71,7 +71,8 @@ class BridgeManager:
                 )
             if runner.error is not None:
                 raise RuntimeError(
-                    f"local {bridge.environment_kind} bridge for environment {bridge.environment_id!r} failed to start"
+                    f"local {bridge.environment_kind} bridge for environment {bridge.environment_id!r} "
+                    f"failed to start: {runner.error}"
                 ) from runner.error
         except BaseException:
             if started:

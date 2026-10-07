@@ -1,4 +1,4 @@
-"""MCP client registry + install dispatch for the remote `hai-agents` server. Add a client = add one `Client`."""
+"""MCP host registry for the remote `hai-agents` server, plus the install engine other CLIs reuse with their own registry."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import platform
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path, PurePosixPath
@@ -19,12 +20,11 @@ SERVER_NAME = "hai-agents"
 DEFAULT_MCP_URL = "https://agp.eu.hcompany.ai/mcp"
 
 # Placeholders kept in the registry leaves; substituted with the live endpoint + key at wire time.
-_URL = "__MCP_URL__"
-_KEY = "__MCP_KEY__"
-
-
-def _bearer_headers() -> dict[str, str]:
-    return {"Authorization": f"Bearer {_KEY}"}
+URL = "__MCP_URL__"
+KEY = "__MCP_KEY__"
+_BEARER_HEADERS = {"Authorization": f"Bearer {KEY}"}
+# Phrases host CLIs print when `mcp add` refuses an existing entry and no `remove` is known.
+_ALREADY_WIRED = ("already", "exists", "duplicate")
 
 
 class Status(enum.Enum):
@@ -46,7 +46,7 @@ class Status(enum.Enum):
 
 @dataclass(frozen=True)
 class Client:
-    """One MCP client: CLI clients set `cli_cmd`; file clients set `config_path` + `key_path` + `leaf`."""
+    """One MCP host: CLI hosts set `cli_cmd`; file hosts set `config_path` (JSON or YAML) + `key_path` + `leaf`."""
 
     name: str
     config_path: str | None = None
@@ -54,19 +54,20 @@ class Client:
     cli_remove_cmds: tuple[tuple[str, ...], ...] = ()
     key_path: tuple[str, ...] | None = None
     leaf: dict[str, Any] | None = None
-    skills_dir: str | None = None  # under $HOME; None if the client has no SKILL.md auto-load
+    skills_dir: str | None = None  # under $HOME; None if the host has no SKILL.md auto-load
+    home_marker: str | None = None  # under $HOME; its presence proves the host is installed
 
 
-def _vscode_config_path(app_dir: str) -> str:
-    """Per-OS user-level VS Code MCP config for the given app directory (`Code`, `Code - Insiders`)."""
+def user_config_path(*parts: str) -> str:
+    """Per-OS user app config: %APPDATA% on Windows, ~/Library/Application Support on macOS, else $XDG_CONFIG_HOME."""
     system = platform.system()
     if system == "Windows":
-        appdata = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
-        return str(Path(appdata) / app_dir / "User" / "mcp.json")
-    if system == "Darwin":
-        return f"~/Library/Application Support/{app_dir}/User/mcp.json"
-    xdg = os.environ.get("XDG_CONFIG_HOME") or "~/.config"
-    return f"{xdg}/{app_dir}/User/mcp.json"
+        root = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+    elif system == "Darwin":
+        root = "~/Library/Application Support"
+    else:
+        root = os.environ.get("XDG_CONFIG_HOME") or "~/.config"
+    return str(Path(root, *parts))
 
 
 CLIENTS: dict[str, Client] = {
@@ -74,20 +75,20 @@ CLIENTS: dict[str, Client] = {
         name="Cursor",
         config_path="~/.cursor/mcp.json",
         key_path=("mcpServers", SERVER_NAME),
-        leaf={"url": _URL, "headers": _bearer_headers()},
+        leaf={"url": URL, "headers": _BEARER_HEADERS},
         skills_dir=".cursor/skills",
     ),
     "vscode": Client(
         name="VS Code",
-        config_path=_vscode_config_path("Code"),
+        config_path=user_config_path("Code", "User", "mcp.json"),
         key_path=("servers", SERVER_NAME),
-        leaf={"type": "http", "url": _URL, "headers": _bearer_headers()},
+        leaf={"type": "http", "url": URL, "headers": _BEARER_HEADERS},
     ),
     "vscode-insiders": Client(
         name="VS Code Insiders",
-        config_path=_vscode_config_path("Code - Insiders"),
+        config_path=user_config_path("Code - Insiders", "User", "mcp.json"),
         key_path=("servers", SERVER_NAME),
-        leaf={"type": "http", "url": _URL, "headers": _bearer_headers()},
+        leaf={"type": "http", "url": URL, "headers": _BEARER_HEADERS},
     ),
     "claude-code": Client(
         name="Claude Code",
@@ -100,9 +101,9 @@ CLIENTS: dict[str, Client] = {
             "--transport",
             "http",
             SERVER_NAME,
-            _URL,
+            URL,
             "--header",
-            f"Authorization: Bearer {_KEY}",
+            f"Authorization: Bearer {KEY}",
         ),
         cli_remove_cmds=(
             # Clear any prior entry at either writable scope so a rotated key / url can't survive,
@@ -112,11 +113,17 @@ CLIENTS: dict[str, Client] = {
         ),
         skills_dir=".claude/skills",
     ),
+    "hermes": Client(
+        name="Hermes",
+        config_path="~/.hermes/config.yaml",
+        key_path=("mcp_servers", SERVER_NAME),
+        leaf={"url": URL, "headers": _BEARER_HEADERS},
+    ),
     "windsurf": Client(
         name="Windsurf",
         config_path="~/.codeium/windsurf/mcp_config.json",
         key_path=("mcpServers", SERVER_NAME),
-        leaf={"serverUrl": _URL, "headers": _bearer_headers()},
+        leaf={"serverUrl": URL, "headers": _BEARER_HEADERS},
     ),
 }
 
@@ -132,8 +139,15 @@ def resolve_mcp_url(base_url: str | None, override: str | None) -> str:
     return DEFAULT_MCP_URL
 
 
+def bundled_skill() -> Path:
+    """The hai-agents SKILL.md directory shipped with this package."""
+    return Path(str(resources.files("hai_agents_cli.host_skills").joinpath(SERVER_NAME)))
+
+
 def host_present(c: Client) -> bool:
-    """True if the client looks installed: its CLI is on PATH, or its config directory exists."""
+    """True if the host looks installed: its home marker exists, its CLI is on PATH, or its config directory exists."""
+    if c.home_marker and (Path.home() / c.home_marker).exists():
+        return True
     if c.cli_cmd is not None:
         return shutil.which(c.cli_cmd[0]) is not None
     assert c.config_path is not None
@@ -142,33 +156,32 @@ def host_present(c: Client) -> bool:
 
 
 def host_target(c: Client) -> str:
-    """Where the config lands (~-path), or 'via CLI' for CLI-managed clients."""
-    return _home_short(c.config_path) if c.config_path else "via CLI"
+    """Where the config lands (~-path), or 'via CLI' for CLI-managed hosts."""
+    return home_short(c.config_path) if c.config_path else "via CLI"
 
 
-def wire_skill(c: Client) -> tuple[Status, str]:
-    """Symlink the bundled hai-agents SKILL.md into `c`'s skills dir so the host auto-loads it."""
+def wire_skill(c: Client, name: str, source: Path) -> tuple[Status, str]:
+    """Symlink the skill directory `source` into `c`'s skills dir as `name` so the host auto-loads it."""
     if c.skills_dir is None:
         return Status.SKIPPED, "no skill auto-load"
     home = Path.home()
-    if not (home / PurePosixPath(c.skills_dir).parts[0]).exists():
-        return Status.ABSENT, "client not installed"
+    if not (home / (c.home_marker or PurePosixPath(c.skills_dir).parts[0])).exists():
+        return Status.ABSENT, "host not installed"
     skills_root = home / c.skills_dir
     skills_root.mkdir(parents=True, exist_ok=True)
-    link = skills_root / SERVER_NAME
-    source = Path(str(resources.files("hai_agents_cli.host_skills").joinpath(SERVER_NAME)))
+    link = skills_root / name
     if link.is_symlink():
         # strict=False: a reinstall can leave the link dangling at a removed site-packages path.
         if link.resolve(strict=False) == source.resolve(strict=False):
-            return Status.SKIPPED, _home_short(str(link))
+            return Status.SKIPPED, home_short(str(link))
         link.unlink()
     elif link.exists():
         skill_md, src_md = link / "SKILL.md", source / "SKILL.md"
         is_ours = link.is_dir() and skill_md.exists()
         if is_ours and src_md.exists() and skill_md.read_bytes() == src_md.read_bytes():
-            return Status.SKIPPED, _home_short(str(link))
+            return Status.SKIPPED, home_short(str(link))
         if not is_ours:
-            return Status.FAILED, f"{_home_short(str(link))} exists and is not a hai-agents skill"
+            return Status.FAILED, f"{home_short(str(link))} exists and is not a {name} skill"
         shutil.rmtree(link)
     try:
         link.symlink_to(source, target_is_directory=True)
@@ -179,41 +192,41 @@ def wire_skill(c: Client) -> tuple[Status, str]:
                 shutil.copytree(source, link)
             except OSError as copy_exc:
                 return Status.FAILED, f"{link}: {copy_exc}"
-            return Status.INSTALLED, f"{_home_short(str(link))} (copy; enable Developer Mode for symlinks)"
+            return Status.INSTALLED, f"{home_short(str(link))} (copy; enable Developer Mode for symlinks)"
         return Status.FAILED, f"{link}: {exc}"
-    return Status.INSTALLED, _home_short(str(link))
+    return Status.INSTALLED, home_short(str(link))
 
 
-def wire_mcp(c: Client, url: str, key: str) -> tuple[Status, str]:
-    """Install the server into `c`: a CLI `add`, or a JSON config merge."""
+def wire_mcp(c: Client, substitutions: Mapping[str, str], *, secret: str | None = None) -> tuple[Status, str]:
+    """Install the server into `c`, filling registry placeholders from `substitutions`; `secret` is masked in errors."""
     if c.cli_cmd is not None:
-        add = [_render(arg, url, key) for arg in c.cli_cmd]
-        removes = [list(rm) for rm in c.cli_remove_cmds]
-        return _install_via_cli(add, removes, secret=key)
+        add = [_render(arg, substitutions) for arg in c.cli_cmd]
+        removes = [[_render(arg, substitutions) for arg in rm] for rm in c.cli_remove_cmds]
+        return _install_via_cli(add, removes, secret=secret)
     assert c.config_path is not None and c.key_path is not None and c.leaf is not None
-    return _wire_json(Path(c.config_path).expanduser(), c.key_path, _render(c.leaf, url, key))
+    return _wire_config(Path(c.config_path).expanduser(), c.key_path, _render(c.leaf, substitutions))
 
 
-def _render(obj: Any, url: str, key: str) -> Any:
-    """Deep-copy `obj`, substituting the URL and key placeholders in every string."""
+def _render(obj: Any, substitutions: Mapping[str, str]) -> Any:
+    """Deep-copy `obj`, substituting every placeholder in every string."""
     if isinstance(obj, str):
-        return obj.replace(_URL, url).replace(_KEY, key)
+        for placeholder, value in substitutions.items():
+            obj = obj.replace(placeholder, value)
+        return obj
     if isinstance(obj, dict):
-        return {k: _render(v, url, key) for k, v in obj.items()}
+        return {k: _render(v, substitutions) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
-        return [_render(x, url, key) for x in obj]
+        return [_render(x, substitutions) for x in obj]
     return obj
 
 
-def _install_via_cli(
-    add_cmd: list[str], remove_cmds: list[list[str]] | None = None, secret: str | None = None
-) -> tuple[Status, str]:
+def _install_via_cli(add_cmd: list[str], remove_cmds: list[list[str]], secret: str | None) -> tuple[Status, str]:
     exe = shutil.which(add_cmd[0])
     if exe is None:
         return Status.ABSENT, f"{add_cmd[0]!r} not on PATH"
     # `add` refuses to overwrite, so drop any existing entry first; otherwise a rotated key or
-    # changed url is silently kept. Re-adding always reflects the current url + key.
-    for rm in remove_cmds or []:
+    # changed url is silently kept. Re-adding always reflects the current values.
+    for rm in remove_cmds:
         subprocess.run([exe, *rm[1:]], capture_output=True, text=True, check=False)
     try:
         subprocess.run([exe, *add_cmd[1:]], check=True, capture_output=True, text=True)
@@ -222,36 +235,62 @@ def _install_via_cli(
         detail = (exc.stderr or exc.stdout or str(exc)).strip()
         if secret:
             detail = detail.replace(secret, "***")
+        if not remove_cmds and any(marker in detail.lower() for marker in _ALREADY_WIRED):
+            return Status.SKIPPED, f"{add_cmd[0]} already wired"
         return Status.FAILED, detail
     return Status.INSTALLED, f"via {add_cmd[0]} CLI"
 
 
-def _wire_json(path: Path, key_path: tuple[str, ...], leaf: dict[str, Any]) -> tuple[Status, str]:
+def _wire_config(path: Path, key_path: tuple[str, ...], leaf: dict[str, Any]) -> tuple[Status, str]:
+    """Merge `leaf` at `key_path` into a JSON or YAML config, keeping sibling servers and any keys the user added."""
+    load: Callable[[str], Any]
+    dump: Callable[[dict[str, Any]], str]
+    parse_error: type[Exception]
+    if path.suffix in (".yaml", ".yml"):
+        import yaml
+
+        load, parse_error = yaml.safe_load, yaml.YAMLError
+
+        def dump(data: dict[str, Any]) -> str:
+            return yaml.safe_dump(data, sort_keys=False, default_flow_style=False)
+
+    else:
+        load, parse_error = json.loads, json.JSONDecodeError
+
+        def dump(data: dict[str, Any]) -> str:
+            return json.dumps(data, indent=2) + "\n"
+
     path.parent.mkdir(parents=True, exist_ok=True)
     data: dict[str, Any] = {}
     if path.exists() and path.stat().st_size > 0:
         try:
-            loaded = json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            return Status.FAILED, f"{path}: invalid JSON ({exc})"
-        if not isinstance(loaded, dict):
-            return Status.FAILED, f"{path}: top-level is not an object"
-        data = loaded
+            loaded = load(path.read_text(encoding="utf-8"))
+        except parse_error as exc:
+            return Status.FAILED, f"{path}: invalid config ({exc})"
+        # YAML reads an empty or comments-only file as None.
+        if loaded is not None and not isinstance(loaded, dict):
+            return Status.FAILED, f"{path}: top-level is not a mapping"
+        data = loaded or {}
     cursor: Any = data
     for k in key_path[:-1]:
         cursor = cursor.setdefault(k, {})
         if not isinstance(cursor, dict):
-            return Status.FAILED, f"{path}: {k!r} is not an object"
+            return Status.FAILED, f"{path}: {k!r} is not a mapping"
     last = key_path[-1]
-    if cursor.get(last) == leaf:
-        return Status.SKIPPED, _home_short(str(path))
-    cursor[last] = leaf
-    _atomic_write_secret(path, json.dumps(data, indent=2) + "\n")
-    return Status.INSTALLED, _home_short(str(path))
+    existing = cursor.get(last)
+    merged = {**existing, **leaf} if isinstance(existing, dict) else leaf
+    if existing == merged:
+        return Status.SKIPPED, home_short(str(path))
+    cursor[last] = merged
+    if path.exists():
+        # YAML round-trips drop comments; keep the original recoverable.
+        shutil.copy2(path, path.with_name(path.name + ".bak"))
+    _atomic_write_secret(path, dump(data))
+    return Status.INSTALLED, home_short(str(path))
 
 
 def _atomic_write_secret(path: Path, content: str) -> None:
-    """Write to a sibling temp then `rename` over the target, chmod 600 (the file embeds an API key)."""
+    """Write to a sibling temp then `rename` over the target, chmod 600 (the file may embed an API key)."""
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
@@ -265,6 +304,6 @@ def _atomic_write_secret(path: Path, content: str) -> None:
         raise
 
 
-def _home_short(p: str) -> str:
+def home_short(p: str) -> str:
     home = str(Path.home())
     return "~" + p[len(home) :] if p.startswith(home) else p

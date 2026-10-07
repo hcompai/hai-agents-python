@@ -1,4 +1,4 @@
-"""`hai doctor`: read-only diagnostics for login, platform access, and local control, with fix-its."""
+"""`hai doctor`: read-only diagnostics for login, platform access, the local runtime, and local control."""
 
 from __future__ import annotations
 
@@ -45,6 +45,17 @@ def check_platform(api_key: str | None, base_url: str | None) -> CheckResult:
             fix="check the key and network; `hai whoami` shows the resolved endpoint",
         )
     return CheckResult("platform", True, f"authenticated against {endpoint}")
+
+
+def check_runtime() -> CheckResult:
+    from hai_agents_local.runtime import locate_runtime
+
+    path = locate_runtime()
+    if path is None:
+        return CheckResult(
+            "runtime", True, "local runtime not installed yet; `Client.local()` downloads it on first use"
+        )
+    return CheckResult("runtime", True, path)
 
 
 def check_browser() -> CheckResult:
@@ -104,5 +115,5 @@ def run_checks(api_key: str | None, base_url: str | None) -> list[CheckResult]:
     checks = [login]
     if login.ok:
         checks.append(check_platform(api_key, base_url))
-    checks.extend([check_browser(), check_desktop()])
+    checks.extend([check_runtime(), check_browser(), check_desktop()])
     return checks

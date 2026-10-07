@@ -4,6 +4,7 @@ import json
 import stat
 import subprocess
 
+import yaml
 from typer.testing import CliRunner
 
 from hai_agents_cli import mcp_hosts
@@ -21,34 +22,53 @@ def test_resolve_mcp_url_prefers_override_then_base_origin_then_eu() -> None:
 
 def test_registry_leaves_carry_bearer_and_client_specific_url_key() -> None:
     rendered = {
-        cid: mcp_hosts._render(c.leaf, "https://u/mcp", "hk-1") for cid, c in mcp_hosts.CLIENTS.items() if c.leaf
+        cid: mcp_hosts._render(c.leaf, _subs("https://u/mcp", "hk-1")) for cid, c in mcp_hosts.CLIENTS.items() if c.leaf
     }
     assert rendered["cursor"] == {"url": "https://u/mcp", "headers": {"Authorization": "Bearer hk-1"}}
     assert rendered["vscode"]["type"] == "http" and rendered["vscode"]["url"] == "https://u/mcp"
     assert rendered["windsurf"]["serverUrl"] == "https://u/mcp"
+    assert rendered["hermes"] == rendered["cursor"]
+
+
+def _subs(url: str, key: str) -> dict[str, str]:
+    return {mcp_hosts.URL: url, mcp_hosts.KEY: key}
+
+
+_LEAF = {"url": mcp_hosts.URL, "headers": {"Authorization": f"Bearer {mcp_hosts.KEY}"}}
 
 
 def test_wire_json_merges_preserves_and_is_idempotent(tmp_path) -> None:
     path = tmp_path / "mcp.json"
-    path.write_text(json.dumps({"mcpServers": {"other": {"url": "keep"}}}), encoding="utf-8")
-    c = Client(
-        name="X",
-        config_path=str(path),
-        key_path=("mcpServers", "hai-agents"),
-        leaf={"url": mcp_hosts._URL, "headers": {"Authorization": f"Bearer {mcp_hosts._KEY}"}},
+    path.write_text(
+        json.dumps({"mcpServers": {"other": {"url": "keep"}, "hai-agents": {"url": "old", "env": {"A": "1"}}}}),
+        encoding="utf-8",
     )
+    c = Client(name="X", config_path=str(path), key_path=("mcpServers", "hai-agents"), leaf=_LEAF)
 
-    status, _ = wire_mcp(c, "https://u/mcp", "hk-secret")
+    status, _ = wire_mcp(c, _subs("https://u/mcp", "hk-secret"), secret="hk-secret")
     assert status is Status.INSTALLED
     data = json.loads(path.read_text())
     assert data["mcpServers"]["other"] == {"url": "keep"}
     assert data["mcpServers"]["hai-agents"] == {
         "url": "https://u/mcp",
+        "env": {"A": "1"},
         "headers": {"Authorization": "Bearer hk-secret"},
     }
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
-    assert wire_mcp(c, "https://u/mcp", "hk-secret")[0] is Status.SKIPPED
+    assert wire_mcp(c, _subs("https://u/mcp", "hk-secret"))[0] is Status.SKIPPED
+
+
+def test_wire_yaml_merges_and_backs_up_the_original(tmp_path) -> None:
+    path = tmp_path / "config.yaml"
+    path.write_text("# user comment\nmodel: hermes-4\nmcp_servers:\n  other:\n    url: keep\n", encoding="utf-8")
+    c = Client(name="X", config_path=str(path), key_path=("mcp_servers", "hai-agents"), leaf=_LEAF)
+
+    assert wire_mcp(c, _subs("https://u/mcp", "hk-1"))[0] is Status.INSTALLED
+    data = yaml.safe_load(path.read_text())
+    assert data["model"] == "hermes-4" and data["mcp_servers"]["other"] == {"url": "keep"}
+    assert data["mcp_servers"]["hai-agents"]["url"] == "https://u/mcp"
+    assert "# user comment" in (tmp_path / "config.yaml.bak").read_text()
 
 
 def test_cli_install_removes_then_adds_at_user_scope(monkeypatch) -> None:
@@ -61,7 +81,7 @@ def test_cli_install_removes_then_adds_at_user_scope(monkeypatch) -> None:
 
     monkeypatch.setattr(mcp_hosts.subprocess, "run", fake_run)
 
-    status, _ = wire_mcp(mcp_hosts.CLIENTS["claude-code"], "https://u/mcp", "hk-rotated")
+    status, _ = wire_mcp(mcp_hosts.CLIENTS["claude-code"], _subs("https://u/mcp", "hk-rotated"), secret="hk-rotated")
 
     assert status is Status.INSTALLED
     *removes, add = calls
@@ -116,12 +136,13 @@ def test_wire_skill_symlinks_bundled_skill_and_is_idempotent(monkeypatch, tmp_pa
     (tmp_path / ".cursor").mkdir()
     c = Client(name="X", skills_dir=".cursor/skills")
 
-    assert wire_skill(c)[0] is Status.INSTALLED
+    assert wire_skill(c, "hai-agents", mcp_hosts.bundled_skill())[0] is Status.INSTALLED
     link = tmp_path / ".cursor" / "skills" / "hai-agents"
     assert link.is_symlink() and (link / "SKILL.md").exists()
-    assert wire_skill(c)[0] is Status.SKIPPED
+    assert wire_skill(c, "hai-agents", mcp_hosts.bundled_skill())[0] is Status.SKIPPED
 
 
 def test_wire_skill_absent_when_client_dir_missing(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
-    assert wire_skill(Client(name="X", skills_dir=".cursor/skills"))[0] is Status.ABSENT
+    c = Client(name="X", skills_dir=".cursor/skills")
+    assert wire_skill(c, "hai-agents", mcp_hosts.bundled_skill())[0] is Status.ABSENT

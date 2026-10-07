@@ -771,6 +771,22 @@ class BrowserServingBridge(ServingBridge):
     environment_kind = "web"
 
 
+class DesktopDrivingBridge(FakeBridge):
+    drives_desktop = True
+
+
+class IdleExchange:
+    def __init__(self, client: Any, base_url: str) -> None:
+        pass
+
+    async def ensure_channel(self, session_id: str) -> None:
+        pass
+
+    async def fetch_commands(self, session_id: str, **kwargs: Any) -> None:
+        await asyncio.sleep(0.01)
+        return None
+
+
 class TestManager:
     @pytest.fixture
     def manager(self):
@@ -870,18 +886,26 @@ class TestManager:
             )
         assert manager._runners == {}
 
+    def test_desktop_bridges_never_share_the_desktop(self, manager, monkeypatch):
+        import hai_agents_local.bridge as bridge_module
+        from hai_agents_local import desktop_lock
+
+        monkeypatch.setattr(bridge_module, "CommandExchange", IdleExchange)
+        monkeypatch.setattr(desktop_lock, "CLAIM_GRACE_S", 0.5)
+        other_process = BridgeManager()
+        try:
+            manager.ensure([DesktopDrivingBridge(api_key="k")])
+            with pytest.raises(RuntimeError, match="another agent is driving this desktop"):
+                other_process.ensure([DesktopDrivingBridge(api_key="k")])
+            takeover = DesktopDrivingBridge(api_key="k")
+            assert manager.ensure([takeover]) == [takeover.session_id]
+            manager.stop([takeover.session_id])
+            after = DesktopDrivingBridge(api_key="k")
+            assert other_process.ensure([after]) == [after.session_id]
+        finally:
+            other_process.stop_all()
+
     def test_restarted_bridge_serves_again_on_a_fresh_loop(self, manager, monkeypatch):
-        class IdleExchange:
-            def __init__(self, client: Any, base_url: str) -> None:
-                pass
-
-            async def ensure_channel(self, session_id: str) -> None:
-                pass
-
-            async def fetch_commands(self, session_id: str, **kwargs: Any) -> None:
-                await asyncio.sleep(0.01)
-                return None
-
         import hai_agents_local.bridge as bridge_module
 
         monkeypatch.setattr(bridge_module, "CommandExchange", IdleExchange)
@@ -943,6 +967,42 @@ class TestKillSwitch:
         assert not detector.record(2.0)
         assert detector.record(2.3)
         assert not detector.record(2.4)
+
+    def test_double_esc_files_a_stop_off_macos(self, monkeypatch, tmp_path):
+        from hai_agents_local import killswitch
+
+        listeners: list[Any] = []
+
+        class FakeListener:
+            running = False
+
+            def __init__(self, on_press: Any) -> None:
+                self.on_press = on_press
+                listeners.append(self)
+
+            def start(self) -> None:
+                self.running = True
+
+            def wait(self) -> None:
+                pass
+
+            def stop(self) -> None:
+                self.running = False
+
+        keyboard = types.SimpleNamespace(Key=types.SimpleNamespace(esc="esc"), Listener=FakeListener)
+        monkeypatch.setitem(sys.modules, "pynput", types.SimpleNamespace(keyboard=keyboard))
+        monkeypatch.setattr(killswitch, "STOP_PATH", tmp_path / "stop")
+        monkeypatch.setattr(sys, "platform", "win32")
+
+        listener = killswitch.arm_esc_listener()
+        assert listener is not None
+        (fake,) = listeners
+        fake.on_press("esc")
+        assert not (tmp_path / "stop").exists()
+        fake.on_press("esc")
+        assert (tmp_path / "stop").exists()
+        listener.stop()
+        assert not fake.running
 
     def test_only_stops_filed_after_start_count(self, monkeypatch, tmp_path):
         from hai_agents_local import killswitch

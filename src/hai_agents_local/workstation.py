@@ -28,6 +28,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
     """Serves workstation environments with a shell in ~/hai/<session_id>, running as the current user."""
 
     environment_kind = "workstation"
+    drives_desktop = True
 
     def __init__(
         self,

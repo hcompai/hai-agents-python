@@ -439,6 +439,17 @@ class LocalRuntime:
                 self._pid_file = None
 
 
+def locate_runtime() -> typing.Optional[str]:
+    """The binary ``Client.local`` would start, without downloading; None when it would download first."""
+    try:
+        command = LocalRuntime._resolve_command(
+            binary_path=None, version=None, cache_dir=resolve_cache_dir(), download=False
+        )
+    except BinaryNotFoundError:
+        return None
+    return command[0]
+
+
 _held_startup_locks = threading.local()
 
 
