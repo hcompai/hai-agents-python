@@ -153,7 +153,8 @@ class _Runner:
                 self.error = RuntimeError("bridge was stopped before it became ready")
         except Exception as exc:
             self.error = exc
-            if not sys.is_finalizing() and threading.main_thread().is_alive():
+            # Startup failures surface to the ensure() caller; only a crash after startup is logged here.
+            if self.bridge.ready.is_set() and not sys.is_finalizing() and threading.main_thread().is_alive():
                 logger.exception("local %s bridge crashed", self.bridge.environment_kind)
                 self.notify_lost()
         finally:
