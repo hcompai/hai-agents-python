@@ -40,6 +40,7 @@ class RawAgentsClient:
         *,
         agent_name: typing.Optional[str] = None,
         search: typing.Optional[str] = None,
+        reserved: typing.Optional[bool] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
         sort: typing.Optional[typing.Sequence[ListAgentsRequestSortItem]] = None,
@@ -55,6 +56,9 @@ class RawAgentsClient:
 
         search : typing.Optional[str]
             Case-insensitive match on agent name or description.
+
+        reserved : typing.Optional[bool]
+            ``true``: reserved ``h/`` agents only. ``false``: org agents only.
 
         page : typing.Optional[int]
             Page number (1-based)
@@ -79,6 +83,7 @@ class RawAgentsClient:
             params={
                 "agent_name": agent_name,
                 "search": search,
+                "reserved": reserved,
                 "page": page,
                 "size": size,
                 "sort": sort,
@@ -584,6 +589,7 @@ class AsyncRawAgentsClient:
         *,
         agent_name: typing.Optional[str] = None,
         search: typing.Optional[str] = None,
+        reserved: typing.Optional[bool] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
         sort: typing.Optional[typing.Sequence[ListAgentsRequestSortItem]] = None,
@@ -599,6 +605,9 @@ class AsyncRawAgentsClient:
 
         search : typing.Optional[str]
             Case-insensitive match on agent name or description.
+
+        reserved : typing.Optional[bool]
+            ``true``: reserved ``h/`` agents only. ``false``: org agents only.
 
         page : typing.Optional[int]
             Page number (1-based)
@@ -623,6 +632,7 @@ class AsyncRawAgentsClient:
             params={
                 "agent_name": agent_name,
                 "search": search,
+                "reserved": reserved,
                 "page": page,
                 "size": size,
                 "sort": sort,

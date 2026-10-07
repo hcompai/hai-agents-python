@@ -59,18 +59,13 @@ def _stored_api_key() -> typing.Optional[str]:
     return None
 
 
-def default_api_key() -> typing.Optional[str]:
-    """`HAI_API_KEY`, else the key stored by `hai login`."""
-    return os.getenv(API_KEY_VAR) or _stored_api_key()
-
-
 def _default_api_key(init: typing.Callable[_P, None]) -> typing.Callable[_P, None]:
     """Resolve `api_key` as: argument, then `HAI_API_KEY`, then the key stored by `hai login`."""
 
     @functools.wraps(init)
     def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> None:
         if kwargs.get("api_key") is None:
-            api_key = default_api_key()
+            api_key = os.getenv(API_KEY_VAR) or _stored_api_key()
             if api_key is None:
                 raise ApiError(body=f"No API key found. Pass api_key, set {API_KEY_VAR}, or run `hai login`.")
             kwargs["api_key"] = api_key

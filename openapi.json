@@ -2186,6 +2186,24 @@
             "description": "Case-insensitive match on agent name or description."
           },
           {
+            "name": "reserved",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "``true``: reserved ``h/`` agents only. ``false``: org agents only.",
+              "title": "Reserved"
+            },
+            "description": "``true``: reserved ``h/`` agents only. ``false``: org agents only."
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
