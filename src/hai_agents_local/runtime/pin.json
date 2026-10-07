@@ -1,7 +1,7 @@
 {
-  "version": "0.1.14",
+  "version": "0.1.15",
   "sha256": {
-    "darwin-arm64": "ca65aa9b2f426cde250c55a13981ff9505d2962e24beef2490f92fcd066eb8b3",
-    "windows-x86_64": "d98f1821322f2afc9c6c597cdcb9215e7f8f1418f8244d16a25177ef48d9440c"
+    "darwin-arm64": "53973f9ea621e68a420e8ed4dae8e35e1f5c2a14fcc0d2a5f16eff92f7b273ca",
+    "windows-x86_64": "16f19cc2c2fee4f9844ab49355b4b463d1015a4b03cce3b1ccc4c0bd45245643"
   }
 }
