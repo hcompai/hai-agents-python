@@ -268,6 +268,7 @@ class _LocalSessionsState:
         for session_id, bridge_ids in list(self._owned_bridges.items()):
             if not serving_bridges(bridge_ids):
                 del self._owned_bridges[session_id]
+                _deregister_exit_cancel(session_id)
         return list(self._owned_bridges)
 
     def _track(self, session: typing.Any, started: typing.List[str]) -> None:
