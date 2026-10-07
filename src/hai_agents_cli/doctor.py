@@ -52,9 +52,7 @@ def check_runtime() -> CheckResult:
 
     path = locate_runtime()
     if path is None:
-        return CheckResult(
-            "runtime", True, "local runtime not installed yet; `Client.local()` downloads it on first use"
-        )
+        return CheckResult("runtime", True, "local runtime not installed yet; downloaded on the first local run")
     return CheckResult("runtime", True, path)
 
 
