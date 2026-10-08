@@ -23,8 +23,6 @@ DEFAULT_MCP_URL = "https://agp.eu.hcompany.ai/mcp"
 URL = "__MCP_URL__"
 KEY = "__MCP_KEY__"
 _BEARER_HEADERS = {"Authorization": f"Bearer {KEY}"}
-# Phrases host CLIs print when `mcp add` refuses an existing entry and no `remove` is known.
-_ALREADY_WIRED = ("already", "exists", "duplicate")
 
 
 class Status(enum.Enum):
@@ -235,8 +233,6 @@ def _install_via_cli(add_cmd: list[str], remove_cmds: list[list[str]], secret: s
         detail = (exc.stderr or exc.stdout or str(exc)).strip()
         if secret:
             detail = detail.replace(secret, "***")
-        if not remove_cmds and any(marker in detail.lower() for marker in _ALREADY_WIRED):
-            return Status.SKIPPED, f"{add_cmd[0]} already wired"
         return Status.FAILED, detail
     return Status.INSTALLED, f"via {add_cmd[0]} CLI"
 

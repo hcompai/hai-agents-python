@@ -203,11 +203,15 @@ class PynputEscListener:
         listener = keyboard.Listener(on_press=on_press)
         try:
             listener.start()
-            listener.wait()
         except Exception:
             logger.debug("could not start the pynput key listener", exc_info=True)
             return False
-        if not listener.running:
+        # `Listener.wait` has no timeout and never returns if the hook dies during setup.
+        ready = threading.Thread(target=listener.wait, daemon=True, name="hai-esc-listener-ready")
+        ready.start()
+        ready.join(TAP_START_TIMEOUT_S)
+        if ready.is_alive() or not listener.running:
+            listener.stop()
             return False
         self._listener = listener
         return True

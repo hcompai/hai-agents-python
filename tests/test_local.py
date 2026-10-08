@@ -775,6 +775,20 @@ class DesktopDrivingBridge(FakeBridge):
     drives_desktop = True
 
 
+class WorkstationDrivingBridge(DesktopDrivingBridge):
+    environment_kind = "workstation"
+
+
+_HOLD_DESKTOP = """
+import asyncio, pathlib, sys, time
+from hai_agents_local import desktop_lock
+desktop_lock.LOCK_PATH = pathlib.Path(sys.argv[1])
+assert asyncio.run(desktop_lock.DesktopClaim().acquire(asyncio.Event()))
+print("held", flush=True)
+time.sleep(60)
+"""
+
+
 class IdleExchange:
     def __init__(self, client: Any, base_url: str) -> None:
         pass
@@ -886,24 +900,27 @@ class TestManager:
             )
         assert manager._runners == {}
 
-    def test_desktop_bridges_never_share_the_desktop(self, manager, monkeypatch):
+    def test_one_process_drives_the_desktop(self, manager, monkeypatch):
+        import subprocess
+        import sys
+
         import hai_agents_local.bridge as bridge_module
         from hai_agents_local import desktop_lock
 
         monkeypatch.setattr(bridge_module, "CommandExchange", IdleExchange)
         monkeypatch.setattr(desktop_lock, "CLAIM_GRACE_S", 0.5)
-        other_process = BridgeManager()
+        holder = subprocess.Popen(
+            [sys.executable, "-c", _HOLD_DESKTOP, str(desktop_lock.LOCK_PATH)], stdout=subprocess.PIPE, text=True
+        )
         try:
-            manager.ensure([DesktopDrivingBridge(api_key="k")])
+            assert holder.stdout is not None and holder.stdout.readline().strip() == "held"
             with pytest.raises(RuntimeError, match="another agent is driving this desktop"):
-                other_process.ensure([DesktopDrivingBridge(api_key="k")])
-            takeover = DesktopDrivingBridge(api_key="k")
-            assert manager.ensure([takeover]) == [takeover.session_id]
-            manager.stop([takeover.session_id])
-            after = DesktopDrivingBridge(api_key="k")
-            assert other_process.ensure([after]) == [after.session_id]
+                manager.ensure([DesktopDrivingBridge(api_key="k")])
         finally:
-            other_process.stop_all()
+            holder.kill()
+            holder.wait()
+        desktop, workstation = DesktopDrivingBridge(api_key="k"), WorkstationDrivingBridge(api_key="k")
+        assert manager.ensure([desktop, workstation]) == [desktop.session_id, workstation.session_id]
 
     def test_restarted_bridge_serves_again_on_a_fresh_loop(self, manager, monkeypatch):
         import hai_agents_local.bridge as bridge_module
@@ -1003,6 +1020,13 @@ class TestKillSwitch:
         assert (tmp_path / "stop").exists()
         listener.stop()
         assert not fake.running
+
+        never_ready = threading.Event()
+        monkeypatch.setattr(FakeListener, "wait", lambda self: never_ready.wait())
+        monkeypatch.setattr(killswitch, "TAP_START_TIMEOUT_S", 0.2)
+        assert killswitch.arm_esc_listener() is None
+        assert not listeners[-1].running
+        never_ready.set()
 
     def test_only_stops_filed_after_start_count(self, monkeypatch, tmp_path):
         from hai_agents_local import killswitch
