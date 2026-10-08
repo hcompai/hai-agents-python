@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hai-agents"
-version = "1.2.1"
+version = "1.2.2"
 description = "Python SDK for H Company's Agents API: autonomous agents powered by Holo."
 requires-python = ">=3.10"
 readme = "README.md"
@@ -34,6 +34,7 @@ dependencies = [
 [project.optional-dependencies]
 cli = [
   "python-dotenv>=1.2.3,<2",
+  "pyyaml>=6.0,<7",
   "rich>=15.0.0,<16",
   "typer>=0.27.2,<1",
 ]
@@ -45,6 +46,7 @@ browser = [
 ]
 workstation = [
   "hai-drivers[browser-cli,cua-cli,desktop-cli]>=0.1.10",
+  "pynput>=1.7.6; sys_platform == 'win32'",
 ]
 all = [
   "hai-agents[browser,cli,desktop,workstation]",

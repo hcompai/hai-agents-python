@@ -604,8 +604,8 @@ def mcp_install(
 
 
 def _install_one(cid: str, c: mcp_hosts.Client, url: str, key: str) -> dict:
-    status, detail = mcp_hosts.wire_mcp(c, url, key)
-    skill = mcp_hosts.wire_skill(c) if c.skills_dir is not None else None
+    status, detail = mcp_hosts.wire_mcp(c, {mcp_hosts.URL: url, mcp_hosts.KEY: key}, secret=key)
+    skill = mcp_hosts.wire_skill(c, mcp_hosts.SERVER_NAME, mcp_hosts.bundled_skill()) if c.skills_dir else None
     return {"client": cid, "status": status, "detail": detail, "skill": skill}
 
 
@@ -792,7 +792,7 @@ def _arm_kill_switch(bridge: Any) -> Any:
     listener = arm_esc_listener()
     if listener is not None:
         console.print(f"[dim]{KILL_SWITCH_ARMED_HINT}[/dim]")
-    elif sys.platform == "darwin":
+    else:
         # A panic button that silently failed to arm is dangerous; always say so.
         console.print(f"[yellow]{KILL_SWITCH_UNAVAILABLE_HINT}[/yellow]")
     return listener

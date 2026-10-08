@@ -99,6 +99,10 @@ with Client.local(local_options={"binary_path": "/path/to/hai-agent-runtime"}) a
 Inference stays hosted (`HAI_API_KEY`) unless you pass `inference=Inference.self_hosted(url, model=...)`
 (`from hai_agents_local.runtime import Inference`).
 
+One agent drives this machine's desktop at a time: a second process asking for a `desktop` or `workstation` bridge
+fails fast instead of sharing the mouse. `hai local stop` stops every local turn on the machine; so does a double Esc
+once `hai_agents_local.killswitch.arm_esc_listener()` is armed (macOS, Windows, and X11 Linux).
+
 ## How a session works
 
 A session is one run of an agent against a task. It moves through a small set of states: `pending`, `running`, and then a settled state such as `completed`, `idle`, `failed`, `timed_out`, or `interrupted`.

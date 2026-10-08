@@ -17,6 +17,7 @@ from typing import Any, AsyncIterator, ClassVar, Generic, TypeVar, Union
 import httpx
 
 from .config import default_base_url
+from .desktop_lock import DesktopClaim
 from .errors import ChannelClosedError, RateLimitedError, SessionNotFoundError
 from .runtime import identity
 from .transport import Command, CommandExchange, Json, deserialize_args, serialize_result
@@ -64,6 +65,8 @@ class LocalBridge(ABC, Generic[DriverT]):
     """Appended to the manager's not-ready timeout error; names the common cause of a hung startup."""
     verify_runtime: bool = False
     """Reject responses not HMAC-proven with api_key; requires api_key to be the local runtime's token string."""
+    drives_desktop: ClassVar[bool] = False
+    """Holds the machine-wide desktop claim while serving, so two agents never share one mouse."""
 
     def __init__(
         self,
@@ -117,9 +120,19 @@ class LocalBridge(ABC, Generic[DriverT]):
         """Stop run-owned work; drivers without owned processes need no special action."""
 
     async def run(self) -> None:
-        """Serve commands until stopped; raises AuthError on a bad key."""
+        """Serve commands until stopped; raises AuthError on a bad key, DesktopBusyError when another agent holds the desktop."""
         # An asyncio.Event binds to the loop it is first awaited on; a restarted bridge runs on a new loop.
         self._stop_event = asyncio.Event()
+        claim = DesktopClaim() if self.drives_desktop else None
+        if claim is not None and not await claim.acquire(self._stop_event):
+            return
+        try:
+            await self._serve()
+        finally:
+            if claim is not None:
+                claim.release()
+
+    async def _serve(self) -> None:
         options: dict[str, Any] = {
             "headers": {"Accept": "application/json"},
             "auth": _BearerAuth(self.api_key),

@@ -1,4 +1,4 @@
-"""Out-of-band kill switch: a cross-process stop file, plus a global double-Esc listener on macOS.
+"""Out-of-band kill switch: a cross-process stop file, plus a global double-Esc listener.
 
 Ctrl-C is not a reliable panic button while an agent drives the mouse and keyboard: the terminal
 may not have focus, and focus itself is what the agent is fighting you for. The stop file works
@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -26,16 +27,30 @@ TAP_START_TIMEOUT_S = 2.0
 TAP_STOP_JOIN_TIMEOUT_S = 2.0
 
 KILL_SWITCH_ARMED_HINT = "kill switch armed: press Esc twice fast to stop"
-KILL_SWITCH_UNAVAILABLE_HINT = (
-    "double-Esc kill switch unavailable; grant Input Monitoring to this terminal in "
-    "System Settings -> Privacy & Security, or stop with `hai local stop`"
-)
+_UNAVAILABLE_REASON = {
+    "darwin": "grant Input Monitoring to this terminal in System Settings -> Privacy & Security",
+    "win32": "the global keyboard hook did not start",
+}.get(sys.platform, "needs `pip install pynput` and an X11 session; Wayland has no global key listener")
+KILL_SWITCH_UNAVAILABLE_HINT = f"double-Esc kill switch unavailable ({_UNAVAILABLE_REASON}); stop with `hai local stop`"
+
+
+class EscListener(Protocol):
+    def stop(self) -> None: ...
 
 
 def request_stop(now: float | None = None) -> None:
     """File a stop request for any in-flight local turn on this machine."""
     STOP_PATH.parent.mkdir(parents=True, exist_ok=True)
     STOP_PATH.write_text(str(now if now is not None else time.time()), encoding="utf-8")
+
+
+def _stop_on_double_esc() -> None:
+    """Never raises: an exception in a key-listener callback silently disarms the kill switch."""
+    logger.warning("double-Esc detected; requesting stop")
+    try:
+        request_stop()
+    except Exception:
+        logger.warning("could not file the kill-switch stop", exc_info=True)
 
 
 class StopSentinel:
@@ -169,18 +184,54 @@ class QuartzEscTap:
                 and quartz.CGEventGetIntegerValueField(event, quartz.kCGKeyboardEventKeycode) == ESC_KEYCODE
                 and self._detector.record(time.monotonic())
             ):
-                logger.warning("double-Esc detected; requesting stop")
-                request_stop()
+                _stop_on_double_esc()
         except Exception:
             logger.warning("Esc kill-switch handler failed", exc_info=True)
         return event
 
 
-def arm_esc_listener() -> QuartzEscTap | None:
-    """Arm the global double-Esc listener; None when unsupported here (non-macOS) or not permitted."""
-    import sys
+class PynputEscListener:
+    """Global double-Esc listener on Windows and X11 Linux that files a stop."""
 
-    if sys.platform != "darwin":
-        return None
-    tap = QuartzEscTap()
-    return tap if tap.start() else None
+    def __init__(self) -> None:
+        self._detector = MultiTapDetector()
+        self._listener: Any = None
+
+    def start(self) -> bool:
+        """False when pynput or a global key hook is unavailable (no display, Wayland)."""
+        try:
+            from pynput import keyboard
+        except Exception:
+            logger.debug("pynput is unavailable; the Esc kill switch is disabled", exc_info=True)
+            return False
+
+        def on_press(key: Any) -> None:
+            if key == keyboard.Key.esc and self._detector.record(time.monotonic()):
+                _stop_on_double_esc()
+
+        listener = keyboard.Listener(on_press=on_press)
+        try:
+            listener.start()
+        except Exception:
+            logger.debug("could not start the pynput key listener", exc_info=True)
+            return False
+        # `Listener.wait` has no timeout and never returns if the hook dies during setup.
+        ready = threading.Thread(target=listener.wait, daemon=True, name="hai-esc-listener-ready")
+        ready.start()
+        ready.join(TAP_START_TIMEOUT_S)
+        if ready.is_alive() or not listener.running:
+            listener.stop()
+            return False
+        self._listener = listener
+        return True
+
+    def stop(self) -> None:
+        if self._listener is not None:
+            self._listener.stop()
+            self._listener = None
+
+
+def arm_esc_listener() -> EscListener | None:
+    """Arm the global double-Esc listener; None when unsupported here or not permitted."""
+    listener: QuartzEscTap | PynputEscListener = QuartzEscTap() if sys.platform == "darwin" else PynputEscListener()
+    return listener if listener.start() else None

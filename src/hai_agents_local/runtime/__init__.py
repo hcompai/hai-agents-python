@@ -10,7 +10,7 @@ from .errors import (
     RuntimeUnhealthyError,
 )
 from .inference import Inference
-from .runtime import LocalRuntime
+from .runtime import LocalRuntime, locate_runtime
 
 __all__ = [
     "BinaryIncompatibleError",
@@ -23,4 +23,5 @@ __all__ = [
     "RuntimeUnhealthyError",
     "acquire_runtime",
     "acquire_runtime_async",
+    "locate_runtime",
 ]

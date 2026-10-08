@@ -74,8 +74,10 @@ def _launch_options(
 
 def _claim(runtime: LocalRuntime, inference: typing.Optional[Inference]) -> typing.Tuple[LocalRuntime, bool]:
     """The runtime to use and whether this process owns it; an attach to our own live child returns that child."""
-    if inference is not None and not runtime.owned:
-        raise ValueError("inference selection cannot reconfigure an existing runtime; choose a free local port")
+    if inference is not None and not runtime.owned and runtime.serves is None:
+        raise ValueError(
+            "a runtime of unknown inference already listens there; stop it or set HAI_AGENT_RUNTIME_PORT to another port"
+        )
     with _spawned_lock:
         if runtime.owned:
             _spawned_here[runtime.base_url] = runtime

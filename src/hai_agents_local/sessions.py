@@ -226,6 +226,18 @@ atexit.register(_cancel_sessions_at_exit)
 STOPPED_CANCEL_STATUSES = frozenset({404, 409})
 
 
+@contextlib.contextmanager
+def _confirming_stop(session_id: str) -> typing.Iterator[None]:
+    """Keep the exit retry registered until the platform confirms the session stopped or had already ended."""
+    try:
+        yield
+    except ApiError as error:
+        if error.status_code in STOPPED_CANCEL_STATUSES:
+            _deregister_exit_cancel(session_id)
+        raise
+    _deregister_exit_cancel(session_id)
+
+
 class _CloseFailures:
     """Cancel errors collected while closing; a session that already ended is not a failure."""
 
@@ -233,14 +245,12 @@ class _CloseFailures:
         self._errors: typing.List[Exception] = []
 
     @contextlib.contextmanager
-    def cancelling(self, session_id: str) -> typing.Iterator[None]:
+    def cancelling(self) -> typing.Iterator[None]:
         try:
             yield
         except ApiError as error:
             if error.status_code not in STOPPED_CANCEL_STATUSES:
                 self._errors.append(error)
-            else:
-                _deregister_exit_cancel(session_id)
         except Exception as error:
             self._errors.append(error)
 
@@ -282,7 +292,7 @@ class LocalSessionsClient(_LocalSessionsState, SessionsClient):
     def close(self) -> None:
         failures = _CloseFailures()
         for session_id in self._live_sessions():
-            with failures.cancelling(session_id):
+            with failures.cancelling():
                 self.cancel_session(session_id)
         failures.raise_any()
 
@@ -294,9 +304,8 @@ class LocalSessionsClient(_LocalSessionsState, SessionsClient):
                 stop_bridges(owned)
                 self._owned_bridges.pop(str(id), None)
         finally:
-            super().cancel_session(id, request_options=request_options)
-        # Keep the exit retry registered until cancellation is confirmed.
-        _deregister_exit_cancel(str(id))
+            with _confirming_stop(str(id)):
+                super().cancel_session(id, request_options=request_options)
 
     @functools.wraps(SessionsClient.create_session)
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
@@ -329,7 +338,7 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
     async def aclose(self) -> None:
         failures = _CloseFailures()
         for session_id in self._live_sessions():
-            with failures.cancelling(session_id):
+            with failures.cancelling():
                 await self.cancel_session(session_id)
         failures.raise_any()
 
@@ -340,8 +349,8 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
                 await asyncio.to_thread(stop_bridges, owned)
                 self._owned_bridges.pop(str(id), None)
         finally:
-            await super().cancel_session(id, request_options=request_options)
-        _deregister_exit_cancel(str(id))
+            with _confirming_stop(str(id)):
+                await super().cancel_session(id, request_options=request_options)
 
     @functools.wraps(AsyncSessionsClient.create_session)
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:

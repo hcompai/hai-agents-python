@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import logging
 import os
 import pathlib
@@ -26,6 +27,7 @@ from .errors import (
     LocalRuntimeError,
     RuntimeUnhealthyError,
 )
+from .inference import HOSTED, served_inference
 from .install import DOWNLOAD_SHA256_ENV, DOWNLOAD_URL_ENV, install_runtime, installed_binary, pinned_artifact
 from .manifest import PINNED_RUNTIME_VERSION
 from .process import (
@@ -41,6 +43,7 @@ from .process import (
 )
 from .state import (
     DEFAULT_PORT,
+    inference_file_path,
     pid_file_path,
     read_pid,
     read_state_file,
@@ -60,6 +63,7 @@ PORT_ENV = "HAI_AGENT_RUNTIME_PORT"
 AUTH_TOKEN_ENV = "HAI_AGENT_RUNTIME_API_TOKEN"
 CLIENT_TIMEOUT_S = 60.0
 IDLE_PROBE_PAGE_SIZE = 50
+INFERENCE_PORTS = 1000
 # Beyond the holder's health budget: its authenticated probe, then a failed child's graceful stop.
 STARTUP_LOCK_GRACE_S = TERM_GRACE_S + KILL_WAIT_S + 5.0
 
@@ -79,6 +83,22 @@ def _warn_on_version_skew(version: typing.Optional[str]) -> None:
 
 def _port_of(base_url: str) -> int:
     return urlsplit(base_url).port or DEFAULT_PORT
+
+
+def _inference_record(served: str, pid: int) -> str:
+    """The pid keeps each runtime's record unique, so a stopping runtime never unlinks its successor's."""
+    return f"{served}\n{pid}"
+
+
+def _served_from_record(record: typing.Optional[str]) -> typing.Optional[str]:
+    return record.splitlines()[0] if record else None
+
+
+def default_port(served: str) -> int:
+    """Hosted inference on ``DEFAULT_PORT``; any other inference on its own stable port, so both run side by side."""
+    if served == HOSTED:
+        return DEFAULT_PORT
+    return DEFAULT_PORT + 1 + int(hashlib.sha256(served.encode()).hexdigest(), 16) % INFERENCE_PORTS
 
 
 def _authenticated_probe(base_url: str, token: str) -> int:
@@ -110,6 +130,8 @@ class LocalRuntime:
         proc: typing.Optional[subprocess.Popen] = None,
         token_file: typing.Optional[pathlib.Path] = None,
         pid_file: typing.Optional[pathlib.Path] = None,
+        serves: typing.Optional[str] = None,
+        inference_file: typing.Optional[pathlib.Path] = None,
     ) -> None:
         self.base_url = base_url
         self.api_key = api_key
@@ -117,12 +139,15 @@ class LocalRuntime:
         self.version = version
         self.log_path = log_path
         self.owned = owned
+        # None for a runtime started before spawners recorded their inference.
+        self.serves = serves
         self._cache_dir = cache_dir
         self._port = port
         self._proc = proc
         # Set only on the spawner that published generated state; attachers never own the files.
         self._token_file = token_file
         self._pid_file = pid_file
+        self._inference_file = inference_file
 
     @classmethod
     def ensure_started(
@@ -142,6 +167,7 @@ class LocalRuntime:
     ) -> "LocalRuntime":
         """Return a reachable LocalRuntime, attaching to an existing one or spawning the binary."""
         resolved_cache = resolve_cache_dir(cache_dir)
+        served = served_inference(cls._child_env(port=0, token="", spawn_env=spawn_env, inherit_env=inherit_env))
         base_override = os.environ.get(BASE_URL_ENV, "").strip()
         if base_override:
             attached = cls._attach(base_url=base_override.rstrip("/"), cache_dir=resolved_cache)
@@ -149,10 +175,9 @@ class LocalRuntime:
                 raise RuntimeUnhealthyError(
                     f"{BASE_URL_ENV} is set to {base_override} but /health is not answering there"
                 )
-            attached.require_recipe(required_recipe)
-            return attached
+            return attached._verified(required_recipe, served)
 
-        resolved_port = port if port is not None else int(os.environ.get(PORT_ENV, "").strip() or DEFAULT_PORT)
+        resolved_port = port if port is not None else int(os.environ.get(PORT_ENV, "").strip() or default_port(served))
         base_url = f"http://{LOOPBACK_HOST}:{resolved_port}"
         lock_wait_s = timeout_s + STARTUP_LOCK_GRACE_S
         try:
@@ -162,8 +187,7 @@ class LocalRuntime:
             with _startup_lock(resolved_cache, resolved_port, lock_wait_s):
                 attached = cls._attach(base_url=base_url, cache_dir=resolved_cache)
         if attached is not None:
-            attached.require_recipe(required_recipe)
-            return attached
+            return attached._verified(required_recipe, served)
 
         if command is not None and (not command or binary_path is not None):
             raise ValueError("command must be nonempty and cannot be combined with binary_path")
@@ -178,8 +202,7 @@ class LocalRuntime:
         with _startup_lock(resolved_cache, resolved_port, lock_wait_s):
             attached = cls._attach(base_url=base_url, cache_dir=resolved_cache)
             if attached is not None:
-                attached.require_recipe(required_recipe)
-                return attached
+                return attached._verified(required_recipe, served)
 
             if _cancel_event is not None and _cancel_event.is_set():
                 raise RuntimeUnhealthyError("runtime startup cancelled")
@@ -190,6 +213,7 @@ class LocalRuntime:
             log_path = runtime_log_path(resolved_port, cache_dir=resolved_cache)
             proc = None
             token_file = None
+            inference_file = None
             try:
                 proc = spawn(
                     cmd,
@@ -209,13 +233,18 @@ class LocalRuntime:
                 # Published only once the child proved it owns the port, so another runtime's file is never replaced.
                 if not explicit_token:
                     token_file = write_owner_only(token_file_path(resolved_port, cache_dir=resolved_cache), token)
+                inference_file = write_owner_only(
+                    inference_file_path(resolved_port, cache_dir=resolved_cache), _inference_record(served, proc.pid)
+                )
                 pid_file = write_owner_only(pid_file_path(resolved_port, cache_dir=resolved_cache), str(proc.pid))
             except BaseException:
-                # Covers KeyboardInterrupt mid-spawn: never leak the child or its token file.
+                # Covers KeyboardInterrupt mid-spawn: never leak the child or its state files.
                 if proc is not None:
                     terminate(proc)
                 if token_file is not None:
                     unlink_if_content(token_file, token)
+                if inference_file is not None and proc is not None:
+                    unlink_if_content(inference_file, _inference_record(served, proc.pid))
                 raise
             reported = payload.get("version")
             reported_version = reported if isinstance(reported, str) else None
@@ -232,6 +261,8 @@ class LocalRuntime:
                 proc=proc,
                 token_file=token_file,
                 pid_file=pid_file,
+                serves=served,
+                inference_file=inference_file,
             )
 
     @classmethod
@@ -259,6 +290,16 @@ class LocalRuntime:
             raise BinaryIncompatibleError(
                 f"runtime must support recipe {recipe!r}; use a compatible source command or binary"
             )
+
+    def _verified(self, recipe: typing.Optional[str], served: str) -> "LocalRuntime":
+        """This runtime, once it supports ``recipe`` and was not started for another inference than ``served``."""
+        self.require_recipe(recipe)
+        if self.serves is not None and self.serves != served:
+            raise LocalRuntimeError(
+                f"the runtime at {self.base_url} infers against {self.serves}, not {served}; "
+                f"set {PORT_ENV} to run another one"
+            )
+        return self
 
     @classmethod
     def attach(
@@ -311,6 +352,7 @@ class LocalRuntime:
             owned=False,
             cache_dir=cache_dir,
             port=port,
+            serves=_served_from_record(read_state_file(inference_file_path(port, cache_dir=cache_dir))),
         )
 
     @staticmethod
@@ -437,6 +479,20 @@ class LocalRuntime:
             if self._pid_file is not None:
                 unlink_if_content(self._pid_file, str(self.pid))
                 self._pid_file = None
+            if self._inference_file is not None and self.serves is not None and self.pid is not None:
+                unlink_if_content(self._inference_file, _inference_record(self.serves, self.pid))
+                self._inference_file = None
+
+
+def locate_runtime() -> typing.Optional[str]:
+    """The binary ``Client.local`` would start, without downloading; None when it would download first."""
+    try:
+        command = LocalRuntime._resolve_command(
+            binary_path=None, version=None, cache_dir=resolve_cache_dir(), download=False
+        )
+    except BinaryNotFoundError:
+        return None
+    return command[0]
 
 
 _held_startup_locks = threading.local()

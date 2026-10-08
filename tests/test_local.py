@@ -10,6 +10,7 @@ import httpx
 import pytest
 
 from hai_agents import Client
+from hai_agents.core.api_error import ApiError
 from hai_agents.sessions.client import SessionsClient
 from hai_agents.types import Desktop, Workstation
 from hai_agents_local import (
@@ -771,6 +772,36 @@ class BrowserServingBridge(ServingBridge):
     environment_kind = "web"
 
 
+class DesktopDrivingBridge(FakeBridge):
+    drives_desktop = True
+
+
+class WorkstationDrivingBridge(DesktopDrivingBridge):
+    environment_kind = "workstation"
+
+
+_HOLD_DESKTOP = """
+import asyncio, pathlib, sys, time
+from hai_agents_local import desktop_lock
+desktop_lock.LOCK_PATH = pathlib.Path(sys.argv[1])
+assert asyncio.run(desktop_lock.DesktopClaim().acquire(asyncio.Event()))
+print("held", flush=True)
+time.sleep(60)
+"""
+
+
+class IdleExchange:
+    def __init__(self, client: Any, base_url: str) -> None:
+        pass
+
+    async def ensure_channel(self, session_id: str) -> None:
+        pass
+
+    async def fetch_commands(self, session_id: str, **kwargs: Any) -> None:
+        await asyncio.sleep(0.01)
+        return None
+
+
 class TestManager:
     @pytest.fixture
     def manager(self):
@@ -870,18 +901,29 @@ class TestManager:
             )
         assert manager._runners == {}
 
+    def test_one_process_drives_the_desktop(self, manager, monkeypatch):
+        import subprocess
+        import sys
+
+        import hai_agents_local.bridge as bridge_module
+        from hai_agents_local import desktop_lock
+
+        monkeypatch.setattr(bridge_module, "CommandExchange", IdleExchange)
+        monkeypatch.setattr(desktop_lock, "CLAIM_GRACE_S", 0.5)
+        holder = subprocess.Popen(
+            [sys.executable, "-c", _HOLD_DESKTOP, str(desktop_lock.LOCK_PATH)], stdout=subprocess.PIPE, text=True
+        )
+        try:
+            assert holder.stdout is not None and holder.stdout.readline().strip() == "held"
+            with pytest.raises(RuntimeError, match="another agent is driving this desktop"):
+                manager.ensure([DesktopDrivingBridge(api_key="k")])
+        finally:
+            holder.kill()
+            holder.wait()
+        desktop, workstation = DesktopDrivingBridge(api_key="k"), WorkstationDrivingBridge(api_key="k")
+        assert manager.ensure([desktop, workstation]) == [desktop.session_id, workstation.session_id]
+
     def test_restarted_bridge_serves_again_on_a_fresh_loop(self, manager, monkeypatch):
-        class IdleExchange:
-            def __init__(self, client: Any, base_url: str) -> None:
-                pass
-
-            async def ensure_channel(self, session_id: str) -> None:
-                pass
-
-            async def fetch_commands(self, session_id: str, **kwargs: Any) -> None:
-                await asyncio.sleep(0.01)
-                return None
-
         import hai_agents_local.bridge as bridge_module
 
         monkeypatch.setattr(bridge_module, "CommandExchange", IdleExchange)
@@ -943,6 +985,54 @@ class TestKillSwitch:
         assert not detector.record(2.0)
         assert detector.record(2.3)
         assert not detector.record(2.4)
+
+    def test_double_esc_files_a_stop_off_macos(self, monkeypatch, tmp_path):
+        from hai_agents_local import killswitch
+
+        listeners: list[Any] = []
+
+        class FakeListener:
+            running = False
+
+            def __init__(self, on_press: Any) -> None:
+                self.on_press = on_press
+                listeners.append(self)
+
+            def start(self) -> None:
+                self.running = True
+
+            def wait(self) -> None:
+                pass
+
+            def stop(self) -> None:
+                self.running = False
+
+        keyboard = types.SimpleNamespace(Key=types.SimpleNamespace(esc="esc"), Listener=FakeListener)
+        monkeypatch.setitem(sys.modules, "pynput", types.SimpleNamespace(keyboard=keyboard))
+        monkeypatch.setattr(killswitch, "STOP_PATH", tmp_path / "stop")
+        monkeypatch.setattr(sys, "platform", "win32")
+
+        listener = killswitch.arm_esc_listener()
+        assert listener is not None
+        (fake,) = listeners
+        fake.on_press("esc")
+        assert not (tmp_path / "stop").exists()
+        fake.on_press("esc")
+        assert (tmp_path / "stop").exists()
+        listener.stop()
+        assert not fake.running
+
+        # pynput stops a listener whose callback raises; an unwritable stop file must not disarm it.
+        monkeypatch.setattr(killswitch, "STOP_PATH", tmp_path / "stop" / "unwritable")
+        fake.on_press("esc")
+        fake.on_press("esc")
+
+        never_ready = threading.Event()
+        monkeypatch.setattr(FakeListener, "wait", lambda self: never_ready.wait())
+        monkeypatch.setattr(killswitch, "TAP_START_TIMEOUT_S", 0.2)
+        assert killswitch.arm_esc_listener() is None
+        assert not listeners[-1].running
+        never_ready.set()
 
     def test_only_stops_filed_after_start_count(self, monkeypatch, tmp_path):
         from hai_agents_local import killswitch
@@ -1051,7 +1141,11 @@ def test_manager_reports_unconfirmed_stop_and_allows_retry(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("asynchronous", [False, True])
-async def test_failed_api_cancel_keeps_interpreter_exit_retry(monkeypatch, asynchronous):
+@pytest.mark.parametrize(
+    ("error", "retried_at_exit"),
+    [(RuntimeError("remote cancel unavailable"), ["run"]), (ApiError(status_code=409, body="ended"), [])],
+)
+async def test_exit_retry_outlives_only_an_unconfirmed_cancel(monkeypatch, asynchronous, error, retried_at_exit):
     from hai_agents import AsyncClient
     from hai_agents.sessions.client import AsyncSessionsClient
     from hai_agents_local import sessions as module
@@ -1060,7 +1154,7 @@ async def test_failed_api_cancel_keeps_interpreter_exit_retry(monkeypatch, async
     monkeypatch.setattr(module, "_exit_cancels", {"run": lambda: retried.append("run")})
 
     def cancel(*args, **kwargs):
-        raise RuntimeError("remote cancel unavailable")
+        raise error
 
     async def async_cancel(*args, **kwargs):
         cancel()
@@ -1069,13 +1163,13 @@ async def test_failed_api_cancel_keeps_interpreter_exit_retry(monkeypatch, async
     monkeypatch.setattr(AsyncSessionsClient, "cancel_session", async_cancel)
     client = (AsyncClient if asynchronous else Client)(api_key=API_KEY)
     try:
-        with pytest.raises(RuntimeError, match="remote cancel unavailable"):
+        with pytest.raises(type(error)):
             if asynchronous:
                 await client.sessions.cancel_session("run")
             else:
                 client.sessions.cancel_session("run")
         module._cancel_sessions_at_exit()
-        assert retried == ["run"]
+        assert retried == retried_at_exit
     finally:
         if asynchronous:
             await client.aclose()

@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Mapping, Optional
 from urllib.parse import urlsplit
+
+URL_ENV = "HAI_AGENT_RUNTIME_BASE_URL"
+MODEL_ENV = "HAI_AGENT_RUNTIME_MODEL"
+HOSTED = "hosted"
 
 
 @dataclass(frozen=True)
@@ -29,9 +33,16 @@ class Inference:
         if self.base_url is not None:
             # Never forward a hosted inference credential to a user-selected endpoint.
             env.pop("HAI_API_KEY", None)
-            env["HAI_AGENT_RUNTIME_BASE_URL"] = self.base_url
+            env[URL_ENV] = self.base_url
         else:
-            env.pop("HAI_AGENT_RUNTIME_BASE_URL", None)
+            env.pop(URL_ENV, None)
         if self.model is not None:
-            env["HAI_AGENT_RUNTIME_MODEL"] = self.model
+            env[MODEL_ENV] = self.model
         return env
+
+
+def served_inference(env: Mapping[str, str]) -> str:
+    """What a runtime started with ``env`` infers against: ``hosted`` or a server URL, then any default model."""
+    url = env.get(URL_ENV, "").strip()
+    model = env.get(MODEL_ENV, "").strip()
+    return " ".join(part for part in (url or HOSTED, model) if part)
