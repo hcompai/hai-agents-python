@@ -16,7 +16,8 @@ from typing import Any, Callable, Protocol
 
 logger = logging.getLogger(__name__)
 
-STOP_PATH = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")) / "hai" / "stop"
+# HOME only: a GUI-launched host never sees shell variables such as XDG_CONFIG_HOME, yet must share this file.
+STOP_PATH = Path.home() / ".hai" / "stop"
 STOP_POLL_S = 0.25
 STOP_KEY_TAPS = 2
 STOP_KEY_WINDOW_S = 0.6
