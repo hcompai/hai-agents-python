@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import threading
 import time
 from pathlib import Path
@@ -26,10 +27,11 @@ TAP_START_TIMEOUT_S = 2.0
 TAP_STOP_JOIN_TIMEOUT_S = 2.0
 
 KILL_SWITCH_ARMED_HINT = "kill switch armed: press Esc twice fast to stop"
-KILL_SWITCH_UNAVAILABLE_HINT = (
-    "double-Esc kill switch unavailable (macOS: grant Input Monitoring to this terminal in "
-    "System Settings -> Privacy & Security; Wayland has no global key listener); stop with `hai local stop`"
-)
+_UNAVAILABLE_REASON = {
+    "darwin": "grant Input Monitoring to this terminal in System Settings -> Privacy & Security",
+    "win32": "the global keyboard hook did not start",
+}.get(sys.platform, "needs `pip install pynput` and an X11 session; Wayland has no global key listener")
+KILL_SWITCH_UNAVAILABLE_HINT = f"double-Esc kill switch unavailable ({_UNAVAILABLE_REASON}); stop with `hai local stop`"
 
 
 class EscListener(Protocol):
@@ -231,7 +233,5 @@ class PynputEscListener:
 
 def arm_esc_listener() -> EscListener | None:
     """Arm the global double-Esc listener; None when unsupported here or not permitted."""
-    import sys
-
     listener: QuartzEscTap | PynputEscListener = QuartzEscTap() if sys.platform == "darwin" else PynputEscListener()
     return listener if listener.start() else None

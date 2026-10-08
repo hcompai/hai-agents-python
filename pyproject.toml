@@ -46,6 +46,7 @@ browser = [
 ]
 workstation = [
   "hai-drivers[browser-cli,cua-cli,desktop-cli]>=0.1.10",
+  "pynput>=1.7.6; sys_platform == 'win32'",
 ]
 all = [
   "hai-agents[browser,cli,desktop,workstation]",

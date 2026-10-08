@@ -552,6 +552,7 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "hai-drivers", extra = ["browser-cli", "cua-cli", "desktop", "desktop-cli", "web"] },
+    { name = "pynput", marker = "sys_platform == 'win32'" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "rich" },
@@ -571,6 +572,7 @@ desktop = [
 ]
 workstation = [
     { name = "hai-drivers", extra = ["browser-cli", "cua-cli", "desktop-cli"] },
+    { name = "pynput", marker = "sys_platform == 'win32'" },
 ]
 
 [package.dev-dependencies]
@@ -591,6 +593,7 @@ requires-dist = [
     { name = "hai-drivers", extras = ["web"], marker = "extra == 'browser'", specifier = ">=0.1.3" },
     { name = "httpx", specifier = ">=0.23.0,<0.29.0" },
     { name = "pydantic", specifier = ">=2.0,<3" },
+    { name = "pynput", marker = "sys_platform == 'win32' and extra == 'workstation'", specifier = ">=1.7.6" },
     { name = "python-dotenv", marker = "extra == 'cli'", specifier = ">=1.2.3,<2" },
     { name = "pyyaml", marker = "extra == 'cli'", specifier = ">=6.0,<7" },
     { name = "rich", marker = "extra == 'cli'", specifier = ">=15.0.0,<16" },
