@@ -35,6 +35,7 @@ from .tools import ToolInput, as_tools
 
 if typing.TYPE_CHECKING:
     from hai_agents_local.runtime import Inference, LocalRuntime
+    from hai_agents_local.runtime.acquire import RuntimeHold
 
 API_KEY_VAR = "HAI_API_KEY"
 
@@ -79,11 +80,23 @@ def _default_api_key(init: typing.Callable[_P, None]) -> typing.Callable[_P, Non
     return wrapper
 
 
-class Client(BaseClient):
-    __init__ = _default_api_key(BaseClient.__init__)
-    local_runtime: typing.Optional[LocalRuntime] = None
-    _owns_runtime = False
+class _LocalRuntimeAccess:
+    """The runtime behind a local client, read through its hold so a re-acquired runtime shows up everywhere."""
+
+    _hold: typing.Optional[RuntimeHold] = None
     _auto_bridges = True
+
+    @property
+    def local_runtime(self) -> typing.Optional[LocalRuntime]:
+        return None if self._hold is None else self._hold.runtime
+
+    @property
+    def _owns_runtime(self) -> bool:
+        return self._hold is not None and self._hold.owned
+
+
+class Client(_LocalRuntimeAccess, BaseClient):
+    __init__ = _default_api_key(BaseClient.__init__)
 
     @classmethod
     def local(
@@ -96,16 +109,16 @@ class Client(BaseClient):
         timeout: typing.Optional[float] = None,
     ) -> Client:
         """A client on a local agent runtime: ``runtime`` if given, else one this client starts and owns."""
-        from hai_agents_local.runtime import acquire_runtime
+        from hai_agents_local.runtime.acquire import RuntimeHold
 
-        runtime, owned = acquire_runtime(runtime, inference=inference, local_options=local_options)
+        hold = RuntimeHold.acquire(runtime, inference=inference, local_options=local_options)
         try:
-            client = cls(base_url=runtime.base_url, api_key=runtime.api_key, httpx_client=runtime.http_client(timeout))
+            client = cls(base_url=hold.runtime.base_url, api_key=hold.api_key, httpx_client=hold.http_client(timeout))
         except BaseException:
-            if owned:
-                runtime.shutdown()
+            if hold.owned:
+                hold.runtime.shutdown()
             raise
-        client.local_runtime, client._owns_runtime, client._auto_bridges = runtime, owned, auto_bridges
+        client._hold, client._auto_bridges = hold, auto_bridges
         return client
 
     def close(self) -> None:
@@ -180,16 +193,13 @@ class Client(BaseClient):
             from hai_agents_local.sessions import LocalSessionsClient
 
             self._sessions = LocalSessionsClient(
-                client_wrapper=self._client_wrapper, runtime=self.local_runtime, auto_bridges=self._auto_bridges
+                client_wrapper=self._client_wrapper, hold=self._hold, auto_bridges=self._auto_bridges
             )
         return self._sessions
 
 
-class AsyncClient(AsyncBaseClient):
+class AsyncClient(_LocalRuntimeAccess, AsyncBaseClient):
     __init__ = _default_api_key(AsyncBaseClient.__init__)
-    local_runtime: typing.Optional[LocalRuntime] = None
-    _owns_runtime = False
-    _auto_bridges = True
 
     @classmethod
     async def local(
@@ -202,18 +212,18 @@ class AsyncClient(AsyncBaseClient):
         timeout: typing.Optional[float] = None,
     ) -> AsyncClient:
         """A client on a local agent runtime: ``runtime`` if given, else one this client starts and owns."""
-        from hai_agents_local.runtime import acquire_runtime_async
+        from hai_agents_local.runtime.acquire import RuntimeHold
 
-        runtime, owned = await acquire_runtime_async(runtime, inference=inference, local_options=local_options)
+        hold = await RuntimeHold.acquire_async(runtime, inference=inference, local_options=local_options)
         try:
             client = cls(
-                base_url=runtime.base_url, api_key=runtime.api_key, httpx_client=runtime.async_http_client(timeout)
+                base_url=hold.runtime.base_url, api_key=hold.api_key, httpx_client=hold.async_http_client(timeout)
             )
         except BaseException:
-            if owned:
-                await asyncio.to_thread(runtime.shutdown)
+            if hold.owned:
+                await asyncio.to_thread(hold.runtime.shutdown)
             raise
-        client.local_runtime, client._owns_runtime, client._auto_bridges = runtime, owned, auto_bridges
+        client._hold, client._auto_bridges = hold, auto_bridges
         return client
 
     async def aclose(self) -> None:
@@ -290,6 +300,6 @@ class AsyncClient(AsyncBaseClient):
             from hai_agents_local.sessions import LocalAsyncSessionsClient
 
             self._sessions = LocalAsyncSessionsClient(
-                client_wrapper=self._client_wrapper, runtime=self.local_runtime, auto_bridges=self._auto_bridges
+                client_wrapper=self._client_wrapper, hold=self._hold, auto_bridges=self._auto_bridges
             )
         return self._sessions

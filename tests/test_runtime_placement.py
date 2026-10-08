@@ -20,8 +20,8 @@ from hai_agents_local.runtime.state import DEFAULT_PORT, inference_file_path, to
 class RuntimeServer(ThreadingHTTPServer):
     """A loopback stand-in for the runtime: answers every response with an HMAC proof keyed by `proof_token`."""
 
-    def __init__(self, token):
-        super().__init__(("127.0.0.1", 0), _RuntimeHandler)
+    def __init__(self, token, port=0):
+        super().__init__(("127.0.0.1", port), _RuntimeHandler)
         self.token = token
         self.proof_token = token
         self.requests = []
@@ -41,6 +41,9 @@ class _RuntimeHandler(BaseHTTPRequestHandler):
         self._route()
 
     def do_DELETE(self):
+        self._route()
+
+    def do_POST(self):
         self._route()
 
     def _route(self):
@@ -194,6 +197,43 @@ def test_runtimes_for_different_inference_never_share(tmp_path, runtime_server):
     with pytest.raises(LocalRuntimeError, match="infers against hosted"):
         LocalRuntime.ensure_started(spawn_env=self_hosted_env, **start)
     assert LocalRuntime.ensure_started(spawn_env={}, **start).serves == hosted
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asynchronous", [False, True])
+async def test_attached_client_reacquires_a_runtime_its_spawner_took_along(
+    tmp_path, runtime_server, monkeypatch, asynchronous
+):
+    from hai_agents.core.api_error import ApiError
+
+    port = runtime_server.port
+    write_owner_only(token_file_path(port, cache_dir=tmp_path), runtime_server.token)
+    monkeypatch.setattr(LocalRuntime, "ensure_started", lambda **_: LocalRuntime.attach(port=port, cache_dir=tmp_path))
+    client = (
+        await AsyncClient.local(local_options={"cache_dir": tmp_path})
+        if asynchronous
+        else Client.local(local_options={"cache_dir": tmp_path})
+    )
+    assert not client._owns_runtime and client.local_runtime.api_key == "local-token"
+
+    runtime_server.shutdown()
+    runtime_server.server_close()
+    replacement = RuntimeServer("fresh-token", port=port)
+    threading.Thread(target=replacement.serve_forever, daemon=True).start()
+    write_owner_only(token_file_path(port, cache_dir=tmp_path), replacement.token)
+    try:
+        # The replacement answers 401 to any other bearer, so a 404 proves the client switched tokens.
+        with pytest.raises(ApiError) as failed:
+            if asynchronous:
+                await client.sessions.create_session(agent="h/agent", messages="hi")
+            else:
+                client.sessions.create_session(agent="h/agent", messages="hi")
+        assert failed.value.status_code == 404
+        assert client.local_runtime.api_key == "fresh-token"
+    finally:
+        await client.aclose() if asynchronous else client.close()
+        replacement.shutdown()
+        replacement.server_close()
 
 
 @pytest.mark.parametrize("proof_token", ["local-token", "squatter-token", None])

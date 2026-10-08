@@ -28,6 +28,7 @@ from .routing import localize_agent
 
 if typing.TYPE_CHECKING:
     from .runtime import LocalRuntime
+    from .runtime.acquire import RuntimeHold
 
 logger = logging.getLogger(__name__)
 
@@ -263,15 +264,24 @@ class _LocalSessionsState:
     """Bridge and session bookkeeping shared by the sync and async local sessions clients."""
 
     def __init__(
-        self, *, client_wrapper: typing.Any, runtime: typing.Optional[LocalRuntime] = None, auto_bridges: bool = True
+        self, *, client_wrapper: typing.Any, hold: typing.Optional[RuntimeHold] = None, auto_bridges: bool = True
     ) -> None:
         super().__init__(client_wrapper=client_wrapper)
-        self._runtime = runtime
+        self._hold = hold
+        self._client_wrapper = client_wrapper
         self._auto_bridges = auto_bridges
-        self._cancel_remote: RemoteCancel = functools.partial(_cancel_remote_session, client_wrapper, runtime)
         self._owned_bridges: typing.Dict[str, typing.List[str]] = {}
         # Sessions this client created on a local runtime; they never keep that runtime alive past close().
         self.own_session_ids: typing.Set[str] = set()
+
+    @property
+    def _runtime(self) -> typing.Optional[LocalRuntime]:
+        return None if self._hold is None else self._hold.runtime
+
+    @property
+    def _cancel_remote(self) -> RemoteCancel:
+        """Bound to the runtime of the moment, so an exit cancel reaches the runtime its session lives on."""
+        return functools.partial(_cancel_remote_session, self._client_wrapper, self._runtime)
 
     def _live_sessions(self) -> typing.List[str]:
         """Forget sessions whose bridges all stopped, since each such stop already ended or cancelled its session."""
@@ -309,6 +319,8 @@ class LocalSessionsClient(_LocalSessionsState, SessionsClient):
 
     @functools.wraps(SessionsClient.create_session)
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
+        if self._hold is not None:
+            self._hold.reacquire()
         bridges = _localize(self._raw_client._client_wrapper, self._runtime, kwargs) if self._auto_bridges else []
         if bridges:
             _apply_runaway_budgets(kwargs)
@@ -354,6 +366,8 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
 
     @functools.wraps(AsyncSessionsClient.create_session)
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:
+        if self._hold is not None:
+            await self._hold.reacquire_async()
         bridges = _localize(self._raw_client._client_wrapper, self._runtime, kwargs) if self._auto_bridges else []
         if bridges:
             _apply_runaway_budgets(kwargs)
