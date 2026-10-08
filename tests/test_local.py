@@ -1087,8 +1087,10 @@ async def test_failed_api_cancel_keeps_interpreter_exit_retry(monkeypatch, async
 @pytest.mark.parametrize("asynchronous", [False, True])
 async def test_close_cancels_only_sessions_still_served(monkeypatch, asynchronous):
     from hai_agents import AsyncClient
+    from hai_agents_local import sessions as module
 
     cancelled = []
+    monkeypatch.setattr(module, "_exit_cancels", {"ended": lambda: cancelled.append("ended at exit")})
 
     def respond(request: httpx.Request) -> httpx.Response:
         session_id = request.url.path.rsplit("/", 1)[1]
@@ -1110,5 +1112,6 @@ async def test_close_cancels_only_sessions_still_served(monkeypatch, asynchronou
     else:
         sessions.cancel_session(id="unbridged")
         sessions.close()
+    module._cancel_sessions_at_exit()
     assert cancelled == ["unbridged", "live", "evicted"]
     assert sessions._owned_bridges == {}
