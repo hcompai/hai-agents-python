@@ -202,7 +202,10 @@ def wire_mcp(c: Client, substitutions: Mapping[str, str], *, secret: str | None 
         removes = [[_render(arg, substitutions) for arg in rm] for rm in c.cli_remove_cmds]
         return _install_via_cli(add, removes, secret=secret)
     assert c.config_path is not None and c.key_path is not None and c.leaf is not None
-    return _wire_config(Path(c.config_path).expanduser(), c.key_path, _render(c.leaf, substitutions))
+    try:
+        return _wire_config(Path(c.config_path).expanduser(), c.key_path, _render(c.leaf, substitutions))
+    except OSError as exc:
+        return Status.FAILED, str(exc)
 
 
 def _render(obj: Any, substitutions: Mapping[str, str]) -> Any:

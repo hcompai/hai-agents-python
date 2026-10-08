@@ -71,6 +71,13 @@ def test_wire_yaml_merges_and_backs_up_the_original(tmp_path) -> None:
     assert "# user comment" in (tmp_path / "config.yaml.bak").read_text()
 
 
+def test_unwritable_config_fails_that_host_only(tmp_path) -> None:
+    (tmp_path / "not-a-dir").write_text("", encoding="utf-8")
+    c = Client(name="X", config_path=str(tmp_path / "not-a-dir" / "mcp.json"), key_path=("mcpServers", "h"), leaf=_LEAF)
+
+    assert wire_mcp(c, _subs("https://u/mcp", "hk-1"))[0] is Status.FAILED
+
+
 def test_cli_install_removes_then_adds_at_user_scope(monkeypatch) -> None:
     calls: list[list[str]] = []
     monkeypatch.setattr(mcp_hosts.shutil, "which", lambda name: f"/usr/bin/{name}")

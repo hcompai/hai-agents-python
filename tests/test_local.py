@@ -10,6 +10,7 @@ import httpx
 import pytest
 
 from hai_agents import Client
+from hai_agents.core.api_error import ApiError
 from hai_agents.sessions.client import SessionsClient
 from hai_agents.types import Desktop, Workstation
 from hai_agents_local import (
@@ -1135,7 +1136,11 @@ def test_manager_reports_unconfirmed_stop_and_allows_retry(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("asynchronous", [False, True])
-async def test_failed_api_cancel_keeps_interpreter_exit_retry(monkeypatch, asynchronous):
+@pytest.mark.parametrize(
+    ("error", "retried_at_exit"),
+    [(RuntimeError("remote cancel unavailable"), ["run"]), (ApiError(status_code=409, body="ended"), [])],
+)
+async def test_exit_retry_outlives_only_an_unconfirmed_cancel(monkeypatch, asynchronous, error, retried_at_exit):
     from hai_agents import AsyncClient
     from hai_agents.sessions.client import AsyncSessionsClient
     from hai_agents_local import sessions as module
@@ -1144,7 +1149,7 @@ async def test_failed_api_cancel_keeps_interpreter_exit_retry(monkeypatch, async
     monkeypatch.setattr(module, "_exit_cancels", {"run": lambda: retried.append("run")})
 
     def cancel(*args, **kwargs):
-        raise RuntimeError("remote cancel unavailable")
+        raise error
 
     async def async_cancel(*args, **kwargs):
         cancel()
@@ -1153,13 +1158,13 @@ async def test_failed_api_cancel_keeps_interpreter_exit_retry(monkeypatch, async
     monkeypatch.setattr(AsyncSessionsClient, "cancel_session", async_cancel)
     client = (AsyncClient if asynchronous else Client)(api_key=API_KEY)
     try:
-        with pytest.raises(RuntimeError, match="remote cancel unavailable"):
+        with pytest.raises(type(error)):
             if asynchronous:
                 await client.sessions.cancel_session("run")
             else:
                 client.sessions.cancel_session("run")
         module._cancel_sessions_at_exit()
-        assert retried == ["run"]
+        assert retried == retried_at_exit
     finally:
         if asynchronous:
             await client.aclose()
