@@ -35,7 +35,6 @@ MANIFEST: typing.Dict[str, RuntimeArtifact] = {
 
 UNIMPLEMENTED_PLATFORMS: typing.Dict[str, str] = {
     "darwin-x86_64": "hai-agent-runtime is not published for macOS Intel yet",
-    "linux-x86_64": "hai-agent-runtime is not published for Linux yet",
 }
 
 
