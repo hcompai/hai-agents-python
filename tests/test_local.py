@@ -1022,6 +1022,11 @@ class TestKillSwitch:
         listener.stop()
         assert not fake.running
 
+        # pynput stops a listener whose callback raises; an unwritable stop file must not disarm it.
+        monkeypatch.setattr(killswitch, "STOP_PATH", tmp_path / "stop" / "unwritable")
+        fake.on_press("esc")
+        fake.on_press("esc")
+
         never_ready = threading.Event()
         monkeypatch.setattr(FakeListener, "wait", lambda self: never_ready.wait())
         monkeypatch.setattr(killswitch, "TAP_START_TIMEOUT_S", 0.2)

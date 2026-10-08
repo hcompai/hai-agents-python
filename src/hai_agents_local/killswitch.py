@@ -42,6 +42,15 @@ def request_stop(now: float | None = None) -> None:
     STOP_PATH.write_text(str(now if now is not None else time.time()), encoding="utf-8")
 
 
+def _stop_on_double_esc() -> None:
+    """Never raises: an exception in a key-listener callback silently disarms the kill switch."""
+    logger.warning("double-Esc detected; requesting stop")
+    try:
+        request_stop()
+    except Exception:
+        logger.warning("could not file the kill-switch stop", exc_info=True)
+
+
 class StopSentinel:
     """Reads the shared stop file; only stops filed after ``started_at`` count, so stale files are inert."""
 
@@ -173,8 +182,7 @@ class QuartzEscTap:
                 and quartz.CGEventGetIntegerValueField(event, quartz.kCGKeyboardEventKeycode) == ESC_KEYCODE
                 and self._detector.record(time.monotonic())
             ):
-                logger.warning("double-Esc detected; requesting stop")
-                request_stop()
+                _stop_on_double_esc()
         except Exception:
             logger.warning("Esc kill-switch handler failed", exc_info=True)
         return event
@@ -197,8 +205,7 @@ class PynputEscListener:
 
         def on_press(key: Any) -> None:
             if key == keyboard.Key.esc and self._detector.record(time.monotonic()):
-                logger.warning("double-Esc detected; requesting stop")
-                request_stop()
+                _stop_on_double_esc()
 
         listener = keyboard.Listener(on_press=on_press)
         try:
