@@ -39,6 +39,11 @@ def pid_file_path(port: int, *, cache_dir: typing.Optional[_PathInput] = None) -
     return state_dir(cache_dir) / f"agent-pid-{port}"
 
 
+def inference_file_path(port: int, *, cache_dir: typing.Optional[_PathInput] = None) -> pathlib.Path:
+    """Where a spawner records the inference its runtime serves, so attachers never borrow another's."""
+    return state_dir(cache_dir) / f"agent-inference-{port}"
+
+
 def runtime_log_path(port: int, *, cache_dir: typing.Optional[_PathInput] = None) -> pathlib.Path:
     """Where the runtime spawned on `port` writes its stderr."""
     return resolve_cache_dir(cache_dir) / "logs" / f"hai-agent-runtime-{port}.log"

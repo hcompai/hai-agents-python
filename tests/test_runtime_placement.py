@@ -12,7 +12,9 @@ import pytest
 
 from hai_agents import AsyncClient, Client
 from hai_agents_local.runtime import BinaryIncompatibleError, Inference, LocalRuntime, LocalRuntimeError
-from hai_agents_local.runtime.state import token_file_path, write_owner_only
+from hai_agents_local.runtime.inference import served_inference
+from hai_agents_local.runtime.runtime import default_port
+from hai_agents_local.runtime.state import DEFAULT_PORT, inference_file_path, token_file_path, write_owner_only
 
 
 class RuntimeServer(ThreadingHTTPServer):
@@ -179,6 +181,19 @@ def test_spawned_runtime_infers_with_the_key_hai_login_stored(tmp_path, monkeypa
     monkeypatch.setattr(LocalRuntime, "ensure_started", start)
     Client.local(inference=inference, auto_bridges=False)
     assert launches[0]["spawn_env"].get("HAI_API_KEY") == forwarded
+
+
+def test_runtimes_for_different_inference_never_share(tmp_path, runtime_server):
+    self_hosted_env = Inference.self_hosted("http://127.0.0.1:8000/v1", model="my-model").runtime_env()
+    hosted, self_hosted = served_inference({}), served_inference(self_hosted_env)
+    assert default_port(hosted) == DEFAULT_PORT != default_port(self_hosted)
+
+    write_owner_only(token_file_path(runtime_server.port, cache_dir=tmp_path), "local-token")
+    write_owner_only(inference_file_path(runtime_server.port, cache_dir=tmp_path), f"{hosted}\n123")
+    start = {"cache_dir": tmp_path, "port": runtime_server.port, "inherit_env": False}
+    with pytest.raises(LocalRuntimeError, match="infers against hosted"):
+        LocalRuntime.ensure_started(spawn_env=self_hosted_env, **start)
+    assert LocalRuntime.ensure_started(spawn_env={}, **start).serves == hosted
 
 
 @pytest.mark.parametrize("proof_token", ["local-token", "squatter-token", None])
@@ -416,6 +431,7 @@ def test_idle_shutdown_stops_an_owned_runtime_that_cannot_answer(tmp_path):
         port = probe.getsockname()[1]
     proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True)
     token_file = write_owner_only(token_file_path(port, cache_dir=tmp_path), "token")
+    inference_file = write_owner_only(inference_file_path(port, cache_dir=tmp_path), f"hosted\n{proc.pid}")
     runtime = LocalRuntime(
         base_url=f"http://127.0.0.1:{port}",
         api_key="token",
@@ -427,10 +443,12 @@ def test_idle_shutdown_stops_an_owned_runtime_that_cannot_answer(tmp_path):
         port=port,
         proc=proc,
         token_file=token_file,
+        serves="hosted",
+        inference_file=inference_file,
     )
     try:
         assert runtime.shutdown_if_idle()
-        assert proc.poll() is not None and not token_file.exists()
+        assert proc.poll() is not None and not token_file.exists() and not inference_file.exists()
     finally:
         proc.kill()
         proc.wait()
