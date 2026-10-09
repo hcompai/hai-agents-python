@@ -147,7 +147,7 @@ class RawAgentsClient:
             What the agent does. Parent agents read this to decide when to delegate to it.
 
         environments : typing.Sequence[AgentEnvironmentsItem]
-            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents (a pure orchestrator owns none).
+            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
@@ -332,7 +332,7 @@ class RawAgentsClient:
             What the agent does. Parent agents read this to decide when to delegate to it.
 
         environments : typing.Sequence[AgentEnvironmentsItem]
-            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents (a pure orchestrator owns none).
+            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
@@ -696,7 +696,7 @@ class AsyncRawAgentsClient:
             What the agent does. Parent agents read this to decide when to delegate to it.
 
         environments : typing.Sequence[AgentEnvironmentsItem]
-            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents (a pure orchestrator owns none).
+            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
@@ -881,7 +881,7 @@ class AsyncRawAgentsClient:
             What the agent does. Parent agents read this to decide when to delegate to it.
 
         environments : typing.Sequence[AgentEnvironmentsItem]
-            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents (a pure orchestrator owns none).
+            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.

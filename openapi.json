@@ -4524,7 +4524,7 @@
             },
             "type": "array",
             "title": "Environments",
-            "description": "Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents (a pure orchestrator owns none)."
+            "description": "Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools."
           },
           "model": {
             "anyOf": [
@@ -9057,6 +9057,12 @@
             ],
             "title": "Session Id",
             "description": "Connect to an existing workstation session by id instead of starting a new one."
+          },
+          "lazy": {
+            "type": "boolean",
+            "title": "Lazy",
+            "description": "Provision on the agent's first use instead of at startup. Cloud workstations only.",
+            "default": false
           }
         },
         "type": "object",
