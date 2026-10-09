@@ -27,6 +27,11 @@ class Workstation(UniversalBaseModel):
     Connect to an existing workstation session by id instead of starting a new one.
     """
 
+    lazy: typing.Optional[bool] = pydantic.Field(default=None)
+    """
+    Provision on the agent's first use instead of at startup. Cloud workstations only.
+    """
+
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
     else:
