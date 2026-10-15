@@ -83,6 +83,7 @@ class SchedulesClient:
         timing: CronTiming,
         session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
+        repeats: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ScheduleRecord:
         """
@@ -98,6 +99,9 @@ class SchedulesClient:
             Template used to create each scheduled session; re-resolved on every fire.
 
         description : typing.Optional[str]
+
+        repeats : typing.Optional[int]
+            How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -130,6 +134,7 @@ class SchedulesClient:
             timing=timing,
             session_request=session_request,
             description=description,
+            repeats=repeats,
             request_options=request_options,
         )
         return _response.data
@@ -203,6 +208,7 @@ class SchedulesClient:
         description: typing.Optional[str] = OMIT,
         timing: typing.Optional[CronTiming] = OMIT,
         session_request: typing.Optional[SessionRequest] = OMIT,
+        repeats: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ScheduleRecord:
         """
@@ -219,6 +225,8 @@ class SchedulesClient:
         timing : typing.Optional[CronTiming]
 
         session_request : typing.Optional[SessionRequest]
+
+        repeats : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -245,6 +253,7 @@ class SchedulesClient:
             description=description,
             timing=timing,
             session_request=session_request,
+            repeats=repeats,
             request_options=request_options,
         )
         return _response.data
@@ -476,6 +485,7 @@ class AsyncSchedulesClient:
         timing: CronTiming,
         session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
+        repeats: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ScheduleRecord:
         """
@@ -491,6 +501,9 @@ class AsyncSchedulesClient:
             Template used to create each scheduled session; re-resolved on every fire.
 
         description : typing.Optional[str]
+
+        repeats : typing.Optional[int]
+            How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -531,6 +544,7 @@ class AsyncSchedulesClient:
             timing=timing,
             session_request=session_request,
             description=description,
+            repeats=repeats,
             request_options=request_options,
         )
         return _response.data
@@ -622,6 +636,7 @@ class AsyncSchedulesClient:
         description: typing.Optional[str] = OMIT,
         timing: typing.Optional[CronTiming] = OMIT,
         session_request: typing.Optional[SessionRequest] = OMIT,
+        repeats: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ScheduleRecord:
         """
@@ -638,6 +653,8 @@ class AsyncSchedulesClient:
         timing : typing.Optional[CronTiming]
 
         session_request : typing.Optional[SessionRequest]
+
+        repeats : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -672,6 +689,7 @@ class AsyncSchedulesClient:
             description=description,
             timing=timing,
             session_request=session_request,
+            repeats=repeats,
             request_options=request_options,
         )
         return _response.data

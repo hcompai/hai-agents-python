@@ -5507,6 +5507,19 @@
           "session_request": {
             "$ref": "#/components/schemas/SessionRequest",
             "description": "Template used to create each scheduled session; re-resolved on every fire."
+          },
+          "repeats": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repeats",
+            "description": "How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted."
           }
         },
         "type": "object",
@@ -7354,6 +7367,23 @@
             ],
             "title": "Pause Note"
           },
+          "repeats": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repeats",
+            "description": "How many sessions to create before the schedule becomes inactive. Null means it runs until paused or deleted."
+          },
+          "sessions_created": {
+            "type": "integer",
+            "title": "Sessions Created",
+            "description": "Automatic fires that created a session. Skipped fires, errors, and manual triggers are not counted. When this reaches repeats, the schedule is paused."
+          },
           "next_run_times": {
             "items": {
               "type": "string",
@@ -7395,6 +7425,8 @@
           "session_request",
           "paused",
           "pause_note",
+          "repeats",
+          "sessions_created",
           "next_run_times",
           "last_run_at",
           "created_at",
@@ -8411,6 +8443,18 @@
                 "type": "null"
               }
             ]
+          },
+          "repeats": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repeats"
           }
         },
         "type": "object",
