@@ -23,6 +23,7 @@ class UpdateEnvironmentRequestBody_Web(UniversalBaseModel):
     session_id: typing.Optional[str] = None
     mode: typing.Optional[BrowserMode] = None
     lazy: typing.Optional[bool] = None
+    settle_s: typing.Optional[float] = None
     vault_id: typing.Optional[str] = None
     browser_profile_id: typing.Optional[str] = None
     use_default_browser_profile: typing.Optional[bool] = None
@@ -45,6 +46,8 @@ class UpdateEnvironmentRequestBody_Desktop(UniversalBaseModel):
     host: DesktopHost
     session_id: typing.Optional[str] = None
     lazy: typing.Optional[bool] = None
+    settle_s: typing.Optional[float] = None
+    screenshot_max_width: typing.Optional[int] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

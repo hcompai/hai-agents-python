@@ -347,11 +347,13 @@ class RawEnvironmentsClient:
         session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         lazy: typing.Optional[bool] = OMIT,
+        settle_s: typing.Optional[float] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
+        screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Environment]:
@@ -374,6 +376,8 @@ class RawEnvironmentsClient:
 
         lazy : typing.Optional[bool]
 
+        settle_s : typing.Optional[float]
+
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
@@ -383,6 +387,8 @@ class RawEnvironmentsClient:
         persist_browser_profile : typing.Optional[bool]
 
         network : typing.Optional[BrowserNetwork]
+
+        screenshot_max_width : typing.Optional[int]
 
         image : typing.Optional[str]
 
@@ -406,6 +412,7 @@ class RawEnvironmentsClient:
                     object_=mode, annotation=typing.Optional[PatchEnvironmentMode], direction="write"
                 ),
                 "lazy": lazy,
+                "settle_s": settle_s,
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
                 "use_default_browser_profile": use_default_browser_profile,
@@ -413,6 +420,7 @@ class RawEnvironmentsClient:
                 "network": convert_and_respect_annotation_metadata(
                     object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
                 ),
+                "screenshot_max_width": screenshot_max_width,
                 "image": image,
             },
             headers={
@@ -771,11 +779,13 @@ class AsyncRawEnvironmentsClient:
         session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         lazy: typing.Optional[bool] = OMIT,
+        settle_s: typing.Optional[float] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
+        screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Environment]:
@@ -798,6 +808,8 @@ class AsyncRawEnvironmentsClient:
 
         lazy : typing.Optional[bool]
 
+        settle_s : typing.Optional[float]
+
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
@@ -807,6 +819,8 @@ class AsyncRawEnvironmentsClient:
         persist_browser_profile : typing.Optional[bool]
 
         network : typing.Optional[BrowserNetwork]
+
+        screenshot_max_width : typing.Optional[int]
 
         image : typing.Optional[str]
 
@@ -830,6 +844,7 @@ class AsyncRawEnvironmentsClient:
                     object_=mode, annotation=typing.Optional[PatchEnvironmentMode], direction="write"
                 ),
                 "lazy": lazy,
+                "settle_s": settle_s,
                 "vault_id": vault_id,
                 "browser_profile_id": browser_profile_id,
                 "use_default_browser_profile": use_default_browser_profile,
@@ -837,6 +852,7 @@ class AsyncRawEnvironmentsClient:
                 "network": convert_and_respect_annotation_metadata(
                     object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
                 ),
+                "screenshot_max_width": screenshot_max_width,
                 "image": image,
             },
             headers={

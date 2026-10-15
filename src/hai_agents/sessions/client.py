@@ -174,10 +174,10 @@ class SessionsClient:
             Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers.
 
         delete_after_min : typing.Optional[int]
-            Minutes after the session finishes before it is automatically deleted. Defaults to 30 days. Null keeps the session forever.
+            Minutes after the session finishes before it is automatically deleted. When omitted, Portal's retention preference applies. An explicit value adds an earlier expiry; null adds no expiry beyond Portal's policy.
 
         delete_screenshot_after_min : typing.Optional[int]
-            Minutes after the session finishes before its screenshots are deleted. Defaults to 30 days. Null keeps screenshots for the session's lifetime.
+            Minutes after the session finishes before its screenshots are deleted. When omitted or null, screenshots follow the session's retention policy. An explicit value can delete screenshots earlier.
 
         queue : typing.Optional[bool]
             When the organization is at its concurrent-session limit, accept this session into a queue (status 'queued') instead of rejecting it with 429. Queued sessions start automatically, oldest first, as running sessions finish. Set to false to get an immediate 429 when no slot is available.
@@ -961,10 +961,10 @@ class AsyncSessionsClient:
             Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers.
 
         delete_after_min : typing.Optional[int]
-            Minutes after the session finishes before it is automatically deleted. Defaults to 30 days. Null keeps the session forever.
+            Minutes after the session finishes before it is automatically deleted. When omitted, Portal's retention preference applies. An explicit value adds an earlier expiry; null adds no expiry beyond Portal's policy.
 
         delete_screenshot_after_min : typing.Optional[int]
-            Minutes after the session finishes before its screenshots are deleted. Defaults to 30 days. Null keeps screenshots for the session's lifetime.
+            Minutes after the session finishes before its screenshots are deleted. When omitted or null, screenshots follow the session's retention policy. An explicit value can delete screenshots earlier.
 
         queue : typing.Optional[bool]
             When the organization is at its concurrent-session limit, accept this session into a queue (status 'queued') instead of rejecting it with 429. Queued sessions start automatically, oldest first, as running sessions finish. Set to false to get an immediate 429 when no slot is available.

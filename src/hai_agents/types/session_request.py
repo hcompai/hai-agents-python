@@ -42,12 +42,12 @@ class SessionRequest(UniversalBaseModel):
 
     delete_after_min: typing.Optional[int] = pydantic.Field(default=None)
     """
-    Minutes after the session finishes before it is automatically deleted. Defaults to 30 days. Null keeps the session forever.
+    Minutes after the session finishes before it is automatically deleted. When omitted, Portal's retention preference applies. An explicit value adds an earlier expiry; null adds no expiry beyond Portal's policy.
     """
 
     delete_screenshot_after_min: typing.Optional[int] = pydantic.Field(default=None)
     """
-    Minutes after the session finishes before its screenshots are deleted. Defaults to 30 days. Null keeps screenshots for the session's lifetime.
+    Minutes after the session finishes before its screenshots are deleted. When omitted or null, screenshots follow the session's retention policy. An explicit value can delete screenshots earlier.
     """
 
     queue: typing.Optional[bool] = pydantic.Field(default=None)

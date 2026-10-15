@@ -8,7 +8,7 @@ from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 
 class Skill(UniversalBaseModel):
     """
-    A named, reusable instruction an agent can draw on during a session.
+    Named instructions with optional scripts, references, and assets.
     """
 
     name: str = pydantic.Field()
@@ -35,6 +35,10 @@ class Skill(UniversalBaseModel):
     """
     Optional regex hinting at URLs where this skill applies.
     """
+
+    compatibility: typing.Optional[str] = None
+    files: typing.Optional[typing.Dict[str, str]] = None
+    executable_files: typing.Optional[typing.List[str]] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

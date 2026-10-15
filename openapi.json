@@ -5135,6 +5135,14 @@
             "description": "Provision on the agent's first use instead of at startup. Skips the initial observation.",
             "default": false
           },
+          "settle_s": {
+            "type": "number",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Settle S",
+            "description": "Seconds to wait after each page action.",
+            "default": 1.0
+          },
           "vault_id": {
             "anyOf": [
               {
@@ -5637,6 +5645,28 @@
             "title": "Lazy",
             "description": "Provision on the agent's first use instead of at startup. Skips the initial observation.",
             "default": false
+          },
+          "settle_s": {
+            "type": "number",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Settle S",
+            "description": "Seconds to wait after each input action.",
+            "default": 0.5
+          },
+          "screenshot_max_width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1920.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screenshot Max Width",
+            "description": "Maximum screenshot width in pixels. Null uses the host default; images are never upscaled."
           }
         },
         "type": "object",
@@ -6927,6 +6957,19 @@
             ],
             "title": "Lazy"
           },
+          "settle_s": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settle S"
+          },
           "vault_id": {
             "anyOf": [
               {
@@ -6982,6 +7025,19 @@
                 "type": "null"
               }
             ]
+          },
+          "screenshot_max_width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1920.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screenshot Max Width"
           },
           "image": {
             "anyOf": [
@@ -7048,6 +7104,47 @@
               }
             ],
             "title": "Url Pattern"
+          },
+          "compatibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compatibility"
+          },
+          "files": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string",
+                  "contentMediaType": "application/octet-stream"
+                },
+                "type": "object",
+                "maxProperties": 511
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Files"
+          },
+          "executable_files": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executable Files"
           }
         },
         "type": "object",
@@ -7839,7 +7936,7 @@
               }
             ],
             "title": "Delete After Min",
-            "description": "Minutes after the session finishes before it is automatically deleted. Defaults to 30 days. Null keeps the session forever.",
+            "description": "Minutes after the session finishes before it is automatically deleted. When omitted, Portal's retention preference applies. An explicit value adds an earlier expiry; null adds no expiry beyond Portal's policy.",
             "default": 43200
           },
           "delete_screenshot_after_min": {
@@ -7853,7 +7950,7 @@
               }
             ],
             "title": "Delete Screenshot After Min",
-            "description": "Minutes after the session finishes before its screenshots are deleted. Defaults to 30 days. Null keeps screenshots for the session's lifetime.",
+            "description": "Minutes after the session finishes before its screenshots are deleted. When omitted or null, screenshots follow the session's retention policy. An explicit value can delete screenshots earlier.",
             "default": 43200
           },
           "queue": {
@@ -8140,6 +8237,35 @@
             ],
             "title": "Url Pattern",
             "description": "Optional regex hinting at URLs where this skill applies."
+          },
+          "compatibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compatibility"
+          },
+          "files": {
+            "additionalProperties": {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "object",
+            "maxProperties": 511,
+            "title": "Files"
+          },
+          "executable_files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Executable Files",
+            "default": []
           }
         },
         "type": "object",
@@ -8149,7 +8275,7 @@
           "body"
         ],
         "title": "Skill",
-        "description": "A named, reusable instruction an agent can draw on during a session."
+        "description": "Named instructions with optional scripts, references, and assets."
       },
       "TokenQuotaStatus": {
         "properties": {
@@ -9105,7 +9231,7 @@
           "lazy": {
             "type": "boolean",
             "title": "Lazy",
-            "description": "Provision on the agent's first use instead of at startup. Cloud workstations only.",
+            "description": "Start on the agent's first use instead of at startup. Skips the initial observation. A cloud workstation is provisioned on first use; a user_device one is not probed until then.",
             "default": false
           }
         },
