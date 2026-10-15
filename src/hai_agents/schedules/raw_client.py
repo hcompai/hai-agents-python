@@ -109,6 +109,7 @@ class RawSchedulesClient:
         timing: CronTiming,
         session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
+        repeats: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[ScheduleRecord]:
         """
@@ -124,6 +125,9 @@ class RawSchedulesClient:
             Template used to create each scheduled session; re-resolved on every fire.
 
         description : typing.Optional[str]
+
+        repeats : typing.Optional[int]
+            How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -145,6 +149,7 @@ class RawSchedulesClient:
                 "session_request": convert_and_respect_annotation_metadata(
                     object_=session_request, annotation=SessionRequest, direction="write"
                 ),
+                "repeats": repeats,
             },
             headers={
                 "content-type": "application/json",
@@ -288,6 +293,7 @@ class RawSchedulesClient:
         description: typing.Optional[str] = OMIT,
         timing: typing.Optional[CronTiming] = OMIT,
         session_request: typing.Optional[SessionRequest] = OMIT,
+        repeats: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[ScheduleRecord]:
         """
@@ -304,6 +310,8 @@ class RawSchedulesClient:
         timing : typing.Optional[CronTiming]
 
         session_request : typing.Optional[SessionRequest]
+
+        repeats : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -325,6 +333,7 @@ class RawSchedulesClient:
                 "session_request": convert_and_respect_annotation_metadata(
                     object_=session_request, annotation=typing.Optional[SessionRequest], direction="write"
                 ),
+                "repeats": repeats,
             },
             headers={
                 "content-type": "application/json",
@@ -689,6 +698,7 @@ class AsyncRawSchedulesClient:
         timing: CronTiming,
         session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
+        repeats: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[ScheduleRecord]:
         """
@@ -704,6 +714,9 @@ class AsyncRawSchedulesClient:
             Template used to create each scheduled session; re-resolved on every fire.
 
         description : typing.Optional[str]
+
+        repeats : typing.Optional[int]
+            How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -725,6 +738,7 @@ class AsyncRawSchedulesClient:
                 "session_request": convert_and_respect_annotation_metadata(
                     object_=session_request, annotation=SessionRequest, direction="write"
                 ),
+                "repeats": repeats,
             },
             headers={
                 "content-type": "application/json",
@@ -868,6 +882,7 @@ class AsyncRawSchedulesClient:
         description: typing.Optional[str] = OMIT,
         timing: typing.Optional[CronTiming] = OMIT,
         session_request: typing.Optional[SessionRequest] = OMIT,
+        repeats: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[ScheduleRecord]:
         """
@@ -884,6 +899,8 @@ class AsyncRawSchedulesClient:
         timing : typing.Optional[CronTiming]
 
         session_request : typing.Optional[SessionRequest]
+
+        repeats : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -905,6 +922,7 @@ class AsyncRawSchedulesClient:
                 "session_request": convert_and_respect_annotation_metadata(
                     object_=session_request, annotation=typing.Optional[SessionRequest], direction="write"
                 ),
+                "repeats": repeats,
             },
             headers={
                 "content-type": "application/json",
