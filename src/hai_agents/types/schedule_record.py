@@ -23,6 +23,16 @@ class ScheduleRecord(UniversalBaseModel):
     session_request: SessionRequest
     paused: bool
     pause_note: typing.Optional[str] = None
+    repeats: typing.Optional[int] = pydantic.Field(default=None)
+    """
+    How many sessions to create before the schedule becomes inactive. Null means it runs until paused or deleted.
+    """
+
+    sessions_created: int = pydantic.Field()
+    """
+    Automatic fires that created a session. Skipped fires, errors, and manual triggers are not counted. When this reaches repeats, the schedule is paused.
+    """
+
     next_run_times: typing.List[dt.datetime] = pydantic.Field()
     """
     The next few fire times, empty while paused.
