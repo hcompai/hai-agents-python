@@ -88,6 +88,9 @@ class SkillsClient:
         body: str,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
+        compatibility: typing.Optional[str] = OMIT,
+        files: typing.Optional[typing.Dict[str, str]] = OMIT,
+        executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
         """
@@ -109,6 +112,12 @@ class SkillsClient:
 
         url_pattern : typing.Optional[str]
             Optional regex hinting at URLs where this skill applies.
+
+        compatibility : typing.Optional[str]
+
+        files : typing.Optional[typing.Dict[str, str]]
+
+        executable_files : typing.Optional[typing.Sequence[str]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -137,6 +146,9 @@ class SkillsClient:
             body=body,
             source=source,
             url_pattern=url_pattern,
+            compatibility=compatibility,
+            files=files,
+            executable_files=executable_files,
             request_options=request_options,
         )
         return _response.data
@@ -180,6 +192,9 @@ class SkillsClient:
         body: str,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
+        compatibility: typing.Optional[str] = OMIT,
+        files: typing.Optional[typing.Dict[str, str]] = OMIT,
+        executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
         """
@@ -203,6 +218,12 @@ class SkillsClient:
 
         url_pattern : typing.Optional[str]
             Optional regex hinting at URLs where this skill applies.
+
+        compatibility : typing.Optional[str]
+
+        files : typing.Optional[typing.Dict[str, str]]
+
+        executable_files : typing.Optional[typing.Sequence[str]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -233,6 +254,9 @@ class SkillsClient:
             body=body,
             source=source,
             url_pattern=url_pattern,
+            compatibility=compatibility,
+            files=files,
+            executable_files=executable_files,
             request_options=request_options,
         )
         return _response.data
@@ -274,6 +298,9 @@ class SkillsClient:
         body: typing.Optional[str] = OMIT,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
+        compatibility: typing.Optional[str] = OMIT,
+        files: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
         """
@@ -290,6 +317,12 @@ class SkillsClient:
         source : typing.Optional[str]
 
         url_pattern : typing.Optional[str]
+
+        compatibility : typing.Optional[str]
+
+        files : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+
+        executable_files : typing.Optional[typing.Sequence[str]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -316,6 +349,9 @@ class SkillsClient:
             body=body,
             source=source,
             url_pattern=url_pattern,
+            compatibility=compatibility,
+            files=files,
+            executable_files=executable_files,
             request_options=request_options,
         )
         return _response.data
@@ -404,6 +440,9 @@ class AsyncSkillsClient:
         body: str,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
+        compatibility: typing.Optional[str] = OMIT,
+        files: typing.Optional[typing.Dict[str, str]] = OMIT,
+        executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
         """
@@ -425,6 +464,12 @@ class AsyncSkillsClient:
 
         url_pattern : typing.Optional[str]
             Optional regex hinting at URLs where this skill applies.
+
+        compatibility : typing.Optional[str]
+
+        files : typing.Optional[typing.Dict[str, str]]
+
+        executable_files : typing.Optional[typing.Sequence[str]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -461,6 +506,9 @@ class AsyncSkillsClient:
             body=body,
             source=source,
             url_pattern=url_pattern,
+            compatibility=compatibility,
+            files=files,
+            executable_files=executable_files,
             request_options=request_options,
         )
         return _response.data
@@ -512,6 +560,9 @@ class AsyncSkillsClient:
         body: str,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
+        compatibility: typing.Optional[str] = OMIT,
+        files: typing.Optional[typing.Dict[str, str]] = OMIT,
+        executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
         """
@@ -535,6 +586,12 @@ class AsyncSkillsClient:
 
         url_pattern : typing.Optional[str]
             Optional regex hinting at URLs where this skill applies.
+
+        compatibility : typing.Optional[str]
+
+        files : typing.Optional[typing.Dict[str, str]]
+
+        executable_files : typing.Optional[typing.Sequence[str]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -573,6 +630,9 @@ class AsyncSkillsClient:
             body=body,
             source=source,
             url_pattern=url_pattern,
+            compatibility=compatibility,
+            files=files,
+            executable_files=executable_files,
             request_options=request_options,
         )
         return _response.data
@@ -622,6 +682,9 @@ class AsyncSkillsClient:
         body: typing.Optional[str] = OMIT,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
+        compatibility: typing.Optional[str] = OMIT,
+        files: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
         """
@@ -638,6 +701,12 @@ class AsyncSkillsClient:
         source : typing.Optional[str]
 
         url_pattern : typing.Optional[str]
+
+        compatibility : typing.Optional[str]
+
+        files : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+
+        executable_files : typing.Optional[typing.Sequence[str]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -672,6 +741,9 @@ class AsyncSkillsClient:
             body=body,
             source=source,
             url_pattern=url_pattern,
+            compatibility=compatibility,
+            files=files,
+            executable_files=executable_files,
             request_options=request_options,
         )
         return _response.data

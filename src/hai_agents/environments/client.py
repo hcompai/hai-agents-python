@@ -232,11 +232,13 @@ class EnvironmentsClient:
         session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         lazy: typing.Optional[bool] = OMIT,
+        settle_s: typing.Optional[float] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
+        screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
@@ -259,6 +261,8 @@ class EnvironmentsClient:
 
         lazy : typing.Optional[bool]
 
+        settle_s : typing.Optional[float]
+
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
@@ -268,6 +272,8 @@ class EnvironmentsClient:
         persist_browser_profile : typing.Optional[bool]
 
         network : typing.Optional[BrowserNetwork]
+
+        screenshot_max_width : typing.Optional[int]
 
         image : typing.Optional[str]
 
@@ -298,11 +304,13 @@ class EnvironmentsClient:
             session_id=session_id,
             mode=mode,
             lazy=lazy,
+            settle_s=settle_s,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
             use_default_browser_profile=use_default_browser_profile,
             persist_browser_profile=persist_browser_profile,
             network=network,
+            screenshot_max_width=screenshot_max_width,
             image=image,
             request_options=request_options,
         )
@@ -562,11 +570,13 @@ class AsyncEnvironmentsClient:
         session_id: typing.Optional[str] = OMIT,
         mode: typing.Optional[PatchEnvironmentMode] = OMIT,
         lazy: typing.Optional[bool] = OMIT,
+        settle_s: typing.Optional[float] = OMIT,
         vault_id: typing.Optional[str] = OMIT,
         browser_profile_id: typing.Optional[str] = OMIT,
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
+        screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
@@ -589,6 +599,8 @@ class AsyncEnvironmentsClient:
 
         lazy : typing.Optional[bool]
 
+        settle_s : typing.Optional[float]
+
         vault_id : typing.Optional[str]
 
         browser_profile_id : typing.Optional[str]
@@ -598,6 +610,8 @@ class AsyncEnvironmentsClient:
         persist_browser_profile : typing.Optional[bool]
 
         network : typing.Optional[BrowserNetwork]
+
+        screenshot_max_width : typing.Optional[int]
 
         image : typing.Optional[str]
 
@@ -636,11 +650,13 @@ class AsyncEnvironmentsClient:
             session_id=session_id,
             mode=mode,
             lazy=lazy,
+            settle_s=settle_s,
             vault_id=vault_id,
             browser_profile_id=browser_profile_id,
             use_default_browser_profile=use_default_browser_profile,
             persist_browser_profile=persist_browser_profile,
             network=network,
+            screenshot_max_width=screenshot_max_width,
             image=image,
             request_options=request_options,
         )

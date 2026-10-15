@@ -32,6 +32,16 @@ class Desktop(UniversalBaseModel):
     Provision on the agent's first use instead of at startup. Skips the initial observation.
     """
 
+    settle_s: typing.Optional[float] = pydantic.Field(default=None)
+    """
+    Seconds to wait after each input action.
+    """
+
+    screenshot_max_width: typing.Optional[int] = pydantic.Field(default=None)
+    """
+    Maximum screenshot width in pixels. Null uses the host default; images are never upscaled.
+    """
+
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
     else:

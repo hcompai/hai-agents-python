@@ -113,6 +113,9 @@ class RawSkillsClient:
         body: str,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
+        compatibility: typing.Optional[str] = OMIT,
+        files: typing.Optional[typing.Dict[str, str]] = OMIT,
+        executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Skill]:
         """
@@ -135,6 +138,12 @@ class RawSkillsClient:
         url_pattern : typing.Optional[str]
             Optional regex hinting at URLs where this skill applies.
 
+        compatibility : typing.Optional[str]
+
+        files : typing.Optional[typing.Dict[str, str]]
+
+        executable_files : typing.Optional[typing.Sequence[str]]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -152,6 +161,9 @@ class RawSkillsClient:
                 "body": body,
                 "source": source,
                 "url_pattern": url_pattern,
+                "compatibility": compatibility,
+                "files": files,
+                "executable_files": executable_files,
             },
             headers={
                 "content-type": "application/json",
@@ -249,6 +261,9 @@ class RawSkillsClient:
         body: str,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
+        compatibility: typing.Optional[str] = OMIT,
+        files: typing.Optional[typing.Dict[str, str]] = OMIT,
+        executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Skill]:
         """
@@ -273,6 +288,12 @@ class RawSkillsClient:
         url_pattern : typing.Optional[str]
             Optional regex hinting at URLs where this skill applies.
 
+        compatibility : typing.Optional[str]
+
+        files : typing.Optional[typing.Dict[str, str]]
+
+        executable_files : typing.Optional[typing.Sequence[str]]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -290,6 +311,9 @@ class RawSkillsClient:
                 "body": body,
                 "source": source,
                 "url_pattern": url_pattern,
+                "compatibility": compatibility,
+                "files": files,
+                "executable_files": executable_files,
             },
             headers={
                 "content-type": "application/json",
@@ -378,6 +402,9 @@ class RawSkillsClient:
         body: typing.Optional[str] = OMIT,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
+        compatibility: typing.Optional[str] = OMIT,
+        files: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Skill]:
         """
@@ -395,6 +422,12 @@ class RawSkillsClient:
 
         url_pattern : typing.Optional[str]
 
+        compatibility : typing.Optional[str]
+
+        files : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+
+        executable_files : typing.Optional[typing.Sequence[str]]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -411,6 +444,9 @@ class RawSkillsClient:
                 "body": body,
                 "source": source,
                 "url_pattern": url_pattern,
+                "compatibility": compatibility,
+                "files": files,
+                "executable_files": executable_files,
             },
             headers={
                 "content-type": "application/json",
@@ -541,6 +577,9 @@ class AsyncRawSkillsClient:
         body: str,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
+        compatibility: typing.Optional[str] = OMIT,
+        files: typing.Optional[typing.Dict[str, str]] = OMIT,
+        executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Skill]:
         """
@@ -563,6 +602,12 @@ class AsyncRawSkillsClient:
         url_pattern : typing.Optional[str]
             Optional regex hinting at URLs where this skill applies.
 
+        compatibility : typing.Optional[str]
+
+        files : typing.Optional[typing.Dict[str, str]]
+
+        executable_files : typing.Optional[typing.Sequence[str]]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -580,6 +625,9 @@ class AsyncRawSkillsClient:
                 "body": body,
                 "source": source,
                 "url_pattern": url_pattern,
+                "compatibility": compatibility,
+                "files": files,
+                "executable_files": executable_files,
             },
             headers={
                 "content-type": "application/json",
@@ -679,6 +727,9 @@ class AsyncRawSkillsClient:
         body: str,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
+        compatibility: typing.Optional[str] = OMIT,
+        files: typing.Optional[typing.Dict[str, str]] = OMIT,
+        executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Skill]:
         """
@@ -703,6 +754,12 @@ class AsyncRawSkillsClient:
         url_pattern : typing.Optional[str]
             Optional regex hinting at URLs where this skill applies.
 
+        compatibility : typing.Optional[str]
+
+        files : typing.Optional[typing.Dict[str, str]]
+
+        executable_files : typing.Optional[typing.Sequence[str]]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -720,6 +777,9 @@ class AsyncRawSkillsClient:
                 "body": body,
                 "source": source,
                 "url_pattern": url_pattern,
+                "compatibility": compatibility,
+                "files": files,
+                "executable_files": executable_files,
             },
             headers={
                 "content-type": "application/json",
@@ -810,6 +870,9 @@ class AsyncRawSkillsClient:
         body: typing.Optional[str] = OMIT,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
+        compatibility: typing.Optional[str] = OMIT,
+        files: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Skill]:
         """
@@ -827,6 +890,12 @@ class AsyncRawSkillsClient:
 
         url_pattern : typing.Optional[str]
 
+        compatibility : typing.Optional[str]
+
+        files : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+
+        executable_files : typing.Optional[typing.Sequence[str]]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -843,6 +912,9 @@ class AsyncRawSkillsClient:
                 "body": body,
                 "source": source,
                 "url_pattern": url_pattern,
+                "compatibility": compatibility,
+                "files": files,
+                "executable_files": executable_files,
             },
             headers={
                 "content-type": "application/json",
