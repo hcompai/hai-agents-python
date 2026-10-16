@@ -403,7 +403,7 @@ class RawSkillsClient:
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
         compatibility: typing.Optional[str] = OMIT,
-        files: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        files: typing.Optional[typing.Dict[str, str]] = OMIT,
         executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Skill]:
@@ -424,7 +424,7 @@ class RawSkillsClient:
 
         compatibility : typing.Optional[str]
 
-        files : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+        files : typing.Optional[typing.Dict[str, str]]
 
         executable_files : typing.Optional[typing.Sequence[str]]
 
@@ -871,7 +871,7 @@ class AsyncRawSkillsClient:
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
         compatibility: typing.Optional[str] = OMIT,
-        files: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        files: typing.Optional[typing.Dict[str, str]] = OMIT,
         executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Skill]:
@@ -892,7 +892,7 @@ class AsyncRawSkillsClient:
 
         compatibility : typing.Optional[str]
 
-        files : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+        files : typing.Optional[typing.Dict[str, str]]
 
         executable_files : typing.Optional[typing.Sequence[str]]
 

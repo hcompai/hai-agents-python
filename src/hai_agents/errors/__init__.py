@@ -7,9 +7,11 @@ from importlib import import_module
 
 if typing.TYPE_CHECKING:
     from .not_found_error import NotFoundError
+    from .precondition_failed_error import PreconditionFailedError
     from .unprocessable_entity_error import UnprocessableEntityError
 _dynamic_imports: typing.Dict[str, str] = {
     "NotFoundError": ".not_found_error",
+    "PreconditionFailedError": ".precondition_failed_error",
     "UnprocessableEntityError": ".unprocessable_entity_error",
 }
 
@@ -35,4 +37,4 @@ def __dir__():
     return sorted(lazy_attrs)
 
 
-__all__ = ["NotFoundError", "UnprocessableEntityError"]
+__all__ = ["NotFoundError", "PreconditionFailedError", "UnprocessableEntityError"]

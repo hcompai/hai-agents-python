@@ -11,6 +11,7 @@ from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
 from ..core.serialization import convert_and_respect_annotation_metadata
+from ..errors.precondition_failed_error import PreconditionFailedError
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.agent import Agent
 from ..types.agent_environments_item import AgentEnvironmentsItem
@@ -19,7 +20,9 @@ from ..types.agent_skills_item import AgentSkillsItem
 from ..types.agent_subagents_item import AgentSubagentsItem
 from ..types.http_validation_error import HttpValidationError
 from ..types.page_agent import PageAgent
+from ..types.page_agent_revision_record import PageAgentRevisionRecord
 from ..types.tool_definition import ToolDefinition
+from .types.list_agent_revisions_request_sort_item import ListAgentRevisionsRequestSortItem
 from .types.list_agents_request_sort_item import ListAgentsRequestSortItem
 from .types.patch_agent_environments_item import PatchAgentEnvironmentsItem
 from .types.patch_agent_reasoning_effort import PatchAgentReasoningEffort
@@ -126,6 +129,7 @@ class RawAgentsClient:
         name: str,
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
+        message: typing.Optional[str] = None,
         model: typing.Optional[str] = OMIT,
         reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
@@ -136,7 +140,7 @@ class RawAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Agent]:
         """
-        Create an agent..
+        Create an agent at revision 1.
 
         Parameters
         ----------
@@ -148,6 +152,9 @@ class RawAgentsClient:
 
         environments : typing.Sequence[AgentEnvironmentsItem]
             Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
@@ -181,6 +188,9 @@ class RawAgentsClient:
         _response = self._client_wrapper.httpx_client.request(
             "api/v2/agents",
             method="POST",
+            params={
+                "message": message,
+            },
             json={
                 "name": name,
                 "description": description,
@@ -239,19 +249,102 @@ class RawAgentsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def get_agent(
+    def list_agent_revisions(
         self,
         agent_name: str,
         *,
-        resolve: typing.Optional[bool] = None,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[typing.Sequence[ListAgentRevisionsRequestSortItem]] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[Agent]:
+    ) -> HttpResponse[PageAgentRevisionRecord]:
         """
-        Fetch by identifier; 404 if not visible. ``resolve=true`` materialises spec leaves.
+        List an agent's revisions without their specs, newest first. Read one with ``?revision=N``.
+
+        Unauthenticated callers can list reserved ``h/`` agents only.
 
         Parameters
         ----------
         agent_name : str
+
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Sequence[ListAgentRevisionsRequestSortItem]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[PageAgentRevisionRecord]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/agents/{encode_path_param(agent_name)}/revisions",
+            method="GET",
+            params={
+                "page": page,
+                "size": size,
+                "sort": sort,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    PageAgentRevisionRecord,
+                    parse_obj_as(
+                        type_=PageAgentRevisionRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def get_agent(
+        self,
+        agent_name: str,
+        *,
+        revision: typing.Optional[int] = None,
+        resolve: typing.Optional[bool] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[Agent]:
+        """
+        Fetch by name at its latest revision, or at ``revision``; 404 if not visible or no such revision.
+
+        The stored spec carries its revision as ``ETag``. A resolved spec does not, since it also
+        reflects the current environments, skills, and subagents it names. ``resolve=true``
+        materialises spec leaves.
+
+        Parameters
+        ----------
+        agent_name : str
+
+        revision : typing.Optional[int]
+            Read this revision instead of the latest. References to an agent elsewhere, such as a session's ``agent``, pin a revision as ``name:N`` instead.
 
         resolve : typing.Optional[bool]
             Materialise string environment/skill/subagent leaves into full specs.
@@ -268,6 +361,7 @@ class RawAgentsClient:
             f"api/v2/agents/{encode_path_param(agent_name)}",
             method="GET",
             params={
+                "revision": revision,
                 "resolve": resolve,
             },
             request_options=request_options,
@@ -309,6 +403,8 @@ class RawAgentsClient:
         name: str,
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         model: typing.Optional[str] = OMIT,
         reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
@@ -319,7 +415,9 @@ class RawAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Agent]:
         """
-        Replace ``spec``. ``spec.name`` must match the URL identifier; renames are not supported.
+        Replace ``spec`` as a new revision. ``spec.name`` must match the URL identifier; renames are not supported.
+
+        Sending the spec that is already current changes nothing and returns the current revision.
 
         Parameters
         ----------
@@ -333,6 +431,12 @@ class RawAgentsClient:
 
         environments : typing.Sequence[AgentEnvironmentsItem]
             Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
@@ -366,6 +470,9 @@ class RawAgentsClient:
         _response = self._client_wrapper.httpx_client.request(
             f"api/v2/agents/{encode_path_param(agent_name)}",
             method="PUT",
+            params={
+                "message": message,
+            },
             json={
                 "name": name,
                 "description": description,
@@ -390,6 +497,7 @@ class RawAgentsClient:
             },
             headers={
                 "content-type": "application/json",
+                "If-Match": str(if_match) if if_match is not None else None,
             },
             request_options=request_options,
             omit=OMIT,
@@ -404,6 +512,17 @@ class RawAgentsClient:
                     ),
                 )
                 return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -425,14 +544,21 @@ class RawAgentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     def delete_agent(
-        self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None
+        self,
+        agent_name: str,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[None]:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete by identifier, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         agent_name : str
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -444,11 +570,25 @@ class RawAgentsClient:
         _response = self._client_wrapper.httpx_client.request(
             f"api/v2/agents/{encode_path_param(agent_name)}",
             method="DELETE",
+            headers={
+                "If-Match": str(if_match) if if_match is not None else None,
+            },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 return HttpResponse(response=_response, data=None)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -473,6 +613,8 @@ class RawAgentsClient:
         self,
         agent_name: str,
         *,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         description: typing.Optional[str] = OMIT,
         environments: typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]] = OMIT,
         model: typing.Optional[str] = OMIT,
@@ -485,11 +627,17 @@ class RawAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Agent]:
         """
-        Partially update an agent spec; only provided fields change.
+        Partially update an agent spec as a new revision; only provided fields change.
 
         Parameters
         ----------
         agent_name : str
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         description : typing.Optional[str]
 
@@ -520,12 +668,13 @@ class RawAgentsClient:
         _response = self._client_wrapper.httpx_client.request(
             f"api/v2/agents/{encode_path_param(agent_name)}",
             method="PATCH",
+            params={
+                "message": message,
+            },
             json={
                 "description": description,
                 "environments": convert_and_respect_annotation_metadata(
-                    object_=environments,
-                    annotation=typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]],
-                    direction="write",
+                    object_=environments, annotation=typing.Sequence[PatchAgentEnvironmentsItem], direction="write"
                 ),
                 "model": model,
                 "reasoning_effort": reasoning_effort,
@@ -545,6 +694,7 @@ class RawAgentsClient:
             },
             headers={
                 "content-type": "application/json",
+                "If-Match": str(if_match) if if_match is not None else None,
             },
             request_options=request_options,
             omit=OMIT,
@@ -559,6 +709,17 @@ class RawAgentsClient:
                     ),
                 )
                 return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -675,6 +836,7 @@ class AsyncRawAgentsClient:
         name: str,
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
+        message: typing.Optional[str] = None,
         model: typing.Optional[str] = OMIT,
         reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
@@ -685,7 +847,7 @@ class AsyncRawAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Agent]:
         """
-        Create an agent..
+        Create an agent at revision 1.
 
         Parameters
         ----------
@@ -697,6 +859,9 @@ class AsyncRawAgentsClient:
 
         environments : typing.Sequence[AgentEnvironmentsItem]
             Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
@@ -730,6 +895,9 @@ class AsyncRawAgentsClient:
         _response = await self._client_wrapper.httpx_client.request(
             "api/v2/agents",
             method="POST",
+            params={
+                "message": message,
+            },
             json={
                 "name": name,
                 "description": description,
@@ -788,19 +956,102 @@ class AsyncRawAgentsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def get_agent(
+    async def list_agent_revisions(
         self,
         agent_name: str,
         *,
-        resolve: typing.Optional[bool] = None,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[typing.Sequence[ListAgentRevisionsRequestSortItem]] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[Agent]:
+    ) -> AsyncHttpResponse[PageAgentRevisionRecord]:
         """
-        Fetch by identifier; 404 if not visible. ``resolve=true`` materialises spec leaves.
+        List an agent's revisions without their specs, newest first. Read one with ``?revision=N``.
+
+        Unauthenticated callers can list reserved ``h/`` agents only.
 
         Parameters
         ----------
         agent_name : str
+
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Sequence[ListAgentRevisionsRequestSortItem]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[PageAgentRevisionRecord]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/agents/{encode_path_param(agent_name)}/revisions",
+            method="GET",
+            params={
+                "page": page,
+                "size": size,
+                "sort": sort,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    PageAgentRevisionRecord,
+                    parse_obj_as(
+                        type_=PageAgentRevisionRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        HttpValidationError,
+                        parse_obj_as(
+                            type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def get_agent(
+        self,
+        agent_name: str,
+        *,
+        revision: typing.Optional[int] = None,
+        resolve: typing.Optional[bool] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[Agent]:
+        """
+        Fetch by name at its latest revision, or at ``revision``; 404 if not visible or no such revision.
+
+        The stored spec carries its revision as ``ETag``. A resolved spec does not, since it also
+        reflects the current environments, skills, and subagents it names. ``resolve=true``
+        materialises spec leaves.
+
+        Parameters
+        ----------
+        agent_name : str
+
+        revision : typing.Optional[int]
+            Read this revision instead of the latest. References to an agent elsewhere, such as a session's ``agent``, pin a revision as ``name:N`` instead.
 
         resolve : typing.Optional[bool]
             Materialise string environment/skill/subagent leaves into full specs.
@@ -817,6 +1068,7 @@ class AsyncRawAgentsClient:
             f"api/v2/agents/{encode_path_param(agent_name)}",
             method="GET",
             params={
+                "revision": revision,
                 "resolve": resolve,
             },
             request_options=request_options,
@@ -858,6 +1110,8 @@ class AsyncRawAgentsClient:
         name: str,
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         model: typing.Optional[str] = OMIT,
         reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
@@ -868,7 +1122,9 @@ class AsyncRawAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Agent]:
         """
-        Replace ``spec``. ``spec.name`` must match the URL identifier; renames are not supported.
+        Replace ``spec`` as a new revision. ``spec.name`` must match the URL identifier; renames are not supported.
+
+        Sending the spec that is already current changes nothing and returns the current revision.
 
         Parameters
         ----------
@@ -882,6 +1138,12 @@ class AsyncRawAgentsClient:
 
         environments : typing.Sequence[AgentEnvironmentsItem]
             Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
@@ -915,6 +1177,9 @@ class AsyncRawAgentsClient:
         _response = await self._client_wrapper.httpx_client.request(
             f"api/v2/agents/{encode_path_param(agent_name)}",
             method="PUT",
+            params={
+                "message": message,
+            },
             json={
                 "name": name,
                 "description": description,
@@ -939,6 +1204,7 @@ class AsyncRawAgentsClient:
             },
             headers={
                 "content-type": "application/json",
+                "If-Match": str(if_match) if if_match is not None else None,
             },
             request_options=request_options,
             omit=OMIT,
@@ -953,6 +1219,17 @@ class AsyncRawAgentsClient:
                     ),
                 )
                 return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -974,14 +1251,21 @@ class AsyncRawAgentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     async def delete_agent(
-        self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None
+        self,
+        agent_name: str,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[None]:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete by identifier, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         agent_name : str
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -993,11 +1277,25 @@ class AsyncRawAgentsClient:
         _response = await self._client_wrapper.httpx_client.request(
             f"api/v2/agents/{encode_path_param(agent_name)}",
             method="DELETE",
+            headers={
+                "If-Match": str(if_match) if if_match is not None else None,
+            },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -1022,6 +1320,8 @@ class AsyncRawAgentsClient:
         self,
         agent_name: str,
         *,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         description: typing.Optional[str] = OMIT,
         environments: typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]] = OMIT,
         model: typing.Optional[str] = OMIT,
@@ -1034,11 +1334,17 @@ class AsyncRawAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Agent]:
         """
-        Partially update an agent spec; only provided fields change.
+        Partially update an agent spec as a new revision; only provided fields change.
 
         Parameters
         ----------
         agent_name : str
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         description : typing.Optional[str]
 
@@ -1069,12 +1375,13 @@ class AsyncRawAgentsClient:
         _response = await self._client_wrapper.httpx_client.request(
             f"api/v2/agents/{encode_path_param(agent_name)}",
             method="PATCH",
+            params={
+                "message": message,
+            },
             json={
                 "description": description,
                 "environments": convert_and_respect_annotation_metadata(
-                    object_=environments,
-                    annotation=typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]],
-                    direction="write",
+                    object_=environments, annotation=typing.Sequence[PatchAgentEnvironmentsItem], direction="write"
                 ),
                 "model": model,
                 "reasoning_effort": reasoning_effort,
@@ -1094,6 +1401,7 @@ class AsyncRawAgentsClient:
             },
             headers={
                 "content-type": "application/json",
+                "If-Match": str(if_match) if if_match is not None else None,
             },
             request_options=request_options,
             omit=OMIT,
@@ -1108,6 +1416,17 @@ class AsyncRawAgentsClient:
                     ),
                 )
                 return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),

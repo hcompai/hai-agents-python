@@ -10,8 +10,10 @@ from ..types.agent_reasoning_effort import AgentReasoningEffort
 from ..types.agent_skills_item import AgentSkillsItem
 from ..types.agent_subagents_item import AgentSubagentsItem
 from ..types.page_agent import PageAgent
+from ..types.page_agent_revision_record import PageAgentRevisionRecord
 from ..types.tool_definition import ToolDefinition
 from .raw_client import AsyncRawAgentsClient, RawAgentsClient
+from .types.list_agent_revisions_request_sort_item import ListAgentRevisionsRequestSortItem
 from .types.list_agents_request_sort_item import ListAgentsRequestSortItem
 from .types.patch_agent_environments_item import PatchAgentEnvironmentsItem
 from .types.patch_agent_reasoning_effort import PatchAgentReasoningEffort
@@ -105,6 +107,7 @@ class AgentsClient:
         name: str,
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
+        message: typing.Optional[str] = None,
         model: typing.Optional[str] = OMIT,
         reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
@@ -115,7 +118,7 @@ class AgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
-        Create an agent..
+        Create an agent at revision 1.
 
         Parameters
         ----------
@@ -127,6 +130,9 @@ class AgentsClient:
 
         environments : typing.Sequence[AgentEnvironmentsItem]
             Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
@@ -174,6 +180,7 @@ class AgentsClient:
             name=name,
             description=description,
             environments=environments,
+            message=message,
             model=model,
             reasoning_effort=reasoning_effort,
             instructions=instructions,
@@ -185,19 +192,78 @@ class AgentsClient:
         )
         return _response.data
 
-    def get_agent(
+    def list_agent_revisions(
         self,
         agent_name: str,
         *,
-        resolve: typing.Optional[bool] = None,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[typing.Sequence[ListAgentRevisionsRequestSortItem]] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> Agent:
+    ) -> PageAgentRevisionRecord:
         """
-        Fetch by identifier; 404 if not visible. ``resolve=true`` materialises spec leaves.
+        List an agent's revisions without their specs, newest first. Read one with ``?revision=N``.
+
+        Unauthenticated callers can list reserved ``h/`` agents only.
 
         Parameters
         ----------
         agent_name : str
+
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Sequence[ListAgentRevisionsRequestSortItem]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        PageAgentRevisionRecord
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.agents.list_agent_revisions(
+            agent_name="agent_name",
+        )
+        """
+        _response = self._raw_client.list_agent_revisions(
+            agent_name, page=page, size=size, sort=sort, request_options=request_options
+        )
+        return _response.data
+
+    def get_agent(
+        self,
+        agent_name: str,
+        *,
+        revision: typing.Optional[int] = None,
+        resolve: typing.Optional[bool] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Agent:
+        """
+        Fetch by name at its latest revision, or at ``revision``; 404 if not visible or no such revision.
+
+        The stored spec carries its revision as ``ETag``. A resolved spec does not, since it also
+        reflects the current environments, skills, and subagents it names. ``resolve=true``
+        materialises spec leaves.
+
+        Parameters
+        ----------
+        agent_name : str
+
+        revision : typing.Optional[int]
+            Read this revision instead of the latest. References to an agent elsewhere, such as a session's ``agent``, pin a revision as ``name:N`` instead.
 
         resolve : typing.Optional[bool]
             Materialise string environment/skill/subagent leaves into full specs.
@@ -221,7 +287,9 @@ class AgentsClient:
             agent_name="agent_name",
         )
         """
-        _response = self._raw_client.get_agent(agent_name, resolve=resolve, request_options=request_options)
+        _response = self._raw_client.get_agent(
+            agent_name, revision=revision, resolve=resolve, request_options=request_options
+        )
         return _response.data
 
     def update_agent(
@@ -231,6 +299,8 @@ class AgentsClient:
         name: str,
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         model: typing.Optional[str] = OMIT,
         reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
@@ -241,7 +311,9 @@ class AgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
-        Replace ``spec``. ``spec.name`` must match the URL identifier; renames are not supported.
+        Replace ``spec`` as a new revision. ``spec.name`` must match the URL identifier; renames are not supported.
+
+        Sending the spec that is already current changes nothing and returns the current revision.
 
         Parameters
         ----------
@@ -255,6 +327,12 @@ class AgentsClient:
 
         environments : typing.Sequence[AgentEnvironmentsItem]
             Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
@@ -304,6 +382,8 @@ class AgentsClient:
             name=name,
             description=description,
             environments=environments,
+            message=message,
+            if_match=if_match,
             model=model,
             reasoning_effort=reasoning_effort,
             instructions=instructions,
@@ -315,13 +395,22 @@ class AgentsClient:
         )
         return _response.data
 
-    def delete_agent(self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
+    def delete_agent(
+        self,
+        agent_name: str,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete by identifier, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         agent_name : str
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -341,13 +430,15 @@ class AgentsClient:
             agent_name="agent_name",
         )
         """
-        _response = self._raw_client.delete_agent(agent_name, request_options=request_options)
+        _response = self._raw_client.delete_agent(agent_name, if_match=if_match, request_options=request_options)
         return _response.data
 
     def patch_agent(
         self,
         agent_name: str,
         *,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         description: typing.Optional[str] = OMIT,
         environments: typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]] = OMIT,
         model: typing.Optional[str] = OMIT,
@@ -360,11 +451,17 @@ class AgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
-        Partially update an agent spec; only provided fields change.
+        Partially update an agent spec as a new revision; only provided fields change.
 
         Parameters
         ----------
         agent_name : str
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         description : typing.Optional[str]
 
@@ -405,6 +502,8 @@ class AgentsClient:
         """
         _response = self._raw_client.patch_agent(
             agent_name,
+            message=message,
+            if_match=if_match,
             description=description,
             environments=environments,
             model=model,
@@ -510,6 +609,7 @@ class AsyncAgentsClient:
         name: str,
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
+        message: typing.Optional[str] = None,
         model: typing.Optional[str] = OMIT,
         reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
@@ -520,7 +620,7 @@ class AsyncAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
-        Create an agent..
+        Create an agent at revision 1.
 
         Parameters
         ----------
@@ -532,6 +632,9 @@ class AsyncAgentsClient:
 
         environments : typing.Sequence[AgentEnvironmentsItem]
             Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
@@ -587,6 +690,7 @@ class AsyncAgentsClient:
             name=name,
             description=description,
             environments=environments,
+            message=message,
             model=model,
             reasoning_effort=reasoning_effort,
             instructions=instructions,
@@ -598,19 +702,86 @@ class AsyncAgentsClient:
         )
         return _response.data
 
-    async def get_agent(
+    async def list_agent_revisions(
         self,
         agent_name: str,
         *,
-        resolve: typing.Optional[bool] = None,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[typing.Sequence[ListAgentRevisionsRequestSortItem]] = None,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> Agent:
+    ) -> PageAgentRevisionRecord:
         """
-        Fetch by identifier; 404 if not visible. ``resolve=true`` materialises spec leaves.
+        List an agent's revisions without their specs, newest first. Read one with ``?revision=N``.
+
+        Unauthenticated callers can list reserved ``h/`` agents only.
 
         Parameters
         ----------
         agent_name : str
+
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Sequence[ListAgentRevisionsRequestSortItem]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        PageAgentRevisionRecord
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.agents.list_agent_revisions(
+                agent_name="agent_name",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.list_agent_revisions(
+            agent_name, page=page, size=size, sort=sort, request_options=request_options
+        )
+        return _response.data
+
+    async def get_agent(
+        self,
+        agent_name: str,
+        *,
+        revision: typing.Optional[int] = None,
+        resolve: typing.Optional[bool] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Agent:
+        """
+        Fetch by name at its latest revision, or at ``revision``; 404 if not visible or no such revision.
+
+        The stored spec carries its revision as ``ETag``. A resolved spec does not, since it also
+        reflects the current environments, skills, and subagents it names. ``resolve=true``
+        materialises spec leaves.
+
+        Parameters
+        ----------
+        agent_name : str
+
+        revision : typing.Optional[int]
+            Read this revision instead of the latest. References to an agent elsewhere, such as a session's ``agent``, pin a revision as ``name:N`` instead.
 
         resolve : typing.Optional[bool]
             Materialise string environment/skill/subagent leaves into full specs.
@@ -642,7 +813,9 @@ class AsyncAgentsClient:
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.get_agent(agent_name, resolve=resolve, request_options=request_options)
+        _response = await self._raw_client.get_agent(
+            agent_name, revision=revision, resolve=resolve, request_options=request_options
+        )
         return _response.data
 
     async def update_agent(
@@ -652,6 +825,8 @@ class AsyncAgentsClient:
         name: str,
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         model: typing.Optional[str] = OMIT,
         reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
@@ -662,7 +837,9 @@ class AsyncAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
-        Replace ``spec``. ``spec.name`` must match the URL identifier; renames are not supported.
+        Replace ``spec`` as a new revision. ``spec.name`` must match the URL identifier; renames are not supported.
+
+        Sending the spec that is already current changes nothing and returns the current revision.
 
         Parameters
         ----------
@@ -676,6 +853,12 @@ class AsyncAgentsClient:
 
         environments : typing.Sequence[AgentEnvironmentsItem]
             Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
@@ -733,6 +916,8 @@ class AsyncAgentsClient:
             name=name,
             description=description,
             environments=environments,
+            message=message,
+            if_match=if_match,
             model=model,
             reasoning_effort=reasoning_effort,
             instructions=instructions,
@@ -744,13 +929,22 @@ class AsyncAgentsClient:
         )
         return _response.data
 
-    async def delete_agent(self, agent_name: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
+    async def delete_agent(
+        self,
+        agent_name: str,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete by identifier, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         agent_name : str
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -778,13 +972,15 @@ class AsyncAgentsClient:
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.delete_agent(agent_name, request_options=request_options)
+        _response = await self._raw_client.delete_agent(agent_name, if_match=if_match, request_options=request_options)
         return _response.data
 
     async def patch_agent(
         self,
         agent_name: str,
         *,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         description: typing.Optional[str] = OMIT,
         environments: typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]] = OMIT,
         model: typing.Optional[str] = OMIT,
@@ -797,11 +993,17 @@ class AsyncAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
-        Partially update an agent spec; only provided fields change.
+        Partially update an agent spec as a new revision; only provided fields change.
 
         Parameters
         ----------
         agent_name : str
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         description : typing.Optional[str]
 
@@ -850,6 +1052,8 @@ class AsyncAgentsClient:
         """
         _response = await self._raw_client.patch_agent(
             agent_name,
+            message=message,
+            if_match=if_match,
             description=description,
             environments=environments,
             model=model,
