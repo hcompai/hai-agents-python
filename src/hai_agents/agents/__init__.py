@@ -7,6 +7,7 @@ from importlib import import_module
 
 if typing.TYPE_CHECKING:
     from .types import (
+        ListAgentRevisionsRequestSortItem,
         ListAgentsRequestSortItem,
         PatchAgentEnvironmentsItem,
         PatchAgentReasoningEffort,
@@ -14,6 +15,7 @@ if typing.TYPE_CHECKING:
         PatchAgentSubagentsItem,
     )
 _dynamic_imports: typing.Dict[str, str] = {
+    "ListAgentRevisionsRequestSortItem": ".types",
     "ListAgentsRequestSortItem": ".types",
     "PatchAgentEnvironmentsItem": ".types",
     "PatchAgentReasoningEffort": ".types",
@@ -44,6 +46,7 @@ def __dir__():
 
 
 __all__ = [
+    "ListAgentRevisionsRequestSortItem",
     "ListAgentsRequestSortItem",
     "PatchAgentEnvironmentsItem",
     "PatchAgentReasoningEffort",

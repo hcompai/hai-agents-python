@@ -27,6 +27,7 @@ if typing.TYPE_CHECKING:
         AgentEventData_PolicyEvent,
         AgentEventData_ToolResult,
         AgentReasoningEffort,
+        AgentRevisionRecord,
         AgentRunStatusChangeData,
         AgentRunStatusChangeDataStatus,
         AgentRunStatusChangeEvent,
@@ -92,6 +93,7 @@ if typing.TYPE_CHECKING:
         OnePasswordConfig,
         OnePasswordConfigProvider,
         PageAgent,
+        PageAgentRevisionRecord,
         PageScheduleRecord,
         PageScheduleRunRecord,
         PageSessionEvent,
@@ -169,7 +171,7 @@ if typing.TYPE_CHECKING:
         WorkstationHost,
         WriteFileResponse,
     )
-    from .errors import NotFoundError, UnprocessableEntityError
+    from .errors import NotFoundError, PreconditionFailedError, UnprocessableEntityError
     from . import (
         agents,
         browser_profiles,
@@ -184,6 +186,7 @@ if typing.TYPE_CHECKING:
     )
     from ._default_clients import DefaultAioHttpClient, DefaultAsyncHttpxClient
     from .agents import (
+        ListAgentRevisionsRequestSortItem,
         ListAgentsRequestSortItem,
         PatchAgentEnvironmentsItem,
         PatchAgentReasoningEffort,
@@ -263,6 +266,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "AgentEventData_PolicyEvent": ".types",
     "AgentEventData_ToolResult": ".types",
     "AgentReasoningEffort": ".types",
+    "AgentRevisionRecord": ".types",
     "AgentRunStatusChangeData": ".types",
     "AgentRunStatusChangeDataStatus": ".types",
     "AgentRunStatusChangeEvent": ".types",
@@ -325,6 +329,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ImageContentType": ".types",
     "InitiateUploadResponse": ".types",
     "JsonValue": ".types",
+    "ListAgentRevisionsRequestSortItem": ".agents",
     "ListAgentsRequestSortItem": ".agents",
     "ListEnvironmentsRequestSortItem": ".environments",
     "ListFilesResponse": ".types",
@@ -351,6 +356,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "OnePasswordConfig": ".types",
     "OnePasswordConfigProvider": ".types",
     "PageAgent": ".types",
+    "PageAgentRevisionRecord": ".types",
     "PageScheduleRecord": ".types",
     "PageScheduleRunRecord": ".types",
     "PageSessionEvent": ".types",
@@ -367,6 +373,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PatchEnvironmentMode_Visual": ".environments",
     "PauseSchedule": ".types",
     "PolicyEvent": ".types",
+    "PreconditionFailedError": ".errors",
     "ProxyPool": ".types",
     "QuotaStatus": ".types",
     "QuotaStatusScope": ".types",
@@ -521,6 +528,7 @@ __all__ = [
     "AgentEventData_PolicyEvent",
     "AgentEventData_ToolResult",
     "AgentReasoningEffort",
+    "AgentRevisionRecord",
     "AgentRunStatusChangeData",
     "AgentRunStatusChangeDataStatus",
     "AgentRunStatusChangeEvent",
@@ -583,6 +591,7 @@ __all__ = [
     "ImageContentType",
     "InitiateUploadResponse",
     "JsonValue",
+    "ListAgentRevisionsRequestSortItem",
     "ListAgentsRequestSortItem",
     "ListEnvironmentsRequestSortItem",
     "ListFilesResponse",
@@ -609,6 +618,7 @@ __all__ = [
     "OnePasswordConfig",
     "OnePasswordConfigProvider",
     "PageAgent",
+    "PageAgentRevisionRecord",
     "PageScheduleRecord",
     "PageScheduleRunRecord",
     "PageSessionEvent",
@@ -625,6 +635,7 @@ __all__ = [
     "PatchEnvironmentMode_Visual",
     "PauseSchedule",
     "PolicyEvent",
+    "PreconditionFailedError",
     "ProxyPool",
     "QuotaStatus",
     "QuotaStatusScope",
