@@ -1,0 +1,86 @@
+name: Release
+
+# Each push to main either releases its version (no vX.Y.Z tag yet), or keeps one rolling
+# "Release X.Y.Z" PR that bumps the patch over the unreleased changes. Merging that PR is the
+# release decision; Publish then waits for the `release` environment approval.
+# Runs as the hai-runtime-release GitHub App (HAI_RUNTIME_RELEASE_APP_ID var,
+# HAI_RUNTIME_RELEASE_APP_PRIVATE_KEY secret): releases and PRs made with GITHUB_TOKEN
+# trigger no workflows, so Publish and CI would never run.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Mint hai-agents-python token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.HAI_RUNTIME_RELEASE_APP_ID }}
+          private-key: ${{ secrets.HAI_RUNTIME_RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Plan
+        id: plan
+        run: |
+          version="$(python3 scripts/bump_version.py --current)"
+          if ! git rev-parse -q --verify "refs/tags/v${version}" >/dev/null; then
+            action=release
+          elif git diff --quiet "v${version}" HEAD -- src pyproject.toml README.md; then
+            action=none
+          else
+            action=stage
+          fi
+          echo "v${version}: ${action}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "action=${action}" >> "$GITHUB_OUTPUT"
+
+      - name: Release v${{ steps.plan.outputs.version }}
+        if: steps.plan.outputs.action == 'release'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: v${{ steps.plan.outputs.version }}
+        run: gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --generate-notes
+
+      - name: Close the stale release PR
+        if: steps.plan.outputs.action != 'stage'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          for pr in $(gh pr list --head release/next --state open --json number --jq '.[].number'); do
+            gh pr close "$pr" --delete-branch
+          done
+
+      - name: Bump the patch version
+        id: bump
+        if: steps.plan.outputs.action == 'stage'
+        run: echo "version=$(python3 scripts/bump_version.py)" >> "$GITHUB_OUTPUT"
+
+      - uses: peter-evans/create-pull-request@v8
+        if: steps.plan.outputs.action == 'stage'
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: release/next
+          delete-branch: true
+          add-paths: |
+            pyproject.toml
+            uv.lock
+            src/hai_agents/core/client_wrapper.py
+          commit-message: "Release ${{ steps.bump.outputs.version }}"
+          title: "Release ${{ steps.bump.outputs.version }}"
+          body: ""
