@@ -62,8 +62,17 @@ jobs:
                                       spawn_env={"HAI_AGENT_RUNTIME_RECIPE": "shared"}).shutdown()
           '
 
+  api-compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prod serves every operation and the pinned runtime accepts every session field
+        run: python3 scripts/check_release.py --runtime-pin src/hai_agents_local/runtime/pin.json
+
   publish:
-    needs: [build, runtime-pin]
+    needs: [build, runtime-pin, api-compat]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: release
