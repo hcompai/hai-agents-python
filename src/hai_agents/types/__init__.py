@@ -28,6 +28,7 @@ if typing.TYPE_CHECKING:
         AgentEventData_ToolResult,
     )
     from .agent_reasoning_effort import AgentReasoningEffort
+    from .agent_revision_record import AgentRevisionRecord
     from .agent_run_status_change_data import AgentRunStatusChangeData
     from .agent_run_status_change_data_status import AgentRunStatusChangeDataStatus
     from .agent_run_status_change_event import AgentRunStatusChangeEvent
@@ -35,6 +36,7 @@ if typing.TYPE_CHECKING:
     from .agent_started_data import AgentStartedData
     from .agent_started_event import AgentStartedEvent
     from .agent_subagents_item import AgentSubagentsItem
+    from .agent_with_revision import AgentWithRevision
     from .android import Android
     from .answer_event import AnswerEvent
     from .answer_event_answer import AnswerEventAnswer
@@ -93,6 +95,7 @@ if typing.TYPE_CHECKING:
     from .one_password_config import OnePasswordConfig
     from .one_password_config_provider import OnePasswordConfigProvider
     from .page_agent import PageAgent
+    from .page_agent_revision_record import PageAgentRevisionRecord
     from .page_schedule_record import PageScheduleRecord
     from .page_schedule_run_record import PageScheduleRunRecord
     from .page_session_event import PageSessionEvent
@@ -194,6 +197,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "AgentEventData_PolicyEvent": ".agent_event_data",
     "AgentEventData_ToolResult": ".agent_event_data",
     "AgentReasoningEffort": ".agent_reasoning_effort",
+    "AgentRevisionRecord": ".agent_revision_record",
     "AgentRunStatusChangeData": ".agent_run_status_change_data",
     "AgentRunStatusChangeDataStatus": ".agent_run_status_change_data_status",
     "AgentRunStatusChangeEvent": ".agent_run_status_change_event",
@@ -201,6 +205,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "AgentStartedData": ".agent_started_data",
     "AgentStartedEvent": ".agent_started_event",
     "AgentSubagentsItem": ".agent_subagents_item",
+    "AgentWithRevision": ".agent_with_revision",
     "Android": ".android",
     "AnswerEvent": ".answer_event",
     "AnswerEventAnswer": ".answer_event_answer",
@@ -259,6 +264,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "OnePasswordConfig": ".one_password_config",
     "OnePasswordConfigProvider": ".one_password_config_provider",
     "PageAgent": ".page_agent",
+    "PageAgentRevisionRecord": ".page_agent_revision_record",
     "PageScheduleRecord": ".page_schedule_record",
     "PageScheduleRunRecord": ".page_schedule_run_record",
     "PageSessionEvent": ".page_session_event",
@@ -380,6 +386,7 @@ __all__ = [
     "AgentEventData_PolicyEvent",
     "AgentEventData_ToolResult",
     "AgentReasoningEffort",
+    "AgentRevisionRecord",
     "AgentRunStatusChangeData",
     "AgentRunStatusChangeDataStatus",
     "AgentRunStatusChangeEvent",
@@ -387,6 +394,7 @@ __all__ = [
     "AgentStartedData",
     "AgentStartedEvent",
     "AgentSubagentsItem",
+    "AgentWithRevision",
     "Android",
     "AnswerEvent",
     "AnswerEventAnswer",
@@ -445,6 +453,7 @@ __all__ = [
     "OnePasswordConfig",
     "OnePasswordConfigProvider",
     "PageAgent",
+    "PageAgentRevisionRecord",
     "PageScheduleRecord",
     "PageScheduleRunRecord",
     "PageSessionEvent",

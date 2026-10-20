@@ -2096,11 +2096,32 @@
           "Agents"
         ],
         "summary": "Create Agent",
-        "description": "Create an agent..",
+        "description": "Create an agent at revision 1.",
         "operationId": "create_agent_api_v2_agents_post",
         "security": [
           {
             "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "message",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional note stored on the revision this write creates, such as why the change was made.",
+              "title": "Message"
+            },
+            "description": "Optional note stored on the revision this write creates, such as why the change was made."
           }
         ],
         "requestBody": {
@@ -2120,6 +2141,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Agent"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -2204,6 +2233,25 @@
             "description": "``true``: reserved ``h/`` agents only. ``false``: org agents only."
           },
           {
+            "name": "include",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "revision",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "``revision``: each item is an ``AgentWithRevision``, the spec plus the agent's current ``revision`` number. Omitted, items are plain ``Agent`` specs.",
+              "title": "Include"
+            },
+            "description": "``revision``: each item is an ``AgentWithRevision``, the spec plus the agent's current ``revision`` number. Omitted, items are plain ``Agent`` specs."
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -2282,6 +2330,211 @@
               }
             }
           }
+        },
+        "x-include-item-schemas": {
+          "revision": {
+            "$ref": "#/components/schemas/AgentWithRevision"
+          }
+        }
+      }
+    },
+    "/api/v2/agents/{agent_name}/revisions": {
+      "get": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "List Agent Revisions",
+        "description": "List an agent's revisions without their specs, newest first. Read one with ``?revision=N``.\n\nUnauthenticated callers can list reserved ``h/`` agents only.",
+        "operationId": "list_agent_revisions_api_v2_agents__agent_name__revisions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Name"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number (1-based)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number (1-based)"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Number of items per page",
+              "default": 10,
+              "title": "Size"
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "number",
+                      "-number"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort by field",
+              "default": [
+                "-number"
+              ],
+              "title": "Sort"
+            },
+            "description": "Sort by field"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AgentRevisionRecord_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/agents/{agent_name}/revisions/{number}/restore": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Restore Agent Revision",
+        "description": "Make revision ``number``'s spec current again, as a new revision with the message ``Restored from vN``.\n\nValidated and authorised like ``PUT``. The new revision's ``restored_from`` is ``number``.\nRestoring a spec that is already current changes nothing and returns the current revision.",
+        "operationId": "restore_agent_revision_api_v2_agents__agent_name__revisions__number__restore_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Name"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The revision whose spec becomes current again.",
+              "title": "Number"
+            },
+            "description": "The revision whose spec becomes current again."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.",
+              "title": "If-Match"
+            },
+            "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Agent"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "``If-Match`` names a revision that is no longer current; ``ETag`` has the current one.",
+            "headers": {
+              "ETag": {
+                "description": "The current revision number, e.g. ``\"4\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -2291,7 +2544,7 @@
           "Agents"
         ],
         "summary": "Get Agent",
-        "description": "Fetch by identifier; 404 if not visible. ``resolve=true`` materialises spec leaves.",
+        "description": "Fetch by name at its latest revision, or at ``revision``; 404 if not visible or no such revision.\n\nThe stored spec carries its revision as ``ETag``. A resolved spec does not, since it also\nreflects the current environments, skills, and subagents it names. ``resolve=true``\nmaterialises spec leaves.",
         "operationId": "get_agent_api_v2_agents__agent_name__get",
         "security": [
           {
@@ -2307,6 +2560,25 @@
               "type": "string",
               "title": "Agent Name"
             }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Read this revision instead of the latest. References to an agent elsewhere, such as a session's ``agent``, pin a revision as ``name:N`` instead.",
+              "title": "Revision"
+            },
+            "description": "Read this revision instead of the latest. References to an agent elsewhere, such as a session's ``agent``, pin a revision as ``name:N`` instead."
           },
           {
             "name": "resolve",
@@ -2330,6 +2602,14 @@
                   "$ref": "#/components/schemas/Agent"
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``. Absent with ``resolve=true``, whose body also reflects the current environments, skills, and subagents it names.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "422": {
@@ -2349,7 +2629,7 @@
           "Agents"
         ],
         "summary": "Update Agent",
-        "description": "Replace ``spec``. ``spec.name`` must match the URL identifier; renames are not supported.",
+        "description": "Replace ``spec`` as a new revision. ``spec.name`` must match the URL identifier; renames are not supported.\n\nSending the spec that is already current changes nothing and returns the current revision.",
         "operationId": "update_agent_api_v2_agents__agent_name__put",
         "security": [
           {
@@ -2365,6 +2645,43 @@
               "type": "string",
               "title": "Agent Name"
             }
+          },
+          {
+            "name": "message",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional note stored on the revision this write creates, such as why the change was made.",
+              "title": "Message"
+            },
+            "description": "Optional note stored on the revision this write creates, such as why the change was made."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.",
+              "title": "If-Match"
+            },
+            "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally."
           }
         ],
         "requestBody": {
@@ -2386,6 +2703,25 @@
                   "$ref": "#/components/schemas/Agent"
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "``If-Match`` names a revision that is no longer current; ``ETag`` has the current one.",
+            "headers": {
+              "ETag": {
+                "description": "The current revision number, e.g. ``\"4\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "422": {
@@ -2405,7 +2741,7 @@
           "Agents"
         ],
         "summary": "Patch Agent",
-        "description": "Partially update an agent spec; only provided fields change.",
+        "description": "Partially update an agent spec as a new revision; only provided fields change.",
         "operationId": "patch_agent_api_v2_agents__agent_name__patch",
         "security": [
           {
@@ -2421,6 +2757,43 @@
               "type": "string",
               "title": "Agent Name"
             }
+          },
+          {
+            "name": "message",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional note stored on the revision this write creates, such as why the change was made.",
+              "title": "Message"
+            },
+            "description": "Optional note stored on the revision this write creates, such as why the change was made."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.",
+              "title": "If-Match"
+            },
+            "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally."
           }
         ],
         "requestBody": {
@@ -2442,6 +2815,25 @@
                   "$ref": "#/components/schemas/Agent"
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "``If-Match`` names a revision that is no longer current; ``ETag`` has the current one.",
+            "headers": {
+              "ETag": {
+                "description": "The current revision number, e.g. ``\"4\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "422": {
@@ -2461,7 +2853,7 @@
           "Agents"
         ],
         "summary": "Delete Agent",
-        "description": "Delete by identifier. Reserved rows: H employee only.",
+        "description": "Delete by identifier, with its revisions. Reserved rows: H employee only.",
         "operationId": "delete_agent_api_v2_agents__agent_name__delete",
         "security": [
           {
@@ -2477,11 +2869,40 @@
               "type": "string",
               "title": "Agent Name"
             }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.",
+              "title": "If-Match"
+            },
+            "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally."
           }
         ],
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "412": {
+            "description": "``If-Match`` names a revision that is no longer current; ``ETag`` has the current one.",
+            "headers": {
+              "ETag": {
+                "description": "The current revision number, e.g. ``\"4\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -4513,7 +4934,7 @@
           },
           "environments": {
             "items": {
-              "anyOf": [
+              "oneOf": [
                 {
                   "type": "string"
                 },
@@ -4572,7 +4993,7 @@
             "anyOf": [
               {
                 "items": {
-                  "anyOf": [
+                  "oneOf": [
                     {
                       "type": "string"
                     },
@@ -4594,7 +5015,7 @@
             "anyOf": [
               {
                 "items": {
-                  "anyOf": [
+                  "oneOf": [
                     {
                       "type": "string"
                     },
@@ -4812,6 +5233,67 @@
         ],
         "title": "AgentEvent",
         "description": "Event emitted by the agent loop itself; ``data`` is discriminated by ``kind``."
+      },
+      "AgentRevisionRecord": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Number",
+            "description": "Revision number, from 1. Read its spec with ``GET /v2/agents/{agent_name}?revision={number}``."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "User who made the change. Null when unknown, and on reserved ``h/`` agents for non-H callers."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "Note sent with the change, if any."
+          },
+          "restored_from": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restored From",
+            "description": "The earlier revision whose spec this one restored, through ``POST .../revisions/{N}/restore``."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "number",
+          "created_at"
+        ],
+        "title": "AgentRevisionRecord",
+        "description": "One stored revision of an agent, without its spec."
       },
       "AgentRunStatusChangeData": {
         "properties": {
@@ -6542,6 +7024,32 @@
         "title": "OnePasswordConfig",
         "description": "1Password vault provider config."
       },
+      "Page_AgentRevisionRecord_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRevisionRecord"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "title": "Page[AgentRevisionRecord]"
+      },
       "Page_Agent_": {
         "properties": {
           "items": {
@@ -6727,36 +7235,22 @@
       "PatchAgent": {
         "properties": {
           "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "minLength": 1,
             "title": "Description"
           },
           "environments": {
-            "anyOf": [
-              {
-                "items": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "$ref": "#/components/schemas/Environment"
-                    }
-                  ]
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
                 },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
+                {
+                  "$ref": "#/components/schemas/Environment"
+                }
+              ]
+            },
+            "type": "array",
             "title": "Environments"
           },
           "model": {
@@ -6802,7 +7296,7 @@
             "anyOf": [
               {
                 "items": {
-                  "anyOf": [
+                  "oneOf": [
                     {
                       "type": "string"
                     },
@@ -6823,7 +7317,7 @@
             "anyOf": [
               {
                 "items": {
-                  "anyOf": [
+                  "oneOf": [
                     {
                       "type": "string"
                     },
@@ -6874,40 +7368,19 @@
       "PatchEnvironment": {
         "properties": {
           "host": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "user_device",
-                  "cloud"
-                ]
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "user_device",
+              "cloud"
             ],
             "title": "Host"
           },
           "start_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Start Url"
           },
           "headless": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "boolean",
             "title": "Headless"
           },
           "session_id": {
@@ -6922,52 +7395,31 @@
             "title": "Session Id"
           },
           "mode": {
-            "anyOf": [
+            "oneOf": [
               {
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/BrowserVisualMode"
-                  },
-                  {
-                    "$ref": "#/components/schemas/BrowserTextMode"
-                  }
-                ],
-                "discriminator": {
-                  "propertyName": "type",
-                  "mapping": {
-                    "text": "#/components/schemas/BrowserTextMode",
-                    "visual": "#/components/schemas/BrowserVisualMode"
-                  }
-                }
+                "$ref": "#/components/schemas/BrowserVisualMode"
               },
               {
-                "type": "null"
+                "$ref": "#/components/schemas/BrowserTextMode"
               }
             ],
-            "title": "Mode"
+            "title": "Mode",
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "text": "#/components/schemas/BrowserTextMode",
+                "visual": "#/components/schemas/BrowserVisualMode"
+              }
+            }
           },
           "lazy": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "boolean",
             "title": "Lazy"
           },
           "settle_s": {
-            "anyOf": [
-              {
-                "type": "number",
-                "maximum": 10.0,
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "number",
+            "maximum": 10.0,
+            "minimum": 0.0,
             "title": "Settle S"
           },
           "vault_id": {
@@ -6995,25 +7447,11 @@
             "title": "Browser Profile Id"
           },
           "use_default_browser_profile": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "boolean",
             "title": "Use Default Browser Profile"
           },
           "persist_browser_profile": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "boolean",
             "title": "Persist Browser Profile"
           },
           "network": {
@@ -7058,27 +7496,13 @@
       "PatchSkill": {
         "properties": {
           "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "minLength": 1,
             "title": "Description"
           },
           "body": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "minLength": 1,
             "title": "Body"
           },
           "source": {
@@ -7117,33 +7541,19 @@
             "title": "Compatibility"
           },
           "files": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "type": "string",
-                  "contentMediaType": "application/octet-stream"
-                },
-                "type": "object",
-                "maxProperties": 511
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "additionalProperties": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "object",
+            "maxProperties": 511,
             "title": "Files"
           },
           "executable_files": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
             "title": "Executable Files"
           }
         },
@@ -7614,10 +8024,23 @@
             "title": "Id"
           },
           "request": {
-            "$ref": "#/components/schemas/SessionRequest"
+            "$ref": "#/components/schemas/SessionRequest",
+            "description": "The request the session runs. Secrets read back as ``***``, with keys and list lengths kept: MCP server ``headers``, ``env`` and ``args``, code sandbox ``env``, and browser ``proxy_url``."
           },
           "status": {
             "$ref": "#/components/schemas/SessionStatus"
+          },
+          "agent_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Revision",
+            "description": "Revision of the catalog agent the session runs; ``request.agent`` is that revision, resolved, with ``request.overrides`` applied. Null for inline agent specs and sessions created before agent revisions."
           },
           "agent_view_url": {
             "anyOf": [
@@ -7854,7 +8277,7 @@
       "SessionRequest": {
         "properties": {
           "agent": {
-            "anyOf": [
+            "oneOf": [
               {
                 "type": "string"
               },
@@ -7866,7 +8289,7 @@
             "description": "Agent to run: a registered agent's name, or an inline Agent definition."
           },
           "messages": {
-            "anyOf": [
+            "oneOf": [
               {
                 "type": "string"
               },
@@ -8085,6 +8508,18 @@
               }
             ],
             "title": "Agent"
+          },
+          "agent_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Revision",
+            "description": "Revision of the catalog agent the session runs; null for inline specs and older sessions."
           },
           "status": {
             "$ref": "#/components/schemas/TrajectoryStatus"
@@ -8526,16 +8961,9 @@
       "UpdateSchedule": {
         "properties": {
           "name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
             "title": "Name"
           },
           "description": {
@@ -8551,24 +8979,10 @@
             "title": "Description"
           },
           "timing": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CronTiming"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/CronTiming"
           },
           "session_request": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SessionRequest"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/SessionRequest"
           },
           "repeats": {
             "anyOf": [
@@ -8590,30 +9004,16 @@
       "UpdateWebhook": {
         "properties": {
           "url": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2048,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
             "title": "Url"
           },
           "enabled_events": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
             "title": "Enabled Events"
           },
           "description": {
@@ -8629,14 +9029,7 @@
             "title": "Description"
           },
           "disabled": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "boolean",
             "title": "Disabled"
           }
         },
@@ -9279,6 +9672,27 @@
         ],
         "title": "WriteFileResponse",
         "description": "The written file's resolved path and byte count."
+      },
+      "AgentWithRevision": {
+        "title": "AgentWithRevision",
+        "description": "An agent spec with its current revision number, as listed by ``GET /v2/agents?include=revision``.\n\nOnly listed, never accepted as a body: ``revision`` is not part of the spec.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Agent"
+          }
+        ],
+        "type": "object",
+        "properties": {
+          "revision": {
+            "description": "Current revision number of the agent, as its ``ETag`` carries it.",
+            "minimum": 1,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision"
+        ]
       }
     },
     "securitySchemes": {

@@ -328,10 +328,10 @@ class RawSchedulesClient:
                 "name": name,
                 "description": description,
                 "timing": convert_and_respect_annotation_metadata(
-                    object_=timing, annotation=typing.Optional[CronTiming], direction="write"
+                    object_=timing, annotation=CronTiming, direction="write"
                 ),
                 "session_request": convert_and_respect_annotation_metadata(
-                    object_=session_request, annotation=typing.Optional[SessionRequest], direction="write"
+                    object_=session_request, annotation=SessionRequest, direction="write"
                 ),
                 "repeats": repeats,
             },
@@ -917,10 +917,10 @@ class AsyncRawSchedulesClient:
                 "name": name,
                 "description": description,
                 "timing": convert_and_respect_annotation_metadata(
-                    object_=timing, annotation=typing.Optional[CronTiming], direction="write"
+                    object_=timing, annotation=CronTiming, direction="write"
                 ),
                 "session_request": convert_and_respect_annotation_metadata(
-                    object_=session_request, annotation=typing.Optional[SessionRequest], direction="write"
+                    object_=session_request, annotation=SessionRequest, direction="write"
                 ),
                 "repeats": repeats,
             },

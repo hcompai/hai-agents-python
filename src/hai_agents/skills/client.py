@@ -299,7 +299,7 @@ class SkillsClient:
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
         compatibility: typing.Optional[str] = OMIT,
-        files: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        files: typing.Optional[typing.Dict[str, str]] = OMIT,
         executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
@@ -320,7 +320,7 @@ class SkillsClient:
 
         compatibility : typing.Optional[str]
 
-        files : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+        files : typing.Optional[typing.Dict[str, str]]
 
         executable_files : typing.Optional[typing.Sequence[str]]
 
@@ -683,7 +683,7 @@ class AsyncSkillsClient:
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
         compatibility: typing.Optional[str] = OMIT,
-        files: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        files: typing.Optional[typing.Dict[str, str]] = OMIT,
         executable_files: typing.Optional[typing.Sequence[str]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
@@ -704,7 +704,7 @@ class AsyncSkillsClient:
 
         compatibility : typing.Optional[str]
 
-        files : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+        files : typing.Optional[typing.Dict[str, str]]
 
         executable_files : typing.Optional[typing.Sequence[str]]
 

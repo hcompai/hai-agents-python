@@ -6,12 +6,16 @@ import typing
 from importlib import import_module
 
 if typing.TYPE_CHECKING:
+    from .list_agent_revisions_request_sort_item import ListAgentRevisionsRequestSortItem
+    from .list_agents_request_include import ListAgentsRequestInclude
     from .list_agents_request_sort_item import ListAgentsRequestSortItem
     from .patch_agent_environments_item import PatchAgentEnvironmentsItem
     from .patch_agent_reasoning_effort import PatchAgentReasoningEffort
     from .patch_agent_skills_item import PatchAgentSkillsItem
     from .patch_agent_subagents_item import PatchAgentSubagentsItem
 _dynamic_imports: typing.Dict[str, str] = {
+    "ListAgentRevisionsRequestSortItem": ".list_agent_revisions_request_sort_item",
+    "ListAgentsRequestInclude": ".list_agents_request_include",
     "ListAgentsRequestSortItem": ".list_agents_request_sort_item",
     "PatchAgentEnvironmentsItem": ".patch_agent_environments_item",
     "PatchAgentReasoningEffort": ".patch_agent_reasoning_effort",
@@ -42,6 +46,8 @@ def __dir__():
 
 
 __all__ = [
+    "ListAgentRevisionsRequestSortItem",
+    "ListAgentsRequestInclude",
     "ListAgentsRequestSortItem",
     "PatchAgentEnvironmentsItem",
     "PatchAgentReasoningEffort",
