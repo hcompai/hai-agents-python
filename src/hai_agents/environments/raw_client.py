@@ -409,7 +409,7 @@ class RawEnvironmentsClient:
                 "headless": headless,
                 "session_id": session_id,
                 "mode": convert_and_respect_annotation_metadata(
-                    object_=mode, annotation=typing.Optional[PatchEnvironmentMode], direction="write"
+                    object_=mode, annotation=PatchEnvironmentMode, direction="write"
                 ),
                 "lazy": lazy,
                 "settle_s": settle_s,
@@ -841,7 +841,7 @@ class AsyncRawEnvironmentsClient:
                 "headless": headless,
                 "session_id": session_id,
                 "mode": convert_and_respect_annotation_metadata(
-                    object_=mode, annotation=typing.Optional[PatchEnvironmentMode], direction="write"
+                    object_=mode, annotation=PatchEnvironmentMode, direction="write"
                 ),
                 "lazy": lazy,
                 "settle_s": settle_s,

@@ -16,6 +16,11 @@ class SessionSummary(UniversalBaseModel):
 
     id: str
     agent: typing.Optional[str] = None
+    agent_revision: typing.Optional[int] = pydantic.Field(default=None)
+    """
+    Revision of the catalog agent the session runs; null for inline specs and older sessions.
+    """
+
     status: TrajectoryStatus
     agent_view_url: typing.Optional[str] = pydantic.Field(default=None)
     """

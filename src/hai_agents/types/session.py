@@ -17,8 +17,17 @@ class Session(UniversalBaseModel):
     """
 
     id: str
-    request: SessionRequest
+    request: SessionRequest = pydantic.Field()
+    """
+    The request the session runs. Secrets read back as ``***``, with keys and list lengths kept: MCP server ``headers``, ``env`` and ``args``, code sandbox ``env``, and browser ``proxy_url``.
+    """
+
     status: SessionStatus
+    agent_revision: typing.Optional[int] = pydantic.Field(default=None)
+    """
+    Revision of the catalog agent the session runs; ``request.agent`` is that revision, resolved, with ``request.overrides`` applied. Null for inline agent specs and sessions created before agent revisions.
+    """
+
     agent_view_url: typing.Optional[str] = pydantic.Field(default=None)
     """
     URL of the session's Agent View page on the H Platform (live view and replay).
