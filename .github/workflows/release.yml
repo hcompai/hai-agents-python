@@ -41,7 +41,7 @@ jobs:
           version="$(python3 scripts/bump_version.py --current)"
           if ! git rev-parse -q --verify "refs/tags/v${version}" >/dev/null; then
             action=release
-          elif git diff --quiet "v${version}" HEAD -- src pyproject.toml README.md; then
+          elif [ "$(python3 scripts/bump_version.py --changed-since "v${version}")" = false ]; then
             action=none
           else
             action=stage

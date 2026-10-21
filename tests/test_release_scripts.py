@@ -2,6 +2,7 @@
 
 import runpy
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -39,6 +40,32 @@ def test_bump_writes_nothing_when_a_stamp_is_out_of_step(tmp_path):
         bump_version["bump"](tmp_path)
 
     assert {relative: (tmp_path / relative).read_text() for relative in bump_version["STAMPS"]} == before
+
+
+def test_only_changes_to_the_wheel_call_for_a_release(tmp_path):
+    config = "-c user.name=t -c user.email=t@t -c commit.gpgsign=false -c tag.gpgsign=false".split()
+
+    def git(*args: str) -> None:
+        subprocess.run(["git", *config, *args], cwd=tmp_path, check=True, capture_output=True)
+
+    def commit(dependency: str, dev_dependency: str) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            f'[project]\ndependencies = ["{dependency}"]\n\n[dependency-groups]\ndev = ["{dev_dependency}"]\n'
+        )
+        git("add", ".")
+        git("commit", "-qm", "change")
+
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "module.py").write_text("")
+    git("init", "-q")
+    commit("httpx>=0.27", "pytest>=9")
+    git("tag", "v1.0.0")
+
+    commit("httpx>=0.27", "pytest>=9.1")
+    assert bump_version["shipped_changed"]("v1.0.0", tmp_path) is False
+
+    commit("httpx>=0.28", "pytest>=9.1")
+    assert bump_version["shipped_changed"]("v1.0.0", tmp_path) is True
 
 
 def _spec(paths: dict, schemas: dict | None = None) -> dict:
