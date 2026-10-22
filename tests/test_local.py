@@ -468,6 +468,20 @@ class TestChannelSetup:
             with pytest.raises(RuntimeError, match="rate-limiting"):
                 await bridge._open_channel(CommandExchange(client, "http://test"))
 
+    async def test_existing_channel_is_found_without_a_redirect(self):
+        """The hosted platform redirects a trailing slash to plain http, which its load balancer drops."""
+        from hai_agents_local.transport import CommandExchange
+
+        def platform(request: httpx.Request) -> httpx.Response:
+            if request.url.scheme == "http":
+                raise httpx.ConnectTimeout("port 80 is closed", request=request)
+            if request.url.path == "/api/v1/trajectories/s1/":
+                return httpx.Response(307, headers={"Location": "http://agp.test/api/v1/trajectories/s1"})
+            return httpx.Response(200 if request.url.path == "/api/v1/trajectories/s1" else 404)
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(platform), follow_redirects=True) as client:
+            await CommandExchange(client, "https://agp.test").ensure_channel("s1")
+
     async def test_auth_error_is_not_retried(self):
         from hai_agents_local.transport import CommandExchange
 
