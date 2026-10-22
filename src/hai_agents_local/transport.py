@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import math
 import typing
 from http import HTTPStatus
 from pathlib import Path
@@ -35,16 +36,26 @@ DEFAULT_RETRY_AFTER_S = 5.0
 
 
 def serialize_result(value: object) -> Json:
-    """Make a driver return value JSON-safe: bytes to base64, pydantic models dumped, containers recursed."""
+    """Make a driver return value JSON-safe: bytes to base64, pydantic models dumped, containers recursed.
+
+    Raises TypeError naming the type of the first value JSON can't encode.
+    """
     if isinstance(value, bytes):
         return base64.b64encode(value).decode("ascii")
     if isinstance(value, BaseModel):
         return value.model_dump(mode="json")
     if isinstance(value, dict):
-        return {k: serialize_result(v) for k, v in value.items()}
+        return {_json_scalar(k): serialize_result(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [serialize_result(v) for v in value]
-    return value  # type: ignore[return-value]
+    return _json_scalar(value)
+
+
+def _json_scalar(value: Any) -> Any:
+    # httpx encodes with allow_nan=False, so non-finite floats fail like unknown types.
+    if value is None or isinstance(value, (str, int)) or (isinstance(value, float) and math.isfinite(value)):
+        return value
+    raise TypeError(type(value).__name__)
 
 
 def deserialize_args(interface: type, name: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -128,8 +139,13 @@ class CommandExchange:
         resp = await self._client.post(url, json=body, timeout=timeout)
         if resp.status_code in {HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN}:
             raise AuthError(f"auth error posting result ({resp.status_code})")
+        if resp.status_code == HTTPStatus.TOO_MANY_REQUESTS:
+            raise RateLimitedError(_retry_after(resp))
         if resp.status_code == HTTPStatus.CONFLICT:
             # Another delivery of the same command_uid already landed; the result is recorded.
+            return
+        if resp.status_code == HTTPStatus.NOT_FOUND:
+            logger.warning("platform no longer knows command %s; dropping its result", command_id)
             return
         _raise_if_gone(resp, command_id)
         resp.raise_for_status()

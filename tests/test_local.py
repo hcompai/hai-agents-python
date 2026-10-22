@@ -23,7 +23,7 @@ from hai_agents_local import (
 from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR
 from hai_agents_local.errors import AuthError, RateLimitedError, SessionNotFoundError
 from hai_agents_local.routing import localize_agent
-from hai_agents_local.transport import Command, deserialize_args, serialize_result
+from hai_agents_local.transport import Command, CommandExchange, deserialize_args, serialize_result
 
 API_KEY = "test-key"
 
@@ -434,6 +434,29 @@ def _bridge(driver: Any) -> FakeBridge:
     return bridge
 
 
+async def _serve(
+    bridge: FakeBridge, batches: list[list[dict[str, Any]]], post_replies: list[httpx.Response]
+) -> list[dict[str, Any]]:
+    """Poll command batches in order, answer result posts in order, stop after the last reply; returns the posts."""
+    posts: list[dict[str, Any]] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/commands"):
+            return httpx.Response(200, json=batches.pop(0))
+        posts.append({"id": request.url.path.split("/")[-2], **json.loads(request.content)})
+        if len(post_replies) == 1:
+            bridge.request_stop()
+        return post_replies.pop(0)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+        await bridge._poll_loop(CommandExchange(client, "http://test"))
+    return posts
+
+
+def _click(command_id: str) -> dict[str, Any]:
+    return {"id": command_id, "command_uid": command_id, "name": "click", "args": {"x": 0, "y": 0}}
+
+
 class TestChannelSetup:
     async def test_429_is_retried_with_backoff_then_succeeds(self, monkeypatch):
         import hai_agents_local.bridge as bridge_module
@@ -693,6 +716,47 @@ class TestBridgeProtocol:
         cmd = Command(id="c1", command_uid="u1", name="click", args={"x": 0, "y": 0})
         with pytest.raises(AuthError):
             await bridge._process_commands(AuthPostExchange(), [cmd])
+
+    async def test_result_post_404_drops_that_result_and_keeps_serving(self):
+        posts = await _serve(
+            _bridge(FakeDriver()), [[_click("c1")], [_click("c2")]], [httpx.Response(404), httpx.Response(200)]
+        )
+        assert [post["id"] for post in posts] == ["c1", "c2"]
+
+    @pytest.mark.parametrize(("retry_after", "waited"), [("3", 3.0), ("0", 1.0)])
+    async def test_result_post_429_waits_retry_after_then_lands(self, monkeypatch, retry_after, waited):
+        bridge = _bridge(FakeDriver())
+        sleeps: list[float] = []
+
+        async def record_sleep(seconds: float) -> bool:
+            sleeps.append(seconds)
+            return False
+
+        monkeypatch.setattr(bridge, "_interruptible_sleep", record_sleep)
+        posts = await _serve(
+            bridge,
+            [[_click("c1")]],
+            [httpx.Response(429, headers={"Retry-After": retry_after}), httpx.Response(200)],
+        )
+        assert [post["id"] for post in posts] == ["c1", "c1"]
+        assert sleeps == [waited]
+
+    async def test_unserializable_result_is_answered_with_an_error_and_serving_goes_on(self):
+        class WebElement:
+            pass
+
+        class ElementDriver(FakeDriver):
+            def execute_script(self, script: str, *args: Any, n_unsafe_attempts: int = 2) -> Any:
+                return {"element": WebElement()}
+
+        script = {"id": "c1", "command_uid": "c1", "name": "execute_script", "args": {"script": "return el;"}}
+        posts = await _serve(
+            _bridge(ElementDriver()), [[script, _click("c2")]], [httpx.Response(200), httpx.Response(200)]
+        )
+        assert [(post["id"], post["error"]) for post in posts] == [
+            ("c1", "result of 'execute_script' is not JSON-serializable: WebElement"),
+            ("c2", None),
+        ]
 
 
 class TestDriverInterfaces:
@@ -1117,6 +1181,40 @@ async def test_cancel_reaches_api_when_local_stop_cannot_be_confirmed(monkeypatc
             sessions.cancel_session("run")
     assert cancelled == ["run"]
     assert sessions._owned_bridges == {"run": ["device"]}, "An unconfirmed stop must remain retryable"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asynchronous", [False, True])
+async def test_terminal_status_read_stops_the_session_bridges(monkeypatch, asynchronous):
+    from hai_agents import AsyncClient
+    from hai_agents.sessions.client import AsyncSessionsClient
+    from hai_agents.types.session_status import SessionStatus
+
+    stopped: list[str] = []
+    statuses = iter(["running", "completed"])
+
+    def get_status(self, id, **kwargs):
+        return SessionStatus(status=next(statuses))
+
+    async def async_get_status(self, id, **kwargs):
+        return get_status(self, id)
+
+    monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", stopped.extend)
+    monkeypatch.setattr(SessionsClient, "get_session_status", get_status)
+    monkeypatch.setattr(AsyncSessionsClient, "get_session_status", async_get_status)
+    sessions = (AsyncClient if asynchronous else Client)(api_key=API_KEY).sessions
+    sessions._owned_bridges = {"run": ["device"]}
+
+    async def read_status() -> None:
+        reply = sessions.get_session_status("run")
+        if asynchronous:
+            await reply
+
+    await read_status()
+    assert stopped == []
+    await read_status()
+    assert stopped == ["device"]
+    assert sessions._owned_bridges == {}
 
 
 def test_manager_reports_unconfirmed_stop_and_allows_retry(monkeypatch):
