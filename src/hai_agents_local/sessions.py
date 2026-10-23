@@ -18,7 +18,9 @@ import httpx
 from hai_agents.base_client import BaseClient
 from hai_agents.core.api_error import ApiError
 from hai_agents.core.request_options import RequestOptions
+from hai_agents.polling import is_terminal_session_status
 from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
+from hai_agents.types.session_status import SessionStatus
 
 from .bridge import LocalBridge, TokenSource
 from .config import auto_bridges_enabled
@@ -291,6 +293,22 @@ class _LocalSessionsState:
                 _deregister_exit_cancel(session_id)
         return list(self._owned_bridges)
 
+    def _ended_bridges(self, session_id: str, status: SessionStatus) -> typing.List[str]:
+        """The bridges to stop when ``status`` shows the session ended; an ended session needs no exit cancel."""
+        if not is_terminal_session_status(status.status):
+            return []
+        _deregister_exit_cancel(session_id)
+        return self._owned_bridges.get(session_id, [])
+
+    def _stop_ended(self, session_id: str, owned: typing.List[str]) -> None:
+        """An unconfirmed stop stays owned, so close() retries it."""
+        try:
+            stop_bridges(owned)
+        except TimeoutError:
+            logger.warning("could not confirm local bridges stopped for ended session %s", session_id, exc_info=True)
+        else:
+            self._owned_bridges.pop(session_id, None)
+
     def _track(self, session: typing.Any, started: typing.List[str]) -> None:
         if self._runtime is not None:
             self.own_session_ids.add(str(session.id))
@@ -316,6 +334,13 @@ class LocalSessionsClient(_LocalSessionsState, SessionsClient):
         finally:
             with _confirming_stop(str(id)):
                 super().cancel_session(id, request_options=request_options)
+
+    def get_session_status(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> SessionStatus:
+        status = super().get_session_status(id, request_options=request_options)
+        owned = self._ended_bridges(str(id), status)
+        if owned:
+            self._stop_ended(str(id), owned)
+        return status
 
     @functools.wraps(SessionsClient.create_session)
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
@@ -363,6 +388,15 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
         finally:
             with _confirming_stop(str(id)):
                 await super().cancel_session(id, request_options=request_options)
+
+    async def get_session_status(
+        self, id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> SessionStatus:
+        status = await super().get_session_status(id, request_options=request_options)
+        owned = self._ended_bridges(str(id), status)
+        if owned:
+            await asyncio.to_thread(self._stop_ended, str(id), owned)
+        return status
 
     @functools.wraps(AsyncSessionsClient.create_session)
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:

@@ -314,12 +314,16 @@ class LocalBridge(ABC, Generic[DriverT]):
             else:
                 result = attr
             logger.info("command %s dispatched in %.2fs", name, time.monotonic() - started)
-            return serialize_result(result), None
         except NotImplementedError:
             return None, f"command {name!r} is not supported by this driver"
         except Exception as exc:
             logger.warning("command %s raised: %s", name, exc)
             return None, str(exc)
+        try:
+            return serialize_result(result), None
+        except Exception as exc:
+            logger.warning("command %s returned a result JSON can't encode: %s", name, exc)
+            return None, f"result of {name!r} is not JSON-serializable: {exc}"
 
     @staticmethod
     def _call_driver_method(method: Callable[..., Any], args: dict[str, Any]) -> Any:
@@ -339,19 +343,26 @@ class LocalBridge(ABC, Generic[DriverT]):
     async def _deliver(
         self, exchange: CommandExchange, command_id: str, command_uid: str, result: Json, error: str | None
     ) -> None:
-        """Post the result, retrying transient failures; raises when delivery keeps failing so the poll
-        loop backs off and the redelivered command reposts from the result cache."""
+        """Post the result, retrying rate limits and transient failures; raises when delivery keeps failing
+        so the poll loop backs off and the redelivered command reposts from the result cache."""
         for attempt in range(POST_RESULT_RETRIES + 1):
             try:
                 await exchange.post_result(
                     command_id, command_uid=command_uid, result=result, error=error, timeout=POST_RESULT_TIMEOUT_S
                 )
                 return
+            except RateLimitedError as exc:
+                if attempt == POST_RESULT_RETRIES:
+                    raise
+                delay = max(exc.retry_after, MIN_RATE_LIMIT_BACKOFF_S)
+                logger.warning("post result for %s rate limited; retrying in %.0fs", command_id, delay)
             except httpx.HTTPError as exc:
                 if attempt == POST_RESULT_RETRIES:
                     raise
+                delay = 0.5 * (attempt + 1)
                 logger.warning("post result for %s failed (attempt %d): %s", command_id, attempt + 1, exc)
-            await asyncio.sleep(0.5 * (attempt + 1))
+            if await self._interruptible_sleep(delay):
+                return
 
     async def _interruptible_sleep(self, seconds: float) -> bool:
         """Sleep up to ``seconds``; True when woken by a stop request."""
