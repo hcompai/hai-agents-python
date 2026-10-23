@@ -10,7 +10,7 @@ from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
-from ..types.http_validation_error import HttpValidationError
+from ..types.error_response import ErrorResponse
 from ..types.token_quota_status import TokenQuotaStatus
 from pydantic import ValidationError
 
@@ -54,9 +54,9 @@ class RawQuotaClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -110,9 +110,9 @@ class AsyncRawQuotaClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),

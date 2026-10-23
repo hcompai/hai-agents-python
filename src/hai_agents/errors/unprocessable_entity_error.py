@@ -3,9 +3,9 @@
 import typing
 
 from ..core.api_error import ApiError
-from ..types.http_validation_error import HttpValidationError
+from ..types.error_response import ErrorResponse
 
 
 class UnprocessableEntityError(ApiError):
-    def __init__(self, body: HttpValidationError, headers: typing.Optional[typing.Dict[str, str]] = None):
+    def __init__(self, body: ErrorResponse, headers: typing.Optional[typing.Dict[str, str]] = None):
         super().__init__(status_code=422, headers=headers, body=body)

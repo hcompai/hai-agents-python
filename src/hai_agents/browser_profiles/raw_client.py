@@ -13,7 +13,7 @@ from ..core.request_options import RequestOptions
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.browser_profile_list import BrowserProfileList
 from ..types.browser_profile_read import BrowserProfileRead
-from ..types.http_validation_error import HttpValidationError
+from ..types.error_response import ErrorResponse
 from ..types.initiate_upload_response import InitiateUploadResponse
 from pydantic import ValidationError
 
@@ -72,9 +72,9 @@ class RawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -126,9 +126,9 @@ class RawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -211,9 +211,9 @@ class RawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -268,9 +268,9 @@ class RawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -324,9 +324,9 @@ class RawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -377,9 +377,9 @@ class RawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -430,9 +430,9 @@ class RawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -475,9 +475,9 @@ class RawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -543,9 +543,9 @@ class AsyncRawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -597,9 +597,9 @@ class AsyncRawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -682,9 +682,9 @@ class AsyncRawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -739,9 +739,9 @@ class AsyncRawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -795,9 +795,9 @@ class AsyncRawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -848,9 +848,9 @@ class AsyncRawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -901,9 +901,9 @@ class AsyncRawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -946,9 +946,9 @@ class AsyncRawBrowserProfilesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),

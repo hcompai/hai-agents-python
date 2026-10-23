@@ -6,7 +6,7 @@ import pytest
 from hai_agents.core.api_error import ApiError
 from hai_agents.core.http_client import HttpClient
 from hai_agents.errors import UnprocessableEntityError
-from hai_agents.types import HttpValidationError, ValidationError
+from hai_agents.types import ErrorResponse
 
 
 def client_returning(*statuses: int) -> tuple[HttpClient, list[httpx.Request]]:
@@ -96,13 +96,14 @@ def test_api_error_leads_with_server_detail(body, expected):
     assert str(ApiError(status_code=429, body=body)) == expected
 
 
-def test_unprocessable_entity_reads_validation_model():
+def test_unprocessable_entity_reads_error_response():
     err = UnprocessableEntityError(
-        body=HttpValidationError(
+        body=ErrorResponse(
+            message="body.x: field required; body.y: not an int",
             detail=[
-                ValidationError(loc=["body", "x"], msg="field required", type="missing"),
-                ValidationError(loc=["body", "y"], msg="not an int", type="int_parsing"),
-            ]
+                {"loc": ["body", "x"], "msg": "field required", "type": "missing"},
+                {"loc": ["body", "y"], "msg": "not an int", "type": "int_parsing"},
+            ],
         )
     )
     assert str(err) == "field required; not an int (status_code: 422)"

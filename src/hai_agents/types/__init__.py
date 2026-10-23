@@ -67,6 +67,7 @@ if typing.TYPE_CHECKING:
     from .environment_page import EnvironmentPage
     from .error_event import ErrorEvent
     from .error_event_kind import ErrorEventKind
+    from .error_response import ErrorResponse
     from .feedback import Feedback
     from .file_content import FileContent
     from .file_content_type import FileContentType
@@ -75,7 +76,6 @@ if typing.TYPE_CHECKING:
     from .file_transfer_data_direction import FileTransferDataDirection
     from .file_transfer_event import FileTransferEvent
     from .flow_event import FlowEvent
-    from .http_validation_error import HttpValidationError
     from .image_content import ImageContent
     from .image_content_type import ImageContentType
     from .initiate_upload_response import InitiateUploadResponse
@@ -166,8 +166,6 @@ if typing.TYPE_CHECKING:
     from .user_message_batch import UserMessageBatch
     from .user_message_event import UserMessageEvent
     from .user_message_event_type import UserMessageEventType
-    from .validation_error import ValidationError
-    from .validation_error_loc_item import ValidationErrorLocItem
     from .vault_config_list import VaultConfigList
     from .vault_config_read import VaultConfigRead
     from .vault_health import VaultHealth
@@ -241,6 +239,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "Environment_Workstation": ".environment",
     "ErrorEvent": ".error_event",
     "ErrorEventKind": ".error_event_kind",
+    "ErrorResponse": ".error_response",
     "Feedback": ".feedback",
     "FileContent": ".file_content",
     "FileContentType": ".file_content_type",
@@ -249,7 +248,6 @@ _dynamic_imports: typing.Dict[str, str] = {
     "FileTransferDataDirection": ".file_transfer_data_direction",
     "FileTransferEvent": ".file_transfer_event",
     "FlowEvent": ".flow_event",
-    "HttpValidationError": ".http_validation_error",
     "ImageContent": ".image_content",
     "ImageContentType": ".image_content_type",
     "InitiateUploadResponse": ".initiate_upload_response",
@@ -336,8 +334,6 @@ _dynamic_imports: typing.Dict[str, str] = {
     "UserMessageBatch": ".user_message_batch",
     "UserMessageEvent": ".user_message_event",
     "UserMessageEventType": ".user_message_event_type",
-    "ValidationError": ".validation_error",
-    "ValidationErrorLocItem": ".validation_error_loc_item",
     "VaultConfigList": ".vault_config_list",
     "VaultConfigRead": ".vault_config_read",
     "VaultHealth": ".vault_health",
@@ -435,6 +431,7 @@ __all__ = [
     "Environment_Workstation",
     "ErrorEvent",
     "ErrorEventKind",
+    "ErrorResponse",
     "Feedback",
     "FileContent",
     "FileContentType",
@@ -443,7 +440,6 @@ __all__ = [
     "FileTransferDataDirection",
     "FileTransferEvent",
     "FlowEvent",
-    "HttpValidationError",
     "ImageContent",
     "ImageContentType",
     "InitiateUploadResponse",
@@ -530,8 +526,6 @@ __all__ = [
     "UserMessageBatch",
     "UserMessageEvent",
     "UserMessageEventType",
-    "ValidationError",
-    "ValidationErrorLocItem",
     "VaultConfigList",
     "VaultConfigRead",
     "VaultHealth",

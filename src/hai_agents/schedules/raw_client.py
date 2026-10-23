@@ -13,7 +13,7 @@ from ..core.request_options import RequestOptions
 from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.cron_timing import CronTiming
-from ..types.http_validation_error import HttpValidationError
+from ..types.error_response import ErrorResponse
 from ..types.page_schedule_record import PageScheduleRecord
 from ..types.page_schedule_run_record import PageScheduleRunRecord
 from ..types.pause_schedule import PauseSchedule
@@ -88,9 +88,9 @@ class RawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -173,9 +173,9 @@ class RawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -226,9 +226,9 @@ class RawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -271,9 +271,9 @@ class RawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -357,9 +357,9 @@ class RawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -423,9 +423,9 @@ class RawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -476,9 +476,9 @@ class RawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -529,9 +529,9 @@ class RawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -604,9 +604,9 @@ class RawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -681,9 +681,9 @@ class AsyncRawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -766,9 +766,9 @@ class AsyncRawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -819,9 +819,9 @@ class AsyncRawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -864,9 +864,9 @@ class AsyncRawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -950,9 +950,9 @@ class AsyncRawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1016,9 +1016,9 @@ class AsyncRawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1069,9 +1069,9 @@ class AsyncRawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1122,9 +1122,9 @@ class AsyncRawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1197,9 +1197,9 @@ class AsyncRawSchedulesClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),

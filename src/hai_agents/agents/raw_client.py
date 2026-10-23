@@ -18,7 +18,7 @@ from ..types.agent_environments_item import AgentEnvironmentsItem
 from ..types.agent_reasoning_effort import AgentReasoningEffort
 from ..types.agent_skills_item import AgentSkillsItem
 from ..types.agent_subagents_item import AgentSubagentsItem
-from ..types.http_validation_error import HttpValidationError
+from ..types.error_response import ErrorResponse
 from ..types.page_agent import PageAgent
 from ..types.page_agent_revision_record import PageAgentRevisionRecord
 from ..types.tool_definition import ToolDefinition
@@ -115,9 +115,9 @@ class RawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -241,9 +241,9 @@ class RawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -318,9 +318,9 @@ class RawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -399,9 +399,9 @@ class RawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -471,9 +471,9 @@ class RawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -618,9 +618,9 @@ class RawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -684,9 +684,9 @@ class RawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -815,9 +815,9 @@ class RawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -912,9 +912,9 @@ class AsyncRawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1038,9 +1038,9 @@ class AsyncRawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1115,9 +1115,9 @@ class AsyncRawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1196,9 +1196,9 @@ class AsyncRawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1268,9 +1268,9 @@ class AsyncRawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1415,9 +1415,9 @@ class AsyncRawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1481,9 +1481,9 @@ class AsyncRawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1612,9 +1612,9 @@ class AsyncRawAgentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),

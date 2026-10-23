@@ -16,7 +16,7 @@ from ..types.browser_network import BrowserNetwork
 from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
-from ..types.http_validation_error import HttpValidationError
+from ..types.error_response import ErrorResponse
 from ..types.workstation_storage import WorkstationStorage
 from .types.create_environment_request import CreateEnvironmentRequest
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
@@ -104,9 +104,9 @@ class RawEnvironmentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -164,9 +164,9 @@ class RawEnvironmentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -217,9 +217,9 @@ class RawEnvironmentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -279,9 +279,9 @@ class RawEnvironmentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -324,9 +324,9 @@ class RawEnvironmentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -452,9 +452,9 @@ class RawEnvironmentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -544,9 +544,9 @@ class AsyncRawEnvironmentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -604,9 +604,9 @@ class AsyncRawEnvironmentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -657,9 +657,9 @@ class AsyncRawEnvironmentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -719,9 +719,9 @@ class AsyncRawEnvironmentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -764,9 +764,9 @@ class AsyncRawEnvironmentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -892,9 +892,9 @@ class AsyncRawEnvironmentsClient:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        HttpValidationError,
+                        ErrorResponse,
                         parse_obj_as(
-                            type_=HttpValidationError,  # type: ignore
+                            type_=ErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),

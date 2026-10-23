@@ -197,6 +197,8 @@ def file_from_path(
 
 def _attach_tool_definitions(create_params: typing.Dict[str, typing.Any], tools: typing.Sequence[Tool]) -> None:
     """Set the agent's tools: on an inline agent directly, since the server validates it before applying overrides."""
+    if (create_params.get("overrides") or {}).get("agent.tools") is not None:
+        raise ValueError("tools conflicts with overrides['agent.tools']; pass only one.")
     definitions = [t.definition() for t in tools]
     agent = create_params.get("agent")
     if isinstance(agent, dict):
