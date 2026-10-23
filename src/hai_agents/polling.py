@@ -7,8 +7,10 @@ import base64
 import concurrent.futures
 import inspect
 import json
+import logging
 import os
 import pathlib
+import threading
 import time
 import typing
 from dataclasses import dataclass
@@ -34,6 +36,8 @@ if typing.TYPE_CHECKING:
     from .client import AsyncClient, Client
     from .types.session import Session
     from .types.session_status import SessionStatus
+
+_logger = logging.getLogger(__name__)
 
 TERMINAL_SESSION_STATUSES = frozenset({"completed", "failed", "timed_out", "interrupted"})
 
@@ -197,30 +201,42 @@ def _attach_tool_definitions(create_params: typing.Dict[str, typing.Any], tools:
     create_params["overrides"] = overrides
 
 
-def _latest_pending_tool_calls(
-    batch: typing.Sequence[SessionEvent],
-    previous: typing.List[typing.Dict[str, typing.Any]],
-) -> typing.List[typing.Dict[str, typing.Any]]:
-    """Pending custom tool calls per the latest ``ActiveStateChangeEvent``.
+class _Advertised:
+    """One loop's view of the pending custom tool calls, per the latest ``ActiveStateChangeEvent``.
 
-    The agent re-publishes the surviving list whenever a call settles, so the
-    latest event is the source of truth; ``previous`` carries it across polls
-    whose batches contain no state change.
+    The agent re-publishes the surviving list whenever a call settles and reports another
+    state once the last one resolves, so a stretch of ``awaiting_tool_results`` events is
+    one step's calls. ``stretch`` is the index of the event that opened it: every loop
+    reading the same log agrees on it, and it tells a reused call id (``xml_0``) apart
+    from the same id in a later step. ``anchored`` is whether this loop read the log from
+    where the stretch could have begun.
     """
-    calls = previous
-    for event in batch:
-        if event.type != "ActiveStateChangeEvent":
-            continue
-        data = event.data
-        if hasattr(data, "model_dump"):
-            data = data.model_dump()
-        if not isinstance(data, dict):
-            data = {}
-        if data.get("state") == "awaiting_tool_results":
-            calls = [c.model_dump() if hasattr(c, "model_dump") else c for c in data.get("pending_tool_calls") or []]
-        else:
-            calls = []
-    return calls
+
+    def __init__(self, anchored: bool) -> None:
+        self.stretch: typing.Optional[int] = None
+        self.calls: typing.List[typing.Dict[str, typing.Any]] = []
+        self.anchored = anchored
+
+    def read(self, batch: typing.Sequence[SessionEvent], end: int) -> None:
+        """Fold in ``batch``, the events just before index ``end``."""
+        for index, event in enumerate(batch, start=end - len(batch)):
+            if event.type != "ActiveStateChangeEvent":
+                continue
+            data = event.data
+            if hasattr(data, "model_dump"):
+                data = data.model_dump()
+            if not isinstance(data, dict):
+                data = {}
+            if data.get("state") == "awaiting_tool_results":
+                if self.stretch is None:
+                    self.stretch = index
+                pending = data.get("pending_tool_calls") or []
+                self.calls = [c.model_dump() if hasattr(c, "model_dump") else c for c in pending]
+            else:
+                self.stretch, self.calls, self.anchored = None, [], True
+
+    def adopt(self, other: "_Advertised") -> None:
+        self.stretch, self.calls, self.anchored = other.stretch, other.calls, other.anchored
 
 
 def _json_safe(value: typing.Any) -> typing.Any:
@@ -323,17 +339,25 @@ def _raise_unless_posted(response: typing.Any) -> None:
     raise ApiError(status_code=response.status_code, headers=dict(response.headers), body=response.text)
 
 
-def _recover_pending_tool_calls(client: Client, id: str) -> typing.List[typing.Dict[str, typing.Any]]:
-    """A wait that joins mid-stream may start past the advertising event; replay from 0 to find the latest batch."""
-    changes = client.sessions.get_session_changes(id, from_index=0, limit=None, include_events=True, wait_for_seconds=0)
-    return _latest_pending_tool_calls(changes.new_events or [], []) if changes is not None else []
+def _replayed(changes: typing.Optional[SessionChanges]) -> _Advertised:
+    replayed = _Advertised(anchored=True)
+    if changes is not None:
+        events = changes.new_events or []
+        replayed.read(events, (getattr(changes, "first_index", None) or 0) + len(events))
+    return replayed
 
 
-async def _async_recover_pending_tool_calls(client: AsyncClient, id: str) -> typing.List[typing.Dict[str, typing.Any]]:
-    changes = await client.sessions.get_session_changes(
-        id, from_index=0, limit=None, include_events=True, wait_for_seconds=0
+def _recover_pending_tool_calls(client: Client, id: str) -> _Advertised:
+    """A loop that joins mid-stream may start past the advertising event; replay from 0 to find the latest batch."""
+    return _replayed(
+        client.sessions.get_session_changes(id, from_index=0, limit=None, include_events=True, wait_for_seconds=0)
     )
-    return _latest_pending_tool_calls(changes.new_events or [], []) if changes is not None else []
+
+
+async def _async_recover_pending_tool_calls(client: AsyncClient, id: str) -> _Advertised:
+    return _replayed(
+        await client.sessions.get_session_changes(id, from_index=0, limit=None, include_events=True, wait_for_seconds=0)
+    )
 
 
 def _is_transient(status_code: int) -> bool:
@@ -371,6 +395,96 @@ async def _async_post_tool_results(
             break
         await asyncio.sleep(min(0.5 * 2**attempt, 2.0))
     _raise_unless_posted(response)
+
+
+class _ToolDispatch(typing.List[Tool]):
+    """Custom tools plus the calls already claimed; a handle shares one across its waits and streams."""
+
+    def __init__(self, tools: typing.Sequence[ToolInput]) -> None:
+        super().__init__(as_tools(tools))
+        self.tools_by_name = {t.name: t for t in self}
+        self._claimed: typing.Set[typing.Tuple[typing.Optional[int], str]] = set()
+        self._lock = threading.Lock()
+
+    def claim(self, advertised: _Advertised) -> typing.List[typing.Dict[str, typing.Any]]:
+        """Return the advertised calls no loop has claimed yet, claiming them."""
+        with self._lock:
+            fresh = [c for c in advertised.calls if (advertised.stretch, _call_key(c)) not in self._claimed]
+            self._claimed.update((advertised.stretch, _call_key(c)) for c in fresh)
+        return fresh
+
+    def release(self, stretch: typing.Optional[int], calls: typing.Sequence[typing.Dict[str, typing.Any]]) -> None:
+        with self._lock:
+            self._claimed.difference_update((stretch, _call_key(c)) for c in calls)
+
+
+def _tool_dispatch(tools: typing.Optional[typing.Sequence[ToolInput]]) -> typing.Optional[_ToolDispatch]:
+    if isinstance(tools, _ToolDispatch):
+        return tools
+    return _ToolDispatch(tools) if tools else None
+
+
+def _caught_up(batch: typing.Sequence[SessionEvent], limit: typing.Optional[int]) -> bool:
+    """Only a short page proves the cursor reached the live tip; without a positive ``limit`` no page is full."""
+    return not limit or len(batch) < limit
+
+
+def _answer_tool_calls(
+    client: Client,
+    id: str,
+    dispatch: _ToolDispatch,
+    advertised: _Advertised,
+    status: TrajectoryStatus,
+    caught_up: bool,
+) -> None:
+    """Run and post the calls the session awaits, each once per step."""
+    # The live status describes the tip: a lagging cursor's advertised calls may already be answered.
+    if not caught_up or status != "awaiting_tool_results":
+        return
+    if not advertised.anchored or not advertised.calls:
+        advertised.adopt(_recover_pending_tool_calls(client, id))
+    calls = dispatch.claim(advertised)
+    if calls:
+        try:
+            _post_tool_results(client, id, [_execute_tool_call(dispatch.tools_by_name, c) for c in calls])
+        except BaseException:
+            dispatch.release(advertised.stretch, calls)
+            raise
+
+
+async def _async_answer_tool_calls(
+    client: AsyncClient,
+    id: str,
+    dispatch: _ToolDispatch,
+    advertised: _Advertised,
+    status: TrajectoryStatus,
+    caught_up: bool,
+) -> None:
+    """Async version of ``_answer_tool_calls``."""
+    if not caught_up or status != "awaiting_tool_results":
+        return
+    if not advertised.anchored or not advertised.calls:
+        advertised.adopt(await _async_recover_pending_tool_calls(client, id))
+    calls = dispatch.claim(advertised)
+    if calls:
+        try:
+            results = [await _async_execute_tool_call(dispatch.tools_by_name, c) for c in calls]
+            await _async_post_tool_results(client, id, results)
+        except BaseException:
+            dispatch.release(advertised.stretch, calls)
+            raise
+
+
+def _cursor_after(cursor: int, changes: typing.Optional[SessionChanges]) -> int:
+    """Cursor past ``changes``; starts at the server's ``first_index`` when it skipped evicted events."""
+    if changes is None:
+        return cursor
+    # Duck-typed changes (the SDK's test fakes) may omit the field.
+    first_index = getattr(changes, "first_index", None)
+    start = cursor if first_index is None else first_index
+    if start > cursor:
+        _logger.warning("Skipped %d session events evicted before they were read", start - cursor)
+    return start + len(changes.new_events or [])
 
 
 def _settled_cleanly(status: TrajectoryStatus) -> bool:
@@ -418,15 +532,15 @@ def wait_for_session(
     events and the final answer, since it 204s whenever no new events exist past
     ``from_index`` -- even after the session has finished.
     """
-    tools_by_name = {t.name: t for t in as_tools(tools)} if tools else {}
-    if tools_by_name and not include_events:
+    dispatch = _tool_dispatch(tools)
+    advertised = _Advertised(anchored=from_index == 0)
+    if dispatch is not None and not include_events:
         raise ValueError("tools require include_events=True: pending calls arrive on the event stream.")
-    answered: typing.Set[str] = set()
-    advertised: typing.List[typing.Dict[str, typing.Any]] = []
     events: typing.List[SessionEvent] = []
     next_from_index = from_index
     last_changes: typing.Optional[SessionChanges] = None
     polls = 0
+    caught_up = True
     deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
 
     while max_polls is None or polls < max_polls:
@@ -441,16 +555,18 @@ def wait_for_session(
                 from_index=next_from_index,
                 limit=limit,
                 include_events=True,
-                wait_for_seconds=wait_for_seconds,
+                wait_for_seconds=wait_for_seconds if caught_up else 0,
             )
             if changes is not None:
                 last_changes = changes
                 batch = changes.new_events or []
                 events.extend(batch)
-                next_from_index += len(batch)
+                next_from_index = _cursor_after(next_from_index, changes)
+                advertised.read(batch, next_from_index)
+        caught_up = _caught_up(batch, limit)
 
         status = client.sessions.get_session_status(id)
-        if is_settled_session_status(status.status) or (status.status == "awaiting_tool_results" and not tools_by_name):
+        if is_settled_session_status(status.status) or (status.status == "awaiting_tool_results" and dispatch is None):
             if include_events:
                 while True:
                     if deadline is not None and time.monotonic() >= deadline:
@@ -464,7 +580,7 @@ def wait_for_session(
                     if tail.answer is not None:
                         last_changes = tail
                     events.extend(batch)
-                    next_from_index += len(batch)
+                    next_from_index = _cursor_after(next_from_index, tail)
             changes = _final_changes(client, id, last_changes, limit, status.status)
             raw = changes.answer if changes is not None else None
             return SessionRunResult(
@@ -479,16 +595,8 @@ def wait_for_session(
                 error_code=status.error_code,
             )
 
-        if tools_by_name:
-            advertised = _latest_pending_tool_calls(batch, advertised)
-            # Status gate: on a replayed stream the live status decides whether calls are still open.
-            if status.status == "awaiting_tool_results":
-                if not advertised:
-                    advertised = _recover_pending_tool_calls(client, id)
-                calls = [c for c in advertised if _call_key(c) not in answered]
-                if calls:
-                    _post_tool_results(client, id, [_execute_tool_call(tools_by_name, c) for c in calls])
-                    answered.update(_call_key(c) for c in calls)
+        if dispatch is not None:
+            _answer_tool_calls(client, id, dispatch, advertised, status.status, caught_up)
 
         # The long-poll above paces the loop when streaming events; otherwise sleep.
         if not include_events:
@@ -568,15 +676,15 @@ async def async_wait_for_session(
     tools: typing.Optional[typing.Sequence[ToolInput]] = None,
 ) -> SessionRunResult[AnswerT]:
     """Async version of ``wait_for_session``."""
-    tools_by_name = {t.name: t for t in as_tools(tools)} if tools else {}
-    if tools_by_name and not include_events:
+    dispatch = _tool_dispatch(tools)
+    advertised = _Advertised(anchored=from_index == 0)
+    if dispatch is not None and not include_events:
         raise ValueError("tools require include_events=True: pending calls arrive on the event stream.")
-    answered: typing.Set[str] = set()
-    advertised: typing.List[typing.Dict[str, typing.Any]] = []
     events: typing.List[SessionEvent] = []
     next_from_index = from_index
     last_changes: typing.Optional[SessionChanges] = None
     polls = 0
+    caught_up = True
     deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
 
     while max_polls is None or polls < max_polls:
@@ -591,16 +699,18 @@ async def async_wait_for_session(
                 from_index=next_from_index,
                 limit=limit,
                 include_events=True,
-                wait_for_seconds=wait_for_seconds,
+                wait_for_seconds=wait_for_seconds if caught_up else 0,
             )
             if changes is not None:
                 last_changes = changes
                 batch = changes.new_events or []
                 events.extend(batch)
-                next_from_index += len(batch)
+                next_from_index = _cursor_after(next_from_index, changes)
+                advertised.read(batch, next_from_index)
+        caught_up = _caught_up(batch, limit)
 
         status = await client.sessions.get_session_status(id)
-        if is_settled_session_status(status.status) or (status.status == "awaiting_tool_results" and not tools_by_name):
+        if is_settled_session_status(status.status) or (status.status == "awaiting_tool_results" and dispatch is None):
             if include_events:
                 while True:
                     if deadline is not None and time.monotonic() >= deadline:
@@ -614,7 +724,7 @@ async def async_wait_for_session(
                     if tail.answer is not None:
                         last_changes = tail
                     events.extend(batch)
-                    next_from_index += len(batch)
+                    next_from_index = _cursor_after(next_from_index, tail)
             changes = await _async_final_changes(client, id, last_changes, limit, status.status)
             raw = changes.answer if changes is not None else None
             return SessionRunResult(
@@ -629,17 +739,8 @@ async def async_wait_for_session(
                 error_code=status.error_code,
             )
 
-        if tools_by_name:
-            advertised = _latest_pending_tool_calls(batch, advertised)
-            # Status gate: on a replayed stream the live status decides whether calls are still open.
-            if status.status == "awaiting_tool_results":
-                if not advertised:
-                    advertised = await _async_recover_pending_tool_calls(client, id)
-                calls = [c for c in advertised if _call_key(c) not in answered]
-                if calls:
-                    results = [await _async_execute_tool_call(tools_by_name, c) for c in calls]
-                    await _async_post_tool_results(client, id, results)
-                    answered.update(_call_key(c) for c in calls)
+        if dispatch is not None:
+            await _async_answer_tool_calls(client, id, dispatch, advertised, status.status, caught_up)
 
         if not include_events:
             await asyncio.sleep(poll_backoff_seconds or wait_for_seconds)
@@ -692,6 +793,7 @@ def stream_session(
     limit: typing.Optional[int] = None,
     until: typing_extensions.Literal["settled", "terminal"] = "settled",
     timeout_seconds: typing.Optional[float] = None,
+    tools: typing.Optional[typing.Sequence[ToolInput]] = None,
 ) -> typing.Iterator[SessionEvent]:
     """Yield a session's events incrementally as they arrive, until it stops.
 
@@ -699,8 +801,11 @@ def stream_session(
     loop reads the authoritative status and stops per ``until`` (``"settled"`` =
     terminal or idle; ``"terminal"`` keeps the stream open across the idle turns of
     an interactive session). A final non-blocking drain loop flushes any backlog
-    remaining when it stops. Unlike ``wait_for_session``, this does not execute
-    custom tools: it is a read-only view of the event stream.
+    remaining when it stops.
+
+    With ``tools``, each poll then runs the custom tool calls the session awaits and
+    posts their results. Without them the stream is a read-only view that keeps
+    polling through ``awaiting_tool_results``, for calls another process answers.
 
     Args:
         client: Client bound to the session.
@@ -710,6 +815,7 @@ def stream_session(
         limit: Optional cap on events returned per poll.
         until: Stop on ``"settled"`` (terminal or idle) or only on ``"terminal"``.
         timeout_seconds: Optional overall wall-clock budget.
+        tools: Custom tools to run when the agent calls them.
 
     Yields:
         Each new ``SessionEvent`` in order.
@@ -718,25 +824,36 @@ def stream_session(
         TimeoutError: If ``timeout_seconds`` elapses before the session stops.
     """
     should_stop = is_terminal_session_status if until == "terminal" else is_settled_session_status
+    dispatch = _tool_dispatch(tools)
+    advertised = _Advertised(anchored=from_index == 0)
     next_from_index = from_index
+    caught_up = True
     deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
 
     while True:
         if deadline is not None and time.monotonic() >= deadline:
             raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
 
+        batch: typing.List[SessionEvent] = []
         changes = client.sessions.get_session_changes(
-            id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=wait_for_seconds
+            id,
+            from_index=next_from_index,
+            limit=limit,
+            include_events=True,
+            wait_for_seconds=wait_for_seconds if caught_up else 0,
         )
         if changes is not None:
             batch = changes.new_events or []
             yield from batch
-            next_from_index += len(batch)
+            next_from_index = _cursor_after(next_from_index, changes)
+            advertised.read(batch, next_from_index)
+        caught_up = _caught_up(batch, limit)
 
-        if should_stop(client.sessions.get_session_status(id).status):
-            # Drain to exhaustion: one page may not cover the backlog past the cursor,
-            # since the server caps page size (and honors ``limit``). Keep honoring the
-            # wall-clock budget so a large tail cannot outlive ``timeout_seconds``.
+        status = client.sessions.get_session_status(id).status
+        if should_stop(status):
+            # Drain to exhaustion: with ``limit``, one page may not cover the backlog past the
+            # cursor. Keep honoring the wall-clock budget so a large tail cannot outlive
+            # ``timeout_seconds``.
             while True:
                 if deadline is not None and time.monotonic() >= deadline:
                     raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
@@ -747,7 +864,10 @@ def stream_session(
                 if not batch:
                     return
                 yield from batch
-                next_from_index += len(batch)
+                next_from_index = _cursor_after(next_from_index, tail)
+
+        if dispatch is not None:
+            _answer_tool_calls(client, id, dispatch, advertised, status, caught_up)
 
 
 async def async_stream_session(
@@ -759,30 +879,41 @@ async def async_stream_session(
     limit: typing.Optional[int] = None,
     until: typing_extensions.Literal["settled", "terminal"] = "settled",
     timeout_seconds: typing.Optional[float] = None,
+    tools: typing.Optional[typing.Sequence[ToolInput]] = None,
 ) -> typing.AsyncIterator[SessionEvent]:
     """Async version of ``stream_session``."""
     should_stop = is_terminal_session_status if until == "terminal" else is_settled_session_status
+    dispatch = _tool_dispatch(tools)
+    advertised = _Advertised(anchored=from_index == 0)
     next_from_index = from_index
+    caught_up = True
     deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
 
     while True:
         if deadline is not None and time.monotonic() >= deadline:
             raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
 
+        batch: typing.List[SessionEvent] = []
         changes = await client.sessions.get_session_changes(
-            id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=wait_for_seconds
+            id,
+            from_index=next_from_index,
+            limit=limit,
+            include_events=True,
+            wait_for_seconds=wait_for_seconds if caught_up else 0,
         )
         if changes is not None:
             batch = changes.new_events or []
             for event in batch:
                 yield event
-            next_from_index += len(batch)
+            next_from_index = _cursor_after(next_from_index, changes)
+            advertised.read(batch, next_from_index)
+        caught_up = _caught_up(batch, limit)
 
         status = await client.sessions.get_session_status(id)
         if should_stop(status.status):
-            # Drain to exhaustion: one page may not cover the backlog past the cursor,
-            # since the server caps page size (and honors ``limit``). Keep honoring the
-            # wall-clock budget so a large tail cannot outlive ``timeout_seconds``.
+            # Drain to exhaustion: with ``limit``, one page may not cover the backlog past the
+            # cursor. Keep honoring the wall-clock budget so a large tail cannot outlive
+            # ``timeout_seconds``.
             while True:
                 if deadline is not None and time.monotonic() >= deadline:
                     raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
@@ -794,7 +925,10 @@ async def async_stream_session(
                     return
                 for event in batch:
                     yield event
-                next_from_index += len(batch)
+                next_from_index = _cursor_after(next_from_index, tail)
+
+        if dispatch is not None:
+            await _async_answer_tool_calls(client, id, dispatch, advertised, status.status, caught_up)
 
 
 class SessionHandle(typing.Generic[AnswerT]):
@@ -809,7 +943,7 @@ class SessionHandle(typing.Generic[AnswerT]):
     ) -> None:
         self._client = client
         self._answer_schema = answer_schema
-        self._tools = as_tools(tools) if tools else None
+        self._tools = _ToolDispatch(tools) if tools else None
         self.id = id
 
     def get(self) -> Session:
@@ -853,8 +987,9 @@ class SessionHandle(typing.Generic[AnswerT]):
         limit: typing.Optional[int] = None,
         until: typing_extensions.Literal["settled", "terminal"] = "settled",
         timeout_seconds: typing.Optional[float] = None,
+        tools: typing.Optional[typing.Sequence[ToolInput]] = None,
     ) -> typing.Iterator[SessionEvent]:
-        """Yield this session's events live until it settles (terminal or idle)."""
+        """Yield events until settled, running ``tools`` (default: the handle's); each call runs once per handle."""
         return stream_session(
             self._client,
             self.id,
@@ -863,6 +998,7 @@ class SessionHandle(typing.Generic[AnswerT]):
             limit=limit,
             until=until,
             timeout_seconds=timeout_seconds,
+            tools=self._tools if tools is None else tools,
         )
 
 
@@ -878,7 +1014,7 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
     ) -> None:
         self._client = client
         self._answer_schema = answer_schema
-        self._tools = as_tools(tools) if tools else None
+        self._tools = _ToolDispatch(tools) if tools else None
         self.id = id
 
     async def get(self) -> Session:
@@ -922,8 +1058,9 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
         limit: typing.Optional[int] = None,
         until: typing_extensions.Literal["settled", "terminal"] = "settled",
         timeout_seconds: typing.Optional[float] = None,
+        tools: typing.Optional[typing.Sequence[ToolInput]] = None,
     ) -> typing.AsyncIterator[SessionEvent]:
-        """Yield this session's events live until it settles (terminal or idle)."""
+        """Yield events until settled, running ``tools`` (default: the handle's); each call runs once per handle."""
         return async_stream_session(
             self._client,
             self.id,
@@ -932,4 +1069,5 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
             limit=limit,
             until=until,
             timeout_seconds=timeout_seconds,
+            tools=self._tools if tools is None else tools,
         )
