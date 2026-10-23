@@ -4,11 +4,15 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .validation_error import ValidationError
 
 
-class HttpValidationError(UniversalBaseModel):
-    detail: typing.Optional[typing.List[ValidationError]] = None
+class ErrorResponse(UniversalBaseModel):
+    """
+    Standard API error body.
+    """
+
+    message: str
+    detail: typing.List[typing.Any]
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
