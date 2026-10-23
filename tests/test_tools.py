@@ -54,12 +54,12 @@ def test_attach_definitions_string_agent_uses_overrides():
     assert params["overrides"]["agent.tools"] == [get_weather.definition()]
 
 
-def test_attach_definitions_inline_agent_uses_overrides():
+def test_attach_definitions_inline_agent_carries_tools():
     agent = {"name": "mine", "description": "d", "environments": []}
     params = {"agent": dict(agent)}
     _attach_tool_definitions(params, [get_weather])
-    assert params["agent"] == agent
-    assert params["overrides"]["agent.tools"] == [get_weather.definition()]
+    assert params["agent"] == {**agent, "tools": [get_weather.definition()]}
+    assert "overrides" not in params
 
 
 class _FakeHttpx:
