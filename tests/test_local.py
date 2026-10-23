@@ -443,9 +443,11 @@ class TestChannelSetup:
 
         monkeypatch.setattr(FakeBridge, "_interruptible_sleep", instant_sleep)
         calls = {"n": 0}
+        paths: list[str] = []
 
         def responder(request: httpx.Request) -> httpx.Response:
             calls["n"] += 1
+            paths.append(request.url.path)
             return httpx.Response(429, headers={"Retry-After": "0"}) if calls["n"] < 3 else httpx.Response(200)
 
         bridge = FakeBridge(api_key="k")
@@ -453,6 +455,7 @@ class TestChannelSetup:
             exchange = bridge_module.CommandExchange(client, "http://test")
             assert await bridge._open_channel(exchange) is True
         assert calls["n"] == 3
+        assert paths == [f"/api/v1/trajectories/{bridge.session_id}"] * 3
 
     async def test_429_gives_up_with_a_clear_error(self, monkeypatch):
         async def instant_sleep(self, seconds: float) -> bool:
