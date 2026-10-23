@@ -28,6 +28,7 @@ from .types.session_changes import SessionChanges
 from .types.session_changes_answer import SessionChangesAnswer
 from .types.file_content import FileContent
 from .types.session_event import SessionEvent
+from .types.tool_definition import ToolDefinition
 from .types.trajectory_status import TrajectoryStatus
 
 # Type-only: the client subclasses import from this module, so importing them at
@@ -195,10 +196,17 @@ def file_from_path(
 
 
 def _attach_tool_definitions(create_params: typing.Dict[str, typing.Any], tools: typing.Sequence[Tool]) -> None:
-    """Carry the tool definitions via the ``agent.tools`` override; the server applies it to referenced and inline agents alike."""
-    overrides = dict(create_params.get("overrides") or {})
-    overrides["agent.tools"] = [t.definition() for t in tools]
-    create_params["overrides"] = overrides
+    """Set the agent's tools: on an inline agent directly, since the server validates it before applying overrides."""
+    definitions = [t.definition() for t in tools]
+    agent = create_params.get("agent")
+    if isinstance(agent, dict):
+        create_params["agent"] = {**agent, "tools": definitions}
+    elif isinstance(agent, pydantic.BaseModel):
+        create_params["agent"] = agent.model_copy(update={"tools": [ToolDefinition(**d) for d in definitions]})
+    else:
+        overrides = dict(create_params.get("overrides") or {})
+        overrides["agent.tools"] = definitions
+        create_params["overrides"] = overrides
 
 
 class _Advertised:
