@@ -8,6 +8,7 @@ import pydantic
 import typing_extensions
 from ...core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from ...types.file_content import FileContent
+from ...types.skill import Skill
 from ...types.user_message_event import UserMessageEvent
 
 
@@ -16,6 +17,7 @@ class SendSessionMessagesRequestBody_UserMessage(UniversalBaseModel):
     message: str
     images: typing.Optional[typing.List[str]] = None
     files: typing.Optional[typing.List[FileContent]] = None
+    skills: typing.Optional[typing.List[Skill]] = None
     caller_id: typing.Optional[str] = None
 
     if IS_PYDANTIC_V2:

@@ -7,6 +7,7 @@ from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .answer_outcome import AnswerOutcome
 from .model_usage import ModelUsage
 from .session_error_code import SessionErrorCode
+from .tool_request import ToolRequest
 from .trajectory_status import TrajectoryStatus
 
 
@@ -48,6 +49,11 @@ class SessionStatus(UniversalBaseModel):
     subagent_session_ids: typing.Optional[typing.List[str]] = pydantic.Field(default=None)
     """
     Session ids of any subagents this session spawned.
+    """
+
+    pending_tool_calls: typing.Optional[typing.List[ToolRequest]] = pydantic.Field(default=None)
+    """
+    Custom tool calls the agent is blocked on; echo each ``id`` back in the ToolResultEvent. Empty unless the agent is awaiting tool results (a pause keeps them).
     """
 
     if IS_PYDANTIC_V2:

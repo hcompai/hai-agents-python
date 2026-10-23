@@ -12,6 +12,7 @@ from ...types.browser_mode import BrowserMode
 from ...types.browser_network import BrowserNetwork
 from ...types.desktop_host import DesktopHost
 from ...types.workstation_host import WorkstationHost
+from ...types.workstation_storage import WorkstationStorage
 
 
 class CreateEnvironmentRequest_Web(UniversalBaseModel):
@@ -81,6 +82,7 @@ class CreateEnvironmentRequest_Workstation(UniversalBaseModel):
     id: str
     host: typing.Optional[WorkstationHost] = None
     session_id: typing.Optional[str] = None
+    storage: typing.Optional[WorkstationStorage] = None
     lazy: typing.Optional[bool] = None
 
     if IS_PYDANTIC_V2:

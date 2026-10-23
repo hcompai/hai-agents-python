@@ -5,6 +5,7 @@ import typing
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .workstation_host import WorkstationHost
+from .workstation_storage import WorkstationStorage
 
 
 class Workstation(UniversalBaseModel):
@@ -25,6 +26,11 @@ class Workstation(UniversalBaseModel):
     session_id: typing.Optional[str] = pydantic.Field(default=None)
     """
     Connect to an existing workstation session by id instead of starting a new one.
+    """
+
+    storage: typing.Optional[WorkstationStorage] = pydantic.Field(default=None)
+    """
+    Which disk a cloud workstation runs on. Omit to let the stage decide: the caller's default volume where the workstation is persistent by default, a fresh machine elsewhere. Ignored when session_id attaches to an existing session, and on a user_device host.
     """
 
     lazy: typing.Optional[bool] = pydantic.Field(default=None)

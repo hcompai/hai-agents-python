@@ -8,6 +8,7 @@ from ..types.browser_network import BrowserNetwork
 from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
+from ..types.workstation_storage import WorkstationStorage
 from .raw_client import AsyncRawEnvironmentsClient, RawEnvironmentsClient
 from .types.create_environment_request import CreateEnvironmentRequest
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
@@ -42,7 +43,9 @@ class EnvironmentsClient:
         search: typing.Optional[str] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListEnvironmentsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListEnvironmentsRequestSortItem, typing.Sequence[ListEnvironmentsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> EnvironmentPage:
         """
@@ -65,7 +68,7 @@ class EnvironmentsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListEnvironmentsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListEnvironmentsRequestSortItem, typing.Sequence[ListEnvironmentsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -240,6 +243,7 @@ class EnvironmentsClient:
         network: typing.Optional[BrowserNetwork] = OMIT,
         screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
+        storage: typing.Optional[WorkstationStorage] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -277,6 +281,8 @@ class EnvironmentsClient:
 
         image : typing.Optional[str]
 
+        storage : typing.Optional[WorkstationStorage]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -312,6 +318,7 @@ class EnvironmentsClient:
             network=network,
             screenshot_max_width=screenshot_max_width,
             image=image,
+            storage=storage,
             request_options=request_options,
         )
         return _response.data
@@ -340,7 +347,9 @@ class AsyncEnvironmentsClient:
         search: typing.Optional[str] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListEnvironmentsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListEnvironmentsRequestSortItem, typing.Sequence[ListEnvironmentsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> EnvironmentPage:
         """
@@ -363,7 +372,7 @@ class AsyncEnvironmentsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListEnvironmentsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListEnvironmentsRequestSortItem, typing.Sequence[ListEnvironmentsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -578,6 +587,7 @@ class AsyncEnvironmentsClient:
         network: typing.Optional[BrowserNetwork] = OMIT,
         screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
+        storage: typing.Optional[WorkstationStorage] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
@@ -614,6 +624,8 @@ class AsyncEnvironmentsClient:
         screenshot_max_width : typing.Optional[int]
 
         image : typing.Optional[str]
+
+        storage : typing.Optional[WorkstationStorage]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -658,6 +670,7 @@ class AsyncEnvironmentsClient:
             network=network,
             screenshot_max_width=screenshot_max_width,
             image=image,
+            storage=storage,
             request_options=request_options,
         )
         return _response.data

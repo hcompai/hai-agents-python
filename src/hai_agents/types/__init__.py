@@ -105,6 +105,10 @@ if typing.TYPE_CHECKING:
     from .pause_schedule import PauseSchedule
     from .policy_event import PolicyEvent
     from .proxy_pool import ProxyPool
+    from .quota_error import QuotaError
+    from .quota_error_response import QuotaErrorResponse
+    from .quota_error_scope import QuotaErrorScope
+    from .quota_error_type import QuotaErrorType
     from .quota_status import QuotaStatus
     from .quota_status_scope import QuotaStatusScope
     from .read_file_response import ReadFileResponse
@@ -175,6 +179,7 @@ if typing.TYPE_CHECKING:
     from .webhook_with_secret_last_delivery_status import WebhookWithSecretLastDeliveryStatus
     from .workstation import Workstation
     from .workstation_host import WorkstationHost
+    from .workstation_storage import WorkstationStorage
     from .write_file_response import WriteFileResponse
 _dynamic_imports: typing.Dict[str, str] = {
     "ActiveStateChangeData": ".active_state_change_data",
@@ -274,6 +279,10 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PauseSchedule": ".pause_schedule",
     "PolicyEvent": ".policy_event",
     "ProxyPool": ".proxy_pool",
+    "QuotaError": ".quota_error",
+    "QuotaErrorResponse": ".quota_error_response",
+    "QuotaErrorScope": ".quota_error_scope",
+    "QuotaErrorType": ".quota_error_type",
     "QuotaStatus": ".quota_status",
     "QuotaStatusScope": ".quota_status_scope",
     "ReadFileResponse": ".read_file_response",
@@ -340,6 +349,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "WebhookWithSecretLastDeliveryStatus": ".webhook_with_secret_last_delivery_status",
     "Workstation": ".workstation",
     "WorkstationHost": ".workstation_host",
+    "WorkstationStorage": ".workstation_storage",
     "WriteFileResponse": ".write_file_response",
 }
 
@@ -463,6 +473,10 @@ __all__ = [
     "PauseSchedule",
     "PolicyEvent",
     "ProxyPool",
+    "QuotaError",
+    "QuotaErrorResponse",
+    "QuotaErrorScope",
+    "QuotaErrorType",
     "QuotaStatus",
     "QuotaStatusScope",
     "ReadFileResponse",
@@ -529,5 +543,6 @@ __all__ = [
     "WebhookWithSecretLastDeliveryStatus",
     "Workstation",
     "WorkstationHost",
+    "WorkstationStorage",
     "WriteFileResponse",
 ]

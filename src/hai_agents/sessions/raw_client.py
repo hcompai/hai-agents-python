@@ -14,11 +14,14 @@ from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
 from ..core.serialization import convert_and_respect_annotation_metadata
+from ..errors.forbidden_error import ForbiddenError
 from ..errors.not_found_error import NotFoundError
+from ..errors.too_many_requests_error import TooManyRequestsError
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.http_validation_error import HttpValidationError
 from ..types.page_session_event import PageSessionEvent
 from ..types.page_session_summary import PageSessionSummary
+from ..types.quota_error_response import QuotaErrorResponse
 from ..types.quota_status import QuotaStatus
 from ..types.session import Session
 from ..types.session_changes import SessionChanges
@@ -46,8 +49,8 @@ class RawSessionsClient:
         self,
         *,
         owner: typing.Optional[ListSessionsRequestOwner] = None,
-        status: typing.Optional[typing.Sequence[TrajectoryStatus]] = None,
-        agent: typing.Optional[typing.Sequence[str]] = None,
+        status: typing.Optional[typing.Union[TrajectoryStatus, typing.Sequence[TrajectoryStatus]]] = None,
+        agent: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         group_id: typing.Optional[str] = None,
         parent_session_id: typing.Optional[str] = None,
         schedule_id: typing.Optional[str] = None,
@@ -58,7 +61,9 @@ class RawSessionsClient:
         finished_after: typing.Optional[dt.datetime] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSessionsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSessionsRequestSortItem, typing.Sequence[ListSessionsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[PageSessionSummary]:
         """
@@ -68,9 +73,9 @@ class RawSessionsClient:
         ----------
         owner : typing.Optional[ListSessionsRequestOwner]
 
-        status : typing.Optional[typing.Sequence[TrajectoryStatus]]
+        status : typing.Optional[typing.Union[TrajectoryStatus, typing.Sequence[TrajectoryStatus]]]
 
-        agent : typing.Optional[typing.Sequence[str]]
+        agent : typing.Optional[typing.Union[str, typing.Sequence[str]]]
 
         group_id : typing.Optional[str]
 
@@ -96,7 +101,7 @@ class RawSessionsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListSessionsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSessionsRequestSortItem, typing.Sequence[ListSessionsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -167,6 +172,7 @@ class RawSessionsClient:
         max_steps: typing.Optional[int] = OMIT,
         max_time_s: typing.Optional[float] = OMIT,
         idle_timeout_s: typing.Optional[int] = OMIT,
+        timezone: typing.Optional[str] = OMIT,
         delete_after_min: typing.Optional[int] = OMIT,
         delete_screenshot_after_min: typing.Optional[int] = OMIT,
         queue: typing.Optional[bool] = OMIT,
@@ -192,10 +198,13 @@ class RawSessionsClient:
             Maximum reasoning steps the agent may take. Unbounded if null.
 
         max_time_s : typing.Optional[float]
-            Maximum wall-clock seconds the agent may run. Unbounded if null.
+            Maximum wall-clock seconds the agent may work toward each answer; at the limit it answers with what it has. Time idle between answers does not count. Unbounded if null.
 
         idle_timeout_s : typing.Optional[int]
             Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers.
+
+        timezone : typing.Optional[str]
+            IANA timezone the agent uses for dates and times, e.g. 'Europe/Paris'. UTC if null.
 
         delete_after_min : typing.Optional[int]
             Minutes after the session finishes before it is automatically deleted. When omitted, Portal's retention preference applies. An explicit value adds an earlier expiry; null adds no expiry beyond Portal's policy.
@@ -236,6 +245,7 @@ class RawSessionsClient:
                 "max_steps": max_steps,
                 "max_time_s": max_time_s,
                 "idle_timeout_s": idle_timeout_s,
+                "timezone": timezone,
                 "delete_after_min": delete_after_min,
                 "delete_screenshot_after_min": delete_screenshot_after_min,
                 "queue": queue,
@@ -260,6 +270,17 @@ class RawSessionsClient:
                     ),
                 )
                 return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -267,6 +288,17 @@ class RawSessionsClient:
                         HttpValidationError,
                         parse_obj_as(
                             type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        QuotaErrorResponse,
+                        parse_obj_as(
+                            type_=QuotaErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -523,6 +555,17 @@ class RawSessionsClient:
                         HttpValidationError,
                         parse_obj_as(
                             type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        QuotaErrorResponse,
+                        parse_obj_as(
+                            type_=QuotaErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -807,7 +850,9 @@ class RawSessionsClient:
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSessionEventsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSessionEventsRequestSortItem, typing.Sequence[ListSessionEventsRequestSortItem]]
+        ] = None,
         type: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[PageSessionEvent]:
@@ -822,7 +867,7 @@ class RawSessionsClient:
 
         size : typing.Optional[int]
 
-        sort : typing.Optional[typing.Sequence[ListSessionEventsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSessionEventsRequestSortItem, typing.Sequence[ListSessionEventsRequestSortItem]]]
 
         type : typing.Optional[str]
 
@@ -1173,8 +1218,8 @@ class AsyncRawSessionsClient:
         self,
         *,
         owner: typing.Optional[ListSessionsRequestOwner] = None,
-        status: typing.Optional[typing.Sequence[TrajectoryStatus]] = None,
-        agent: typing.Optional[typing.Sequence[str]] = None,
+        status: typing.Optional[typing.Union[TrajectoryStatus, typing.Sequence[TrajectoryStatus]]] = None,
+        agent: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         group_id: typing.Optional[str] = None,
         parent_session_id: typing.Optional[str] = None,
         schedule_id: typing.Optional[str] = None,
@@ -1185,7 +1230,9 @@ class AsyncRawSessionsClient:
         finished_after: typing.Optional[dt.datetime] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSessionsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSessionsRequestSortItem, typing.Sequence[ListSessionsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[PageSessionSummary]:
         """
@@ -1195,9 +1242,9 @@ class AsyncRawSessionsClient:
         ----------
         owner : typing.Optional[ListSessionsRequestOwner]
 
-        status : typing.Optional[typing.Sequence[TrajectoryStatus]]
+        status : typing.Optional[typing.Union[TrajectoryStatus, typing.Sequence[TrajectoryStatus]]]
 
-        agent : typing.Optional[typing.Sequence[str]]
+        agent : typing.Optional[typing.Union[str, typing.Sequence[str]]]
 
         group_id : typing.Optional[str]
 
@@ -1223,7 +1270,7 @@ class AsyncRawSessionsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListSessionsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSessionsRequestSortItem, typing.Sequence[ListSessionsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -1294,6 +1341,7 @@ class AsyncRawSessionsClient:
         max_steps: typing.Optional[int] = OMIT,
         max_time_s: typing.Optional[float] = OMIT,
         idle_timeout_s: typing.Optional[int] = OMIT,
+        timezone: typing.Optional[str] = OMIT,
         delete_after_min: typing.Optional[int] = OMIT,
         delete_screenshot_after_min: typing.Optional[int] = OMIT,
         queue: typing.Optional[bool] = OMIT,
@@ -1319,10 +1367,13 @@ class AsyncRawSessionsClient:
             Maximum reasoning steps the agent may take. Unbounded if null.
 
         max_time_s : typing.Optional[float]
-            Maximum wall-clock seconds the agent may run. Unbounded if null.
+            Maximum wall-clock seconds the agent may work toward each answer; at the limit it answers with what it has. Time idle between answers does not count. Unbounded if null.
 
         idle_timeout_s : typing.Optional[int]
             Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers.
+
+        timezone : typing.Optional[str]
+            IANA timezone the agent uses for dates and times, e.g. 'Europe/Paris'. UTC if null.
 
         delete_after_min : typing.Optional[int]
             Minutes after the session finishes before it is automatically deleted. When omitted, Portal's retention preference applies. An explicit value adds an earlier expiry; null adds no expiry beyond Portal's policy.
@@ -1363,6 +1414,7 @@ class AsyncRawSessionsClient:
                 "max_steps": max_steps,
                 "max_time_s": max_time_s,
                 "idle_timeout_s": idle_timeout_s,
+                "timezone": timezone,
                 "delete_after_min": delete_after_min,
                 "delete_screenshot_after_min": delete_screenshot_after_min,
                 "queue": queue,
@@ -1387,6 +1439,17 @@ class AsyncRawSessionsClient:
                     ),
                 )
                 return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -1394,6 +1457,17 @@ class AsyncRawSessionsClient:
                         HttpValidationError,
                         parse_obj_as(
                             type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        QuotaErrorResponse,
+                        parse_obj_as(
+                            type_=QuotaErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1654,6 +1728,17 @@ class AsyncRawSessionsClient:
                         HttpValidationError,
                         parse_obj_as(
                             type_=HttpValidationError,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        QuotaErrorResponse,
+                        parse_obj_as(
+                            type_=QuotaErrorResponse,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1942,7 +2027,9 @@ class AsyncRawSessionsClient:
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSessionEventsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSessionEventsRequestSortItem, typing.Sequence[ListSessionEventsRequestSortItem]]
+        ] = None,
         type: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[PageSessionEvent]:
@@ -1957,7 +2044,7 @@ class AsyncRawSessionsClient:
 
         size : typing.Optional[int]
 
-        sort : typing.Optional[typing.Sequence[ListSessionEventsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSessionEventsRequestSortItem, typing.Sequence[ListSessionEventsRequestSortItem]]]
 
         type : typing.Optional[str]
 

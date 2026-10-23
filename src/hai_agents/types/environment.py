@@ -12,6 +12,7 @@ from .browser_mode import BrowserMode
 from .browser_network import BrowserNetwork
 from .desktop_host import DesktopHost
 from .workstation_host import WorkstationHost
+from .workstation_storage import WorkstationStorage
 
 
 class Environment_Android(UniversalBaseModel):
@@ -81,6 +82,7 @@ class Environment_Workstation(UniversalBaseModel):
     id: str
     host: typing.Optional[WorkstationHost] = None
     session_id: typing.Optional[str] = None
+    storage: typing.Optional[WorkstationStorage] = None
     lazy: typing.Optional[bool] = None
 
     if IS_PYDANTIC_V2:

@@ -4,10 +4,12 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .environment_kind import EnvironmentKind
 
 
 class RunnerSessionData(UniversalBaseModel):
     runner_session_id: str
+    kind: typing.Optional[EnvironmentKind] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

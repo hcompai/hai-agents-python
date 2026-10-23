@@ -49,7 +49,9 @@ class AgentsClient:
         include: typing.Optional[ListAgentsRequestInclude] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListAgentsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListAgentsRequestSortItem, typing.Sequence[ListAgentsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageAgent:
         """
@@ -75,7 +77,7 @@ class AgentsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListAgentsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListAgentsRequestSortItem, typing.Sequence[ListAgentsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -204,7 +206,9 @@ class AgentsClient:
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListAgentRevisionsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListAgentRevisionsRequestSortItem, typing.Sequence[ListAgentRevisionsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageAgentRevisionRecord:
         """
@@ -222,7 +226,7 @@ class AgentsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListAgentRevisionsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListAgentRevisionsRequestSortItem, typing.Sequence[ListAgentRevisionsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -597,7 +601,9 @@ class AsyncAgentsClient:
         include: typing.Optional[ListAgentsRequestInclude] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListAgentsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListAgentsRequestSortItem, typing.Sequence[ListAgentsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageAgent:
         """
@@ -623,7 +629,7 @@ class AsyncAgentsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListAgentsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListAgentsRequestSortItem, typing.Sequence[ListAgentsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -768,7 +774,9 @@ class AsyncAgentsClient:
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListAgentRevisionsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListAgentRevisionsRequestSortItem, typing.Sequence[ListAgentRevisionsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageAgentRevisionRecord:
         """
@@ -786,7 +794,7 @@ class AsyncAgentsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListAgentRevisionsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListAgentRevisionsRequestSortItem, typing.Sequence[ListAgentRevisionsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]

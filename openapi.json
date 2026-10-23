@@ -71,6 +71,19 @@
               }
             }
           },
+          "403": {
+            "description": "``detail[0].type`` is ``environment_not_public`` when the agent uses an environment not open to the caller's organization."
+          },
+          "429": {
+            "description": "No session slot is free. ``detail[0].type`` says which limit: ``plan_limit`` (the concurrent-session limit), ``capacity`` (the platform is full) or ``queue_full`` (the organization's queue is full). ``detail[0].scope`` says whose slots ran out: ``user``, ``org`` or ``platform``.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -595,6 +608,16 @@
         "responses": {
           "202": {
             "description": "Successful Response"
+          },
+          "429": {
+            "description": "No session slot is free. ``detail[0].type`` says which limit: ``plan_limit`` (the concurrent-session limit), ``capacity`` (the platform is full) or ``queue_full`` (the organization's queue is full). ``detail[0].scope`` says whose slots ran out: ``user``, ``org`` or ``platform``.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaErrorResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1325,7 +1348,7 @@
           "Skills"
         ],
         "summary": "List Skills",
-        "description": "List reserved + caller's org skills. Unauthenticated callers see reserved ``h/`` skills only.",
+        "description": "List visible skills. Pages exceeding 8 MiB of encoded helper files return 413; retry with ``size=1``.",
         "operationId": "list_skills_api_v2_skills_get",
         "security": [
           {
@@ -1437,6 +1460,9 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "Page exceeds 8 MiB of encoded helper files; retry with size=1."
           },
           "422": {
             "description": "Validation Error",
@@ -7487,6 +7513,16 @@
               }
             ],
             "title": "Image"
+          },
+          "storage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkstationStorage"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7543,6 +7579,7 @@
           "files": {
             "additionalProperties": {
               "type": "string",
+              "contentEncoding": "base64",
               "contentMediaType": "application/octet-stream"
             },
             "type": "object",
@@ -7640,6 +7677,62 @@
         ],
         "title": "ProxyPool",
         "description": "The kind of upstream IPs a managed proxy draws from."
+      },
+      "QuotaError": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "plan_limit",
+              "capacity",
+              "queue_full"
+            ],
+            "title": "Type"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "user",
+              "org",
+              "platform"
+            ],
+            "title": "Scope"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "message",
+          "scope"
+        ],
+        "title": "QuotaError",
+        "description": "One ``detail`` item of a quota 429: which limit was hit and whose slots ran out."
+      },
+      "QuotaErrorResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/QuotaError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "detail"
+        ],
+        "title": "QuotaErrorResponse",
+        "description": "Body of a quota 429."
       },
       "QuotaStatus": {
         "properties": {
@@ -7796,6 +7889,16 @@
           "runner_session_id": {
             "type": "string",
             "title": "Runner Session Id"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnvironmentKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": true,
@@ -8157,6 +8260,17 @@
             "title": "New Events",
             "default": []
           },
+          "first_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Index"
+          },
           "answer": {
             "anyOf": [
               {
@@ -8184,6 +8298,14 @@
           },
           "metrics": {
             "$ref": "#/components/schemas/Metrics"
+          },
+          "pending_tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ToolRequest"
+            },
+            "type": "array",
+            "title": "Pending Tool Calls",
+            "default": []
           }
         },
         "type": "object",
@@ -8333,7 +8455,7 @@
               }
             ],
             "title": "Max Time S",
-            "description": "Maximum wall-clock seconds the agent may run. Unbounded if null."
+            "description": "Maximum wall-clock seconds the agent may work toward each answer; at the limit it answers with what it has. Time idle between answers does not count. Unbounded if null."
           },
           "idle_timeout_s": {
             "anyOf": [
@@ -8347,6 +8469,18 @@
             ],
             "title": "Idle Timeout S",
             "description": "Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers."
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone",
+            "description": "IANA timezone the agent uses for dates and times, e.g. 'Europe/Paris'. UTC if null."
           },
           "delete_after_min": {
             "anyOf": [
@@ -8482,6 +8616,14 @@
             "type": "array",
             "title": "Subagent Session Ids",
             "description": "Session ids of any subagents this session spawned."
+          },
+          "pending_tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ToolRequest"
+            },
+            "type": "array",
+            "title": "Pending Tool Calls",
+            "description": "Custom tool calls the agent is blocked on; echo each ``id`` back in the ToolResultEvent. Empty unless the agent is awaiting tool results (a pause keeps them)."
           }
         },
         "type": "object",
@@ -9091,6 +9233,14 @@
             "title": "Files",
             "description": "Optional files attached to the message: up to 10, 7 MB in total. They are saved under files/ in the workspace of a workstation or code sandbox, and ~/Downloads on a cloud browser."
           },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/Skill"
+            },
+            "type": "array",
+            "title": "Skills",
+            "description": "Skills for this message only, as inline definitions. Skills with files are not supported here yet: add those to the agent's skills."
+          },
           "caller_id": {
             "type": "string",
             "title": "Caller Id",
@@ -9621,6 +9771,17 @@
             "title": "Session Id",
             "description": "Connect to an existing workstation session by id instead of starting a new one."
           },
+          "storage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkstationStorage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which disk a cloud workstation runs on. Omit to let the stage decide: the caller's default volume where the workstation is persistent by default, a fresh machine elsewhere. Ignored when session_id attaches to an existing session, and on a user_device host."
+          },
           "lazy": {
             "type": "boolean",
             "title": "Lazy",
@@ -9634,6 +9795,37 @@
         ],
         "title": "Workstation",
         "description": "A desktop computer with a browser, office apps and a shell, which the agent drives from that shell."
+      },
+      "WorkstationStorage": {
+        "properties": {
+          "volume_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Id",
+            "description": "A volume of the caller's, by id. Its workspace, home directory and installed packages come back on every session that runs on it."
+          },
+          "use_default_volume": {
+            "type": "boolean",
+            "title": "Use Default Volume",
+            "description": "The caller's default volume, created on first use within the organisation's caps.",
+            "default": false
+          },
+          "ephemeral": {
+            "type": "boolean",
+            "title": "Ephemeral",
+            "description": "A fresh machine whose files do not outlive the session, whatever the stage's default.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "WorkstationStorage",
+        "description": "Which disk a cloud workstation runs on. Exactly one of the three."
       },
       "WriteFileRequest": {
         "properties": {
