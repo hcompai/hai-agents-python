@@ -72,7 +72,7 @@ class CommandExchange:
         self._base = base_url.rstrip("/")
 
     async def ensure_channel(self, session_id: str) -> None:
-        check = await self._client.get(f"{self._base}/api/v1/trajectories/{session_id}/")
+        check = await self._client.get(f"{self._base}/api/v1/trajectories/{session_id}")
         if check.status_code in {HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN}:
             raise AuthError(f"auth error checking channel ({check.status_code})")
         if check.status_code == HTTPStatus.TOO_MANY_REQUESTS:
