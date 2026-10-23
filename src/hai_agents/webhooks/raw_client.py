@@ -33,7 +33,9 @@ class RawWebhooksClient:
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListWebhooksRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListWebhooksRequestSortItem, typing.Sequence[ListWebhooksRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[PageWebhookRecord]:
         """
@@ -47,7 +49,7 @@ class RawWebhooksClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListWebhooksRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListWebhooksRequestSortItem, typing.Sequence[ListWebhooksRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -513,7 +515,9 @@ class AsyncRawWebhooksClient:
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListWebhooksRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListWebhooksRequestSortItem, typing.Sequence[ListWebhooksRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[PageWebhookRecord]:
         """
@@ -527,7 +531,7 @@ class AsyncRawWebhooksClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListWebhooksRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListWebhooksRequestSortItem, typing.Sequence[ListWebhooksRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]

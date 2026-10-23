@@ -35,11 +35,13 @@ class SkillsClient:
         search: typing.Optional[str] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSkillsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSkillsRequestSortItem, typing.Sequence[ListSkillsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageSkill:
         """
-        List reserved + caller's org skills. Unauthenticated callers see reserved ``h/`` skills only.
+        List visible skills. Pages exceeding 8 MiB of encoded helper files return 413; retry with ``size=1``.
 
         Parameters
         ----------
@@ -55,7 +57,7 @@ class SkillsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListSkillsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSkillsRequestSortItem, typing.Sequence[ListSkillsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -379,11 +381,13 @@ class AsyncSkillsClient:
         search: typing.Optional[str] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSkillsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSkillsRequestSortItem, typing.Sequence[ListSkillsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageSkill:
         """
-        List reserved + caller's org skills. Unauthenticated callers see reserved ``h/`` skills only.
+        List visible skills. Pages exceeding 8 MiB of encoded helper files return 413; retry with ``size=1``.
 
         Parameters
         ----------
@@ -399,7 +403,7 @@ class AsyncSkillsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListSkillsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSkillsRequestSortItem, typing.Sequence[ListSkillsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]

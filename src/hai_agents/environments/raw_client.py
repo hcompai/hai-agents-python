@@ -17,6 +17,7 @@ from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
 from ..types.http_validation_error import HttpValidationError
+from ..types.workstation_storage import WorkstationStorage
 from .types.create_environment_request import CreateEnvironmentRequest
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
 from .types.patch_environment_host import PatchEnvironmentHost
@@ -40,7 +41,9 @@ class RawEnvironmentsClient:
         search: typing.Optional[str] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListEnvironmentsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListEnvironmentsRequestSortItem, typing.Sequence[ListEnvironmentsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[EnvironmentPage]:
         """
@@ -63,7 +66,7 @@ class RawEnvironmentsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListEnvironmentsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListEnvironmentsRequestSortItem, typing.Sequence[ListEnvironmentsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -355,6 +358,7 @@ class RawEnvironmentsClient:
         network: typing.Optional[BrowserNetwork] = OMIT,
         screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
+        storage: typing.Optional[WorkstationStorage] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Environment]:
         """
@@ -392,6 +396,8 @@ class RawEnvironmentsClient:
 
         image : typing.Optional[str]
 
+        storage : typing.Optional[WorkstationStorage]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -422,6 +428,9 @@ class RawEnvironmentsClient:
                 ),
                 "screenshot_max_width": screenshot_max_width,
                 "image": image,
+                "storage": convert_and_respect_annotation_metadata(
+                    object_=storage, annotation=typing.Optional[WorkstationStorage], direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
@@ -472,7 +481,9 @@ class AsyncRawEnvironmentsClient:
         search: typing.Optional[str] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListEnvironmentsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListEnvironmentsRequestSortItem, typing.Sequence[ListEnvironmentsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[EnvironmentPage]:
         """
@@ -495,7 +506,7 @@ class AsyncRawEnvironmentsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListEnvironmentsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListEnvironmentsRequestSortItem, typing.Sequence[ListEnvironmentsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -787,6 +798,7 @@ class AsyncRawEnvironmentsClient:
         network: typing.Optional[BrowserNetwork] = OMIT,
         screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
+        storage: typing.Optional[WorkstationStorage] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Environment]:
         """
@@ -824,6 +836,8 @@ class AsyncRawEnvironmentsClient:
 
         image : typing.Optional[str]
 
+        storage : typing.Optional[WorkstationStorage]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -854,6 +868,9 @@ class AsyncRawEnvironmentsClient:
                 ),
                 "screenshot_max_width": screenshot_max_width,
                 "image": image,
+                "storage": convert_and_respect_annotation_metadata(
+                    object_=storage, annotation=typing.Optional[WorkstationStorage], direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",

@@ -32,12 +32,17 @@ class SessionRequest(UniversalBaseModel):
 
     max_time_s: typing.Optional[float] = pydantic.Field(default=None)
     """
-    Maximum wall-clock seconds the agent may run. Unbounded if null.
+    Maximum wall-clock seconds the agent may work toward each answer; at the limit it answers with what it has. Time idle between answers does not count. Unbounded if null.
     """
 
     idle_timeout_s: typing.Optional[int] = pydantic.Field(default=None)
     """
     Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers.
+    """
+
+    timezone: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    IANA timezone the agent uses for dates and times, e.g. 'Europe/Paris'. UTC if null.
     """
 
     delete_after_min: typing.Optional[int] = pydantic.Field(default=None)

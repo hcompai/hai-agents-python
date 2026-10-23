@@ -5,6 +5,7 @@ import typing
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .file_content import FileContent
+from .skill import Skill
 from .user_message_event_type import UserMessageEventType
 
 
@@ -27,6 +28,11 @@ class UserMessageEvent(UniversalBaseModel):
     files: typing.Optional[typing.List[FileContent]] = pydantic.Field(default=None)
     """
     Optional files attached to the message: up to 10, 7 MB in total. They are saved under files/ in the workspace of a workstation or code sandbox, and ~/Downloads on a cloud browser.
+    """
+
+    skills: typing.Optional[typing.List[Skill]] = pydantic.Field(default=None)
+    """
+    Skills for this message only, as inline definitions. Skills with files are not supported here yet: add those to the agent's skills.
     """
 
     caller_id: typing.Optional[str] = None

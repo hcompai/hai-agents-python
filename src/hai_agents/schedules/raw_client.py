@@ -37,7 +37,9 @@ class RawSchedulesClient:
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSchedulesRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSchedulesRequestSortItem, typing.Sequence[ListSchedulesRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[PageScheduleRecord]:
         """
@@ -51,7 +53,7 @@ class RawSchedulesClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListSchedulesRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSchedulesRequestSortItem, typing.Sequence[ListSchedulesRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -549,7 +551,9 @@ class RawSchedulesClient:
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListScheduleRunsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListScheduleRunsRequestSortItem, typing.Sequence[ListScheduleRunsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[PageScheduleRunRecord]:
         """
@@ -565,7 +569,7 @@ class RawSchedulesClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListScheduleRunsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListScheduleRunsRequestSortItem, typing.Sequence[ListScheduleRunsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -626,7 +630,9 @@ class AsyncRawSchedulesClient:
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSchedulesRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSchedulesRequestSortItem, typing.Sequence[ListSchedulesRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[PageScheduleRecord]:
         """
@@ -640,7 +646,7 @@ class AsyncRawSchedulesClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListSchedulesRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSchedulesRequestSortItem, typing.Sequence[ListSchedulesRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -1138,7 +1144,9 @@ class AsyncRawSchedulesClient:
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListScheduleRunsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListScheduleRunsRequestSortItem, typing.Sequence[ListScheduleRunsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[PageScheduleRunRecord]:
         """
@@ -1154,7 +1162,7 @@ class AsyncRawSchedulesClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListScheduleRunsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListScheduleRunsRequestSortItem, typing.Sequence[ListScheduleRunsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]

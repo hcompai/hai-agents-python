@@ -45,8 +45,8 @@ class SessionsClient:
         self,
         *,
         owner: typing.Optional[ListSessionsRequestOwner] = None,
-        status: typing.Optional[typing.Sequence[TrajectoryStatus]] = None,
-        agent: typing.Optional[typing.Sequence[str]] = None,
+        status: typing.Optional[typing.Union[TrajectoryStatus, typing.Sequence[TrajectoryStatus]]] = None,
+        agent: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         group_id: typing.Optional[str] = None,
         parent_session_id: typing.Optional[str] = None,
         schedule_id: typing.Optional[str] = None,
@@ -57,7 +57,9 @@ class SessionsClient:
         finished_after: typing.Optional[dt.datetime] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSessionsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSessionsRequestSortItem, typing.Sequence[ListSessionsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageSessionSummary:
         """
@@ -67,9 +69,9 @@ class SessionsClient:
         ----------
         owner : typing.Optional[ListSessionsRequestOwner]
 
-        status : typing.Optional[typing.Sequence[TrajectoryStatus]]
+        status : typing.Optional[typing.Union[TrajectoryStatus, typing.Sequence[TrajectoryStatus]]]
 
-        agent : typing.Optional[typing.Sequence[str]]
+        agent : typing.Optional[typing.Union[str, typing.Sequence[str]]]
 
         group_id : typing.Optional[str]
 
@@ -95,7 +97,7 @@ class SessionsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListSessionsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSessionsRequestSortItem, typing.Sequence[ListSessionsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -143,6 +145,7 @@ class SessionsClient:
         max_steps: typing.Optional[int] = OMIT,
         max_time_s: typing.Optional[float] = OMIT,
         idle_timeout_s: typing.Optional[int] = OMIT,
+        timezone: typing.Optional[str] = OMIT,
         delete_after_min: typing.Optional[int] = OMIT,
         delete_screenshot_after_min: typing.Optional[int] = OMIT,
         queue: typing.Optional[bool] = OMIT,
@@ -168,10 +171,13 @@ class SessionsClient:
             Maximum reasoning steps the agent may take. Unbounded if null.
 
         max_time_s : typing.Optional[float]
-            Maximum wall-clock seconds the agent may run. Unbounded if null.
+            Maximum wall-clock seconds the agent may work toward each answer; at the limit it answers with what it has. Time idle between answers does not count. Unbounded if null.
 
         idle_timeout_s : typing.Optional[int]
             Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers.
+
+        timezone : typing.Optional[str]
+            IANA timezone the agent uses for dates and times, e.g. 'Europe/Paris'. UTC if null.
 
         delete_after_min : typing.Optional[int]
             Minutes after the session finishes before it is automatically deleted. When omitted, Portal's retention preference applies. An explicit value adds an earlier expiry; null adds no expiry beyond Portal's policy.
@@ -217,6 +223,7 @@ class SessionsClient:
             max_steps=max_steps,
             max_time_s=max_time_s,
             idle_timeout_s=idle_timeout_s,
+            timezone=timezone,
             delete_after_min=delete_after_min,
             delete_screenshot_after_min=delete_screenshot_after_min,
             queue=queue,
@@ -573,7 +580,9 @@ class SessionsClient:
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSessionEventsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSessionEventsRequestSortItem, typing.Sequence[ListSessionEventsRequestSortItem]]
+        ] = None,
         type: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageSessionEvent:
@@ -588,7 +597,7 @@ class SessionsClient:
 
         size : typing.Optional[int]
 
-        sort : typing.Optional[typing.Sequence[ListSessionEventsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSessionEventsRequestSortItem, typing.Sequence[ListSessionEventsRequestSortItem]]]
 
         type : typing.Optional[str]
 
@@ -824,8 +833,8 @@ class AsyncSessionsClient:
         self,
         *,
         owner: typing.Optional[ListSessionsRequestOwner] = None,
-        status: typing.Optional[typing.Sequence[TrajectoryStatus]] = None,
-        agent: typing.Optional[typing.Sequence[str]] = None,
+        status: typing.Optional[typing.Union[TrajectoryStatus, typing.Sequence[TrajectoryStatus]]] = None,
+        agent: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         group_id: typing.Optional[str] = None,
         parent_session_id: typing.Optional[str] = None,
         schedule_id: typing.Optional[str] = None,
@@ -836,7 +845,9 @@ class AsyncSessionsClient:
         finished_after: typing.Optional[dt.datetime] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSessionsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSessionsRequestSortItem, typing.Sequence[ListSessionsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageSessionSummary:
         """
@@ -846,9 +857,9 @@ class AsyncSessionsClient:
         ----------
         owner : typing.Optional[ListSessionsRequestOwner]
 
-        status : typing.Optional[typing.Sequence[TrajectoryStatus]]
+        status : typing.Optional[typing.Union[TrajectoryStatus, typing.Sequence[TrajectoryStatus]]]
 
-        agent : typing.Optional[typing.Sequence[str]]
+        agent : typing.Optional[typing.Union[str, typing.Sequence[str]]]
 
         group_id : typing.Optional[str]
 
@@ -874,7 +885,7 @@ class AsyncSessionsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListSessionsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSessionsRequestSortItem, typing.Sequence[ListSessionsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -930,6 +941,7 @@ class AsyncSessionsClient:
         max_steps: typing.Optional[int] = OMIT,
         max_time_s: typing.Optional[float] = OMIT,
         idle_timeout_s: typing.Optional[int] = OMIT,
+        timezone: typing.Optional[str] = OMIT,
         delete_after_min: typing.Optional[int] = OMIT,
         delete_screenshot_after_min: typing.Optional[int] = OMIT,
         queue: typing.Optional[bool] = OMIT,
@@ -955,10 +967,13 @@ class AsyncSessionsClient:
             Maximum reasoning steps the agent may take. Unbounded if null.
 
         max_time_s : typing.Optional[float]
-            Maximum wall-clock seconds the agent may run. Unbounded if null.
+            Maximum wall-clock seconds the agent may work toward each answer; at the limit it answers with what it has. Time idle between answers does not count. Unbounded if null.
 
         idle_timeout_s : typing.Optional[int]
             Seconds to keep the session open for follow-up messages after each answer. Null ends the session as soon as the agent answers.
+
+        timezone : typing.Optional[str]
+            IANA timezone the agent uses for dates and times, e.g. 'Europe/Paris'. UTC if null.
 
         delete_after_min : typing.Optional[int]
             Minutes after the session finishes before it is automatically deleted. When omitted, Portal's retention preference applies. An explicit value adds an earlier expiry; null adds no expiry beyond Portal's policy.
@@ -1012,6 +1027,7 @@ class AsyncSessionsClient:
             max_steps=max_steps,
             max_time_s=max_time_s,
             idle_timeout_s=idle_timeout_s,
+            timezone=timezone,
             delete_after_min=delete_after_min,
             delete_screenshot_after_min=delete_screenshot_after_min,
             queue=queue,
@@ -1452,7 +1468,9 @@ class AsyncSessionsClient:
         *,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSessionEventsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSessionEventsRequestSortItem, typing.Sequence[ListSessionEventsRequestSortItem]]
+        ] = None,
         type: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> PageSessionEvent:
@@ -1467,7 +1485,7 @@ class AsyncSessionsClient:
 
         size : typing.Optional[int]
 
-        sort : typing.Optional[typing.Sequence[ListSessionEventsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSessionEventsRequestSortItem, typing.Sequence[ListSessionEventsRequestSortItem]]]
 
         type : typing.Optional[str]
 

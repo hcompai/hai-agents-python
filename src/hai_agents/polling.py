@@ -57,6 +57,7 @@ class CreateSessionParams(typing_extensions.TypedDict, total=False):
     idle_timeout_s: typing.Optional[int]
     group_id: typing.Optional[str]
     parent_session_id: typing.Optional[str]
+    timezone: typing.Optional[str]
     delete_after_min: typing.Optional[int]
     delete_screenshot_after_min: typing.Optional[int]
     queue: typing.Optional[bool]

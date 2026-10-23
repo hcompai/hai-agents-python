@@ -10,6 +10,7 @@ from ..core.jsonable_encoder import encode_path_param
 from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
+from ..errors.content_too_large_error import ContentTooLargeError
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.http_validation_error import HttpValidationError
 from ..types.page_skill import PageSkill
@@ -32,11 +33,13 @@ class RawSkillsClient:
         search: typing.Optional[str] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSkillsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSkillsRequestSortItem, typing.Sequence[ListSkillsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[PageSkill]:
         """
-        List reserved + caller's org skills. Unauthenticated callers see reserved ``h/`` skills only.
+        List visible skills. Pages exceeding 8 MiB of encoded helper files return 413; retry with ``size=1``.
 
         Parameters
         ----------
@@ -52,7 +55,7 @@ class RawSkillsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListSkillsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSkillsRequestSortItem, typing.Sequence[ListSkillsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -85,6 +88,17 @@ class RawSkillsClient:
                     ),
                 )
                 return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 413:
+                raise ContentTooLargeError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -496,11 +510,13 @@ class AsyncRawSkillsClient:
         search: typing.Optional[str] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
-        sort: typing.Optional[typing.Sequence[ListSkillsRequestSortItem]] = None,
+        sort: typing.Optional[
+            typing.Union[ListSkillsRequestSortItem, typing.Sequence[ListSkillsRequestSortItem]]
+        ] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[PageSkill]:
         """
-        List reserved + caller's org skills. Unauthenticated callers see reserved ``h/`` skills only.
+        List visible skills. Pages exceeding 8 MiB of encoded helper files return 413; retry with ``size=1``.
 
         Parameters
         ----------
@@ -516,7 +532,7 @@ class AsyncRawSkillsClient:
         size : typing.Optional[int]
             Number of items per page
 
-        sort : typing.Optional[typing.Sequence[ListSkillsRequestSortItem]]
+        sort : typing.Optional[typing.Union[ListSkillsRequestSortItem, typing.Sequence[ListSkillsRequestSortItem]]]
             Sort by field
 
         request_options : typing.Optional[RequestOptions]
@@ -549,6 +565,17 @@ class AsyncRawSkillsClient:
                     ),
                 )
                 return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 413:
+                raise ContentTooLargeError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
