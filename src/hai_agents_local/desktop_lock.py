@@ -92,7 +92,7 @@ class DesktopClaim:
                 return False
             if time.monotonic() >= deadline:
                 raise DesktopBusyError(
-                    "another agent is driving this desktop; wait for it to finish or stop it with `hai local stop`"
+                    "another agent is driving this desktop; wait for it to finish or stop it with `holo local stop`"
                 )
             with contextlib.suppress(asyncio.TimeoutError, TimeoutError):
                 await asyncio.wait_for(stop.wait(), CLAIM_POLL_S)

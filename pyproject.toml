@@ -54,6 +54,7 @@ all = [
 ]
 
 [project.scripts]
+holo = "hai_agents_cli:main"
 hai = "hai_agents_cli:main"
 
 [project.urls]

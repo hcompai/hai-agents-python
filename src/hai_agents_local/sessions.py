@@ -92,7 +92,7 @@ def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) 
     if overrides and "user_device" in json.dumps(overrides, default=str):
         logger.warning(
             "session overrides mention user_device, but auto-started bridges are derived from the agent "
-            "spec only; serve override-injected environments manually with `hai local browser|desktop|workstation`"
+            "spec only; serve override-injected environments manually with `holo local browser|desktop|workstation`"
         )
 
 

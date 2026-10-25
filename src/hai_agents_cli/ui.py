@@ -1,4 +1,4 @@
-"""Terminal look shared by the hai and holo CLIs, in the style of Claude Code."""
+"""Terminal look of the holo CLI, in the style of Claude Code."""
 
 from __future__ import annotations
 

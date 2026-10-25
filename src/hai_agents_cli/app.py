@@ -1,4 +1,4 @@
-"""`hai` command-line interface."""
+"""`holo` command-line interface."""
 
 from __future__ import annotations
 
@@ -47,13 +47,13 @@ console = ui.console()
 err_console = ui.console(stderr=True)
 
 app = typer.Typer(
-    name="hai",
+    name="holo",
     help="Run H Company agents from your terminal.",
-    epilog='\b\nExamples:\n  hai "What is the top story on Hacker News?"\n'
-    '  hai --local "Open Calculator and compute 2+2"\n'
-    "  hai                                  (interactive session)\n"
-    "  hai agents use h/web-surfer-pro      (change the default agent)\n"
-    "  hai sessions watch <session-id>",
+    epilog='\b\nExamples:\n  holo "What is the top story on Hacker News?"\n'
+    '  holo --local "Open Calculator and compute 2+2"\n'
+    "  holo                                  (interactive session)\n"
+    "  holo agents use h/web-surfer-pro      (change the default agent)\n"
+    "  holo sessions watch <session-id>",
     no_args_is_help=True,
     rich_markup_mode=None,
 )
@@ -115,7 +115,7 @@ def _interactive() -> bool:
 
 
 def _sign_in_if_needed(state: AppState) -> None:
-    """Commands sign in on first use in a terminal, so a fresh install needs no `hai login` step."""
+    """Commands sign in on first use in a terminal, so a fresh install needs no `holo login` step."""
     if credentials.current_api_key(state.api_key) or state.json_output or not _interactive():
         return
     console.print("No API key found, so let's sign you in first.")
@@ -138,7 +138,7 @@ def _sign_in(base_url: str | None) -> None:
 
 
 def _browser_sign_in(base_url: str | None) -> None:
-    label = f"hai CLI ({socket.gethostname()})"
+    label = f"holo CLI ({socket.gethostname()})"
     try:
         minted = auth.login_and_mint(
             credentials.portal_base(base_url),
@@ -182,7 +182,7 @@ def logout() -> None:
 
 @app.command()
 def doctor(ctx: typer.Context) -> None:
-    """Diagnose this machine's hai setup: login, platform access, local browser/desktop. Read-only."""
+    """Diagnose this machine's holo setup: login, platform access, local browser/desktop. Read-only."""
     from .doctor import run_checks
 
     state = _state(ctx)
@@ -206,7 +206,7 @@ def _offer_privacy_settings() -> None:
         return
     for grant in missing:
         subprocess.run(["open", settings_urls()[grant]], check=False)
-    ui.hint(console, "after granting, restart this terminal and run `hai doctor` again")
+    ui.hint(console, "after granting, restart this terminal and run `holo doctor` again")
 
 
 @app.command()
@@ -265,7 +265,7 @@ LOCAL_DESKTOP_AGENT = {
 }
 
 
-AGENT_HELP = f"Agent name. Default: {credentials.DEFAULT_AGENT}, or the one set with `hai agents use`."
+AGENT_HELP = f"Agent name. Default: {credentials.DEFAULT_AGENT}, or the one set with `holo agents use`."
 SLASH_COMMANDS = [
     ("/agent [name]", "switch agent and save it as the default"),
     ("/new", "start a new session"),
@@ -329,10 +329,10 @@ def chat(
     agent: str | None = typer.Option(None, "--agent", "-a", help=AGENT_HELP),
     local: bool = typer.Option(False, "--local", help="Drive this machine's desktop through the local runtime."),
 ) -> None:
-    """Start an interactive session; plain `hai` in a terminal opens this."""
+    """Start an interactive session; plain `holo` in a terminal opens this."""
     state = _state(ctx)
     if not _interactive() or state.json_output:
-        _raise_cli_error(RuntimeError('chat needs an interactive terminal; run one task with `hai "<task>"`'))
+        _raise_cli_error(RuntimeError('chat needs an interactive terminal; run one task with `holo "<task>"`'))
     convo = _Conversation(
         state,
         agent or (LOCAL_DESKTOP_AGENT if local else credentials.default_agent()),
@@ -416,7 +416,7 @@ class _Conversation:
         label = "local desktop" if self.local else str(self.agent)
         where = ("esc esc stops" if self._listener else None) if self.local else _endpoint_host(self.state)
         hint = "/help for commands" if self.followups else None
-        ui.header(err_console, "hai", [label, where, hint], link=self.view_url)
+        ui.header(err_console, "holo", [label, where, hint], link=self.view_url)
 
     def turn(self, message: str, *, echo: bool = False) -> None:
         if self.session is None:
@@ -523,7 +523,7 @@ class _Conversation:
     def _switch_agent(self, name: str) -> None:
         if self.local:
             ui.error(
-                err_console, "the local desktop agent cannot be switched", fix="leave and run `hai` without --local"
+                err_console, "the local desktop agent cannot be switched", fix="leave and run `holo` without --local"
             )
             return
         try:
@@ -820,7 +820,7 @@ def watch(
 
 
 def _watch_human(client: Any, session_id: str, timeout: float) -> None:
-    ui.header(err_console, "hai", ["watching", session_id])
+    ui.header(err_console, "holo", ["watching", session_id])
     feed = ui.StepFeed(err_console)
     try:
         _follow(client, session_id, feed, timeout_s=timeout)
@@ -867,7 +867,7 @@ def list_agents_command(
 
 @agents_app.command("use")
 def use_agent_command(ctx: typer.Context, agent_name: str = typer.Argument(...)) -> None:
-    """Set the default agent for `hai run` and `hai chat`."""
+    """Set the default agent for `holo run` and `holo chat`."""
     path = _save_default_agent(_client(_state(ctx)), agent_name)
     ui.ok(console, f"default agent {agent_name} {ui.SEP} saved to {path}")
 
@@ -938,11 +938,11 @@ def mcp_install(
     if client is None:
         targets = [(cid, c) for cid, c in mcp_hosts.CLIENTS.items() if mcp_hosts.host_present(c)]
         if not targets:
-            _raise_cli_error(RuntimeError("No supported MCP clients detected. Run `hai mcp install list`."))
+            _raise_cli_error(RuntimeError("No supported MCP clients detected. Run `holo mcp install list`."))
     elif client in mcp_hosts.CLIENTS:
         targets = [(client, mcp_hosts.CLIENTS[client])]
     else:
-        _raise_cli_error(RuntimeError(f"Unknown client {client!r}. Run `hai mcp install list` to see supported ids."))
+        _raise_cli_error(RuntimeError(f"Unknown client {client!r}. Run `holo mcp install list` to see supported ids."))
 
     _sign_in_if_needed(state)
     try:
@@ -974,7 +974,7 @@ def _mcp_list(json_output: bool) -> None:
         table.add_row(cid, "[green]yes[/green]" if detected else "[dim]no[/dim]", tgt)
     console.print(table)
     console.print(
-        "[dim]Wire one with[/dim] [cyan]hai mcp install <id>[/cyan][dim], or all detected with[/dim] [cyan]hai mcp install[/cyan]."
+        "[dim]Wire one with[/dim] [cyan]holo mcp install <id>[/cyan][dim], or all detected with[/dim] [cyan]holo mcp install[/cyan]."
     )
 
 
@@ -1102,7 +1102,7 @@ def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str
 
     console.print(
         f"[bold]Local {bridge.environment_kind} bridge[/bold] serving session id "
-        f"[cyan]{bridge.session_id}[/cyan]. Press Ctrl-C to stop, or run `hai local stop` from any terminal."
+        f"[cyan]{bridge.session_id}[/cyan]. Press Ctrl-C to stop, or run `holo local stop` from any terminal."
     )
     console.print(
         "[dim]Point a user_device environment at it: "
@@ -1168,7 +1168,7 @@ _HELP_FLAGS = ("--help", "--install-completion", "--show-completion")
 
 
 def route(argv: list[str], commands: set[str], interactive: bool) -> list[str]:
-    """`hai "task"` runs it, plain `hai` opens a prompt, and global options work in any position."""
+    """`holo "task"` runs it, plain `holo` opens a prompt, and global options work in any position."""
     head: list[str] = []
     rest: list[str] = []
     i = 0
@@ -1198,7 +1198,7 @@ def route(argv: list[str], commands: set[str], interactive: bool) -> list[str]:
 
 def main() -> None:
     commands = set(typer.main.get_command(app).commands)  # type: ignore[attr-defined]
-    app(args=route(sys.argv[1:], commands, _interactive()), prog_name="hai")
+    app(args=route(sys.argv[1:], commands, _interactive()), prog_name="holo")
 
 
 def _state(ctx: typer.Context) -> AppState:
@@ -1359,7 +1359,7 @@ def _raise_cli_error(exc: Exception) -> NoReturn:
         if exc.status_code is not None:
             message = f"API error {exc.status_code}: {message}"
         if exc.status_code in (401, 403):
-            fix = "hai login --force"
+            fix = "holo login --force"
     else:
         message = str(exc)
     ui.error(err_console, message, fix=fix)

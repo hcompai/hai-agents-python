@@ -45,7 +45,7 @@ Python 3.10 or newer is required. Get an API key at [platform.hcompany.ai/settin
 export HAI_API_KEY=hk-...
 ```
 
-With the `cli` extra, `hai login` stores a key once instead, and `Client()` picks it up.
+With the `cli` extra, `holo login` stores a key once instead, and `Client()` picks it up.
 
 ## Quickstart
 
@@ -65,7 +65,7 @@ print(result.status)
 print(result.answer)
 ```
 
-`Client()` reads `HAI_API_KEY` from the environment, else the key `hai login` stored in `~/.config/hai/.env`.
+`Client()` reads `HAI_API_KEY` from the environment, else the key `holo login` stored in `~/.config/hai/.env`.
 
 `result` is a `SessionRunResult`: `id`, `status`, `answer`, the accumulated `events`, and `final_changes`.
 
@@ -100,7 +100,7 @@ Inference stays hosted (`HAI_API_KEY`) unless you pass `inference=Inference.self
 (`from hai_agents_local.runtime import Inference`).
 
 One agent drives this machine's desktop at a time: a second process asking for a `desktop` or `workstation` bridge
-fails fast instead of sharing the mouse. `hai local stop` stops every local turn on the machine; so does a double Esc
+fails fast instead of sharing the mouse. `holo local stop` stops every local turn on the machine; so does a double Esc
 once `hai_agents_local.killswitch.arm_esc_listener()` is armed (macOS, Windows, and X11 Linux).
 
 ## How a session works
@@ -331,17 +331,18 @@ print(event.type, event.data)
 
 ## Command line
 
-The `cli` extra installs the `hai` command for driving agents from your terminal:
+The `cli` extra installs the `holo` command (also available as `hai`) for driving agents from your terminal:
 
 ```bash
-hai login
-hai run "What's the top story on Hacker News?"
-hai sessions list
-hai sessions watch <session-id>
-hai mcp install
+holo "What's the top story on Hacker News?"   # run one task
+holo                                         # interactive session: follow-ups, /help, Esc to steer
+holo --local "Open Calculator and compute 2+2"
+holo agents use h/web-surfer-pro             # change the default agent
+holo sessions watch <session-id>
+holo mcp install
 ```
 
-`hai login` signs in with Google in the browser, or takes a key you paste from [platform.hcompany.ai/settings/api-keys](https://platform.hcompany.ai/settings/api-keys), and stores it in `~/.config/hai/.env`. Any other command does the same on first use in a terminal, so `hai login` is optional. Scripts and `--json` runs never prompt: pipe a key into `hai login --key` or set `HAI_API_KEY`. `hai mcp install` adds the hai-agents MCP server to Cursor, VS Code, Claude Code, and other MCP clients. Credentials resolve from `--api-key`, then `HAI_API_KEY`, then `~/.config/hai/.env`. Run `hai --help` for the full command set.
+Tasks run on `h/web-surfer-flash` unless you pass `--agent` or set a default with `holo agents use`. `holo login` signs in with Google in the browser, or takes a key you paste from [platform.hcompany.ai/settings/api-keys](https://platform.hcompany.ai/settings/api-keys), and stores it in `~/.config/hai/.env`. Any other command does the same on first use in a terminal, so `holo login` is optional. Scripts and `--json` runs never prompt: pipe a key into `holo login --key` or set `HAI_API_KEY`. `holo mcp install` adds the hai-agents MCP server to Cursor, VS Code, Claude Code, and other MCP clients. Credentials resolve from `--api-key`, then `HAI_API_KEY`, then `~/.config/hai/.env`. Run `holo --help` for the full command set.
 
 ## Documentation
 

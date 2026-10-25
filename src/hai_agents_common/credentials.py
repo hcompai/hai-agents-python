@@ -31,7 +31,7 @@ GLOBAL_ENV_PATH = credentials_path()
 
 
 def portal_base(base_url: str | None = None) -> str:
-    """Portal origin used by `hai login`: `HAI_PORTAL_URL`, else the portal of the platform's region."""
+    """Portal origin used by `holo login`: `HAI_PORTAL_URL`, else the portal of the platform's region."""
     if os.environ.get(PORTAL_URL_VAR):
         return os.environ[PORTAL_URL_VAR]
     platform = (resolve_base_url(base_url) or HaiAgentsEnvironment.EU.value).rstrip("/")
@@ -51,7 +51,7 @@ def resolve_api_key(explicit: ApiKey | None = None) -> ApiKey:
     """Resolved API key, or raise with guidance if none is configured."""
     key = current_api_key(explicit)
     if not key:
-        raise RuntimeError(f"No API key found. Run `hai login`, set {API_KEY_VAR}, or pass --api-key.")
+        raise RuntimeError(f"No API key found. Run `holo login`, set {API_KEY_VAR}, or pass --api-key.")
     return key
 
 
@@ -84,7 +84,7 @@ def save_api_key(key: str) -> Path:
 
 
 def default_agent() -> str:
-    """Agent `hai run` uses without `--agent`: `HAI_AGENT`, else the fast web surfer."""
+    """Agent `holo run` uses without `--agent`: `HAI_AGENT`, else the fast web surfer."""
     return _lookup(AGENT_VAR) or DEFAULT_AGENT
 
 
@@ -114,7 +114,7 @@ def clear_api_key() -> Path | None:
 
 
 def source(explicit: ApiKey | None = None) -> str | None:
-    """Where the resolved credential comes from (`argument`, `environment`, or a file path), for `hai whoami`."""
+    """Where the resolved credential comes from (`argument`, `environment`, or a file path), for `holo whoami`."""
     if explicit:
         return "argument"
     if os.environ.get(API_KEY_VAR):

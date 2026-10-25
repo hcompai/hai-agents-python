@@ -151,7 +151,7 @@ def test_login_key_validates_then_stores(monkeypatch, status, saved):
 
 @pytest.mark.parametrize("client_type", [Client, AsyncClient])
 def test_sdk_client_falls_back_to_the_key_hai_login_stored(monkeypatch, client_type):
-    with pytest.raises(ApiError, match="hai login"):
+    with pytest.raises(ApiError, match="holo login"):
         client_type()
 
     credentials.save_api_key("hk-stored")

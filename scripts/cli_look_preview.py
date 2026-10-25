@@ -89,10 +89,10 @@ def main() -> None:
     err.print()
     ui.summary(err, "completed", feed)
 
-    err.print("\n[meta]$ hai run ...[/meta]")
-    ui.error(err, "API key rejected (401)", fix="hai login --force")
+    err.print("\n[meta]$ holo run ...[/meta]")
+    ui.error(err, "API key rejected (401)", fix="holo login --force")
 
-    err.print("\n[meta]$ hai doctor[/meta]")
+    err.print("\n[meta]$ holo doctor[/meta]")
     ui.check(err, "ok", "login", "API key found (~/.config/hai/.env)")
     ui.check(err, "ok", "platform", "authenticated against https://agp.eu.hcompany.ai")
     ui.check(

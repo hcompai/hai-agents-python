@@ -1,4 +1,4 @@
-"""`hai doctor`: read-only diagnostics for login, platform access, the local runtime, and local control."""
+"""`holo doctor`: read-only diagnostics for login, platform access, the local runtime, and local control."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def check_login(api_key: str | None) -> CheckResult:
         "login",
         False,
         "no API key configured",
-        fix=f"run `hai login`, set {credentials.API_KEY_VAR}, or pass --api-key",
+        fix=f"run `holo login`, set {credentials.API_KEY_VAR}, or pass --api-key",
     )
 
 
@@ -42,7 +42,7 @@ def check_platform(api_key: str | None, base_url: str | None) -> CheckResult:
             "platform",
             False,
             f"cannot query {endpoint}: {exc}",
-            fix="check the key and network; `hai whoami` shows the resolved endpoint",
+            fix="check the key and network; `holo whoami` shows the resolved endpoint",
         )
     return CheckResult("platform", True, f"authenticated against {endpoint}")
 

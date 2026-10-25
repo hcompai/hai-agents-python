@@ -20,7 +20,7 @@ from .login_pages import ERROR_HTML, SUCCESS_HTML
 
 SIGN_IN_TIMEOUT_S = 180
 KEY_FALLBACK = (
-    f"Browser sign-in works with Google accounts. Otherwise create a key at {API_KEYS_PAGE} and run `hai login --key`."
+    f"Browser sign-in works with Google accounts. Otherwise create a key at {API_KEYS_PAGE} and run `holo login --key`."
 )
 
 

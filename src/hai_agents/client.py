@@ -3,7 +3,7 @@
 Fern emits the API surface as ``BaseClient``/``AsyncBaseClient``; these thin
 subclasses add the object-oriented sugar (``run_session``, ``start_session``,
 ``session``) that delegates to the hand-written polling helpers, and default
-``api_key`` to the key ``hai login`` stored.
+``api_key`` to the key ``holo login`` stored.
 """
 
 from __future__ import annotations
@@ -43,12 +43,12 @@ _P = typing_extensions.ParamSpec("_P")
 
 
 def credentials_path() -> Path:
-    """The global `.env` that `hai login` writes: `$XDG_CONFIG_HOME/hai/.env`, else `~/.config/hai/.env`."""
+    """The global `.env` that `holo login` writes: `$XDG_CONFIG_HOME/hai/.env`, else `~/.config/hai/.env`."""
     return Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")) / "hai" / ".env"
 
 
 def _stored_api_key() -> typing.Optional[str]:
-    """The `HAI_API_KEY` that `hai login` stored, if any."""
+    """The `HAI_API_KEY` that `holo login` stored, if any."""
     try:
         lines = credentials_path().read_text(encoding="utf-8").splitlines()
     except (OSError, RuntimeError, UnicodeDecodeError):
@@ -61,19 +61,19 @@ def _stored_api_key() -> typing.Optional[str]:
 
 
 def default_api_key() -> typing.Optional[str]:
-    """`HAI_API_KEY`, else the key stored by `hai login`."""
+    """`HAI_API_KEY`, else the key stored by `holo login`."""
     return os.getenv(API_KEY_VAR) or _stored_api_key()
 
 
 def _default_api_key(init: typing.Callable[_P, None]) -> typing.Callable[_P, None]:
-    """Resolve `api_key` as: argument, then `HAI_API_KEY`, then the key stored by `hai login`."""
+    """Resolve `api_key` as: argument, then `HAI_API_KEY`, then the key stored by `holo login`."""
 
     @functools.wraps(init)
     def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> None:
         if kwargs.get("api_key") is None:
             api_key = default_api_key()
             if api_key is None:
-                raise ApiError(body=f"No API key found. Pass api_key, set {API_KEY_VAR}, or run `hai login`.")
+                raise ApiError(body=f"No API key found. Pass api_key, set {API_KEY_VAR}, or run `holo login`.")
             kwargs["api_key"] = api_key
         init(*args, **kwargs)
 

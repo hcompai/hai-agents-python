@@ -1,7 +1,7 @@
 """Command-line interface for the H Agent API SDK."""
 
 _CLI_EXTRAS = {"typer", "rich", "dotenv"}
-_CLI_HINT = "The `hai` CLI needs extra dependencies. Install them with: pip install 'hai-agents[cli]'"
+_CLI_HINT = "The `holo` CLI needs extra dependencies. Install them with: pip install 'hai-agents[cli]'"
 
 
 def main() -> None:

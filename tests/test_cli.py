@@ -17,7 +17,7 @@ def test_help_lists_examples() -> None:
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    assert 'hai "What is the top story on Hacker News?"' in result.output
+    assert 'holo "What is the top story on Hacker News?"' in result.output
 
 
 def test_route_runs_bare_tasks_and_hoists_global_options() -> None:
