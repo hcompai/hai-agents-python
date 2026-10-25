@@ -289,20 +289,24 @@ def run(
         _raise_cli_error(exc)
     client = _local_client(state) if local else _client(state)
     params["agent"] = agent or (LOCAL_DESKTOP_AGENT if local else _select_agent(state, client))
+    started_at = time.time()
+    listener = _arm_local_kill_switch() if local else None
     try:
         session = client.sessions.create_session(**params)
     except Exception as exc:
+        if listener is not None:
+            listener.stop()
         _raise_cli_error(exc)
     agent_view_url = getattr(session, "agent_view_url", None)
 
     feed = None
     if not (state.json_output or quiet):
         agent_label = "local desktop" if local else str(params["agent"])
-        where = "Esc Esc stops" if local else _endpoint_host(state)
+        where = ("esc esc stops" if listener else None) if local else _endpoint_host(state)
         ui.header(err_console, "hai", [agent_label, where], link=agent_view_url)
         ui.user(err_console, task)
-        feed = ui.StepFeed(err_console, max_steps=max_steps)
-    listener = _arm_local_kill_switch() if local else None
+        stop_hint = "esc esc to stop" if listener else "ctrl+c to stop"
+        feed = ui.StepFeed(err_console, max_steps=max_steps, stop_hint=stop_hint)
     try:
         if feed is not None:
             _follow(client, session.id, feed, timeout_s=max_time_s + 30.0)
@@ -324,7 +328,8 @@ def run(
         feed.close()
         if feed.answer is None:
             feed.answer = result.answer
-    _print_run_result(result, state.json_output, agent_view_url=agent_view_url, feed=feed)
+    stopped = local and _kill_switch_fired(started_at)
+    _print_run_result(result, state.json_output, agent_view_url=agent_view_url, feed=feed, stopped=stopped)
 
 
 def _follow(client: Any, session_id: str, feed: ui.StepFeed, *, timeout_s: float) -> None:
@@ -358,6 +363,12 @@ def _arm_local_kill_switch() -> Any:
     if listener is None:
         err_console.print(f"[warn]{ui.ATTENTION}[/warn] {escape(KILL_SWITCH_UNAVAILABLE_HINT)}")
     return listener
+
+
+def _kill_switch_fired(since: float) -> bool:
+    from hai_agents_local.killswitch import StopSentinel
+
+    return StopSentinel(since).stop_requested()
 
 
 def _cancel_quietly(client: Any, session_id: str) -> None:
@@ -923,7 +934,11 @@ def _select_agent(state: AppState, client: Client) -> str:
 
 
 def _print_run_result(
-    result, json_output: bool, agent_view_url: str | None = None, feed: ui.StepFeed | None = None
+    result,
+    json_output: bool,
+    agent_view_url: str | None = None,
+    feed: ui.StepFeed | None = None,
+    stopped: bool = False,
 ) -> None:
     payload = {
         "session_id": result.id,
@@ -945,6 +960,8 @@ def _print_run_result(
     error_text = _error_line(result.error, result.error_code)
     if status == "awaiting_tool_results":
         error_text = "the agent is waiting on client-side tools the CLI cannot run; drive it from the SDK with tools"
+    if stopped:
+        error_text = "stopped by the kill switch"
     if feed is not None:
         if answer is not None:
             err_console.print()

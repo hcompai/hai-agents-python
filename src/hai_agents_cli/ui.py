@@ -194,6 +194,7 @@ class StepFeed:
     cost: float | None = None
     answer: Any = None
     page: str | None = None
+    stop_hint: str = "ctrl+c to stop"
     _current: _Step | None = None
     _done: _Done | None = None
     _last_end: float = field(default_factory=time.monotonic)
@@ -322,7 +323,7 @@ class StepFeed:
             _clock(self.elapsed),
             f"step {n}/{self.max_steps}" if self.max_steps else f"step {n}",
             money(self.cost),
-            "ctrl+c to stop",
+            self.stop_hint,
         ]
         meta = f" {SEP} ".join(p for p in parts if p)
         frame = _FRAMES[int(now * 8) % len(_FRAMES)]

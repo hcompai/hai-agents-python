@@ -81,6 +81,21 @@ def test_run_prints_live_view_link(monkeypatch) -> None:
     assert "https://platform.example.test/agent-view/sess_1" in result.output
 
 
+def test_local_run_stopped_by_kill_switch_says_so(monkeypatch, tmp_path) -> None:
+    from hai_agents_local import killswitch
+
+    monkeypatch.setattr(killswitch, "STOP_PATH", tmp_path / "stop")
+    cancelled = SessionRunResult(id="sess_1", status="cancelled", events=[], next_from_index=0)
+    monkeypatch.setattr(app_module, "_local_client", lambda state: _RunClient())
+    monkeypatch.setattr(app_module, "wait_for_session", lambda client, id, **_: cancelled)
+    monkeypatch.setattr(app_module, "_follow", lambda *a, **k: killswitch.request_stop())
+
+    result = runner.invoke(app, ["run", "open calculator", "--local"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code != 0
+    assert "stopped by the kill switch" in _error_text(result)
+
+
 def test_run_without_agent_requires_selection(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
 
