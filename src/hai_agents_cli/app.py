@@ -15,7 +15,13 @@ from rich.console import Console
 from rich.markup import escape
 from rich.table import Column, Table
 
-from hai_agents import Client, assert_request_under_limit, is_settled_session_status, wait_for_session
+from hai_agents import (
+    Client,
+    assert_request_under_limit,
+    is_settled_session_status,
+    stream_session,
+    wait_for_session,
+)
 from hai_agents.core.api_error import ApiError
 from hai_agents.environment import HaiAgentsEnvironment
 from hai_agents.sessions import SendSessionMessagesRequestBody_UserMessage
@@ -25,31 +31,22 @@ from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
 from hai_agents_local import desktop as desktop_defaults
 
-from . import auth, mcp_hosts
+from . import auth, mcp_hosts, ui
 
 if TYPE_CHECKING:
     from hai_agents_local import LocalBridge
 
-H_GLYPH = "\n".join(
-    (
-        "| |  | |",
-        "| |__| |",
-        "|  __  |",
-        "| |  | |",
-        "|_|  |_|",
-    )
-)
-
 CLEAN_STATUSES = ("completed", "idle")
 
-console = Console()
-err_console = Console(stderr=True)
+console = ui.console()
+err_console = ui.console(stderr=True)
 
 app = typer.Typer(
     name="hai",
     help="Run H Company agents from your terminal.",
-    epilog=f'\b\n{H_GLYPH}\n\n\b\nExamples:\n  hai run "Find the H Agent API quickstart"\n'
-    "  hai sessions share <session-id>",
+    epilog='\b\nExamples:\n  hai run "Find the H Agent API quickstart" -a h/web-surfer-pro\n'
+    '  hai run --local "Open Calculator and compute 2+2"\n'
+    "  hai sessions watch <session-id>",
     no_args_is_help=True,
     rich_markup_mode=None,
 )
@@ -144,7 +141,7 @@ def _browser_sign_in(base_url: str | None) -> None:
     except Exception as exc:
         _raise_cli_error(exc)
     path = credentials.save_api_key(minted)
-    console.print(f"Signed in. Wrote {credentials.API_KEY_VAR} to {path}.")
+    console.print(f"[ok]{ui.DONE}[/ok] signed in [meta]{ui.SEP} key saved to {path}[/meta]")
 
 
 def _store_pasted_key(base_url: str | None) -> None:
@@ -162,11 +159,11 @@ def _store_pasted_key(base_url: str | None) -> None:
                     f"the platform rejected this key ({exc.status_code}); check it at {credentials.API_KEYS_PAGE}."
                 )
             )
-        _raise_cli_error(exc)
+            _raise_cli_error(exc)
     except Exception as exc:
         _raise_cli_error(exc)
     path = credentials.save_api_key(pasted)
-    console.print(f"Signed in. Wrote {credentials.API_KEY_VAR} to {path}.")
+    console.print(f"[ok]{ui.DONE}[/ok] signed in [meta]{ui.SEP} key saved to {path}[/meta]")
 
 
 @app.command()
@@ -187,10 +184,7 @@ def doctor(ctx: typer.Context) -> None:
         _print_json([{"name": r.name, "ok": r.ok, "detail": r.detail, "fix": r.fix} for r in results])
     else:
         for r in results:
-            mark = "[bold green]ok[/bold green]" if r.ok else "[bold red]fail[/bold red]"
-            console.print(f"{mark} [bold]{r.name}[/bold] {escape(r.detail)}")
-            if r.fix is not None:
-                console.print(f"   [dim]fix:[/dim] {escape(r.fix)}")
+            ui.check(console, "ok" if r.ok else "fail", r.name, r.detail, fix=r.fix)
     if not all(r.ok for r in results):
         raise typer.Exit(1)
 
@@ -244,6 +238,13 @@ def _parse_overrides(items: list[str]) -> dict[str, Any]:
     return overrides
 
 
+LOCAL_DESKTOP_AGENT = {
+    "name": "holo",
+    "description": "Desktop agent that drives the user's machine.",
+    "environments": [{"id": "desktop", "kind": "desktop", "host": "user_device"}],
+}
+
+
 @app.command()
 def run(
     ctx: typer.Context,
@@ -251,8 +252,14 @@ def run(
     agent: str | None = typer.Option(
         None, "--agent", "-a", help="Registered agent name. Omit to pick from a list (see `hai agents list`)."
     ),
-    max_steps: int = typer.Option(20, "--max-steps", min=1, max=200, help="Maximum reasoning steps."),
-    max_time_s: float = typer.Option(180.0, "--max-time", min=1.0, max=1800.0, help="Maximum run seconds."),
+    local: bool = typer.Option(False, "--local", help="Drive this machine's desktop through the local runtime."),
+    max_steps: int | None = typer.Option(
+        None, "--max-steps", min=1, max=200, help="Maximum reasoning steps. Default 20, or 150 with --local."
+    ),
+    max_time_s: float | None = typer.Option(
+        None, "--max-time", min=1.0, max=1800.0, help="Maximum run seconds. Default 180, or 1800 with --local."
+    ),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Print only the answer."),
     override: list[str] = typer.Option(
         None,
         "--override",
@@ -263,9 +270,10 @@ def run(
         ),
     ),
 ) -> None:
-    """Run an agent task and print the final answer."""
+    """Run an agent task, streaming its steps, and print the final answer."""
     state = _state(ctx)
-    client = _client(state)
+    max_steps = max_steps or (150 if local else 20)
+    max_time_s = max_time_s or (1800.0 if local else 180.0)
     overrides = _parse_overrides(override or [])
     params: dict[str, Any] = {
         "agent": agent,
@@ -279,19 +287,83 @@ def run(
         assert_request_under_limit(params)
     except Exception as exc:
         _raise_cli_error(exc)
-    params["agent"] = agent or _select_agent(state, client)
+    client = _local_client(state) if local else _client(state)
+    params["agent"] = agent or (LOCAL_DESKTOP_AGENT if local else _select_agent(state, client))
     try:
         session = client.sessions.create_session(**params)
     except Exception as exc:
         _raise_cli_error(exc)
     agent_view_url = getattr(session, "agent_view_url", None)
-    if agent_view_url and not state.json_output:
-        console.print(f"[bold]Live view:[/bold] [link={agent_view_url}]{agent_view_url}[/link]")
+
+    feed = None
+    if not (state.json_output or quiet):
+        agent_label = "local desktop" if local else str(params["agent"])
+        where = "Esc Esc stops" if local else _endpoint_host(state)
+        ui.header(err_console, "hai", [agent_label, where], link=agent_view_url)
+        feed = ui.StepFeed(err_console, max_steps=max_steps)
+    listener = _arm_local_kill_switch() if local else None
     try:
+        if feed is not None:
+            _follow(client, session.id, feed, timeout_s=max_time_s + 30.0)
         result = wait_for_session(client, session.id, timeout_seconds=max_time_s + 30.0)
+    except KeyboardInterrupt:
+        _cancel_quietly(client, session.id)
+        if feed is not None:
+            feed.close()
+        ui.error(err_console, "interrupted; session cancelled")
+        raise typer.Exit(130) from None
     except Exception as exc:
+        if feed is not None:
+            feed.close()
         _raise_cli_error(exc)
-    _print_run_result(result, state.json_output, agent_view_url=agent_view_url)
+    finally:
+        if listener is not None:
+            listener.stop()
+    if feed is not None:
+        feed.close()
+        if feed.answer is None:
+            feed.answer = result.answer
+    _print_run_result(result, state.json_output, agent_view_url=agent_view_url, feed=feed)
+
+
+def _follow(client: Any, session_id: str, feed: ui.StepFeed, *, timeout_s: float) -> None:
+    for event in stream_session(client, session_id, timeout_seconds=timeout_s):
+        feed.handle(event)
+
+
+def _endpoint_host(state: AppState) -> str:
+    from urllib.parse import urlparse
+
+    base = credentials.resolve_base_url(state.base_url) or HaiAgentsEnvironment.EU.value
+    return urlparse(base).netloc or base
+
+
+def _local_client(state: AppState) -> Any:
+    from hai_agents import Client
+
+    _sign_in_if_needed(state)
+    try:
+        return Client.local()
+    except (RuntimeError, ValueError, PermissionError) as exc:
+        _raise_cli_error(exc)
+
+
+def _arm_local_kill_switch() -> Any:
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return None
+    from hai_agents_local.killswitch import KILL_SWITCH_UNAVAILABLE_HINT, arm_esc_listener
+
+    listener = arm_esc_listener()
+    if listener is None:
+        err_console.print(f"[warn]{ui.ATTENTION}[/warn] {escape(KILL_SWITCH_UNAVAILABLE_HINT)}")
+    return listener
+
+
+def _cancel_quietly(client: Any, session_id: str) -> None:
+    try:
+        client.sessions.cancel_session(session_id)
+    except Exception:
+        pass
 
 
 @sessions_app.command("list")
@@ -458,40 +530,42 @@ def watch(
     """Stream a session's events live until it settles."""
     state = _state(ctx)
     client = _client(state)
-    from_index = 0
-    deadline = time.monotonic() + timeout
-    while True:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            _raise_cli_error(TimeoutError(f"Session {session_id} did not settle within {timeout}s."))
-        try:
-            changes = client.sessions.get_session_changes(
-                session_id,
-                from_index=from_index,
-                include_events=True,
-                wait_for_seconds=max(1, min(20, int(remaining))),
-            )
-            for event in (changes.new_events if changes else None) or []:
-                _emit_watch_event(state, from_index, event)
-                from_index += 1
-            current = client.sessions.get_session_status(session_id)
-            if is_settled_session_status(current.status):
-                # /changes is a delta endpoint: drain events that landed between the last poll
-                # and settling, otherwise the tail of the trajectory is silently dropped.
-                tail = client.sessions.get_session_changes(
-                    session_id, from_index=from_index, include_events=True, wait_for_seconds=0
-                )
-                for event in (tail.new_events if tail else None) or []:
-                    _emit_watch_event(state, from_index, event)
-                    from_index += 1
-                # The terminal answer lives on /changes, not /status.
-                final = client.sessions.get_session_changes(
-                    session_id, from_index=0, include_events=False, wait_for_seconds=0
-                )
-                break
-        except Exception as exc:
-            _raise_cli_error(exc)
-    _print_watch_result(state, current, final)
+    if not state.json_output:
+        _watch_human(client, session_id, timeout)
+        return
+    try:
+        for event in stream_session(client, session_id, timeout_seconds=timeout):
+            _emit_watch_event(event)
+        current = client.sessions.get_session_status(session_id)
+        # The terminal answer lives on /changes, not /status.
+        final = client.sessions.get_session_changes(session_id, from_index=0, include_events=False, wait_for_seconds=0)
+    except Exception as exc:
+        _raise_cli_error(exc)
+    _print_watch_result(current, final)
+
+
+def _watch_human(client: Any, session_id: str, timeout: float) -> None:
+    ui.header(err_console, "hai", ["watching", session_id])
+    feed = ui.StepFeed(err_console)
+    try:
+        _follow(client, session_id, feed, timeout_s=timeout)
+        current = client.sessions.get_session_status(session_id)
+        final = client.sessions.get_session_changes(session_id, from_index=0, include_events=False, wait_for_seconds=0)
+    except KeyboardInterrupt:
+        feed.close()
+        raise typer.Exit(130) from None
+    except Exception as exc:
+        feed.close()
+        _raise_cli_error(exc)
+    feed.close()
+    status = _status_text(current.status)
+    answer = feed.answer if feed.answer is not None else getattr(final, "answer", None)
+    if answer is not None:
+        err_console.print()
+        ui.print_answer(console, answer)
+    err_console.print()
+    ui.summary(err_console, status, feed, error_text=_error_line(current.error, current.error_code))
+    _exit_unless_clean(current.status)
 
 
 @agents_app.command("list")
@@ -624,10 +698,10 @@ def _mcp_list(json_output: bool) -> None:
 
 
 _MCP_GLYPH: dict[mcp_hosts.Status, str] = {
-    mcp_hosts.Status.INSTALLED: "[bold green]+[/bold green]",
-    mcp_hosts.Status.SKIPPED: "[dim green]=[/dim green]",
-    mcp_hosts.Status.ABSENT: "[yellow]-[/yellow]",
-    mcp_hosts.Status.FAILED: "[bold red]x[/bold red]",
+    mcp_hosts.Status.INSTALLED: f"[ok]{ui.DONE}[/ok]",
+    mcp_hosts.Status.SKIPPED: f"[meta]{ui.DONE}[/meta]",
+    mcp_hosts.Status.ABSENT: f"[meta]{ui.SEP}[/meta]",
+    mcp_hosts.Status.FAILED: f"[fail]{ui.FAILED}[/fail]",
 }
 
 
@@ -649,14 +723,16 @@ def _print_mcp_results(results: list[dict], server_url: str, json_output: bool) 
         )
         return
     for r in results:
-        line = f"  {_MCP_GLYPH[r['status']]} [bold cyan]{r['client']}[/bold cyan]  {r['detail']}"
+        line = f"  {_MCP_GLYPH[r['status']]} [key]{r['client']:<14}[/key] [meta]{escape(r['detail'])}[/meta]"
         if r["skill"] and r["skill"][0].ok:
-            line += f"  [dim]+ skill {r['skill'][1]}[/dim]"
+            line += f"  [meta]+ skill {escape(r['skill'][1])}[/meta]"
         elif r["skill"]:
-            line += f"  {_MCP_GLYPH[r['skill'][0]]} [dim]skill: {r['skill'][1]}[/dim]"
+            line += f"  {_MCP_GLYPH[r['skill'][0]]} [meta]skill: {escape(r['skill'][1])}[/meta]"
         console.print(line)
-    console.print(f"\n[bold]Server:[/bold] {server_url}")
-    console.print("[yellow]Your API key was written into these configs in plaintext. Keep them private.[/yellow]")
+    console.print(f"\n  [meta]server[/meta] {server_url}")
+    console.print(
+        f"  [warn]{ui.ATTENTION}[/warn] your API key was written into these configs in plaintext; keep them private"
+    )
 
 
 @local_app.command("browser")
@@ -846,7 +922,9 @@ def _select_agent(state: AppState, client: Client) -> str:
     return agents[choice - 1].name
 
 
-def _print_run_result(result, json_output: bool, agent_view_url: str | None = None) -> None:
+def _print_run_result(
+    result, json_output: bool, agent_view_url: str | None = None, feed: ui.StepFeed | None = None
+) -> None:
     payload = {
         "session_id": result.id,
         "status": _status_text(result.status),
@@ -858,24 +936,29 @@ def _print_run_result(result, json_output: bool, agent_view_url: str | None = No
     }
     if json_output:
         _print_json(payload)
-    else:
-        console.print(f"[bold]Session:[/bold] {result.id}")
-        _print_outcome(result.status, result.answer, result.outcome, result.error, result.error_code)
+        _exit_unless_clean(result.status)
+        return
+    status = _status_text(result.status)
+    answer = feed.answer if feed is not None and feed.answer is not None else result.answer
+    if answer is not None:
+        if feed is not None:
+            err_console.print()
+        ui.print_answer(console, answer)
+    error_text = _error_line(result.error, result.error_code)
+    if status == "awaiting_tool_results":
+        error_text = "the agent is waiting on client-side tools the CLI cannot run; drive it from the SDK with tools"
+    if feed is not None:
+        err_console.print()
+        ui.summary(err_console, status, feed, error_text=error_text, session_id=result.id)
+    elif error_text or status not in CLEAN_STATUSES:
+        ui.error(err_console, error_text or f"session {status}")
     _exit_unless_clean(result.status)
 
 
-def _print_outcome(status, answer, outcome: str | None, error: str | None, error_code: str | None) -> None:
-    console.print(f"[bold]Status:[/bold] {_status_text(status)}")
-    if outcome:
-        console.print(f"[bold]Outcome:[/bold] {escape(outcome)}")
-    if status == "awaiting_tool_results":
-        console.print("The agent is waiting on client-side tools the CLI cannot run; drive it from the SDK with tools.")
-    if error:
-        console.print(
-            f"[bold]Error:[/bold] {escape(error)}" + (f" [dim]({escape(error_code)})[/dim]" if error_code else "")
-        )
-    if answer is not None:
-        console.print(escape(answer if isinstance(answer, str) else json.dumps(to_jsonable(answer), indent=2)))
+def _error_line(error: str | None, error_code: str | None) -> str | None:
+    if not error:
+        return None
+    return f"{error} ({error_code})" if error_code else error
 
 
 def _exit_unless_clean(status) -> None:
@@ -895,17 +978,8 @@ def _print_json(value) -> None:
     print(json.dumps(to_jsonable(value), indent=2, sort_keys=True))
 
 
-def _print_watch_result(state: AppState, status_result, final) -> None:
-    if state.json_output:
-        print(json.dumps(to_jsonable(final if final is not None else status_result), sort_keys=True))
-    else:
-        _print_outcome(
-            status_result.status,
-            final.answer if final is not None else None,
-            status_result.outcome,
-            status_result.error or (final.error if final is not None else None),
-            status_result.error_code,
-        )
+def _print_watch_result(status_result, final) -> None:
+    print(json.dumps(to_jsonable(final if final is not None else status_result), sort_keys=True))
     _exit_unless_clean(status_result.status)
 
 
@@ -926,11 +1000,8 @@ def _event_line(index: int, event) -> str:
     return f"[dim]{index:>4}[/dim] [cyan]{event_type}[/cyan]" + (f"  {escape(detail)}" if detail else "")
 
 
-def _emit_watch_event(state: AppState, index: int, event) -> None:
-    if state.json_output:
-        print(json.dumps(to_jsonable(event), sort_keys=True))
-    else:
-        console.print(_event_line(index, event))
+def _emit_watch_event(event) -> None:
+    print(json.dumps(to_jsonable(event), sort_keys=True))
 
 
 def _format_api_body(body) -> str:
@@ -956,12 +1027,14 @@ def _format_api_body(body) -> str:
 
 
 def _raise_cli_error(exc: Exception) -> NoReturn:
+    fix = None
     if isinstance(exc, ApiError):
         message = _format_api_body(exc.body)
         if exc.status_code is not None:
             message = f"API error {exc.status_code}: {message}"
+        if exc.status_code in (401, 403):
+            fix = "hai login --force"
     else:
         message = str(exc)
-    # Escape: rich would otherwise eat brackets in messages, e.g. pip extras like hai-agents[browser].
-    err_console.print(f"[red]Error:[/red] {escape(message)}")
+    ui.error(err_console, message, fix=fix)
     raise typer.Exit(1)

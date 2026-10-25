@@ -12,12 +12,11 @@ from hai_agents_common import credentials
 runner = CliRunner()
 
 
-def test_help_renders_h_glyph() -> None:
+def test_help_lists_examples() -> None:
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    assert "| |__| |" in result.output
-    assert "hai" in result.output
+    assert 'hai run --local "Open Calculator and compute 2+2"' in result.output
 
 
 def test_missing_api_key_is_clear(monkeypatch, tmp_path) -> None:
@@ -33,6 +32,7 @@ def test_missing_api_key_is_clear(monkeypatch, tmp_path) -> None:
 def test_run_prints_json(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
     monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
 
     result = runner.invoke(app, ["--json", "run", "hello", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
 
@@ -61,6 +61,7 @@ def test_run_failure_exits_nonzero_with_error_and_structured_answer(monkeypatch)
     )
     monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
     monkeypatch.setattr(app_module, "wait_for_session", lambda client, id, **_: failed)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
 
     result = runner.invoke(app, ["run", "hello", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
 
@@ -72,6 +73,7 @@ def test_run_failure_exits_nonzero_with_error_and_structured_answer(monkeypatch)
 def test_run_prints_live_view_link(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
     monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
 
     result = runner.invoke(app, ["run", "hello", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
 
@@ -156,6 +158,7 @@ def test_run_parses_overrides(monkeypatch) -> None:
 
     monkeypatch.setattr(app_module, "_client", lambda state: client)
     monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
 
     result = runner.invoke(
         app,
@@ -177,6 +180,10 @@ def test_run_parses_overrides(monkeypatch) -> None:
         "agent.environments[kind=web].start_url": "https://bing.com",
         "agent.max_steps": 5,
     }
+
+
+def _no_events(client, session_id, feed, **_) -> None:
+    return None
 
 
 def _fake_wait_for_session(client, id, **kwargs):
