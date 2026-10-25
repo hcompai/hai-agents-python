@@ -130,7 +130,7 @@ def test_portal_failure_shows_the_portal_reason():
         auth._ok(response)
 
 
-@pytest.mark.parametrize(("status", "saved"), [(None, True), (401, False)])
+@pytest.mark.parametrize(("status", "saved"), [(None, True), (401, False), (500, False)])
 def test_login_key_validates_then_stores(monkeypatch, status, saved):
     class _Sessions:
         def get_session_quota(self):
@@ -145,7 +145,7 @@ def test_login_key_validates_then_stores(monkeypatch, status, saved):
     stored = credentials.GLOBAL_ENV_PATH.read_text() if credentials.GLOBAL_ENV_PATH.exists() else ""
     assert (result.exit_code == 0) is saved
     assert ("hk-pasted" in stored) is saved
-    if not saved:
+    if status == 401:
         assert "rejected this key" in _error_text(result)
 
 

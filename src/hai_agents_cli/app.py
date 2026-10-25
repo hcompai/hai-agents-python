@@ -166,7 +166,7 @@ def _store_pasted_key(base_url: str | None) -> None:
                     f"the platform rejected this key ({exc.status_code}); check it at {credentials.API_KEYS_PAGE}."
                 )
             )
-            _raise_cli_error(exc)
+        _raise_cli_error(exc)
     except Exception as exc:
         _raise_cli_error(exc)
     path = credentials.save_api_key(pasted)
@@ -367,7 +367,6 @@ class _Conversation:
     steps: int = 0
     cost: float | None = None
     _listener: Any = None
-    _started_at: float = 0.0
     _header_shown: bool = False
     _feed: ui.StepFeed | None = None
     _turn_done: bool = False
@@ -400,7 +399,6 @@ class _Conversation:
 
     def open(self) -> None:
         self.client = _local_client(self.state) if self.local else _client(self.state)
-        self._started_at = time.time()
         if self.local:
             self._listener = _arm_local_kill_switch()
 
@@ -419,6 +417,7 @@ class _Conversation:
         ui.header(err_console, "holo", [label, where, hint], link=self.view_url)
 
     def turn(self, message: str, *, echo: bool = False) -> None:
+        started_at = time.time()
         if self.session is None:
             try:
                 self.session = self.client.sessions.create_session(**self.params(message))
@@ -467,8 +466,10 @@ class _Conversation:
                 feed.answer = result.answer
             self.steps, self.cost = feed.steps, feed.cost
         self.result, self.next_index = result, result.next_from_index
-        stopped = self.local and _kill_switch_fired(self._started_at)
+        stopped = self.local and _kill_switch_fired(started_at)
         _print_run_result(result, self.state.json_output, agent_view_url=self.view_url, feed=feed, stopped=stopped)
+        if stopped:
+            self.session, self.steps, self.cost = None, 0, None
 
     def loop(self) -> None:
         ui.hint(
@@ -598,6 +599,20 @@ def _ask() -> str | None:
 def _follow(client: Any, session_id: str, feed: ui.StepFeed, *, timeout_s: float, from_index: int = 0) -> None:
     for event in stream_session(client, session_id, from_index=from_index, timeout_seconds=timeout_s):
         feed.handle(event)
+        if _awaits_tool_results(event):
+            return
+
+
+def _awaits_tool_results(event: Any) -> bool:
+    from hai_agents_common.jsonable import to_jsonable
+
+    event = to_jsonable(event)
+    data = event.get("data") if isinstance(event, dict) else None
+    return (
+        event.get("type") == "ActiveStateChangeEvent"
+        and isinstance(data, dict)
+        and data.get("state") == "awaiting_tool_results"
+    )
 
 
 def _endpoint_host(state: AppState) -> str:
@@ -611,8 +626,9 @@ def _local_client(state: AppState) -> Any:
     from hai_agents import Client
 
     _sign_in_if_needed(state)
+    local_options = {"spawn_env": {credentials.API_KEY_VAR: state.api_key}} if state.api_key else None
     try:
-        return Client.local()
+        return Client.local(local_options=local_options)
     except (RuntimeError, ValueError, PermissionError) as exc:
         _raise_cli_error(exc)
 

@@ -98,19 +98,57 @@ def test_run_prints_live_view_link(monkeypatch) -> None:
     assert "https://platform.example.test/agent-view/sess_1" in result.output
 
 
-def test_local_run_stopped_by_kill_switch_says_so(monkeypatch, tmp_path) -> None:
+def test_kill_switch_stops_that_turn_and_the_next_message_starts_a_new_session(monkeypatch, tmp_path) -> None:
     from hai_agents_local import killswitch
 
     monkeypatch.setattr(killswitch, "STOP_PATH", tmp_path / "stop")
-    cancelled = SessionRunResult(id="sess_1", status="cancelled", events=[], next_from_index=0)
-    monkeypatch.setattr(app_module, "_local_client", lambda state: _RunClient())
-    monkeypatch.setattr(app_module, "wait_for_session", lambda client, id, **_: cancelled)
-    monkeypatch.setattr(app_module, "_follow", lambda *a, **k: killswitch.request_stop())
+    client = _RunClient()
+    results = iter(
+        [
+            SessionRunResult(id="sess_1", status="cancelled", events=[], next_from_index=0),
+            SessionRunResult(id="sess_1", status="idle", events=[], next_from_index=3, answer="ok"),
+        ]
+    )
+    follows = iter([killswitch.request_stop, lambda: None])
+    replies = iter(["open it again", None])
+    monkeypatch.setattr(app_module, "_local_client", lambda state: client)
+    monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
+    monkeypatch.setattr(app_module, "_follow", lambda *a, **k: next(follows)())
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+    monkeypatch.setattr(app_module, "_ask", lambda: next(replies))
 
     result = runner.invoke(app, ["run", "open calculator", "--local"], env={"HAI_API_KEY": "hk-test"})
 
-    assert result.exit_code != 0
-    assert "stopped by the kill switch" in _error_text(result)
+    assert result.output.count("stopped by the kill switch") == 1
+    assert client.sessions.created == 2
+    assert client.sessions.sent == []
+
+
+def test_follow_stops_once_the_agent_awaits_client_tools(monkeypatch) -> None:
+    awaiting = {"type": "ActiveStateChangeEvent", "data": {"state": "awaiting_tool_results"}}
+
+    def stream(*args, **kwargs):
+        yield awaiting
+        raise AssertionError("kept streaming past awaiting_tool_results")
+
+    handled: list = []
+    monkeypatch.setattr(app_module, "stream_session", stream)
+    app_module._follow(None, "sess_1", type("Feed", (), {"handle": lambda self, e: handled.append(e)})(), timeout_s=1)
+
+    assert handled == [awaiting]
+
+
+def test_local_run_hands_the_api_key_flag_to_the_runtime(monkeypatch) -> None:
+    import hai_agents
+
+    captured: dict = {}
+    monkeypatch.setattr(hai_agents.Client, "local", classmethod(lambda cls, **kw: captured.update(kw) or _RunClient()))
+    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
+
+    runner.invoke(app, ["--api-key", "hk-flag", "run", "open calculator", "--local"])
+
+    assert captured["local_options"]["spawn_env"]["HAI_API_KEY"] == "hk-flag"
 
 
 def test_run_without_agent_uses_the_default(monkeypatch, tmp_path) -> None:
