@@ -1,32 +1,39 @@
-"""Terminal look shared by the hai and holo CLIs: one accent, one glyph set, lines instead of boxes."""
+"""Terminal look shared by the hai and holo CLIs, in the style of Claude Code."""
 
 from __future__ import annotations
 
+import json
 import re
+import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 from urllib.parse import urlparse
 
-from rich.console import Console, Group
+from rich import box
+from rich.console import Console, Group, RenderableType
 from rich.live import Live
 from rich.markdown import Markdown
-from rich.markup import escape
-from rich.padding import Padding
+from rich.panel import Panel
+from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 
-IRIS = "#7114eb"
+IRIS = "#9a5bec"
 
-RUNNING = "●"
+DOT = "●"
+RESULT = "⎿"
+SPARK = "✻"
+PROMPT = ">"
+POINTER = "❯"
 DONE = "✓"
 FAILED = "✗"
 ATTENTION = "!"
-PROMPT = "›"
-DETAIL = "└"
 SEP = "·"
-BAR = "┃"
+
+_SPINNER = "·✢✳✶✻✽" if sys.platform == "darwin" else "·✢*✶✻✽"
+_FRAMES = _SPINNER + _SPINNER[-2:0:-1]
 
 THEME = Theme(
     {
@@ -64,8 +71,8 @@ _VERBS = {
     "upload_file": "upload",
     "open_app": "open",
 }
+_GERUNDS = {"back": "Going back", "drag": "Dragging", "run": "Running", "hover": "Hovering"}
 _TARGET_KEYS = ("url", "app", "text", "content", "query", "element", "target", "description", "selector", "key", "keys")
-_VERB_WIDTH = 10
 
 
 def console(*, stderr: bool = False) -> Console:
@@ -78,35 +85,54 @@ def interactive(out: Console) -> bool:
     return out.is_terminal and bool(isatty and isatty())
 
 
+def header(out: Console, name: str, parts: list[str], link: str | None = None) -> None:
+    title, *rest = [p for p in parts if p] or [""]
+    lines: list[RenderableType] = [
+        Text.assemble((f"{SPARK} ", "accent"), (name, "bold"), "  ", title),
+        Text(""),
+    ]
+    if rest:
+        lines.append(Text(f"  {f' {SEP} '.join(rest)}", style="meta"))
+    if link:
+        lines.append(Text(f"  {link}", style=f"dim link {link}"))
+    out.print(Panel(Group(*lines), box=box.ROUNDED, border_style="accent", expand=False, padding=(0, 1)))
+    out.print()
+
+
+def user(out: Console, text: str) -> None:
+    grid = Table.grid()
+    grid.add_column(width=2, no_wrap=True)
+    grid.add_column()
+    grid.add_row(Text(PROMPT, style="meta"), Text(text, style="meta"))
+    out.print(grid)
+    out.print()
+
+
 def error(out: Console, message: str, *, fix: str | None = None) -> None:
-    out.print(f"[fail]{FAILED}[/fail] {escape(message)}")
-    _fix(out, fix)
+    out.print(Text.assemble((f"{DOT} ", "fail"), message))
+    if fix:
+        out.print(_result(Text.assemble(("fix: ", "meta"), fix), wrap=True))
 
 
 def check(out: Console, state: CheckState, name: str, detail: str, *, fix: str | None = None) -> None:
-    out.print(f"[{state}]{_CHECK_GLYPH[state]}[/{state}] {name:<10} {escape(detail)}")
-    _fix(out, fix)
-
-
-def _fix(out: Console, fix: str | None) -> None:
+    out.print(Text.assemble((_CHECK_GLYPH[state], state), f" {name:<10} {detail}"))
     if fix:
-        out.print(Padding(Text.assemble(("fix: ", "meta"), fix), (0, 0, 0, 2), expand=False))
+        out.print(_result(Text.assemble(("fix: ", "meta"), fix), wrap=True))
 
 
-def needs_you(out: Console, title: str, lines: list[str], keys: list[tuple[str, str]]) -> None:
-    bar = f"  [warn]{BAR}[/warn] "
-    out.print(f"{bar}[warn]needs you[/warn]  {escape(title)}")
-    for line in lines:
-        out.print(f"{bar}{line}")
-    out.print(bar.rstrip())
-    out.print(bar + "   ".join(f"[key]{k}[/key] {escape(label)}" for k, label in keys))
-
-
-def header(out: Console, name: str, parts: list[str], link: str | None = None) -> None:
-    meta = f" {SEP} ".join(escape(p) for p in parts if p)
-    out.print(f"[accent]{RUNNING}[/accent] [key]{escape(name)}[/key]  [meta]{meta}[/meta]")
-    if link:
-        out.print(f"  [link={link}]{escape(link)}[/link]", soft_wrap=True)
+def needs_you(out: Console, action: str, lines: list[str], options: list[str], *, selected: int = 0) -> None:
+    body: list[RenderableType] = [
+        Text("Needs you", style="bold warn"),
+        Text(""),
+        Text.from_markup(f"  {action}"),
+        *(Text.from_markup(f"  {line}") for line in lines),
+        Text(""),
+        Text("Do you want to proceed?"),
+    ]
+    for i, option in enumerate(options):
+        mark, style = (POINTER, "accent") if i == selected else (" ", "")
+        body.append(Text(f"{mark} {i + 1}. {option}", style=style))
+    out.print(Panel(Group(*body), box=box.ROUNDED, border_style="warn", expand=False, padding=(0, 1)))
     out.print()
 
 
@@ -114,7 +140,7 @@ def duration(seconds: float) -> str:
     if seconds < 60:
         return f"{seconds:.1f}s"
     minutes, secs = divmod(int(seconds), 60)
-    return f"{minutes}m{secs:02d}s"
+    return f"{minutes}m {secs}s"
 
 
 def money(usd: float | None) -> str | None:
@@ -123,19 +149,41 @@ def money(usd: float | None) -> str | None:
     return f"${usd:.3f}" if usd < 1 else f"${usd:.2f}"
 
 
+def _clock(seconds: float) -> str:
+    minutes, secs = divmod(int(seconds), 60)
+    return f"{minutes}m {secs}s" if minutes else f"{secs}s"
+
+
+def _result(text: Text, *, wrap: bool = False) -> RenderableType:
+    if not wrap:
+        return Text.assemble((f"  {RESULT}  ", "meta"), text, no_wrap=True, overflow="ellipsis")
+    grid = Table.grid()
+    grid.add_column(width=5, no_wrap=True)
+    grid.add_column()
+    grid.add_row(Text(f"  {RESULT}  ", style="meta"), text)
+    return grid
+
+
 @dataclass
 class _Step:
     n: int
     verb: str
     target: str
-    detail: str | None
+    thought: str | None
     started: float
     started_ts: float | None
 
 
 @dataclass
+class _Done:
+    step: _Step
+    seconds: float
+    error: str | None
+
+
+@dataclass
 class StepFeed:
-    """Renders session events as one row per step, with a live row and status line on a terminal.
+    """Renders session events as one `⏺ Tool(args)` block per step, with a live spinner on a terminal.
 
     Step durations come from event timestamps when present, so replaying a finished session shows real timings.
     """
@@ -147,6 +195,7 @@ class StepFeed:
     answer: Any = None
     page: str | None = None
     _current: _Step | None = None
+    _done: _Done | None = None
     _last_end: float = field(default_factory=time.monotonic)
     _last_end_ts: float | None = None
     _first_ts: float | None = None
@@ -156,7 +205,7 @@ class StepFeed:
 
     def __post_init__(self) -> None:
         if interactive(self.out):
-            self._live = Live(self._render_live(), console=self.out, transient=True, refresh_per_second=8)
+            self._live = Live(console=self.out, transient=True, refresh_per_second=12, get_renderable=self._render_live)
             self._live.start()
 
     def handle(self, event: Any) -> None:
@@ -172,20 +221,28 @@ class StepFeed:
             self.cost = metrics.get("total_cost", self.cost)
         elif kind == "observation_event":
             meta = data.get("metadata") or {}
-            self.page = meta.get("title") or _short_url(meta.get("url")) or self.page
+            title = meta.get("title") or _short_url(meta.get("url"))
+            self._flush(title if title != self.page else None)
+            self.page = title or self.page
         elif kind == "policy_event":
+            self._flush()
             self._start_step(data, ts)
         elif kind == "tool_result":
-            self._finish_step(data, ts)
+            req = data.get("tool_req") or {}
+            result = data.get("result")
+            if self._current is not None and req.get("tool_name") != "answer":
+                self._finish(ts, _first_line(result.get("error")) if isinstance(result, dict) else None)
         elif kind == "error_event" and data.get("origin") == "tool" and self._current is not None:
-            self._close(FAILED, ts, note=_first_line(data.get("error")))
+            self._finish(ts, _first_line(data.get("error")) or "tool failed")
         elif kind == "answer_event":
             self.answer = data.get("answer")
-        self._refresh()
+        if self._live is not None:
+            self._live.refresh()
 
     def close(self) -> None:
         if self._current is not None:
-            self._close(DONE, None)
+            self._finish(None, None)
+        self._flush()
         if self._live is not None:
             self._live.stop()
             self._live = None
@@ -196,89 +253,98 @@ class StepFeed:
         return max(span, time.monotonic() - self._started)
 
     def _start_step(self, data: dict[str, Any], ts: float | None) -> None:
-        reqs = [r for r in data.get("tool_reqs") or [] if isinstance(r, dict)]
-        reqs = [r for r in reqs if r.get("tool_name") != "answer"]
+        reqs = [r for r in data.get("tool_reqs") or [] if isinstance(r, dict) and r.get("tool_name") != "answer"]
         if not reqs:
             return
         if self._current is not None:
-            self._close(DONE, ts)
+            self._finish(ts, None)
+            self._flush()
+        content = " ".join(str(data.get("content") or "").split())
+        if content:
+            self.out.print(Text.assemble(f"{DOT} ", content))
+            self.out.print()
         verb, target = _describe(reqs[0])
         if len(reqs) > 1:
             target = f"{target}  +{len(reqs) - 1}"
-        self._current = _Step(self.steps + 1, verb, target, _first_sentence(data), self._last_end, self._last_end_ts)
+        thought = _first_sentence(data.get("reasoning_content"))
+        self._current = _Step(self.steps + 1, verb, target, thought, self._last_end, self._last_end_ts)
 
-    def _finish_step(self, data: dict[str, Any], ts: float | None) -> None:
-        if self._current is None or (data.get("tool_req") or {}).get("tool_name") == "answer":
-            return
-        result = data.get("result")
-        error = result.get("error") if isinstance(result, dict) else None
-        self._close(FAILED if error else DONE, ts, note=_first_line(error))
-
-    def _close(self, glyph: str, end_ts: float | None, *, note: str | None = None) -> None:
+    def _finish(self, end_ts: float | None, error: str | None) -> None:
         step = self._current
         assert step is not None
         if end_ts is not None and step.started_ts is not None:
             seconds = max(0.0, end_ts - step.started_ts)
         else:
             seconds = time.monotonic() - step.started
-        self.out.print(self._row(step, glyph, "fail" if glyph == FAILED else "ok", duration(seconds)))
-        if note:
-            self.out.print(Text(f"         {DETAIL} {note}", style="fail", overflow="ellipsis", no_wrap=True))
+        self._done = _Done(step, seconds, error)
         self._last_end = time.monotonic()
         self._last_end_ts = end_ts
         self.steps = max(self.steps, step.n)
         self._current = None
 
-    def _row(self, step: _Step, glyph: str, style: str, right: str) -> Text:
-        width = max(40, self.out.width)
-        target_width = max(10, width - 9 - _VERB_WIDTH - len(right) - 4)
-        target = step.target if len(step.target) <= target_width else step.target[: target_width - 1] + "…"
-        row = Text("  ")
-        row.append(glyph, style=style)
-        row.append(f" {step.n:>3}  ", style="meta")
-        row.append(f"{step.verb:<{_VERB_WIDTH}}")
-        row.append(f"{target:<{target_width}}")
-        row.append(f" {right}", style="meta")
-        return row
+    def _flush(self, title: str | None = None) -> None:
+        done, self._done = self._done, None
+        if done is None:
+            return
+        for line in self._block(done, title or "Done"):
+            self.out.print(line)
 
-    def _render_live(self) -> Group:
+    def _block(self, done: _Done, title: str) -> list[RenderableType]:
+        style = "fail" if done.error else "ok"
+        outcome = Text(done.error, style="fail") if done.error else Text(title)
+        outcome.append(f" {SEP} {duration(done.seconds)}", style="meta")
+        return [Text.assemble((f"{DOT} ", style), self._call(done.step)), _result(outcome), Text("")]
+
+    def _call(self, step: _Step) -> Text:
+        name = step.verb.capitalize()
+        call = Text(no_wrap=True, overflow="ellipsis")
+        call.append(name, style="bold")
+        if step.target:
+            room = max(10, self.out.width - len(name) - 6)
+            target = step.target if len(step.target) <= room else step.target[: room - 1] + "…"
+            call.append(f"({target})")
+        return call
+
+    def _render_live(self) -> RenderableType:
         now = time.monotonic()
-        lines: list[Any] = []
-        if self._current is not None:
-            lines.append(self._row(self._current, RUNNING, "accent", duration(now - self._current.started)))
-            if self._current.detail:
-                lines.append(Text(f"         {DETAIL} {self._current.detail}", style="meta", overflow="ellipsis"))
-        else:
-            thinking = _Step(self.steps + 1, "thinking", "", None, self._last_end, None)
-            lines.append(self._row(thinking, RUNNING, "accent", duration(now - self._last_end)))
-        lines.append(Text(""))
-        lines.append(Text(self._status(), style="meta", overflow="ellipsis", no_wrap=True))
+        current, done = self._current, self._done
+        lines: list[RenderableType] = []
+        if done is not None:
+            lines += self._block(done, "Done")
+        if current is not None:
+            dot = "accent" if int(now * 2) % 2 == 0 else "meta"
+            lines.append(Text.assemble((f"{DOT} ", dot), self._call(current)))
+            lines.append(_result(Text(current.thought or "Running…", style="meta italic")))
+            lines.append(Text(""))
+        verb = _gerund(current.verb) if current else "Thinking"
+        n = current.n if current else self.steps + 1
+        parts = [
+            _clock(self.elapsed),
+            f"step {n}/{self.max_steps}" if self.max_steps else f"step {n}",
+            money(self.cost),
+            "ctrl+c to stop",
+        ]
+        meta = f" {SEP} ".join(p for p in parts if p)
+        frame = _FRAMES[int(now * 8) % len(_FRAMES)]
+        lines.append(
+            Text.assemble((f"{frame} {verb}…", "accent"), (f" ({meta})", "meta"), no_wrap=True, overflow="ellipsis")
+        )
         return Group(*lines)
-
-    def _status(self) -> str:
-        n = self._current.n if self._current else self.steps + 1
-        step = f"step {n}/{self.max_steps}" if self.max_steps else f"step {n}"
-        page = self.page if not self.page or len(self.page) <= 32 else self.page[:31] + "…"
-        parts = [step, duration(self.elapsed), money(self.cost), page, "ctrl+c cancel"]
-        return f" {SEP} ".join(p for p in parts if p)
-
-    def _refresh(self) -> None:
-        if self._live is not None:
-            self._live.update(self._render_live(), refresh=True)
 
 
 def print_answer(out: Console, answer: Any) -> None:
     if answer is None:
         return
-    if isinstance(answer, str):
-        if interactive(out):
-            out.print(Markdown(answer))
-        else:
-            out.print(answer, markup=False, highlight=False, soft_wrap=True)
+    if not isinstance(answer, str):
+        out.print(json.dumps(answer, indent=2, default=str), markup=False, highlight=False, soft_wrap=True)
+    elif interactive(out):
+        grid = Table.grid()
+        grid.add_column(width=2, no_wrap=True)
+        grid.add_column()
+        grid.add_row(DOT, Markdown(answer))
+        out.print(grid)
     else:
-        import json
-
-        out.print(json.dumps(answer, indent=2, default=str))
+        out.print(answer, markup=False, highlight=False, soft_wrap=True)
 
 
 def summary(
@@ -291,20 +357,27 @@ def summary(
 ) -> None:
     parts: list[str | None] = []
     if feed is not None:
-        parts = [f"{feed.steps} steps", duration(feed.elapsed), money(feed.cost)]
+        parts = [f"{feed.steps} steps", money(feed.cost)]
     if session_id:
         parts.append(f"session {session_id}")
-    meta = f" {SEP} ".join(p for p in parts if p)
+    meta = "".join(f" {SEP} {p}" for p in parts if p)
+    took = duration(feed.elapsed) if feed is not None else None
     if status in ("completed", "idle"):
-        out.print(f"[ok]{DONE} done[/ok]  [meta]{meta}[/meta]")
+        line = Text.assemble((f"{SPARK} ", "accent"), f"Done in {took}" if took else "Done", (meta, "meta"))
     elif status == "failed":
-        out.print(f"[fail]{FAILED} failed[/fail]  [meta]{meta}[/meta]")
-        if error_text:
-            out.print(f"  {escape(error_text)}")
+        line = Text.assemble((f"{DOT} ", "fail"), f"Failed after {took}" if took else "Failed", (meta, "meta"))
     else:
-        out.print(f"[warn]{ATTENTION} {escape(status)}[/warn]  [meta]{meta}[/meta]")
-        if error_text:
-            out.print(f"  {escape(error_text)}")
+        line = Text.assemble((f"{DOT} ", "warn"), status, (meta, "meta"))
+    out.print(line)
+    if error_text:
+        out.print(_result(Text(error_text, style="fail"), wrap=True))
+
+
+def _gerund(verb: str) -> str:
+    if verb in _GERUNDS:
+        return _GERUNDS[verb]
+    stem = verb[:-1] if verb.endswith("e") and not verb.endswith("ee") else verb
+    return f"{stem}ing".capitalize()
 
 
 def _unwrap(event: Any) -> tuple[str, dict[str, Any], float | None]:
@@ -336,7 +409,7 @@ def _describe(req: dict[str, Any]) -> tuple[str, str]:
     name = str(req.get("tool_name") or "tool")
     args = req.get("args") or {}
     base = _TOOL_SUFFIX.sub("", name)
-    verb = _VERBS.get(base) or base.split("_")[0][:_VERB_WIDTH]
+    verb = _VERBS.get(base) or base.split("_")[0]
     for key in _TARGET_KEYS:
         value = args.get(key)
         if value:
@@ -345,7 +418,7 @@ def _describe(req: dict[str, Any]) -> tuple[str, str]:
             text = " ".join(str(value).split())
             return verb, f'"{text}"' if key in ("text", "content", "query") else text
     if "x" in args and "y" in args:
-        return verb, f"({args['x']}, {args['y']})"
+        return verb, f"{args['x']}, {args['y']}"
     if "coordinates" in args:
         return verb, str(args["coordinates"])
     return verb, ""
@@ -360,9 +433,8 @@ def _short_url(url: str | None) -> str | None:
     return f"{host}{path}" if host else url
 
 
-def _first_sentence(data: dict[str, Any]) -> str | None:
-    text = data.get("content") or data.get("reasoning_content") or ""
-    text = " ".join(str(text).split())
+def _first_sentence(text: Any) -> str | None:
+    text = " ".join(str(text or "").split())
     if not text:
         return None
     for stop in (". ", "! ", "? "):

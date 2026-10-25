@@ -300,6 +300,7 @@ def run(
         agent_label = "local desktop" if local else str(params["agent"])
         where = "Esc Esc stops" if local else _endpoint_host(state)
         ui.header(err_console, "hai", [agent_label, where], link=agent_view_url)
+        ui.user(err_console, task)
         feed = ui.StepFeed(err_console, max_steps=max_steps)
     listener = _arm_local_kill_switch() if local else None
     try:
@@ -561,9 +562,8 @@ def _watch_human(client: Any, session_id: str, timeout: float) -> None:
     status = _status_text(current.status)
     answer = feed.answer if feed.answer is not None else getattr(final, "answer", None)
     if answer is not None:
-        err_console.print()
         ui.print_answer(console, answer)
-    err_console.print()
+        err_console.print()
     ui.summary(err_console, status, feed, error_text=_error_line(current.error, current.error_code))
     _exit_unless_clean(current.status)
 
@@ -941,14 +941,13 @@ def _print_run_result(
     status = _status_text(result.status)
     answer = feed.answer if feed is not None and feed.answer is not None else result.answer
     if answer is not None:
-        if feed is not None:
-            err_console.print()
         ui.print_answer(console, answer)
     error_text = _error_line(result.error, result.error_code)
     if status == "awaiting_tool_results":
         error_text = "the agent is waiting on client-side tools the CLI cannot run; drive it from the SDK with tools"
     if feed is not None:
-        err_console.print()
+        if answer is not None:
+            err_console.print()
         ui.summary(err_console, status, feed, error_text=error_text, session_id=result.id)
     elif error_text or status not in CLEAN_STATUSES:
         ui.error(err_console, error_text or f"session {status}")

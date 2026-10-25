@@ -28,6 +28,7 @@ EVENTS = [
         "timestamp": "2026-10-25T20:35:37.8Z",
         "data": {"metrics": {"steps": 1, "total_cost": 0.0028}},
     },
+    _agent("2026-10-25T20:35:38.0Z", kind="observation_event", metadata={"title": "Hacker News"}),
     _agent("2026-10-25T20:35:40.0Z", kind="policy_event", content="", tool_reqs=[{"tool_name": "go_back_web"}]),
     _agent(
         "2026-10-25T20:35:47.8Z",
@@ -52,18 +53,20 @@ EVENTS = [
 ]
 
 
-def test_feed_renders_one_row_per_action_with_server_timings() -> None:
+def test_feed_renders_one_block_per_action_with_server_timings() -> None:
     buffer = io.StringIO()
-    feed = ui.StepFeed(Console(file=buffer, width=80, color_system=None))
+    feed = ui.StepFeed(Console(file=buffer, width=100, color_system=None))
 
     for event in EVENTS:
         feed.handle(event)
     feed.close()
 
-    navigate, back, reason = [line.rstrip() for line in buffer.getvalue().splitlines() if line.strip()]
-    assert "✓" in navigate and "navigate" in navigate and "news.ycombinator.com" in navigate
-    assert navigate.endswith("6.3s")
-    assert "✗" in back and "back" in back and back.endswith("10.1s")
-    assert "└ Error navigating back: Page.go_back" in reason and "Call log" not in reason
+    lines = [line.rstrip() for line in buffer.getvalue().splitlines() if line.strip()]
+    assert lines == [
+        f"{ui.DOT} Navigate(news.ycombinator.com)",
+        f"  {ui.RESULT}  Hacker News · 6.3s",
+        f"{ui.DOT} Back",
+        f"  {ui.RESULT}  Error navigating back: Page.go_back: Timeout 10000ms exceeded. · 10.1s",
+    ]
     assert feed.answer == "Dolly Parton's Imagination Library"
     assert (feed.steps, feed.cost) == (3, 0.004)
