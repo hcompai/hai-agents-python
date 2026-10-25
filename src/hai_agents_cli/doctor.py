@@ -75,7 +75,7 @@ def check_desktop() -> CheckResult:
         )
     if sys.platform != "darwin":
         return CheckResult("desktop", True, "deps installed")
-    missing = _missing_macos_grants()
+    missing = missing_macos_grants()
     if missing:
         from hai_agents_local.desktop import ACCESSIBILITY_SETTINGS_URL, SCREEN_RECORDING_SETTINGS_URL
 
@@ -89,7 +89,13 @@ def check_desktop() -> CheckResult:
     return CheckResult("desktop", True, "deps installed; Accessibility and Screen Recording granted")
 
 
-def _missing_macos_grants() -> list[str]:
+def settings_urls() -> dict[str, str]:
+    from hai_agents_local.desktop import ACCESSIBILITY_SETTINGS_URL, SCREEN_RECORDING_SETTINGS_URL
+
+    return {"Accessibility": ACCESSIBILITY_SETTINGS_URL, "Screen Recording": SCREEN_RECORDING_SETTINGS_URL}
+
+
+def missing_macos_grants() -> list[str]:
     # Non-prompting variants keep the doctor read-only; the bridge preflight does the prompting.
     from ApplicationServices import AXIsProcessTrusted
     from Quartz import CGPreflightScreenCaptureAccess

@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import difflib
 import json
 import socket
+import subprocess
 import sys
 import time
+import webbrowser
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NoReturn
 
@@ -31,7 +35,7 @@ from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
 from hai_agents_local import desktop as desktop_defaults
 
-from . import auth, mcp_hosts, ui
+from . import auth, keys, mcp_hosts, ui
 
 if TYPE_CHECKING:
     from hai_agents_local import LocalBridge
@@ -44,8 +48,10 @@ err_console = ui.console(stderr=True)
 app = typer.Typer(
     name="hai",
     help="Run H Company agents from your terminal.",
-    epilog='\b\nExamples:\n  hai run "Find the H Agent API quickstart" -a h/web-surfer-pro\n'
-    '  hai run --local "Open Calculator and compute 2+2"\n'
+    epilog='\b\nExamples:\n  hai "What is the top story on Hacker News?"\n'
+    '  hai --local "Open Calculator and compute 2+2"\n'
+    "  hai                                  (interactive session)\n"
+    "  hai agents use h/web-surfer-pro      (change the default agent)\n"
     "  hai sessions watch <session-id>",
     no_args_is_help=True,
     rich_markup_mode=None,
@@ -141,7 +147,7 @@ def _browser_sign_in(base_url: str | None) -> None:
     except Exception as exc:
         _raise_cli_error(exc)
     path = credentials.save_api_key(minted)
-    console.print(f"[ok]{ui.DONE}[/ok] signed in [meta]{ui.SEP} key saved to {path}[/meta]")
+    ui.ok(console, f"signed in {ui.SEP} key saved to {path}")
 
 
 def _store_pasted_key(base_url: str | None) -> None:
@@ -163,7 +169,7 @@ def _store_pasted_key(base_url: str | None) -> None:
     except Exception as exc:
         _raise_cli_error(exc)
     path = credentials.save_api_key(pasted)
-    console.print(f"[ok]{ui.DONE}[/ok] signed in [meta]{ui.SEP} key saved to {path}[/meta]")
+    ui.ok(console, f"signed in {ui.SEP} key saved to {path}")
 
 
 @app.command()
@@ -185,8 +191,21 @@ def doctor(ctx: typer.Context) -> None:
     else:
         for r in results:
             ui.check(console, "ok" if r.ok else "fail", r.name, r.detail, fix=r.fix)
+        if _interactive() and any(r.name == "desktop" and not r.ok for r in results):
+            _offer_privacy_settings()
     if not all(r.ok for r in results):
         raise typer.Exit(1)
+
+
+def _offer_privacy_settings() -> None:
+    from .doctor import missing_macos_grants, settings_urls
+
+    missing = missing_macos_grants()
+    if not missing or not typer.confirm(f"\nOpen System Settings to grant {' and '.join(missing)}?", default=True):
+        return
+    for grant in missing:
+        subprocess.run(["open", settings_urls()[grant]], check=False)
+    ui.hint(console, "after granting, restart this terminal and run `hai doctor` again")
 
 
 @app.command()
@@ -245,13 +264,22 @@ LOCAL_DESKTOP_AGENT = {
 }
 
 
+AGENT_HELP = f"Agent name. Default: {credentials.DEFAULT_AGENT}, or the one set with `hai agents use`."
+SLASH_COMMANDS = [
+    ("/agent [name]", "switch agent and save it as the default"),
+    ("/new", "start a new session"),
+    ("/live", "open the live view in your browser"),
+    ("/share", "create a public share link"),
+    ("/exit", "leave; so does enter on an empty line"),
+    ("esc", "pause the agent mid-run and tell it what to do instead"),
+]
+
+
 @app.command()
 def run(
     ctx: typer.Context,
     task: str = typer.Argument(..., help="Task to run."),
-    agent: str | None = typer.Option(
-        None, "--agent", "-a", help="Registered agent name. Omit to pick from a list (see `hai agents list`)."
-    ),
+    agent: str | None = typer.Option(None, "--agent", "-a", help=AGENT_HELP),
     local: bool = typer.Option(False, "--local", help="Drive this machine's desktop through the local runtime."),
     max_steps: int | None = typer.Option(
         None, "--max-steps", min=1, max=200, help="Maximum reasoning steps. Default 20, or 150 with --local."
@@ -270,70 +298,294 @@ def run(
         ),
     ),
 ) -> None:
-    """Run an agent task, streaming its steps, and print the final answer."""
-    state = _state(ctx)
-    max_steps = max_steps or (150 if local else 20)
-    max_time_s = max_time_s or (1800.0 if local else 180.0)
-    overrides = _parse_overrides(override or [])
-    params: dict[str, Any] = {
-        "agent": agent,
-        "messages": task,
-        "max_steps": max_steps,
-        "max_time_s": max_time_s,
-    }
-    if overrides:
-        params["overrides"] = overrides
+    """Run a task, stream its steps, and print the answer; in a terminal, follow up on the same session."""
+    convo = _Conversation(
+        _state(ctx),
+        agent or (LOCAL_DESKTOP_AGENT if local else credentials.default_agent()),
+        local=local,
+        max_steps=max_steps or (150 if local else 20),
+        max_time_s=max_time_s or (1800.0 if local else 180.0),
+        overrides=_parse_overrides(override or []),
+        quiet=quiet,
+    )
     try:
-        assert_request_under_limit(params)
+        assert_request_under_limit(convo.params(task))
     except Exception as exc:
         _raise_cli_error(exc)
-    client = _local_client(state) if local else _client(state)
-    params["agent"] = agent or (LOCAL_DESKTOP_AGENT if local else _select_agent(state, client))
-    started_at = time.time()
-    listener = _arm_local_kill_switch() if local else None
+    convo.open()
     try:
-        session = client.sessions.create_session(**params)
-    except Exception as exc:
-        if listener is not None:
-            listener.stop()
-        _raise_cli_error(exc)
-    agent_view_url = getattr(session, "agent_view_url", None)
-
-    feed = None
-    if not (state.json_output or quiet):
-        agent_label = "local desktop" if local else str(params["agent"])
-        where = ("esc esc stops" if listener else None) if local else _endpoint_host(state)
-        ui.header(err_console, "hai", [agent_label, where], link=agent_view_url)
-        ui.user(err_console, task)
-        stop_hint = "esc esc to stop" if listener else "ctrl+c to stop"
-        feed = ui.StepFeed(err_console, max_steps=max_steps, stop_hint=stop_hint)
-    try:
-        if feed is not None:
-            _follow(client, session.id, feed, timeout_s=max_time_s + 30.0)
-        result = wait_for_session(client, session.id, timeout_seconds=max_time_s + 30.0)
-    except KeyboardInterrupt:
-        _cancel_quietly(client, session.id)
-        if feed is not None:
-            feed.close()
-        ui.error(err_console, "interrupted; session cancelled")
-        raise typer.Exit(130) from None
-    except Exception as exc:
-        if feed is not None:
-            feed.close()
-        _raise_cli_error(exc)
+        convo.turn(task, echo=True)
+        if convo.followups:
+            convo.loop()
     finally:
-        if listener is not None:
-            listener.stop()
-    if feed is not None:
-        feed.close()
-        if feed.answer is None:
-            feed.answer = result.answer
-    stopped = local and _kill_switch_fired(started_at)
-    _print_run_result(result, state.json_output, agent_view_url=agent_view_url, feed=feed, stopped=stopped)
+        convo.close()
+    _exit_unless_clean(convo.result.status)
 
 
-def _follow(client: Any, session_id: str, feed: ui.StepFeed, *, timeout_s: float) -> None:
-    for event in stream_session(client, session_id, timeout_seconds=timeout_s):
+@app.command()
+def chat(
+    ctx: typer.Context,
+    agent: str | None = typer.Option(None, "--agent", "-a", help=AGENT_HELP),
+    local: bool = typer.Option(False, "--local", help="Drive this machine's desktop through the local runtime."),
+) -> None:
+    """Start an interactive session; plain `hai` in a terminal opens this."""
+    state = _state(ctx)
+    if not _interactive() or state.json_output:
+        _raise_cli_error(RuntimeError('chat needs an interactive terminal; run one task with `hai "<task>"`'))
+    convo = _Conversation(
+        state,
+        agent or (LOCAL_DESKTOP_AGENT if local else credentials.default_agent()),
+        local=local,
+        max_steps=150 if local else 20,
+        max_time_s=1800.0 if local else 180.0,
+        overrides={},
+    )
+    convo.open()
+    try:
+        convo.show_header()
+        convo.loop()
+    finally:
+        convo.close()
+
+
+@dataclass
+class _Conversation:
+    """One session across turns: the first message creates it; follow-ups and Esc corrections continue it."""
+
+    state: AppState
+    agent: Any
+    local: bool
+    max_steps: int
+    max_time_s: float
+    overrides: dict[str, Any]
+    quiet: bool = False
+    client: Any = None
+    session: Any = None
+    result: Any = None
+    next_index: int = 0
+    steps: int = 0
+    cost: float | None = None
+    _listener: Any = None
+    _started_at: float = 0.0
+    _header_shown: bool = False
+    _feed: ui.StepFeed | None = None
+    _turn_done: bool = False
+    _pending: str | None = None
+
+    @property
+    def human(self) -> bool:
+        return not (self.state.json_output or self.quiet)
+
+    @property
+    def followups(self) -> bool:
+        return self.human and _interactive()
+
+    @property
+    def view_url(self) -> str | None:
+        return getattr(self.session, "agent_view_url", None)
+
+    def params(self, message: str) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "agent": self.agent,
+            "messages": message,
+            "max_steps": self.max_steps,
+            "max_time_s": self.max_time_s,
+        }
+        if self.overrides:
+            params["overrides"] = self.overrides
+        return params
+
+    def open(self) -> None:
+        self.client = _local_client(self.state) if self.local else _client(self.state)
+        self._started_at = time.time()
+        if self.local:
+            self._listener = _arm_local_kill_switch()
+
+    def close(self) -> None:
+        if self._listener is not None:
+            self._listener.stop()
+            self._listener = None
+
+    def show_header(self) -> None:
+        if self._header_shown or not self.human:
+            return
+        self._header_shown = True
+        label = "local desktop" if self.local else str(self.agent)
+        where = ("esc esc stops" if self._listener else None) if self.local else _endpoint_host(self.state)
+        hint = "/help for commands" if self.followups else None
+        ui.header(err_console, "hai", [label, where, hint], link=self.view_url)
+
+    def turn(self, message: str, *, echo: bool = False) -> None:
+        if self.session is None:
+            try:
+                self.session = self.client.sessions.create_session(**self.params(message))
+            except Exception as exc:
+                _raise_cli_error(exc)
+            self.next_index = 0
+        else:
+            request = SendSessionMessagesRequestBody_UserMessage(message=message)
+            try:
+                self.client.sessions.send_session_messages(self.session.id, request=request)
+            except Exception as exc:
+                _raise_cli_error(exc)
+        self.show_header()
+        if echo and self.human:
+            ui.user(err_console, message)
+        feed = None
+        if self.human:
+            if self.local:
+                stop_hint = "esc esc to stop" if self._listener else "ctrl+c to stop"
+            else:
+                stop_hint = f"esc to steer {ui.SEP} ctrl+c to stop" if _interactive() else "ctrl+c to stop"
+            feed = ui.StepFeed(
+                err_console, max_steps=self.max_steps, steps=self.steps, cost=self.cost, stop_hint=stop_hint
+            )
+        self._feed, self._turn_done = feed, False
+        timeout = self.max_time_s + 30.0
+        try:
+            if feed is not None:
+                with self._esc_watcher():
+                    _follow(self.client, self.session.id, feed, timeout_s=timeout, from_index=self.next_index)
+                    self._turn_done = True
+            result = wait_for_session(self.client, self.session.id, from_index=self.next_index, timeout_seconds=timeout)
+        except KeyboardInterrupt:
+            _cancel_quietly(self.client, self.session.id)
+            if feed is not None:
+                feed.close()
+            ui.error(err_console, "interrupted; session cancelled")
+            raise typer.Exit(130) from None
+        except Exception as exc:
+            if feed is not None:
+                feed.close()
+            _raise_cli_error(exc)
+        if feed is not None:
+            feed.close()
+            if feed.answer is None:
+                feed.answer = result.answer
+            self.steps, self.cost = feed.steps, feed.cost
+        self.result, self.next_index = result, result.next_from_index
+        stopped = self.local and _kill_switch_fired(self._started_at)
+        _print_run_result(result, self.state.json_output, agent_view_url=self.view_url, feed=feed, stopped=stopped)
+
+    def loop(self) -> None:
+        ui.hint(
+            err_console, "type a task, /help for commands" if self.session is None else "follow up, or enter to exit"
+        )
+        while True:
+            try:
+                text = self._pending if self._pending is not None else _ask()
+            except KeyboardInterrupt:
+                err_console.print()
+                return
+            self._pending = None
+            text = (text or "").strip()
+            if not text:
+                return
+            if text.startswith("/"):
+                if not self.command(text):
+                    return
+                continue
+            try:
+                self.turn(text)
+            except typer.Exit as exc:
+                if exc.exit_code == 130:
+                    raise
+            err_console.print()
+
+    def command(self, text: str) -> bool:
+        """Run a slash command; False means leave."""
+        name, _, arg = text[1:].partition(" ")
+        arg = arg.strip()
+        if name in ("exit", "quit"):
+            return False
+        if name == "help":
+            ui.commands(err_console, SLASH_COMMANDS)
+        elif name == "new":
+            self.session, self.steps, self.cost = None, 0, None
+            ui.ok(err_console, "the next message starts a new session")
+        elif name == "agent":
+            self._switch_agent(arg)
+        elif name == "live":
+            if self.view_url:
+                webbrowser.open(self.view_url)
+                ui.ok(err_console, f"opened {self.view_url}")
+            else:
+                ui.error(err_console, "no session yet", fix="send a task first")
+        elif name == "share":
+            self._share()
+        else:
+            ui.error(err_console, f"unknown command /{name}", fix="/help lists the commands")
+        return True
+
+    def _switch_agent(self, name: str) -> None:
+        if self.local:
+            ui.error(
+                err_console, "the local desktop agent cannot be switched", fix="leave and run `hai` without --local"
+            )
+            return
+        try:
+            name = name or _pick_agent(self.client)
+            path = _save_default_agent(self.client, name)
+        except typer.Exit:
+            return
+        self.agent, self.session, self.steps, self.cost = name, None, 0, None
+        ui.ok(
+            err_console, f"agent {name} {ui.SEP} saved as default in {path} {ui.SEP} next message starts a new session"
+        )
+
+    def _share(self) -> None:
+        if self.session is None:
+            ui.error(err_console, "no session yet", fix="send a task first")
+            return
+        try:
+            share = self.client.sessions.share_session(self.session.id)
+        except Exception as exc:
+            ui.error(err_console, str(exc))
+            return
+        ui.ok(err_console, absolute_share_url(self.client, share.share_url))
+
+    def _esc_watcher(self) -> Any:
+        if self.local or not _interactive():
+            return contextlib.nullcontext()
+        return keys.EscWatcher(self._steer)
+
+    def _steer(self, watcher: keys.EscWatcher) -> None:
+        """Pause the agent, ask what to do instead, then send it (or resume on an empty answer)."""
+        feed, session_id = self._feed, self.session.id
+        try:
+            self.client.sessions.pause_session(session_id)
+        except Exception:
+            return
+        if feed is not None:
+            feed.hold()
+        ui.paused(err_console)
+        with watcher.cooked():
+            text = (_ask() or "").strip()
+        try:
+            if self._turn_done:
+                self._pending = text or None
+            elif text:
+                request = SendSessionMessagesRequestBody_UserMessage(message=text)
+                self.client.sessions.send_session_messages(session_id, request=request)
+            else:
+                self.client.sessions.resume_session(session_id)
+        except Exception as exc:
+            ui.error(err_console, str(exc))
+        if feed is not None:
+            err_console.print()
+            feed.release()
+
+
+def _ask() -> str | None:
+    try:
+        return err_console.input(ui.prompt_text())
+    except EOFError:
+        err_console.print()
+        return None
+
+
+def _follow(client: Any, session_id: str, feed: ui.StepFeed, *, timeout_s: float, from_index: int = 0) -> None:
+    for event in stream_session(client, session_id, from_index=from_index, timeout_seconds=timeout_s):
         feed.handle(event)
 
 
@@ -600,6 +852,13 @@ def list_agents_command(
     for item in result.items:
         table.add_row(item.name, escape(_truncate(item.description)))
     console.print(table)
+
+
+@agents_app.command("use")
+def use_agent_command(ctx: typer.Context, agent_name: str = typer.Argument(...)) -> None:
+    """Set the default agent for `hai run` and `hai chat`."""
+    path = _save_default_agent(_client(_state(ctx)), agent_name)
+    ui.ok(console, f"default agent {agent_name} {ui.SEP} saved to {path}")
 
 
 @agents_app.command("get")
@@ -892,8 +1151,43 @@ app.add_typer(mcp_app, name="mcp")
 app.add_typer(local_app, name="local")
 
 
+_GLOBAL_FLAGS = ("--json",)
+_GLOBAL_OPTIONS = ("--api-key", "--base-url")
+_HELP_FLAGS = ("--help", "--install-completion", "--show-completion")
+
+
+def route(argv: list[str], commands: set[str], interactive: bool) -> list[str]:
+    """`hai "task"` runs it, plain `hai` opens a prompt, and global options work in any position."""
+    head: list[str] = []
+    rest: list[str] = []
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--":
+            rest += argv[i:]
+            break
+        if arg in _GLOBAL_FLAGS or arg.split("=", 1)[0] in _GLOBAL_OPTIONS and "=" in arg:
+            head.append(arg)
+        elif arg in _GLOBAL_OPTIONS and i + 1 < len(argv):
+            head += argv[i : i + 2]
+            i += 1
+        else:
+            rest.append(arg)
+        i += 1
+    if not rest:
+        return head + (["chat"] if interactive else [])
+    first = rest[0]
+    if first in commands or first in _HELP_FLAGS:
+        return head + rest
+    looks_like_typo = not first.startswith("-") and " " not in first
+    if looks_like_typo and difflib.get_close_matches(first, commands, n=1, cutoff=0.75):
+        return head + rest
+    return head + ["run", *rest]
+
+
 def main() -> None:
-    app()
+    commands = set(typer.main.get_command(app).commands)  # type: ignore[attr-defined]
+    app(args=route(sys.argv[1:], commands, _interactive()), prog_name="hai")
 
 
 def _state(ctx: typer.Context) -> AppState:
@@ -910,27 +1204,31 @@ def _client(state: AppState) -> Client:
         _raise_cli_error(exc)
 
 
-def _select_agent(state: AppState, client: Client) -> str:
-    """Pick an agent from the live catalog; require --agent when non-interactive."""
-    if state.json_output or not (sys.stdin.isatty() and sys.stdout.isatty()):
-        _raise_cli_error(RuntimeError("No agent specified. Pass --agent (see `hai agents list`)."))
+def _pick_agent(client: Client) -> str:
+    """Pick an agent from the live catalog by number."""
     try:
         agents = client.agents.list_agents(page=1, size=100).items
     except Exception as exc:
         _raise_cli_error(exc)
     if not agents:
-        _raise_cli_error(RuntimeError("No agents available. Create one, then pass --agent."))
-    console.print("Select an agent:")
+        _raise_cli_error(RuntimeError("No agents available."))
     for i, item in enumerate(agents, 1):
-        desc = " ".join((item.description or "").split())
-        if len(desc) > 80:
-            desc = desc[:77] + "..."
-        line = f"  [bold]{i}[/bold]. {item.name}"
-        console.print(f"{line}  [dim]{escape(desc)}[/dim]" if desc else line)
-    choice = typer.prompt("Agent number", type=int)
+        desc = _truncate(" ".join((item.description or "").split()))
+        line = f"  [bold]{i}[/bold]. {escape(item.name)}"
+        err_console.print(f"{line}  [meta]{escape(desc)}[/meta]" if desc else line)
+    choice = typer.prompt("Agent number", type=int, err=True)
     if not 1 <= choice <= len(agents):
         _raise_cli_error(RuntimeError(f"Choice must be between 1 and {len(agents)}."))
     return agents[choice - 1].name
+
+
+def _save_default_agent(client: Client, name: str) -> Any:
+    """Check the agent exists, then store it as the default."""
+    try:
+        client.agents.get_agent(name)
+    except Exception as exc:
+        _raise_cli_error(exc)
+    return credentials.save_default_agent(name)
 
 
 def _print_run_result(
@@ -951,7 +1249,6 @@ def _print_run_result(
     }
     if json_output:
         _print_json(payload)
-        _exit_unless_clean(result.status)
         return
     status = _status_text(result.status)
     answer = feed.answer if feed is not None and feed.answer is not None else result.answer
@@ -968,7 +1265,6 @@ def _print_run_result(
         ui.summary(err_console, status, feed, error_text=error_text, session_id=result.id)
     elif error_text or status not in CLEAN_STATUSES:
         ui.error(err_console, error_text or f"session {status}")
-    _exit_unless_clean(result.status)
 
 
 def _error_line(error: str | None, error_code: str | None) -> str | None:

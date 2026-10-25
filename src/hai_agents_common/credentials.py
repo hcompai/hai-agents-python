@@ -18,6 +18,8 @@ ApiKey = str | Callable[[], str]
 
 BASE_URL_VAR = "HAI_API_BASE_URL"
 PORTAL_URL_VAR = "HAI_PORTAL_URL"
+AGENT_VAR = "HAI_AGENT"
+DEFAULT_AGENT = "h/web-surfer-flash"
 
 PORTALS = {
     HaiAgentsEnvironment.EU.value: "https://portal.api.eu.hcompany.ai",
@@ -78,13 +80,26 @@ def absolute_share_url(client: Client | AsyncClient, share_path: str) -> str:
 
 def save_api_key(key: str) -> Path:
     """Persist the API key to the global `.env` (file 600, directory 700) and the process env."""
+    return _save(API_KEY_VAR, key)
+
+
+def default_agent() -> str:
+    """Agent `hai run` uses without `--agent`: `HAI_AGENT`, else the fast web surfer."""
+    return _lookup(AGENT_VAR) or DEFAULT_AGENT
+
+
+def save_default_agent(name: str) -> Path:
+    return _save(AGENT_VAR, name)
+
+
+def _save(name: str, value: str) -> Path:
     GLOBAL_ENV_PATH.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     GLOBAL_ENV_PATH.parent.chmod(0o700)  # mkdir leaves an existing directory's mode untouched, so we set it explicitly
     # Create owner-only from the start
     os.close(os.open(GLOBAL_ENV_PATH, os.O_WRONLY | os.O_CREAT, 0o600))
     GLOBAL_ENV_PATH.chmod(0o600)  # tighten a file that already existed
-    set_key(str(GLOBAL_ENV_PATH), API_KEY_VAR, key)
-    os.environ[API_KEY_VAR] = key
+    set_key(str(GLOBAL_ENV_PATH), name, value)
+    os.environ[name] = value
     return GLOBAL_ENV_PATH
 
 

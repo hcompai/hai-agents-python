@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 
 from typer.testing import CliRunner
@@ -16,7 +17,23 @@ def test_help_lists_examples() -> None:
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    assert 'hai run --local "Open Calculator and compute 2+2"' in result.output
+    assert 'hai "What is the top story on Hacker News?"' in result.output
+
+
+def test_route_runs_bare_tasks_and_hoists_global_options() -> None:
+    commands = {"run", "chat", "sessions", "agents", "doctor", "login"}
+
+    def route(*argv: str, interactive: bool = True) -> list[str]:
+        return app_module.route(list(argv), commands, interactive)
+
+    assert route("top story on HN?") == ["run", "top story on HN?"]
+    assert route("--local", "open calculator") == ["run", "--local", "open calculator"]
+    assert route("run", "x", "--json") == ["--json", "run", "x"]
+    assert route("sessions", "get", "s1", "--api-key", "k") == ["--api-key", "k", "sessions", "get", "s1"]
+    assert route() == ["chat"]
+    assert route(interactive=False) == []
+    assert route("sesions") == ["sesions"]
+    assert route("--help") == ["--help"]
 
 
 def test_missing_api_key_is_clear(monkeypatch, tmp_path) -> None:
@@ -96,13 +113,65 @@ def test_local_run_stopped_by_kill_switch_says_so(monkeypatch, tmp_path) -> None
     assert "stopped by the kill switch" in _error_text(result)
 
 
-def test_run_without_agent_requires_selection(monkeypatch) -> None:
-    monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
+def test_run_without_agent_uses_the_default(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", tmp_path / "global.env")
+    monkeypatch.delenv(credentials.AGENT_VAR, raising=False)
+    captured: dict = {}
+    monkeypatch.setattr(app_module, "_client", lambda state: _RunClient(capture=captured))
+    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
 
     result = runner.invoke(app, ["run", "hello"], env={"HAI_API_KEY": "hk-test"})
 
-    assert result.exit_code != 0
-    assert "--agent" in _error_text(result)
+    assert result.exit_code == 0, result.output
+    assert captured["agent"] == "h/web-surfer-flash"
+
+    credentials.save_default_agent("h/web-surfer-pro")
+    runner.invoke(app, ["run", "hello"], env={"HAI_API_KEY": "hk-test"})
+    assert captured["agent"] == "h/web-surfer-pro"
+
+
+def test_follow_up_continues_the_same_session_from_the_last_event(monkeypatch) -> None:
+    client = _RunClient()
+    waits: list[int] = []
+
+    def wait(client_, id, *, from_index=0, **_):
+        waits.append(from_index)
+        return SessionRunResult(id=id, status="idle", events=[], next_from_index=from_index + 7, answer="ok")
+
+    replies = iter(["and the second one?", None])
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module, "wait_for_session", wait)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+    monkeypatch.setattr(app_module, "_ask", lambda: next(replies))
+
+    result = runner.invoke(app, ["run", "top story?"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 0, result.output
+    assert client.sessions.created == 1
+    assert client.sessions.sent == [("sess_1", "and the second one?")]
+    assert waits == [0, 7]
+
+
+def test_esc_pauses_then_sends_the_correction_or_resumes(monkeypatch) -> None:
+    for typed, expected in (("only the top 2", ("send", "only the top 2")), ("", ("resume",))):
+        client = _RunClient()
+        convo = app_module._Conversation(
+            app_module.AppState(api_key=None, base_url=None, json_output=False),
+            "h/test-agent",
+            local=False,
+            max_steps=5,
+            max_time_s=60,
+            overrides={},
+            client=client,
+            session=type("Session", (), {"id": "sess_1"})(),
+        )
+        monkeypatch.setattr(app_module, "_ask", lambda typed=typed: typed)
+
+        convo._steer(_Watcher())
+
+        assert client.sessions.calls == [("pause",), expected]
 
 
 def test_share_session_prints_absolute_url(monkeypatch) -> None:
@@ -209,8 +278,12 @@ def _fake_wait_for_session(client, id, **kwargs):
 class _RunSessions:
     def __init__(self, capture: dict | None = None) -> None:
         self._capture = capture
+        self.created = 0
+        self.sent: list[tuple[str, str]] = []
+        self.calls: list[tuple] = []
 
     def create_session(self, **kwargs):
+        self.created += 1
         if self._capture is not None:
             self._capture.update(kwargs)
         return type(
@@ -218,6 +291,22 @@ class _RunSessions:
             (),
             {"id": "sess_1", "agent_view_url": "https://platform.example.test/agent-view/sess_1"},
         )()
+
+    def send_session_messages(self, id, *, request):
+        self.sent.append((id, request.message))
+        self.calls.append(("send", request.message))
+
+    def pause_session(self, id):
+        self.calls.append(("pause",))
+
+    def resume_session(self, id):
+        self.calls.append(("resume",))
+
+
+class _Watcher:
+    @contextlib.contextmanager
+    def cooked(self):
+        yield
 
 
 class _RunClient:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -85,7 +86,7 @@ def interactive(out: Console) -> bool:
     return out.is_terminal and bool(isatty and isatty())
 
 
-def header(out: Console, name: str, parts: list[str], link: str | None = None) -> None:
+def header(out: Console, name: str, parts: list[str | None], link: str | None = None) -> None:
     title, *rest = [p for p in parts if p] or [""]
     lines: list[RenderableType] = [
         Text.assemble((f"{SPARK} ", "accent"), (name, "bold"), "  ", title),
@@ -106,6 +107,34 @@ def user(out: Console, text: str) -> None:
     grid.add_row(Text(PROMPT, style="meta"), Text(text, style="meta"))
     out.print(grid)
     out.print()
+
+
+def prompt_text() -> Text:
+    return Text(f"{PROMPT} ", style="accent")
+
+
+def ok(out: Console, message: str) -> None:
+    out.print(Text.assemble((f"{DONE} ", "ok"), message))
+
+
+def hint(out: Console, message: str) -> None:
+    out.print(Text(f"  {message}", style="meta"))
+
+
+def paused(out: Console) -> None:
+    out.print()
+    out.print(
+        Text.assemble((f"{DOT} ", "warn"), "Paused", (" · say what to do instead, or press enter to resume", "meta"))
+    )
+
+
+def commands(out: Console, rows: list[tuple[str, str]]) -> None:
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="accent", no_wrap=True)
+    grid.add_column(style="meta")
+    for name, description in rows:
+        grid.add_row(name, description)
+    out.print(grid)
 
 
 def error(out: Console, message: str, *, fix: str | None = None) -> None:
@@ -203,13 +232,43 @@ class StepFeed:
     _latest_ts: float | None = None
     _started: float = field(default_factory=time.monotonic)
     _live: Live | None = None
+    _held: list[Any] | None = None
+    _lock: threading.RLock = field(default_factory=threading.RLock)
 
     def __post_init__(self) -> None:
-        if interactive(self.out):
+        self._start_live()
+
+    def handle(self, event: Any) -> None:
+        with self._lock:
+            if self._held is not None:
+                self._held.append(event)
+            else:
+                self._handle(event)
+
+    def hold(self) -> None:
+        """Queue events and clear the live area, so a prompt can take the terminal."""
+        with self._lock:
+            self._held = []
+            self._stop_live()
+
+    def release(self) -> None:
+        with self._lock:
+            held, self._held = self._held or [], None
+            self._start_live()
+            for event in held:
+                self._handle(event)
+
+    def _start_live(self) -> None:
+        if self._live is None and interactive(self.out):
             self._live = Live(console=self.out, transient=True, refresh_per_second=12, get_renderable=self._render_live)
             self._live.start()
 
-    def handle(self, event: Any) -> None:
+    def _stop_live(self) -> None:
+        if self._live is not None:
+            self._live.stop()
+            self._live = None
+
+    def _handle(self, event: Any) -> None:
         kind, data, ts = _unwrap(event)
         if ts is not None:
             self._first_ts = self._first_ts or ts
@@ -241,12 +300,14 @@ class StepFeed:
             self._live.refresh()
 
     def close(self) -> None:
-        if self._current is not None:
-            self._finish(None, None)
-        self._flush()
-        if self._live is not None:
-            self._live.stop()
-            self._live = None
+        with self._lock:
+            for event in self._held or []:
+                self._handle(event)
+            self._held = None
+            if self._current is not None:
+                self._finish(None, None)
+            self._flush()
+            self._stop_live()
 
     @property
     def elapsed(self) -> float:
