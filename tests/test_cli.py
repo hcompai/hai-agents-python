@@ -160,6 +160,29 @@ def test_local_run_hands_the_key_and_endpoint_flags_to_the_runtime(monkeypatch) 
     assert seen == {"key": "hk-flag", "url": "https://agp.example.test"}
 
 
+def test_a_follow_up_after_a_failed_turn_starts_a_new_session(monkeypatch) -> None:
+    client = _RunClient()
+    failed = SessionRunResult(id="sess_1", status="failed", events=[], next_from_index=1)
+    replies = iter(["try again", None])
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module, "wait_for_session", lambda *a, **k: failed)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+    monkeypatch.setattr(app_module, "_ask", lambda: next(replies))
+
+    runner.invoke(app, ["run", "first task"], env={"HAI_API_KEY": "hk-test"})
+
+    assert client.sessions.created == 2
+    assert client.sessions.sent == []
+
+
+def test_local_rejects_a_named_agent() -> None:
+    result = runner.invoke(app, ["run", "x", "--local", "--agent", "h/web-surfer-pro"], env={"HAI_API_KEY": "hk-t"})
+
+    assert result.exit_code != 0
+    assert "drop --agent" in _error_text(result)
+
+
 def test_new_releases_the_idle_session_before_starting_another(monkeypatch) -> None:
     client = _RunClient()
     idle = SessionRunResult(id="sess_1", status="idle", events=[], next_from_index=1, answer="ok")

@@ -267,6 +267,14 @@ LOCAL_DESKTOP_AGENT = {
 }
 
 
+def _resolve_agent(agent: str | None, local: bool) -> Any:
+    if not local:
+        return agent or credentials.default_agent()
+    if agent:
+        _raise_cli_error(RuntimeError("--local drives this desktop with its own agent; drop --agent"))
+    return LOCAL_DESKTOP_AGENT
+
+
 AGENT_HELP = f"Agent name. Default: {credentials.DEFAULT_AGENT}, or the one set with `holo agents use`."
 SLASH_COMMANDS = [
     ("/agent [name]", "switch agent and save it as the default"),
@@ -304,7 +312,7 @@ def run(
     """Run a task, stream its steps, and print the answer; in a terminal, follow up on the same session."""
     convo = _Conversation(
         _state(ctx),
-        agent or (LOCAL_DESKTOP_AGENT if local else credentials.default_agent()),
+        _resolve_agent(agent, local),
         local=local,
         max_steps=max_steps or (150 if local else 20),
         max_time_s=max_time_s or (1800.0 if local else 180.0),
@@ -337,7 +345,7 @@ def chat(
         _raise_cli_error(RuntimeError('chat needs an interactive terminal; run one task with `holo "<task>"`'))
     convo = _Conversation(
         state,
-        agent or (LOCAL_DESKTOP_AGENT if local else credentials.default_agent()),
+        _resolve_agent(agent, local),
         local=local,
         max_steps=150 if local else 20,
         max_time_s=1800.0 if local else 180.0,
@@ -480,8 +488,10 @@ class _Conversation:
         self.result, self.next_index = result, result.next_from_index
         stopped = self.local and _kill_switch_fired(started_at)
         _print_run_result(result, self.state.json_output, agent_view_url=self.view_url, feed=feed, stopped=stopped)
-        if stopped:
+        if stopped or is_terminal_session_status(str(result.status)):
             self._end_session()
+            if self.followups:
+                ui.hint(err_console, "session ended; the next message starts a new one")
 
     def _end_session(self) -> None:
         """Release the session's browser or desktop; the next message starts a new one."""
