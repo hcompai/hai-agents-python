@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import difflib
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -23,6 +24,7 @@ from hai_agents import (
     Client,
     assert_request_under_limit,
     is_settled_session_status,
+    is_terminal_session_status,
     stream_session,
     wait_for_session,
 )
@@ -424,6 +426,8 @@ class _Conversation:
             except Exception as exc:
                 _raise_cli_error(exc)
             self.next_index = 0
+            if self._header_shown and self.view_url:
+                ui.hint(err_console, f"live view {self.view_url}")
         else:
             request = SendSessionMessagesRequestBody_UserMessage(message=message)
             try:
@@ -477,7 +481,13 @@ class _Conversation:
         stopped = self.local and _kill_switch_fired(started_at)
         _print_run_result(result, self.state.json_output, agent_view_url=self.view_url, feed=feed, stopped=stopped)
         if stopped:
-            self.session, self.steps, self.cost = None, 0, None
+            self._end_session()
+
+    def _end_session(self) -> None:
+        """Release the session's browser or desktop; the next message starts a new one."""
+        if self.session is not None and not is_terminal_session_status(str(getattr(self.result, "status", ""))):
+            _cancel_quietly(self.client, self.session.id)
+        self.session, self.steps, self.cost = None, 0, None
 
     def loop(self) -> None:
         ui.hint(
@@ -513,7 +523,7 @@ class _Conversation:
         if name == "help":
             ui.commands(err_console, SLASH_COMMANDS)
         elif name == "new":
-            self.session, self.steps, self.cost = None, 0, None
+            self._end_session()
             ui.ok(err_console, "the next message starts a new session")
         elif name == "agent":
             self._switch_agent(arg)
@@ -540,7 +550,8 @@ class _Conversation:
             _save_default_agent(self.client, name)
         except typer.Exit:
             return
-        self.agent, self.session, self.steps, self.cost = name, None, 0, None
+        self._end_session()
+        self.agent = name
         ui.ok(err_console, f"{name} is now the default {ui.SEP} next message starts a new session")
 
     def _share(self) -> None:
@@ -642,9 +653,12 @@ def _local_client(state: AppState) -> Any:
     from hai_agents import Client
 
     _sign_in_if_needed(state)
-    local_options = {"spawn_env": {credentials.API_KEY_VAR: state.api_key}} if state.api_key else None
+    # The spawned runtime and the in-process bridges both read these from the environment.
+    for var, value in ((credentials.API_KEY_VAR, state.api_key), (credentials.BASE_URL_VAR, state.base_url)):
+        if value:
+            os.environ[var] = value
     try:
-        return Client.local(local_options=local_options)
+        return Client.local()
     except (RuntimeError, ValueError, PermissionError) as exc:
         _raise_cli_error(exc)
 

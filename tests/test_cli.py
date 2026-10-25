@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 
 from typer.testing import CliRunner
 
@@ -139,17 +140,41 @@ def test_a_turn_stops_following_at_a_client_tool_wait_but_watch_does_not(monkeyp
         assert handled == expected
 
 
-def test_local_run_hands_the_api_key_flag_to_the_runtime(monkeypatch) -> None:
+def test_local_run_hands_the_key_and_endpoint_flags_to_the_runtime(monkeypatch) -> None:
     import hai_agents
 
-    captured: dict = {}
-    monkeypatch.setattr(hai_agents.Client, "local", classmethod(lambda cls, **kw: captured.update(kw) or _RunClient()))
+    seen: dict = {}
+
+    def local(cls, **_):
+        seen.update(key=os.environ.get("HAI_API_KEY"), url=os.environ.get("HAI_API_BASE_URL"))
+        return _RunClient()
+
+    for var in ("HAI_API_KEY", "HAI_API_BASE_URL"):
+        monkeypatch.setenv(var, "unset")
+    monkeypatch.setattr(hai_agents.Client, "local", classmethod(local))
     monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
     monkeypatch.setattr(app_module, "_follow", _no_events)
 
-    runner.invoke(app, ["--api-key", "hk-flag", "run", "open calculator", "--local"])
+    runner.invoke(app, ["--api-key", "hk-flag", "--base-url", "https://agp.example.test", "run", "x", "--local"])
 
-    assert captured["local_options"]["spawn_env"]["HAI_API_KEY"] == "hk-flag"
+    assert seen == {"key": "hk-flag", "url": "https://agp.example.test"}
+
+
+def test_new_releases_the_idle_session_before_starting_another(monkeypatch) -> None:
+    client = _RunClient()
+    idle = SessionRunResult(id="sess_1", status="idle", events=[], next_from_index=1, answer="ok")
+    replies = iter(["/new", "second task", None])
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module, "wait_for_session", lambda *a, **k: idle)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+    monkeypatch.setattr(app_module, "_ask", lambda: next(replies))
+
+    result = runner.invoke(app, ["run", "first task"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 0, result.output
+    assert client.sessions.calls == [("cancel",)]
+    assert client.sessions.created == 2
 
 
 def test_run_without_agent_uses_the_default(monkeypatch, tmp_path) -> None:
@@ -349,6 +374,9 @@ class _RunSessions:
 
     def resume_session(self, id):
         self.calls.append(("resume",))
+
+    def cancel_session(self, id):
+        self.calls.append(("cancel",))
 
 
 class _Watcher:
