@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from hai_agents_local import LocalBridge
 
 CLEAN_STATUSES = ("completed", "idle")
+IDLE_TIMEOUT_S = 600
 
 console = ui.console()
 err_console = ui.console(stderr=True)
@@ -393,6 +394,8 @@ class _Conversation:
         }
         if self.overrides:
             params["overrides"] = self.overrides
+        if self.followups:
+            params["idle_timeout_s"] = IDLE_TIMEOUT_S
         return params
 
     def open(self) -> None:

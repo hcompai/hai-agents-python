@@ -125,6 +125,7 @@ def test_run_without_agent_uses_the_default(monkeypatch, tmp_path) -> None:
 
     assert result.exit_code == 0, result.output
     assert captured["agent"] == "h/web-surfer-flash"
+    assert "idle_timeout_s" not in captured
 
     credentials.save_default_agent("h/web-surfer-pro")
     runner.invoke(app, ["run", "hello"], env={"HAI_API_KEY": "hk-test"})
@@ -132,7 +133,8 @@ def test_run_without_agent_uses_the_default(monkeypatch, tmp_path) -> None:
 
 
 def test_follow_up_continues_the_same_session_from_the_last_event(monkeypatch) -> None:
-    client = _RunClient()
+    captured: dict = {}
+    client = _RunClient(capture=captured)
     waits: list[int] = []
 
     def wait(client_, id, *, from_index=0, **_):
@@ -149,6 +151,7 @@ def test_follow_up_continues_the_same_session_from_the_last_event(monkeypatch) -
     result = runner.invoke(app, ["run", "top story?"], env={"HAI_API_KEY": "hk-test"})
 
     assert result.exit_code == 0, result.output
+    assert captured["idle_timeout_s"] == app_module.IDLE_TIMEOUT_S
     assert client.sessions.created == 1
     assert client.sessions.sent == [("sess_1", "and the second one?")]
     assert waits == [0, 7]
