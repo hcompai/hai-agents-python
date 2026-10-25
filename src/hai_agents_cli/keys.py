@@ -14,6 +14,10 @@ ESC = b"\x1b"
 _POLL_S = 0.1
 
 
+def supported() -> bool:
+    return sys.platform != "win32" and sys.stdin.isatty()
+
+
 class EscWatcher:
     """Calls ``on_esc(watcher)`` on its own thread when Esc is pressed; a no-op off a TTY or on Windows."""
 
@@ -25,7 +29,7 @@ class EscWatcher:
         self._saved: Any = None
 
     def __enter__(self) -> EscWatcher:
-        if sys.platform == "win32" or not sys.stdin.isatty():
+        if not supported():
             return self
         import termios
         import tty

@@ -31,6 +31,9 @@ def test_route_runs_bare_tasks_and_hoists_global_options() -> None:
     assert route("run", "x", "--json") == ["--json", "run", "x"]
     assert route("sessions", "get", "s1", "--api-key", "k") == ["--api-key", "k", "sessions", "get", "s1"]
     assert route() == ["chat"]
+    assert route("--local") == ["chat", "--local"]
+    assert route("-a", "h/web-surfer-pro") == ["chat", "-a", "h/web-surfer-pro"]
+    assert route("--local", interactive=False) == ["run", "--local"]
     assert route(interactive=False) == []
     assert route("sesions") == ["sesions"]
     assert route("--help") == ["--help"]
@@ -124,18 +127,16 @@ def test_kill_switch_stops_that_turn_and_the_next_message_starts_a_new_session(m
     assert client.sessions.sent == []
 
 
-def test_follow_stops_once_the_agent_awaits_client_tools(monkeypatch) -> None:
+def test_a_turn_stops_following_at_a_client_tool_wait_but_watch_does_not(monkeypatch) -> None:
     awaiting = {"type": "ActiveStateChangeEvent", "data": {"state": "awaiting_tool_results"}}
+    answered = {"type": "ActiveStateChangeEvent", "data": {"state": "running"}}
+    monkeypatch.setattr(app_module, "stream_session", lambda *a, **k: iter([awaiting, answered]))
 
-    def stream(*args, **kwargs):
-        yield awaiting
-        raise AssertionError("kept streaming past awaiting_tool_results")
-
-    handled: list = []
-    monkeypatch.setattr(app_module, "stream_session", stream)
-    app_module._follow(None, "sess_1", type("Feed", (), {"handle": lambda self, e: handled.append(e)})(), timeout_s=1)
-
-    assert handled == [awaiting]
+    for stop_at_tool_wait, expected in ((True, [awaiting]), (False, [awaiting, answered])):
+        handled: list = []
+        feed = type("Feed", (), {"handle": lambda self, e: handled.append(e)})()
+        app_module._follow(None, "sess_1", feed, timeout_s=1, stop_at_tool_wait=stop_at_tool_wait)
+        assert handled == expected
 
 
 def test_local_run_hands_the_api_key_flag_to_the_runtime(monkeypatch) -> None:

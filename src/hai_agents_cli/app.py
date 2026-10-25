@@ -438,7 +438,8 @@ class _Conversation:
             if self.local:
                 stop_hint = "esc esc to stop" if self._listener else "ctrl+c to stop"
             else:
-                stop_hint = f"esc to steer {ui.SEP} ctrl+c to stop" if _interactive() else "ctrl+c to stop"
+                steerable = _interactive() and keys.supported()
+                stop_hint = f"esc to steer {ui.SEP} ctrl+c to stop" if steerable else "ctrl+c to stop"
             feed = ui.StepFeed(
                 err_console, max_steps=self.max_steps, steps=self.steps, cost=self.cost, stop_hint=stop_hint
             )
@@ -447,7 +448,14 @@ class _Conversation:
         try:
             if feed is not None:
                 with self._esc_watcher():
-                    _follow(self.client, self.session.id, feed, timeout_s=timeout, from_index=self.next_index)
+                    _follow(
+                        self.client,
+                        self.session.id,
+                        feed,
+                        timeout_s=timeout,
+                        from_index=self.next_index,
+                        stop_at_tool_wait=True,
+                    )
                     self._turn_done = True
             result = wait_for_session(self.client, self.session.id, from_index=self.next_index, timeout_seconds=timeout)
         except KeyboardInterrupt:
@@ -596,10 +604,18 @@ def _ask() -> str | None:
         return None
 
 
-def _follow(client: Any, session_id: str, feed: ui.StepFeed, *, timeout_s: float, from_index: int = 0) -> None:
+def _follow(
+    client: Any,
+    session_id: str,
+    feed: ui.StepFeed,
+    *,
+    timeout_s: float,
+    from_index: int = 0,
+    stop_at_tool_wait: bool = False,
+) -> None:
     for event in stream_session(client, session_id, from_index=from_index, timeout_seconds=timeout_s):
         feed.handle(event)
-        if _awaits_tool_results(event):
+        if stop_at_tool_wait and _awaits_tool_results(event):
             return
 
 
@@ -1181,6 +1197,21 @@ app.add_typer(local_app, name="local")
 _GLOBAL_FLAGS = ("--json",)
 _GLOBAL_OPTIONS = ("--api-key", "--base-url")
 _HELP_FLAGS = ("--help", "--install-completion", "--show-completion")
+_CHAT_FLAGS = ("--local",)
+_CHAT_OPTIONS = ("--agent", "-a")
+
+
+def _only_chat_options(args: list[str]) -> bool:
+    i = 0
+    while i < len(args):
+        name, has_value, _ = args[i].partition("=")
+        if args[i] in _CHAT_FLAGS or (has_value and name in _CHAT_OPTIONS):
+            i += 1
+        elif args[i] in _CHAT_OPTIONS and i + 1 < len(args):
+            i += 2
+        else:
+            return False
+    return True
 
 
 def route(argv: list[str], commands: set[str], interactive: bool) -> list[str]:
@@ -1201,8 +1232,8 @@ def route(argv: list[str], commands: set[str], interactive: bool) -> list[str]:
         else:
             rest.append(arg)
         i += 1
-    if not rest:
-        return head + (["chat"] if interactive else [])
+    if not rest or (interactive and _only_chat_options(rest)):
+        return head + (["chat", *rest] if interactive else [])
     first = rest[0]
     if first in commands or first in _HELP_FLAGS:
         return head + rest
