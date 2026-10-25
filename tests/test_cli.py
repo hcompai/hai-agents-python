@@ -154,8 +154,9 @@ def test_follow_up_continues_the_same_session_from_the_last_event(monkeypatch) -
     assert waits == [0, 7]
 
 
-def test_esc_pauses_then_sends_the_correction_or_resumes(monkeypatch) -> None:
-    for typed, expected in (("only the top 2", ("send", "only the top 2")), ("", ("resume",))):
+def test_esc_waits_for_the_pause_then_sends_the_correction_and_resumes(monkeypatch) -> None:
+    monkeypatch.setattr(app_module.time, "sleep", lambda s: None)
+    for typed, expected in (("only the top 2", [("send", "only the top 2"), ("resume",)]), ("", [("resume",)])):
         client = _RunClient()
         convo = app_module._Conversation(
             app_module.AppState(api_key=None, base_url=None, json_output=False),
@@ -171,7 +172,7 @@ def test_esc_pauses_then_sends_the_correction_or_resumes(monkeypatch) -> None:
 
         convo._steer(_Watcher())
 
-        assert client.sessions.calls == [("pause",), expected]
+        assert client.sessions.calls == [("pause",), *expected]
 
 
 def test_share_session_prints_absolute_url(monkeypatch) -> None:
@@ -298,6 +299,11 @@ class _RunSessions:
 
     def pause_session(self, id):
         self.calls.append(("pause",))
+        self._polls_until_paused = 2
+
+    def get_session_status(self, id):
+        self._polls_until_paused -= 1
+        return type("Status", (), {"status": "paused" if self._polls_until_paused <= 0 else "running"})()
 
     def resume_session(self, id):
         self.calls.append(("resume",))

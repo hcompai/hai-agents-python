@@ -525,13 +525,11 @@ class _Conversation:
             return
         try:
             name = name or _pick_agent(self.client)
-            path = _save_default_agent(self.client, name)
+            _save_default_agent(self.client, name)
         except typer.Exit:
             return
         self.agent, self.session, self.steps, self.cost = name, None, 0, None
-        ui.ok(
-            err_console, f"agent {name} {ui.SEP} saved as default in {path} {ui.SEP} next message starts a new session"
-        )
+        ui.ok(err_console, f"{name} is now the default {ui.SEP} next message starts a new session")
 
     def _share(self) -> None:
         if self.session is None:
@@ -550,7 +548,7 @@ class _Conversation:
         return keys.EscWatcher(self._steer)
 
     def _steer(self, watcher: keys.EscWatcher) -> None:
-        """Pause the agent, ask what to do instead, then send it (or resume on an empty answer)."""
+        """Pause the agent, ask what to do instead, then send that once the pause lands and resume."""
         feed, session_id = self._feed, self.session.id
         try:
             self.client.sessions.pause_session(session_id)
@@ -562,18 +560,28 @@ class _Conversation:
         with watcher.cooked():
             text = (_ask() or "").strip()
         try:
-            if self._turn_done:
+            status = self._await_pause(session_id)
+            if self._turn_done or is_settled_session_status(status):
                 self._pending = text or None
-            elif text:
-                request = SendSessionMessagesRequestBody_UserMessage(message=text)
-                self.client.sessions.send_session_messages(session_id, request=request)
             else:
+                if text:
+                    request = SendSessionMessagesRequestBody_UserMessage(message=text)
+                    self.client.sessions.send_session_messages(session_id, request=request)
                 self.client.sessions.resume_session(session_id)
         except Exception as exc:
             ui.error(err_console, str(exc))
         if feed is not None:
             err_console.print()
             feed.release()
+
+    def _await_pause(self, session_id: str, timeout_s: float = 30.0) -> str:
+        """A pause lands at the end of the current step; a message sent before then is overtaken by it."""
+        deadline = time.monotonic() + timeout_s
+        while True:
+            status = str(self.client.sessions.get_session_status(session_id).status)
+            if status == "paused" or is_settled_session_status(status) or time.monotonic() > deadline:
+                return status
+            time.sleep(0.5)
 
 
 def _ask() -> str | None:
@@ -1320,6 +1328,9 @@ def _format_api_body(body) -> str:
     """Human-readable message from an API error body, flattening 422 validation detail."""
     if isinstance(body, str):
         return body
+    message = body.get("message") if isinstance(body, dict) else getattr(body, "message", None)
+    if isinstance(message, str):
+        return message
     detail = getattr(body, "detail", None)
     if detail is None and isinstance(body, dict):
         detail = body.get("detail")
