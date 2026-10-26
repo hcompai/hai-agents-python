@@ -74,6 +74,7 @@ CheckState = Literal["ok", "warn", "fail"]
 _CHECK_GLYPH: dict[CheckState, str] = {"ok": DONE, "warn": ATTENTION, "fail": FAILED}
 
 MAX_CALLS = 4
+_MAX_TAIL = 12
 _MODEL_NUDGES = frozenset({"no_tool_called", "tool_skipped", "answer_validation", "prompt_too_large_recovery"})
 
 
@@ -292,6 +293,8 @@ class _Step:
     thought: str | None
     started: float
     started_ts: float | None
+    call_ids: list[Any] = field(default_factory=list)
+    agents: dict[int, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -299,17 +302,13 @@ class _Done:
     step: _Step
     seconds: float
     error: str | None
+    title: str | None = None
 
 
 @dataclass
 class _Agent:
     name: str
-    started: float
-    started_ts: float | None
-    steps: int | None = None
     status: str = "running"
-    seconds: float | None = None
-    shown: bool = False
 
 
 @dataclass
@@ -338,6 +337,7 @@ class StepFeed:
     _closed: bool = False
     _lock: threading.RLock = field(default_factory=threading.RLock)
     _agents: dict[str, _Agent] = field(default_factory=dict)
+    _tail: list[_Done | RenderableType] = field(default_factory=list)
     _turn_from_steps: int = 0
     _turn_from_cost: float = 0.0
 
@@ -374,29 +374,58 @@ class StepFeed:
             self._start_live()
             for event in held:
                 self._handle(event)
+            self._settle()
 
     def running_agents(self) -> list[str]:
         """Session ids of the spawned subagents still running."""
         with self._lock:
             return [session_id for session_id, agent in self._agents.items() if agent.status == "running"]
 
-    def agent_status(self, session_id: str, status: str, steps: int | None) -> None:
+    def agent_status(self, session_id: str, status: str) -> None:
         with self._lock:
             agent = self._agents.get(session_id)
-            if agent is None or agent.status != "running":
-                return
-            agent.steps = steps or agent.steps
-            if status in _ACTIVITY_GLYPH:
-                self._end_agent(agent, status, None)
-            if self._live is not None:
-                self._live.refresh()
+            if agent is not None and agent.status == "running" and status in _ACTIVITY_GLYPH:
+                agent.status = status
+                self._settle()
 
-    def _end_agent(self, agent: _Agent, status: str, ts: float | None) -> None:
-        agent.status = status
-        if ts is not None and agent.started_ts is not None:
-            agent.seconds = max(0.0, ts - agent.started_ts)
-        else:
-            agent.seconds = time.monotonic() - agent.started
+    def _end_agents(self, names: Any) -> None:
+        for agent in self._agents.values():
+            if agent.status == "running" and agent.name in (names or ()):
+                agent.status = "completed"
+        self._settle()
+
+    def _track_spawn(self, req: dict[str, Any], result: dict[str, Any]) -> None:
+        session_id = str(result["trajectory_id"])
+        self._agents[session_id] = _Agent(str(result.get("agent_id") or session_id))
+        for step in (self._current, self._done.step if self._done else None):
+            if step is None:
+                continue
+            if req.get("id") in step.call_ids:
+                index: int | None = step.call_ids.index(req.get("id"))
+            else:
+                free = [i for i, (verb, _) in enumerate(step.calls) if verb == "spawn" and i not in step.agents]
+                index = free[0] if free else None
+            if index is not None:
+                step.agents[index] = session_id
+                return
+
+    def _emit(self, item: _Done | RenderableType) -> None:
+        """Print in order; a block whose subagents still run stays live, and holds back what follows it."""
+        self._tail.append(item)
+        self._settle()
+
+    def _settle(self, *, force: bool = False) -> None:
+        if self._held is not None and not force:
+            return
+        while self._tail and (force or len(self._tail) > _MAX_TAIL or not self._runs_agents(self._tail[0])):
+            for line in self._render(self._tail.pop(0)):
+                self.out.print(line)
+
+    def _runs_agents(self, item: _Done | RenderableType) -> bool:
+        return isinstance(item, _Done) and any(self._agents[s].status == "running" for s in item.step.agents.values())
+
+    def _render(self, item: _Done | RenderableType, *, live: bool = False) -> list[RenderableType]:
+        return self._block(item, live=live) if isinstance(item, _Done) else [item]
 
     def _start_live(self) -> None:
         if self._live is None and interactive(self.out):
@@ -429,15 +458,13 @@ class StepFeed:
             req = data.get("tool_req") or {}
             result = data.get("result")
             if req.get("tool_name") == "spawn" and isinstance(result, dict) and result.get("trajectory_id"):
-                name = str(result.get("agent_id") or result["trajectory_id"])
-                self._agents[result["trajectory_id"]] = _Agent(name, time.monotonic(), ts)
+                self._track_spawn(req, result)
+            if req.get("tool_name") == "sleep" and isinstance(result, dict):
+                self._end_agents(result.get("completed"))
             if self._current is not None and req.get("tool_name") != "answer":
                 self._finish(ts, _tool_error(result))
         elif kind == "message_event":
-            caller = data.get("caller_id")
-            for agent in self._agents.values():
-                if agent.name == caller and agent.status == "running":
-                    self._end_agent(agent, "completed", ts)
+            self._end_agents([data.get("caller_id")])
         elif kind == "error_event":
             message = _first_line(data.get("error")) or "error"
             origin = data.get("origin")
@@ -447,8 +474,8 @@ class StepFeed:
                 self._finish(ts, message)
             else:
                 self._flush()
-                self.out.print(_bullet(Text(message, style="warn"), "warn"))
-                self.out.print()
+                self._emit(_bullet(Text(message, style="warn"), "warn"))
+                self._emit(Text(""))
         elif kind == "answer_event":
             self.answer = data.get("answer")
         if self._live is not None:
@@ -463,7 +490,10 @@ class StepFeed:
             if self._current is not None:
                 self._finish(None, None)
             self._flush()
-            self._print_agents(final=True)
+            self._settle(force=True)
+            if running := len(self.running_agents()):
+                self.out.print(Text(f"  {count(running, 'agent')} still running", style="meta"))
+                self.out.print()
             self._stop_live()
 
     @property
@@ -480,13 +510,14 @@ class StepFeed:
             self._flush()
         content = " ".join(str(data.get("content") or "").split())
         if content:
-            self.out.print(_bullet(Text(content)))
-            self.out.print()
+            self._emit(_bullet(Text(content)))
+            self._emit(Text(""))
         calls = [tools.label(req) for req in reqs]
         thought = None if content else _first_sentence(data.get("reasoning_content"))
         set_title(self.out, f"holo {SEP} step {self.steps + 1 - self._turn_from_steps}")
         busy = tools.busy(reqs[0])
-        self._current = _Step(self.steps + 1, calls, busy, thought, self._last_end, self._last_end_ts)
+        ids = [req.get("id") for req in reqs]
+        self._current = _Step(self.steps + 1, calls, busy, thought, self._last_end, self._last_end_ts, ids)
 
     def _finish(self, end_ts: float | None, error: str | None) -> None:
         step = self._current
@@ -503,51 +534,36 @@ class StepFeed:
 
     def _flush(self, title: str | None = None) -> None:
         done, self._done = self._done, None
-        if done is None:
-            return
-        for line in self._block(done, title):
-            self.out.print(line)
-        self._print_agents()
+        if done is not None:
+            done.title = title
+            self._emit(done)
 
-    def _print_agents(self, *, final: bool = False) -> None:
-        """Print each subagent once it ends; at the end of a turn, also those still running."""
-        agents = [a for a in self._agents.values() if not a.shown and (final or a.status != "running")]
-        for agent in agents:
-            agent.shown = True
-            self.out.print(self._agent_row(agent, time.monotonic()))
-        if agents:
-            self.out.print()
-
-    def _agent_row(self, agent: _Agent, now: float, *, live: bool = False) -> Text:
-        if agent.status == "running":
-            glyph, style = (_FRAMES[int(now * 8) % len(_FRAMES)], "accent") if live else ("◦", "meta")
-            word = None if live else "still running"
-            parts = [f"step {agent.steps}" if agent.steps else None, _clock(now - agent.started)]
-        else:
-            glyph, style = _ACTIVITY_GLYPH[agent.status]
-            word = None if style == "ok" else agent.status.replace("_", " ")
-            parts = [count(agent.steps, "step") if agent.steps else None, duration(agent.seconds or 0.0)]
-        row = Text.assemble("  ", (f"{glyph} ", style), (agent.name, "bold"), no_wrap=True, overflow="ellipsis")
-        if word:
-            row.append(f" {word}", style=style)
-        row.append(f" {SEP} " + f" {SEP} ".join(p for p in parts if p), style="meta")
-        return row
-
-    def _block(self, done: _Done, title: str | None) -> list[RenderableType]:
+    def _block(self, done: _Done, *, live: bool = False) -> list[RenderableType]:
         style = "fail" if done.error else "ok"
-        outcome = Text(done.error, style="fail") if done.error else Text(title or "")
+        outcome = Text(done.error, style="fail") if done.error else Text(done.title or "")
         if outcome.plain:
             outcome.append(f" {SEP} ", style="meta")
         outcome.append(duration(done.seconds), style="meta")
-        return [*self._calls(done.step, style), _result(outcome), Text("")]
+        return [*self._calls(done.step, style, live=live), _result(outcome), Text("")]
 
-    def _calls(self, step: _Step, dot: str) -> list[Text]:
-        """One dotted line per call; parallel calls share the step's result."""
+    def _calls(self, step: _Step, dot: str, *, live: bool = False) -> list[Text]:
+        """One dotted line per call; a spawn's dot blinks while its subagent runs, then shows how it ended."""
         shown = step.calls if len(step.calls) <= MAX_CALLS else step.calls[: MAX_CALLS - 1]
-        lines = [Text.assemble((f"{DOT} ", dot), self._call(verb, target)) for verb, target in shown]
+        lines = [
+            Text.assemble((f"{DOT} ", self._dot(step, i, dot, live)), self._call(verb, target))
+            for i, (verb, target) in enumerate(shown)
+        ]
         if hidden := len(step.calls) - len(shown):
             lines.append(Text(f"  +{hidden} more", style="meta"))
         return lines
+
+    def _dot(self, step: _Step, index: int, default: str, live: bool) -> str:
+        if index not in step.agents:
+            return default
+        status = self._agents[step.agents[index]].status
+        if status == "running":
+            return _blink() if live else "meta"
+        return _ACTIVITY_GLYPH[status][1]
 
     def _call(self, verb: str, target: str) -> Text:
         name = verb.capitalize()
@@ -561,15 +577,13 @@ class StepFeed:
         now = time.monotonic()
         current, done = self._current, self._done
         lines: list[RenderableType] = []
+        for item in self._tail:
+            lines += self._render(item, live=True)
         if done is not None:
-            lines += self._block(done, None)
+            lines += self._block(done, live=True)
         if current is not None:
-            dot = "accent" if int(now * 2) % 2 == 0 else "meta"
-            lines += self._calls(current, dot)
+            lines += self._calls(current, _blink(), live=True)
             lines.append(_result(Text(current.thought or "Running…", style="meta italic")))
-            lines.append(Text(""))
-        if agents := [a for a in self._agents.values() if not a.shown]:
-            lines += [self._agent_row(agent, now, live=True) for agent in agents]
             lines.append(Text(""))
         verb = current.busy if current else "Thinking"
         n = current.n if current else self.steps + 1
@@ -585,6 +599,10 @@ class StepFeed:
             Text.assemble((f"{frame} {verb}…", "accent"), (f" ({meta})", "meta"), no_wrap=True, overflow="ellipsis")
         )
         return Group(*lines)
+
+
+def _blink() -> str:
+    return "accent" if int(time.monotonic() * 2) % 2 == 0 else "meta"
 
 
 def print_answer(out: Console, answer: Any) -> None:

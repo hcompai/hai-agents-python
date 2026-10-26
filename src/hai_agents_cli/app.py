@@ -1017,7 +1017,7 @@ def _poll_agents(client: Any, feed: ui.StepFeed, stop: threading.Event) -> None:
                 status = client.sessions.get_session_status(session_id)
             except Exception:
                 continue
-            feed.agent_status(session_id, status.status, status.steps)
+            feed.agent_status(session_id, status.status)
 
 
 def _awaits_tool_results(event: Any) -> bool:

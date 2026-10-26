@@ -97,24 +97,36 @@ def test_feed_names_every_parallel_call_and_unknown_tools() -> None:
     ]
 
 
-def test_feed_tracks_each_subagent_until_it_reports_or_ends() -> None:
+def test_spawn_lines_show_each_subagent_state_and_hold_back_later_output(monkeypatch) -> None:
+    monkeypatch.delenv("NO_COLOR", raising=False)
     buffer = io.StringIO()
-    feed = ui.StepFeed(Console(file=buffer, width=100, color_system=None))
+    feed = ui.StepFeed(Console(file=buffer, width=100, color_system="standard", theme=ui.THEME))
     names = ("Blog", "News", "Wiki")
-    feed.handle(_agent("2026-10-26T12:00:00Z", kind="policy_event", tool_reqs=[{"tool_name": "spawn"}] * 3))
-    for name in names:
-        result = {"agent_id": name, "agent_type": "h/web-scraper-pro", "trajectory_id": f"sess_{name}"}
-        feed.handle(_agent("2026-10-26T12:00:01Z", kind="tool_result", tool_req={"tool_name": "spawn"}, result=result))
-    assert feed.running_agents() == ["sess_Blog", "sess_News", "sess_Wiki"]
+    spawns = [{"tool_name": "spawn", "args": {"agent_id": name}, "id": f"call_{name}"} for name in names]
+    feed.handle(_agent("2026-10-26T12:00:00Z", kind="policy_event", tool_reqs=spawns))
+    for req in spawns:
+        result = {"agent_id": req["args"]["agent_id"], "trajectory_id": f"sess_{req['args']['agent_id']}"}
+        feed.handle(_agent("2026-10-26T12:00:01Z", kind="tool_result", tool_req=req, result=result))
+    feed.handle(_agent("2026-10-26T12:00:02Z", kind="policy_event", tool_reqs=[{"tool_name": "sleep"}]))
+    feed.handle(_agent("2026-10-26T12:00:09Z", kind="tool_result", tool_req={"tool_name": "sleep"}, result={}))
+    feed.handle(_agent("2026-10-26T12:00:10Z", kind="policy_event", tool_reqs=[{"tool_name": "web_search"}]))
+    assert "Spawn" not in buffer.getvalue()
 
-    feed.agent_status("sess_News", "failed", 2)
+    feed.agent_status("sess_News", "failed")
     feed.handle(_agent("2026-10-26T12:01:41Z", kind="message_event", caller_id="Blog", content=["report"]))
-    feed.agent_status("sess_Blog", "completed", 5)
     feed.close()
 
-    rows = [line.strip() for line in buffer.getvalue().splitlines() if line.strip().startswith(("✓", "✗", "◦"))]
-    assert [row.split(" · ")[0] for row in rows] == ["✓ Blog", "✗ News failed", "◦ Wiki still running"]
-    assert rows[0] == "✓ Blog · 1m 40s"
+    lines = [line for line in buffer.getvalue().splitlines() if ui.DOT in line]
+    colors = {f"\x1b[{code}m{ui.DOT}": name for code, name in ((32, "green"), (31, "red"), (2, "dim"))}
+    assert [next(c for p, c in colors.items() if line.startswith(p)) for line in lines] == [
+        "green",
+        "red",
+        "dim",
+        "green",
+        "green",
+    ]
+    assert ["Blog" in lines[0], "News" in lines[1], "Wiki" in lines[2], "Wait" in lines[3]] == [True] * 4
+    assert "1 agent still running" in buffer.getvalue()
 
 
 def test_feed_surfaces_environment_and_tool_failures() -> None:
