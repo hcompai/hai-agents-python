@@ -26,7 +26,7 @@ from .bridge import LocalBridge, TokenSource
 from .config import auto_bridges_enabled
 from .killswitch import StopWatcher
 from .manager import ensure_bridges, serving_bridges, stop_bridges
-from .routing import localize_agent
+from .routing import Reference, localize_agent, references, split_revision
 
 if typing.TYPE_CHECKING:
     from .runtime import LocalRuntime
@@ -86,28 +86,85 @@ def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) 
         )
 
 
-def _localize(
-    client_wrapper: typing.Any, runtime: typing.Optional[LocalRuntime], kwargs: typing.Dict[str, typing.Any]
-) -> typing.List[LocalBridge]:
-    """Spawn bridges for unclaimed user_device environments in an inline agent and stamp their session ids.
+def _wants_bridges(auto_bridges: bool, kwargs: typing.Dict[str, typing.Any]) -> bool:
+    return auto_bridges and kwargs.get("agent") is not None and auto_bridges_enabled()
 
-    String agent references are left alone: registered agents must carry an explicit session_id on their
-    user_device environments, served manually with `hai local browser|desktop|workstation`.
-    """
-    agent = kwargs.get("agent")
-    if agent is None or isinstance(agent, str) or not auto_bridges_enabled():
-        return []
+
+def _resolve_references(client_wrapper: typing.Any, agent: typing.Any) -> typing.Dict[Reference, typing.Any]:
+    """Fetch the specs behind the names in ``agent``; a name that cannot be fetched gets no bridge."""
+    from hai_agents.agents.client import AgentsClient
+    from hai_agents.environments.client import EnvironmentsClient
+
+    agents, environments = (
+        AgentsClient(client_wrapper=client_wrapper),
+        EnvironmentsClient(client_wrapper=client_wrapper),
+    )
+    resolved: typing.Dict[Reference, typing.Any] = {}
+    for reference in references(agent):
+        kind, name = reference
+        try:
+            if kind == "agent":
+                agent_name, revision = split_revision(name)
+                resolved[reference] = agents.get_agent(agent_name, revision=revision, resolve=True)
+            else:
+                resolved[reference] = environments.get_environment(name)
+        except ApiError as exc:
+            logger.debug("cannot fetch %s %r to look for user_device environments: %s", kind, name, exc)
+    return resolved
+
+
+async def _resolve_references_async(
+    client_wrapper: typing.Any, agent: typing.Any
+) -> typing.Dict[Reference, typing.Any]:
+    from hai_agents.agents.client import AsyncAgentsClient
+    from hai_agents.environments.client import AsyncEnvironmentsClient
+
+    agents = AsyncAgentsClient(client_wrapper=client_wrapper)
+    environments = AsyncEnvironmentsClient(client_wrapper=client_wrapper)
+
+    async def fetch(reference: Reference) -> typing.Any:
+        kind, name = reference
+        try:
+            if kind == "agent":
+                agent_name, revision = split_revision(name)
+                return await agents.get_agent(agent_name, revision=revision, resolve=True)
+            return await environments.get_environment(name)
+        except ApiError as exc:
+            logger.debug("cannot fetch %s %r to look for user_device environments: %s", kind, name, exc)
+            return None
+
+    found = references(agent)
+    specs = await asyncio.gather(*(fetch(reference) for reference in found))
+    return {reference: spec for reference, spec in zip(found, specs) if spec is not None}
+
+
+def _localize(
+    client_wrapper: typing.Any,
+    runtime: typing.Optional[LocalRuntime],
+    kwargs: typing.Dict[str, typing.Any],
+    resolved: typing.Mapping[Reference, typing.Any],
+) -> typing.List[LocalBridge]:
+    """Spawn bridges for unclaimed user_device environments and route each one to its bridge; caller overrides win."""
     _warn_if_overrides_target_user_device(kwargs)
+    overrides = kwargs.get("overrides") or {}
     if runtime is None:
-        localized, bridges = localize_agent(
-            agent, api_key=_token_source(client_wrapper), base_url=client_wrapper.get_base_url()
-        )
+        api_key, base_url = _token_source(client_wrapper), client_wrapper.get_base_url()
     else:
-        localized, bridges = localize_agent(agent, api_key=runtime.api_key, base_url=runtime.base_url)
-        for bridge in bridges:
-            bridge.verify_runtime = True
-    kwargs["agent"] = localized
-    return bridges
+        api_key, base_url = runtime.api_key, runtime.base_url
+    localized = localize_agent(
+        kwargs["agent"],
+        api_key=api_key,
+        base_url=base_url,
+        resolved=resolved,
+        claimed=overrides,
+        seed=kwargs.get("idempotency_key"),
+    )
+    kwargs["agent"] = localized.agent
+    if localized.overrides:
+        kwargs["overrides"] = {**localized.overrides, **overrides}
+    for bridge in localized.bridges:
+        bridge.verify_runtime = runtime is not None
+    return localized.bridges
 
 
 class _LossWatcher:
@@ -205,9 +262,9 @@ def _register_exit_cancel(cancel_remote: RemoteCancel, session_id: str) -> None:
 
 
 def _panic_stop() -> None:
-    logger.warning("kill switch fired: cancelling local sessions and stopping bridges")
-    _cancel_sessions_at_exit()
+    logger.warning("kill switch fired: stopping bridges and cancelling local sessions")
     stop_bridges()
+    _cancel_sessions_at_exit()
 
 
 def _deregister_exit_cancel(session_id: str) -> None:
@@ -346,7 +403,10 @@ class LocalSessionsClient(_LocalSessionsState, SessionsClient):
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
         if self._hold is not None:
             self._hold.reacquire()
-        bridges = _localize(self._raw_client._client_wrapper, self._runtime, kwargs) if self._auto_bridges else []
+        bridges: typing.List[LocalBridge] = []
+        if _wants_bridges(self._auto_bridges, kwargs):
+            wrapper = self._raw_client._client_wrapper
+            bridges = _localize(wrapper, self._runtime, kwargs, _resolve_references(wrapper, kwargs["agent"]))
         if bridges:
             _apply_runaway_budgets(kwargs)
         stop_watcher = _ensure_stop_watcher() if bridges else None
@@ -402,7 +462,11 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:
         if self._hold is not None:
             await self._hold.reacquire_async()
-        bridges = _localize(self._raw_client._client_wrapper, self._runtime, kwargs) if self._auto_bridges else []
+        bridges: typing.List[LocalBridge] = []
+        if _wants_bridges(self._auto_bridges, kwargs):
+            wrapper = self._raw_client._client_wrapper
+            resolved = await _resolve_references_async(wrapper, kwargs["agent"])
+            bridges = _localize(wrapper, self._runtime, kwargs, resolved)
         if bridges:
             _apply_runaway_budgets(kwargs)
         # Native permission prompts must run before bridge startup moves to a worker.

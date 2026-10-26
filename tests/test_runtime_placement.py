@@ -267,7 +267,7 @@ async def test_bridge_never_serves_an_unproven_runtime(monkeypatch, runtime_serv
     runtime_server.proof_token = "squatter-token"
     runtime = SimpleNamespace(api_key="local-token", base_url=f"http://127.0.0.1:{runtime_server.port}")
     agent = {"environments": [{"id": "workstation", "kind": "workstation", "host": "user_device"}]}
-    [bridge] = _localize(None, runtime, {"agent": agent})
+    [bridge] = _localize(None, runtime, {"agent": agent}, {})
     bridge.create_driver = lambda: pytest.fail("a driver started for an unproven runtime")
     with pytest.raises(LocalRuntimeError, match="did not prove"):
         await bridge.run()
