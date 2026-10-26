@@ -768,7 +768,7 @@ class _Conversation:
         self.session, self.result, self._answer = session, None, session.latest_answer
         self.next_index = (changes.first_index or 0) + len(changes.new_events or [])
         if picked.agent:
-            self.agent, self._kinds = picked.agent, None
+            self._use_agent(picked.agent)
         ui.ok(err_console, f"resumed {ui.SEP} {welcome.activity(picked).task}", url=self.view_url)
 
     def _status(self) -> None:
@@ -792,7 +792,7 @@ class _Conversation:
         if _to_clipboard(text):
             ui.ok(err_console, "copied the last answer")
         else:
-            ui.error(err_console, "no clipboard tool found", fix="install pbcopy, wl-copy, xclip or xsel")
+            ui.error(err_console, "could not copy", fix="needs a working pbcopy, wl-copy, xclip or xsel")
 
     def _switch_agent(self, name: str) -> None:
         if self.local:
@@ -806,9 +806,12 @@ class _Conversation:
         except typer.Exit:
             return
         self._end_session()
+        self._use_agent(name)
+        ui.ok(err_console, f"{name} is now the default {ui.SEP} {self.does} {ui.SEP} next message starts a new session")
+
+    def _use_agent(self, name: str) -> None:
         self.agent, self._kinds = name, None
         self._arm_listener()
-        ui.ok(err_console, f"{name} is now the default {ui.SEP} {self.does} {ui.SEP} next message starts a new session")
 
     def _share(self) -> None:
         if self.session is None:
@@ -1640,8 +1643,9 @@ _CLIPBOARD_TOOLS = (("pbcopy",), ("wl-copy",), ("xclip", "-selection", "clipboar
 def _to_clipboard(text: str) -> bool:
     for command in _CLIPBOARD_TOOLS:
         if shutil.which(command[0]):
-            subprocess.run(command, input=text.encode(), check=True, timeout=5)
-            return True
+            with contextlib.suppress(OSError, subprocess.SubprocessError):
+                subprocess.run(command, input=text.encode(), check=True, timeout=5)
+                return True
     return False
 
 
