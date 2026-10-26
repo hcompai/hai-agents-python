@@ -7,6 +7,7 @@ import contextlib
 import difflib
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -384,6 +385,8 @@ class _Conversation:
     _feed: ui.StepFeed | None = None
     _turn_done: bool = False
     _pending: str | None = None
+    _kinds: list[str] | None = None
+    _answer: Any = None
 
     @property
     def human(self) -> bool:
@@ -412,10 +415,40 @@ class _Conversation:
             params["idle_timeout_s"] = IDLE_TIMEOUT_S
         return params
 
+    @property
+    def kinds(self) -> list[str]:
+        """The environments this agent drives on this machine; empty for an agent that runs in the cloud."""
+        if self.local:
+            return ["desktop"]
+        if self._kinds is None:
+            self._kinds = _local_kinds(self.client, self.agent)
+        return self._kinds
+
+    @property
+    def controls_machine(self) -> bool:
+        return bool(self.kinds)
+
+    @property
+    def drives_desktop(self) -> bool:
+        return any(kind in ("desktop", "workstation") for kind in self.kinds)
+
+    @property
+    def does(self) -> str:
+        if self.drives_desktop:
+            return "drives this desktop"
+        return "drives this machine's browser" if self.controls_machine else "runs in the cloud"
+
     def open(self) -> None:
         self.client = _local_client(self.state) if self.local else _client(self.state)
-        if self.local:
+        self._arm_listener()
+
+    def _arm_listener(self) -> None:
+        """Double-Esc stops an agent that controls this machine, from any app."""
+        if self.controls_machine and self._listener is None:
             self._listener = _arm_local_kill_switch()
+        elif not self.controls_machine and self._listener is not None:
+            self._listener.stop()
+            self._listener = None
 
     def close(self) -> None:
         if self._listener is not None:
@@ -428,26 +461,25 @@ class _Conversation:
         if self._header_shown or not self.human:
             return
         self._header_shown = True
-        does = "drives this desktop" if self.local else "runs tasks in a cloud browser"
         if self.followups:
-            self._show_welcome(does)
+            self._show_welcome()
             return
-        stop = f" {ui.SEP} esc esc stops it" if self.local and self._listener else ""
-        ui.header(err_console, "holo", [self.label, does + stop, _custom_endpoint_host(self.state)])
+        stop = f" {ui.SEP} esc esc stops it" if self.controls_machine and self._listener else ""
+        ui.header(err_console, "holo", [self.label, self.does + stop, _custom_endpoint_host(self.state)])
 
-    def _show_welcome(self, does: str) -> None:
+    def _show_welcome(self) -> None:
         facts = welcome.gather(self.client, cloud=not self.local)
         current = welcome.current_version()
-        if self.local:
+        if self.controls_machine:
             stop = "esc esc stops the agent, from any app" if self._listener else "ctrl+c stops the agent"
         else:
             stop = "esc pauses the agent so you can steer it"
-        tips = [Text(stop), Text("follow up in plain words; /new starts a fresh task")]
+        tips = [Text(stop), Text("follow up in plain words; / lists commands")]
         if welcome.is_newer(facts.latest, current):
             tips.append(Text(f"holo {facts.latest} is available {ui.SEP} pip install -U hai-agents", style="warn"))
-        if self.local and (missing := welcome.missing_grants()):
+        if self.drives_desktop and (missing := welcome.missing_grants()):
             tips.append(Text(f"missing macOS grants: {', '.join(missing)} {ui.SEP} run holo doctor", style="warn"))
-        about = [self.label, does, welcome.quota_line(facts.quota), _custom_endpoint_host(self.state)]
+        about = [self.label, self.does, welcome.quota_line(facts.quota), _custom_endpoint_host(self.state)]
         recent = None if self.local or facts.recent is None else [welcome.activity(s) for s in facts.recent]
         ui.welcome(err_console, current, [line for line in about if line], tips, recent)
 
@@ -459,19 +491,22 @@ class _Conversation:
         rows = [("/new [task]", "end this session; start fresh, optionally with a task")]
         if not self.local:
             rows += [
+                ("/resume [n]", "continue one of your recent sessions"),
                 ("/agent [name]", "switch agent and save it as the default"),
                 ("/live", "open the live view in your browser"),
                 ("/share", "create a public share link"),
             ]
+        rows += [("/status", "session, agent and usage"), ("/copy", "copy the last answer")]
         return [*rows, ("/help", "commands and keys"), ("/exit", "leave")]
 
     def keys(self) -> list[tuple[str, str]]:
-        stop = (
-            ("esc esc", "stop the agent") if self.local else ("esc", "pause the agent and tell it what to do instead")
-        )
+        if self.controls_machine:
+            stop = [("esc esc", "stop the agent")]
+        else:
+            stop = [("esc", "pause the agent and tell it what to do instead"), ("esc, then /answer", "answer now")]
         return [
             ("enter", "send"),
-            stop,
+            *stop,
             ("ctrl+c", "cancel the turn or clear the input; twice to exit"),
             ("ctrl+d", "exit"),
             ("up / down", "history"),
@@ -489,7 +524,7 @@ class _Conversation:
     def placeholder(self) -> str:
         if self.session is not None:
             return "Follow up, or /new for a fresh task"
-        return f'Try "{EXAMPLE_TASKS[self.local]}"'
+        return f'Try "{EXAMPLE_TASKS[self.drives_desktop]}"'
 
     def turn(self, message: str, *, echo: bool = False) -> None:
         started_at = time.time()
@@ -518,7 +553,7 @@ class _Conversation:
             ui.user(err_console, message)
         feed = None
         if self.human:
-            if self.local:
+            if self.controls_machine:
                 stop_hint = "esc esc to stop" if self._listener else "ctrl+c to stop"
             else:
                 steerable = _interactive() and keys.supported()
@@ -561,7 +596,10 @@ class _Conversation:
                 feed.answer = result.answer
             self.steps, self.cost = feed.steps, feed.cost
         self.result, self.next_index = result, result.next_from_index
-        stopped = self.local and _kill_switch_fired(started_at)
+        answer = feed.answer if feed is not None else result.answer
+        if answer is not None:
+            self._answer = answer
+        stopped = self.controls_machine and _kill_switch_fired(started_at)
         _print_run_result(
             result,
             self.state.json_output,
@@ -620,7 +658,7 @@ class _Conversation:
         err_console.print()
 
     def _leave(self) -> None:
-        if self.session is not None and not self.local:
+        if self.session is not None and not self.controls_machine:
             minutes = IDLE_TIMEOUT_S // 60
             ui.hint(err_console, f"session {self.session.id} stays open {minutes} min, then closes")
 
@@ -659,9 +697,74 @@ class _Conversation:
                 ui.error(err_console, "no session yet", fix="send a task first")
         elif name == "share":
             self._share()
+        elif name == "resume" and not self.local:
+            try:
+                self._resume_session(arg)
+            except KeyboardInterrupt:
+                err_console.print()
+        elif name == "status":
+            self._status()
+        elif name == "copy":
+            self._copy()
+        elif name == "answer":
+            ui.error(err_console, "/answer works mid-run", fix="press esc while the agent works, then type /answer")
         else:
             ui.error(err_console, f"unknown command /{name}", fix="/help lists the commands")
         return True
+
+    def _resume_session(self, arg: str) -> None:
+        try:
+            recent = self.client.sessions.list_sessions(page=1, size=10).items
+        except Exception as exc:
+            ui.error(err_console, str(exc))
+            return
+        if not recent:
+            ui.error(err_console, "no sessions yet", fix="send a task first")
+            return
+        try:
+            picked = _pick_session(recent, arg)
+        except typer.Exit:
+            return
+        if picked.agent and _local_kinds(self.client, picked.agent):
+            ui.error(err_console, "a session that drove this machine cannot be resumed", fix="/new starts a fresh one")
+            return
+        try:
+            session = self.client.sessions.get_session(picked.id)
+            changes = self.client.sessions.get_session_changes(
+                picked.id, from_index=0, include_events=True, wait_for_seconds=0
+            )
+        except Exception as exc:
+            ui.error(err_console, str(exc))
+            return
+        self._end_session()
+        self.session, self.result, self._answer = session, None, session.latest_answer
+        self.next_index = (changes.first_index or 0) + len(changes.new_events or [])
+        if picked.agent:
+            self.agent, self._kinds = picked.agent, None
+        ui.ok(err_console, f"resumed {ui.SEP} {welcome.activity(picked).task}", url=self.view_url)
+
+    def _status(self) -> None:
+        if self.session is None:
+            ui.ok(err_console, f"{self.label} {ui.SEP} {self.does} {ui.SEP} no session yet")
+        else:
+            status = _status_text(getattr(self.result, "status", None) or "running")
+            parts = [f"session {str(self.session.id)[:8]}", status, ui.count(self.steps, "step"), ui.money(self.cost)]
+            ui.ok(err_console, f" {ui.SEP} ".join(p for p in parts if p), url=self.view_url)
+            ui.hint(err_console, f"{self.label} {ui.SEP} {self.does}")
+        if not self.local:
+            with contextlib.suppress(Exception):
+                if line := welcome.quota_line(self.client.quota.get_token_quota()):
+                    ui.hint(err_console, line)
+
+    def _copy(self) -> None:
+        if self._answer is None:
+            ui.error(err_console, "no answer yet", fix="send a task first")
+            return
+        text = self._answer if isinstance(self._answer, str) else json.dumps(to_jsonable(self._answer), indent=2)
+        if _to_clipboard(text):
+            ui.ok(err_console, "copied the last answer")
+        else:
+            ui.error(err_console, "no clipboard tool found", fix="install pbcopy, wl-copy, xclip or xsel")
 
     def _switch_agent(self, name: str) -> None:
         if self.local:
@@ -675,8 +778,9 @@ class _Conversation:
         except typer.Exit:
             return
         self._end_session()
-        self.agent = name
-        ui.ok(err_console, f"{name} is now the default {ui.SEP} next message starts a new session")
+        self.agent, self._kinds = name, None
+        self._arm_listener()
+        ui.ok(err_console, f"{name} is now the default {ui.SEP} {self.does} {ui.SEP} next message starts a new session")
 
     def _share(self) -> None:
         if self.session is None:
@@ -690,7 +794,7 @@ class _Conversation:
         ui.ok(err_console, "share link", url=absolute_share_url(self.client, share.share_url))
 
     def _esc_watcher(self) -> Any:
-        if self.local or not _interactive():
+        if self.controls_machine or not _interactive():
             return contextlib.nullcontext()
         return keys.EscWatcher(self._steer)
 
@@ -721,11 +825,14 @@ class _Conversation:
         if watcher.stopped:
             return
         if status == "paused" and not self._turn_done:
-            self._correct_and_resume(session_id, text)
+            if text == "/answer":
+                self._force_answer(session_id)
+            else:
+                self._correct_and_resume(session_id, text)
         else:
             if status is None or status == "paused":
                 self._resume(session_id)
-            self._pending = text or None
+            self._pending = None if text == "/answer" else text or None
         if feed is not None:
             err_console.print()
             feed.release()
@@ -739,6 +846,14 @@ class _Conversation:
             except Exception as exc:
                 ui.error(err_console, f"correction not sent: {exc}")
         self._resume(session_id)
+
+    def _force_answer(self, session_id: str) -> None:
+        """Asking for the answer also unpauses the session."""
+        try:
+            self.client.sessions.force_session_answer(session_id)
+        except Exception as exc:
+            ui.error(err_console, f"could not ask for the answer: {exc}")
+            self._resume(session_id)
 
     def _resume(self, session_id: str) -> None:
         try:
@@ -1436,14 +1551,20 @@ def _client(state: AppState) -> Client:
 
 
 def _pick_agent(client: Client) -> str:
-    """Pick an agent from the live catalog by number."""
+    """Pick an agent by number: H's agents first, then your organization's."""
     try:
-        agents = client.agents.list_agents(page=1, size=100).items
+        listed = client.agents.list_agents(page=1, size=100).items
     except Exception as exc:
         _raise_cli_error(exc)
-    if not agents:
+    if not listed:
         _raise_cli_error(RuntimeError("No agents available."))
+    h_agents = [item for item in listed if item.name.startswith("h/")]
+    agents = h_agents + [item for item in listed if not item.name.startswith("h/")]
     for i, item in enumerate(agents, 1):
+        if i in (1, len(h_agents) + 1):
+            if i > 1:
+                err_console.print()
+            err_console.print(f"  [accent]{'H agents' if i <= len(h_agents) else 'Your organization'}[/accent]")
         desc = _truncate(" ".join((item.description or "").split()))
         line = f"  [bold]{i}[/bold]. {escape(item.name)}"
         err_console.print(f"{line}  [meta]{escape(desc)}[/meta]" if desc else line)
@@ -1451,6 +1572,43 @@ def _pick_agent(client: Client) -> str:
     if not 1 <= choice <= len(agents):
         _raise_cli_error(RuntimeError(f"Choice must be between 1 and {len(agents)}."))
     return agents[choice - 1].name
+
+
+def _pick_session(recent: list[Any], arg: str) -> Any:
+    """A session by list number or id prefix; with no argument, list them and ask."""
+    if not arg:
+        for i, summary in enumerate(recent, 1):
+            item = welcome.activity(summary)
+            agent = f"  [meta]{escape(summary.agent)}[/meta]" if summary.agent else ""
+            err_console.print(f"  [bold]{i}[/bold]. {escape(_truncate(item.task))}  [meta]{item.age}[/meta]{agent}")
+        arg = str(typer.prompt("Session number", type=int, err=True))
+    if arg.isdigit() and 1 <= int(arg) <= len(recent):
+        return recent[int(arg) - 1]
+    matches = [summary for summary in recent if str(summary.id).startswith(arg)]
+    if len(matches) != 1:
+        ui.error(err_console, f"no single recent session matches {arg!r}", fix="/resume lists them")
+        raise typer.Exit(1)
+    return matches[0]
+
+
+def _local_kinds(client: Any, agent: Any) -> list[str]:
+    from hai_agents_local.sessions import local_environment_kinds
+
+    try:
+        return local_environment_kinds(client, agent)
+    except Exception:
+        return []
+
+
+_CLIPBOARD_TOOLS = (("pbcopy",), ("wl-copy",), ("xclip", "-selection", "clipboard"), ("xsel", "--clipboard", "--input"))
+
+
+def _to_clipboard(text: str) -> bool:
+    for command in _CLIPBOARD_TOOLS:
+        if shutil.which(command[0]):
+            subprocess.run(command, input=text.encode(), check=True, timeout=5)
+            return True
+    return False
 
 
 def _save_default_agent(client: Client, name: str) -> Any:

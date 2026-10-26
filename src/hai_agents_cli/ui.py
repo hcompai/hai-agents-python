@@ -227,7 +227,7 @@ def _link(url: str | None) -> tuple[tuple[str, str], ...]:
 def paused(out: Console) -> None:
     out.print()
     out.print(
-        Text.assemble((f"{DOT} ", "warn"), "Paused", (" · say what to do instead, or press enter to resume", "meta"))
+        Text.assemble((f"{DOT} ", "warn"), "Paused", (" · say what to do instead, /answer to wrap up, or enter to resume", "meta"))
     )
 
 

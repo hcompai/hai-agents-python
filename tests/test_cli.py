@@ -274,6 +274,7 @@ def test_esc_waits_for_the_pause_then_sends_the_correction_and_resumes(monkeypat
     cases = (
         ("only the top 2", False, False, False, send_and_resume, None),
         ("", False, False, False, [("resume",)], None),
+        ("/answer", False, False, False, [("answer",)], None),
         ("only the top 2", True, False, False, [("resume",)], None),
         ("only the top 2", False, True, False, [], None),
         ("only the top 2", False, False, True, [("resume",)], "only the top 2"),
@@ -324,6 +325,16 @@ def test_esc_settles_when_the_pause_cannot_land(status, expected) -> None:
 
     assert client.sessions.calls == expected
     assert convo._pending == "only the top 2"
+
+
+def test_agent_numbers_follow_the_listed_order_h_agents_first(monkeypatch) -> None:
+    agent = lambda name: type("Agent", (), {"name": name, "description": ""})()  # noqa: E731
+    client = type("Client", (), {})()
+    client.agents = type("Agents", (), {})()
+    client.agents.list_agents = lambda **_: type("Page", (), {"items": [agent("mine"), agent("h/surfer")]})()
+    monkeypatch.setattr(app_module.typer, "prompt", lambda *a, **k: 2)
+
+    assert app_module._pick_agent(client) == "mine"
 
 
 def test_share_session_prints_absolute_url(monkeypatch) -> None:
@@ -461,6 +472,9 @@ class _RunSessions:
 
     def resume_session(self, id):
         self.calls.append(("resume",))
+
+    def force_session_answer(self, id):
+        self.calls.append(("answer",))
 
     def cancel_session(self, id):
         self.calls.append(("cancel",))
