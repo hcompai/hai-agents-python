@@ -328,9 +328,11 @@ def run(
         _raise_cli_error(exc)
     convo.open()
     try:
-        convo.turn(task, echo=True)
         if convo.followups:
+            convo._send(task, echo=True)
             convo.loop()
+        else:
+            convo.turn(task, echo=True)
     finally:
         convo.close()
     if convo.result is not None:
@@ -690,9 +692,9 @@ class _Conversation:
                 continue
             self._send(text)
 
-    def _send(self, text: str) -> None:
+    def _send(self, text: str, *, echo: bool = False) -> None:
         with contextlib.suppress(typer.Exit):
-            self.turn(text)
+            self.turn(text, echo=echo)
         err_console.print()
 
     def _leave(self) -> None:

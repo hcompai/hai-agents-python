@@ -158,7 +158,7 @@ def test_a_client_tool_wait_ends_the_session_and_the_next_message_starts_a_new_o
 def test_a_lost_stream_cancels_the_session_and_the_chat_continues(monkeypatch) -> None:
     client = _RunClient()
     idle = SessionRunResult(id="sess_1", status="idle", events=[], next_from_index=1)
-    results = iter([idle, RuntimeError("stream lost"), idle])
+    results = iter([RuntimeError("stream lost"), idle])
 
     def wait(client_, id, **_):
         result = next(results)
@@ -166,7 +166,7 @@ def test_a_lost_stream_cancels_the_session_and_the_chat_continues(monkeypatch) -
             raise result
         return result
 
-    replies = iter(["only direct ones", "try again", None])
+    replies = iter(["try again", None])
     monkeypatch.setattr(app_module, "_client", lambda state: client)
     monkeypatch.setattr(app_module, "wait_for_session", wait)
     monkeypatch.setattr(app_module, "_follow", _no_events)
@@ -176,7 +176,6 @@ def test_a_lost_stream_cancels_the_session_and_the_chat_continues(monkeypatch) -
     result = runner.invoke(app, ["run", "find flights", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
 
     assert result.exit_code == 0, result.output
-    assert client.sessions.sent == [("sess_1", "only direct ones")]
     assert client.sessions.created == 2
     assert ("cancel",) in client.sessions.calls
 
