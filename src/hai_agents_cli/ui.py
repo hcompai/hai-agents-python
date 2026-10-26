@@ -202,6 +202,10 @@ def duration(seconds: float) -> str:
     return f"{minutes}m {secs}s"
 
 
+def count(n: int, noun: str) -> str:
+    return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
+
+
 def money(usd: float | None) -> str | None:
     if usd is None:
         return None
@@ -264,9 +268,20 @@ class StepFeed:
     _live: Live | None = None
     _held: list[Any] | None = None
     _lock: threading.RLock = field(default_factory=threading.RLock)
+    _turn_from_steps: int = 0
+    _turn_from_cost: float = 0.0
 
     def __post_init__(self) -> None:
+        self._turn_from_steps, self._turn_from_cost = self.steps, self.cost or 0.0
         self._start_live()
+
+    @property
+    def turn_steps(self) -> int:
+        return self.steps - self._turn_from_steps
+
+    @property
+    def turn_cost(self) -> float | None:
+        return None if self.cost is None else max(0.0, self.cost - self._turn_from_cost)
 
     def handle(self, event: Any) -> None:
         with self._lock:
@@ -412,8 +427,8 @@ class StepFeed:
         n = current.n if current else self.steps + 1
         parts = [
             _clock(self.elapsed),
-            f"step {n}/{self.max_steps}" if self.max_steps else f"step {n}",
-            money(self.cost),
+            f"step {n}/{self.max_steps}" if self.max_steps else f"step {n - self._turn_from_steps}",
+            money(self.turn_cost),
             self.stop_hint,
         ]
         meta = f" {SEP} ".join(p for p in parts if p)
@@ -449,7 +464,7 @@ def summary(
 ) -> None:
     parts: list[str | None] = []
     if feed is not None:
-        parts = [f"{feed.steps} steps", money(feed.cost)]
+        parts = [count(feed.turn_steps, "step"), money(feed.turn_cost)]
     if session_id:
         parts.append(f"session {session_id}")
     meta = "".join(f" {SEP} {p}" for p in parts if p)

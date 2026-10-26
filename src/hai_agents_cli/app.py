@@ -19,6 +19,7 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Column, Table
+from rich.text import Text
 
 from hai_agents import (
     Client,
@@ -278,14 +279,11 @@ def _resolve_agent(agent: str | None, local: bool) -> Any:
 
 
 AGENT_HELP = f"Agent name. Default: {credentials.DEFAULT_AGENT}, or the one set with `holo agents use`."
-SLASH_COMMANDS = [
-    ("/agent [name]", "switch agent and save it as the default"),
-    ("/new", "start a new session"),
-    ("/live", "open the live view in your browser"),
-    ("/share", "create a public share link"),
-    ("/exit", "leave; so does enter on an empty line"),
-    ("esc", "pause the agent mid-run and tell it what to do instead"),
-]
+COMMAND_NAMES = frozenset({"new", "clear", "agent", "live", "share", "help", "exit", "quit"})
+EXAMPLE_TASKS = {
+    False: "Find the top 3 stories on Hacker News and their URLs",
+    True: "Open Calculator and compute 15% of 240",
+}
 
 
 @app.command()
@@ -332,7 +330,8 @@ def run(
             convo.loop()
     finally:
         convo.close()
-    _exit_unless_clean(convo.result.status)
+    if convo.result is not None:
+        _exit_unless_clean(convo.result.status)
 
 
 @app.command()
@@ -380,6 +379,7 @@ class _Conversation:
     cost: float | None = None
     _listener: Any = None
     _header_shown: bool = False
+    _prompt: Any = None
     _feed: ui.StepFeed | None = None
     _turn_done: bool = False
     _pending: str | None = None
@@ -425,30 +425,78 @@ class _Conversation:
         if self._header_shown or not self.human:
             return
         self._header_shown = True
-        label = "local desktop" if self.local else str(self.agent)
-        where = ("esc esc stops" if self._listener else None) if self.local else _custom_endpoint_host(self.state)
-        hint = "/help for commands" if self.followups else None
+        if self.local:
+            does = "drives this desktop" + (f" {ui.SEP} esc esc stops it" if self._listener else "")
+        else:
+            does = "runs tasks in a cloud browser"
+        hint = f"? for shortcuts {ui.SEP} / for commands" if self.followups else None
         if self.followups:
             ui.banner(err_console)
-        ui.header(err_console, "holo", [label, where, hint], link=self.view_url)
+        ui.header(err_console, "holo", [self.label, does, _custom_endpoint_host(self.state), hint])
+
+    @property
+    def label(self) -> str:
+        return "local desktop" if self.local else str(self.agent)
+
+    def commands(self) -> list[tuple[str, str]]:
+        rows = [("/new [task]", "end this session; start fresh, optionally with a task")]
+        if not self.local:
+            rows += [
+                ("/agent [name]", "switch agent and save it as the default"),
+                ("/live", "open the live view in your browser"),
+                ("/share", "create a public share link"),
+            ]
+        return [*rows, ("/help", "commands and keys"), ("/exit", "leave")]
+
+    def keys(self) -> list[tuple[str, str]]:
+        stop = (
+            ("esc esc", "stop the agent") if self.local else ("esc", "pause the agent and tell it what to do instead")
+        )
+        return [
+            ("enter", "send"),
+            stop,
+            ("ctrl+c", "cancel the turn or clear the input; twice to exit"),
+            ("ctrl+d", "exit"),
+            ("up / down", "history"),
+            ("\\ enter", "new line"),
+        ]
+
+    def toolbar(self) -> str:
+        if self.session is None:
+            state = "new task"
+        else:
+            parts = [f"follow-up on {str(self.session.id)[:8]}", ui.count(self.steps, "step"), ui.money(self.cost)]
+            state = f" {ui.SEP} ".join(p for p in parts if p) + f" {ui.SEP} /new for a fresh task"
+        return f"  {self.label} {ui.SEP} {state} {ui.SEP} ? for shortcuts"
+
+    def placeholder(self) -> str:
+        if self.session is not None:
+            return "Follow up, or /new for a fresh task"
+        return f'Try "{EXAMPLE_TASKS[self.local]}"'
 
     def turn(self, message: str, *, echo: bool = False) -> None:
         started_at = time.time()
+        self.show_header()
         if self.session is None:
             try:
-                self.session = self.client.sessions.create_session(**self.params(message))
+                with self._starting():
+                    self.session = self.client.sessions.create_session(**self.params(message))
             except Exception as exc:
                 _raise_cli_error(exc)
             self.next_index = 0
-            if self._header_shown and self.view_url:
+            if self.human and self.view_url:
                 ui.hint(err_console, f"live view {self.view_url}")
         else:
             request = SendSessionMessagesRequestBody_UserMessage(message=message)
             try:
                 self.client.sessions.send_session_messages(self.session.id, request=request)
             except Exception as exc:
-                _raise_cli_error(exc)
-        self.show_header()
+                if not self._session_ended():
+                    _raise_cli_error(exc)
+                self._end_session()
+                ui.hint(err_console, "that session had ended; starting a new one")
+                self.turn(message, echo=echo)
+                return
         if echo and self.human:
             ui.user(err_console, message)
         feed = None
@@ -480,8 +528,12 @@ class _Conversation:
             _cancel_quietly(self.client, self.session.id)
             if feed is not None:
                 feed.close()
-            ui.error(err_console, "interrupted; session cancelled")
-            raise typer.Exit(130) from None
+            if not self.followups:
+                ui.error(err_console, "interrupted; session cancelled")
+                raise typer.Exit(130) from None
+            ui.error(err_console, "turn cancelled; the next message starts a new session")
+            self.session, self.result, self.steps, self.cost = None, None, 0, None
+            return
         except Exception as exc:
             if feed is not None:
                 feed.close()
@@ -493,7 +545,14 @@ class _Conversation:
             self.steps, self.cost = feed.steps, feed.cost
         self.result, self.next_index = result, result.next_from_index
         stopped = self.local and _kill_switch_fired(started_at)
-        _print_run_result(result, self.state.json_output, agent_view_url=self.view_url, feed=feed, stopped=stopped)
+        _print_run_result(
+            result,
+            self.state.json_output,
+            agent_view_url=self.view_url,
+            feed=feed,
+            stopped=stopped,
+            show_session_id=not self.followups,
+        )
         if stopped or is_terminal_session_status(str(result.status)):
             self._end_session()
             if self.followups:
@@ -505,30 +564,52 @@ class _Conversation:
             _cancel_quietly(self.client, self.session.id)
         self.session, self.steps, self.cost = None, 0, None
 
+    def _session_ended(self) -> bool:
+        try:
+            return is_terminal_session_status(str(self.client.sessions.get_session_status(self.session.id).status))
+        except Exception:
+            return False
+
+    def _starting(self) -> Any:
+        if not (self.human and ui.interactive(err_console)):
+            return contextlib.nullcontext()
+        return err_console.status(Text("Starting the agent…", style="accent"), spinner="dots", spinner_style="accent")
+
     def loop(self) -> None:
-        ui.hint(
-            err_console, "type a task, /help for commands" if self.session is None else "follow up, or enter to exit"
-        )
         while True:
-            try:
-                text = self._pending if self._pending is not None else _ask()
-            except KeyboardInterrupt:
-                err_console.print()
-                return
+            text = self._pending if self._pending is not None else _read_message(self)
             self._pending = None
-            text = (text or "").strip()
-            if not text:
+            if text is None:
+                self._leave()
                 return
-            if text.startswith("/"):
+            text = text.strip()
+            if not text:
+                continue
+            if text == "?":
+                self._show_help()
+                continue
+            if _is_command(text):
                 if not self.command(text):
+                    self._leave()
                     return
                 continue
-            try:
-                self.turn(text)
-            except typer.Exit as exc:
-                if exc.exit_code == 130:
-                    raise
-            err_console.print()
+            self._send(text)
+
+    def _send(self, text: str) -> None:
+        with contextlib.suppress(typer.Exit):
+            self.turn(text)
+        err_console.print()
+
+    def _leave(self) -> None:
+        if self.session is not None and not self.local:
+            minutes = IDLE_TIMEOUT_S // 60
+            ui.hint(err_console, f"session {self.session.id} stays open {minutes} min, then closes")
+
+    def _show_help(self) -> None:
+        ui.commands(err_console, self.commands())
+        err_console.print()
+        ui.commands(err_console, self.keys())
+        err_console.print()
 
     def command(self, text: str) -> bool:
         """Run a slash command; False means leave."""
@@ -537,16 +618,24 @@ class _Conversation:
         if name in ("exit", "quit"):
             return False
         if name == "help":
-            ui.commands(err_console, SLASH_COMMANDS)
-        elif name == "new":
+            self._show_help()
+        elif name in ("new", "clear"):
             self._end_session()
-            ui.ok(err_console, "the next message starts a new session")
+            if arg:
+                self._send(arg)
+            else:
+                ui.ok(err_console, "the next message starts a new session")
         elif name == "agent":
-            self._switch_agent(arg)
+            try:
+                self._switch_agent(arg)
+            except KeyboardInterrupt:
+                err_console.print()
         elif name == "live":
             if self.view_url:
                 webbrowser.open(self.view_url)
                 ui.ok(err_console, f"opened {self.view_url}")
+            elif self.session is not None:
+                ui.error(err_console, "this session has no live view")
             else:
                 ui.error(err_console, "no session yet", fix="send a task first")
         elif name == "share":
@@ -591,7 +680,8 @@ class _Conversation:
         feed, session_id = self._feed, self.session.id
         try:
             self.client.sessions.pause_session(session_id)
-        except Exception:
+        except Exception as exc:
+            ui.error(err_console, f"could not pause: {exc}")
             return
         if feed is not None:
             feed.hold()
@@ -631,6 +721,23 @@ class _Conversation:
             if status == "paused" or is_settled_session_status(status):
                 return status
             time.sleep(0.5)
+
+
+def _read_message(convo: _Conversation) -> str | None:
+    """The conversation prompt; None means the user left."""
+    if convo._prompt is None:
+        from hai_agents_cli.prompt import Prompt
+
+        convo._prompt = Prompt(credentials.GLOBAL_ENV_PATH.parent / "history", convo.commands)
+    return convo._prompt.read(toolbar=convo.toolbar, placeholder=convo.placeholder())
+
+
+def _is_command(text: str) -> bool:
+    """A known `/name`, or an unknown one that is not a path like `/Users/me/a.pdf`."""
+    if not text.startswith("/"):
+        return False
+    name = text[1:].split(maxsplit=1)[0] if text[1:].strip() else ""
+    return name in COMMAND_NAMES or ("/" not in name and "." not in name)
 
 
 def _ask() -> str | None:
@@ -1337,6 +1444,7 @@ def _print_run_result(
     agent_view_url: str | None = None,
     feed: ui.StepFeed | None = None,
     stopped: bool = False,
+    show_session_id: bool = True,
 ) -> None:
     payload = {
         "session_id": result.id,
@@ -1362,7 +1470,7 @@ def _print_run_result(
     if feed is not None:
         if answer is not None:
             err_console.print()
-        ui.summary(err_console, status, feed, error_text=error_text, session_id=result.id)
+        ui.summary(err_console, status, feed, error_text=error_text, session_id=result.id if show_session_id else None)
     elif error_text or status not in CLEAN_STATUSES:
         ui.error(err_console, error_text or f"session {status}")
 

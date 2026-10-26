@@ -119,7 +119,7 @@ def test_kill_switch_stops_that_turn_and_the_next_message_starts_a_new_session(m
     monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
     monkeypatch.setattr(app_module, "_follow", lambda *a, **k: next(follows)())
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
-    monkeypatch.setattr(app_module, "_ask", lambda: next(replies))
+    monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
 
     result = runner.invoke(app, ["run", "open calculator", "--local"], env={"HAI_API_KEY": "hk-test"})
 
@@ -168,7 +168,7 @@ def test_a_follow_up_after_a_failed_turn_starts_a_new_session(monkeypatch) -> No
     monkeypatch.setattr(app_module, "wait_for_session", lambda *a, **k: failed)
     monkeypatch.setattr(app_module, "_follow", _no_events)
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
-    monkeypatch.setattr(app_module, "_ask", lambda: next(replies))
+    monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
 
     runner.invoke(app, ["run", "first task"], env={"HAI_API_KEY": "hk-test"})
 
@@ -191,7 +191,7 @@ def test_new_releases_the_idle_session_before_starting_another(monkeypatch) -> N
     monkeypatch.setattr(app_module, "wait_for_session", lambda *a, **k: idle)
     monkeypatch.setattr(app_module, "_follow", _no_events)
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
-    monkeypatch.setattr(app_module, "_ask", lambda: next(replies))
+    monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
 
     result = runner.invoke(app, ["run", "first task"], env={"HAI_API_KEY": "hk-test"})
 
@@ -233,7 +233,7 @@ def test_follow_up_continues_the_same_session_from_the_last_event(monkeypatch) -
     monkeypatch.setattr(app_module, "wait_for_session", wait)
     monkeypatch.setattr(app_module, "_follow", _no_events)
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
-    monkeypatch.setattr(app_module, "_ask", lambda: next(replies))
+    monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
 
     result = runner.invoke(app, ["run", "top story?"], env={"HAI_API_KEY": "hk-test"})
 
