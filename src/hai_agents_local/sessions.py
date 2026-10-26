@@ -7,6 +7,7 @@ import atexit
 import concurrent.futures
 import contextlib
 import functools
+import hashlib
 import inspect
 import json
 import logging
@@ -18,6 +19,7 @@ import httpx
 
 from hai_agents.base_client import BaseClient
 from hai_agents.core.api_error import ApiError
+from hai_agents.core.parse_error import ParsingError
 from hai_agents.core.request_options import RequestOptions
 from hai_agents.polling import is_terminal_session_status
 from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
@@ -79,6 +81,11 @@ def _resolve_token(source: TokenSource) -> str:
         return pool.submit(lambda: asyncio.run(consume())).result()
 
 
+def _caller(api_key: TokenSource, base_url: typing.Optional[str]) -> str:
+    """Idempotency keys are scoped per caller on the platform, so bridge ids seeded from them must be too."""
+    return hashlib.sha256(f"{base_url}\n{_resolve_token(api_key)}".encode()).hexdigest()
+
+
 def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) -> None:
     overrides = kwargs.get("overrides")
     if overrides and "user_device" in json.dumps(overrides, default=str):
@@ -90,6 +97,9 @@ def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) 
 
 def _wants_bridges(auto_bridges: bool, kwargs: typing.Dict[str, typing.Any]) -> bool:
     return auto_bridges and kwargs.get("agent") is not None and auto_bridges_enabled()
+
+
+_LOOKUP_ERRORS = (ApiError, ParsingError, httpx.HTTPError)
 
 
 def _resolve_references(client_wrapper: typing.Any, agent: typing.Any) -> typing.Dict[Reference, typing.Any]:
@@ -110,7 +120,7 @@ def _resolve_references(client_wrapper: typing.Any, agent: typing.Any) -> typing
                 resolved[reference] = agents.get_agent(agent_name, revision=revision, resolve=True)
             else:
                 resolved[reference] = environments.get_environment(name)
-        except ApiError as exc:
+        except _LOOKUP_ERRORS as exc:
             logger.debug("cannot fetch %s %r to look for user_device environments: %s", kind, name, exc)
     return resolved
 
@@ -131,7 +141,7 @@ async def _resolve_references_async(
                 agent_name, revision = split_revision(name)
                 return await agents.get_agent(agent_name, revision=revision, resolve=True)
             return await environments.get_environment(name)
-        except ApiError as exc:
+        except _LOOKUP_ERRORS as exc:
             logger.debug("cannot fetch %s %r to look for user_device environments: %s", kind, name, exc)
             return None
 
@@ -163,13 +173,14 @@ def _localize(
         api_key, base_url = _token_source(client_wrapper), client_wrapper.get_base_url()
     else:
         api_key, base_url = runtime.api_key, runtime.base_url
+    idempotency_key = kwargs.get("idempotency_key")
     localized = localize_agent(
         kwargs["agent"],
         api_key=api_key,
         base_url=base_url,
         resolved=resolved,
         claimed=overrides,
-        seed=kwargs.get("idempotency_key"),
+        seed=None if idempotency_key is None else f"{_caller(api_key, base_url)}:{idempotency_key}",
     )
     kwargs["agent"] = localized.agent
     if localized.overrides:
@@ -275,8 +286,10 @@ def _register_exit_cancel(cancel_remote: RemoteCancel, session_id: str) -> None:
 
 def _panic_stop() -> None:
     logger.warning("kill switch fired: stopping bridges and cancelling local sessions")
-    stop_bridges()
-    _cancel_sessions_at_exit()
+    try:
+        stop_bridges()
+    finally:
+        _cancel_sessions_at_exit()
 
 
 def _deregister_exit_cancel(session_id: str) -> None:
