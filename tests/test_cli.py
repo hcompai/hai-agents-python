@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
 import json
 import os
@@ -202,28 +203,27 @@ def test_retry_runs_the_first_task_again_in_a_new_session(monkeypatch) -> None:
 def test_ctrl_c_while_starting_cancels_the_new_session_and_the_chat_continues(monkeypatch) -> None:
     client = _RunClient()
 
-    class InterruptedFuture:
-        def __init__(self, call, kwargs) -> None:
-            self.session, self.waits = call(**kwargs), 0
-
-        def result(self):
-            self.waits += 1
-            if self.waits == 1:
+    class InterruptedFuture(concurrent.futures.Future):
+        def result(self, timeout=None):
+            if not self.done():
                 raise KeyboardInterrupt
-            return self.session
+            return super().result(timeout)
 
     class Pool:
         def __init__(self, **_) -> None:
-            pass
+            self.jobs: list = []
 
         def __enter__(self):
             return self
 
         def __exit__(self, *_) -> None:
-            pass
+            for future, call, kwargs in self.jobs:
+                future.set_result(call(**kwargs))
 
         def submit(self, call, **kwargs):
-            return InterruptedFuture(call, kwargs)
+            future = InterruptedFuture()
+            self.jobs.append((future, call, kwargs))
+            return future
 
     replies = iter([None])
     monkeypatch.setattr(app_module, "_client", lambda state: client)

@@ -628,16 +628,19 @@ class _Conversation:
                 ui.hint(err_console, "session ended; the next message starts a new one")
 
     def _create_session(self, message: str) -> Any:
-        """Ctrl+c still waits for the create call, so the session it made is cancelled rather than left running."""
+        """On ctrl+c, the session is cancelled once the create call returns, even if ctrl+c is pressed again."""
         params = self.params(message)
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             created = pool.submit(self.client.sessions.create_session, **params)
             try:
                 return created.result()
             except KeyboardInterrupt:
-                with contextlib.suppress(Exception):
-                    _cancel_quietly(self.client, created.result().id)
+                created.add_done_callback(self._cancel_created)
                 raise
+
+    def _cancel_created(self, created: concurrent.futures.Future) -> None:
+        if not created.cancelled() and created.exception() is None:
+            _cancel_quietly(self.client, created.result().id)
 
     def _cancel_turn(self, feed: ui.StepFeed | None) -> None:
         if self.session is not None:
@@ -1661,14 +1664,21 @@ def _local_kinds(client: Any, agent: Any) -> list[str]:
         return []
 
 
-_CLIPBOARD_TOOLS = (("pbcopy",), ("wl-copy",), ("xclip", "-selection", "clipboard"), ("xsel", "--clipboard", "--input"))
+_CLIPBOARD_TOOLS = (
+    ("pbcopy",),
+    ("wl-copy",),
+    ("xclip", "-selection", "clipboard"),
+    ("xsel", "--clipboard", "--input"),
+    ("clip",),
+)
 
 
 def _to_clipboard(text: str) -> bool:
     for command in _CLIPBOARD_TOOLS:
         if shutil.which(command[0]):
+            data = text.encode("utf-16" if command[0] == "clip" else "utf-8")
             with contextlib.suppress(OSError, subprocess.SubprocessError):
-                subprocess.run(command, input=text.encode(), check=True, timeout=5)
+                subprocess.run(command, input=data, check=True, timeout=5)
                 return True
     return False
 
