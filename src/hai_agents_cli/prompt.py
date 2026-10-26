@@ -7,9 +7,7 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import CompleteEvent, Completer, Completion
-from prompt_toolkit.document import Document
-from prompt_toolkit.filters import Condition
+from prompt_toolkit.filters import Condition, to_filter
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
@@ -28,26 +26,49 @@ _STYLE = Style.from_dict(
         "placeholder": "#6c6c6c",
         "bottom-toolbar": "noreverse #8a8a8a",
         "bottom-toolbar.warn": "noreverse #d7af00",
-        "completion-menu.completion": "bg:default #bcbcbc",
-        "completion-menu.completion.current": f"bg:default {ui.IRIS} bold",
-        "completion-menu.meta.completion": "bg:default #6c6c6c",
-        "completion-menu.meta.completion.current": "bg:default #8a8a8a",
+        "menu": "#bcbcbc",
+        "menu.current": f"{ui.IRIS} bold",
+        "menu.meta": "#6c6c6c",
+        "menu.meta.current": ui.IRIS,
     }
 )
 
 
-class _SlashCompleter(Completer):
+class _SlashMenu:
+    """The commands matching a typed `/prefix`, listed under the input with one row selected."""
+
     def __init__(self, commands: Rows) -> None:
         self._commands = commands
+        self._index, self._typed = 0, ""
 
-    def get_completions(self, document: Document, complete_event: CompleteEvent) -> Iterable[Completion]:
-        text = document.text_before_cursor
-        if not text.startswith("/") or " " in text:
-            return
-        for usage, description in self._commands():
-            name = usage.split()[0]
-            if name.startswith(text):
-                yield Completion(name, start_position=-len(text), display=usage, display_meta=description)
+    def matches(self, text: str) -> list[tuple[str, str]]:
+        if not text.startswith("/") or any(char.isspace() for char in text):
+            return []
+        return [(usage, about) for usage, about in self._commands() if usage.split()[0].startswith(text)]
+
+    def selected(self, text: str) -> str | None:
+        rows = self.matches(text)
+        return rows[self._current(text, rows)][0] if rows else None
+
+    def move(self, text: str, step: int) -> None:
+        rows = self.matches(text)
+        if rows:
+            self._index, self._typed = (self._current(text, rows) + step) % len(rows), text
+
+    def render(self, text: str) -> FormattedText:
+        rows = self.matches(text)
+        current = self._current(text, rows)
+        width = max(len(usage) for usage, _ in rows)
+        fragments: list[tuple[str, str]] = []
+        for index, (usage, about) in enumerate(rows):
+            suffix = ".current" if index == current else ""
+            if fragments:
+                fragments.append(("", "\n"))
+            fragments += [(f"class:menu{suffix}", f"  {usage.ljust(width)}   "), (f"class:menu.meta{suffix}", about)]
+        return FormattedText(fragments)
+
+    def _current(self, text: str, rows: list[tuple[str, str]]) -> int:
+        return min(self._index, len(rows) - 1) if text == self._typed else 0
 
 
 class Prompt:
@@ -55,23 +76,25 @@ class Prompt:
 
     def __init__(self, history_path: Path, commands: Rows) -> None:
         history_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        self._commands = commands
+        self._menu = _SlashMenu(commands)
         self._exit_armed_at = 0.0
         self._session: PromptSession[str] = PromptSession(
             history=FileHistory(str(history_path)),
-            completer=_SlashCompleter(commands),
-            complete_while_typing=True,
             key_bindings=self._key_bindings(),
             style=_STYLE,
             multiline=True,
             prompt_continuation="  ",
-            reserve_space_for_menu=0,
         )
+        # The input grows with its text only, so the toolbar and menu sit right under it.
+        self._session.layout.current_window.dont_extend_height = to_filter(True)
 
     def read(self, *, toolbar: Callable[[], str], placeholder: str) -> str | None:
         def bottom() -> FormattedText:
             if self._exit_pending():
                 return FormattedText([("class:bottom-toolbar.warn", "  press ctrl+c again to exit")])
+            text = self._session.default_buffer.text
+            if self._menu.matches(text):
+                return self._menu.render(text)
             return FormattedText([("", toolbar())])
 
         try:
@@ -84,16 +107,13 @@ class Prompt:
         except (EOFError, KeyboardInterrupt):
             return None
 
-    def _first_command(self, prefix: str) -> str | None:
-        names = [usage.split()[0] for usage, _ in self._commands()]
-        return next((name for name in names if name.startswith(prefix)), None)
-
     def _exit_pending(self) -> bool:
         return time.monotonic() - self._exit_armed_at < EXIT_WINDOW_S
 
     def _key_bindings(self) -> KeyBindings:
         kb = KeyBindings()
         empty = Condition(lambda: not self._session.default_buffer.text)
+        menu_open = Condition(lambda: bool(self._menu.matches(self._session.default_buffer.text)))
 
         @kb.add("enter")
         def _submit(event: KeyPressEvent) -> None:
@@ -104,12 +124,26 @@ class Prompt:
                 buf.delete_before_cursor()
                 buf.newline(copy_margin=False)
                 return
-            if buf.text.startswith("/") and " " not in buf.text:
-                picked = buf.complete_state.current_completion if buf.complete_state else None
-                name = picked.text if picked else self._first_command(buf.text)
-                if name:
-                    buf.text = name
+            usage = self._menu.selected(buf.text)
+            if usage:
+                buf.text = usage.split()[0]
             buf.validate_and_handle()
+
+        @kb.add("up", filter=menu_open)
+        @kb.add("s-tab", filter=menu_open)
+        def _menu_up(event: KeyPressEvent) -> None:
+            self._menu.move(event.current_buffer.text, -1)
+
+        @kb.add("down", filter=menu_open)
+        def _menu_down(event: KeyPressEvent) -> None:
+            self._menu.move(event.current_buffer.text, 1)
+
+        @kb.add("tab", filter=menu_open)
+        def _menu_complete(event: KeyPressEvent) -> None:
+            usage = self._menu.selected(event.current_buffer.text) or ""
+            name, _, args = usage.partition(" ")
+            event.current_buffer.text = f"{name} " if args else name
+            event.current_buffer.cursor_position = len(event.current_buffer.text)
 
         @kb.add("escape", "enter")
         @kb.add("c-j")
