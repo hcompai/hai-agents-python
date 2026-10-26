@@ -465,12 +465,9 @@ class StepFeed:
         return [*self._calls(done.step, style), _result(outcome), Text("")]
 
     def _calls(self, step: _Step, dot: str) -> list[Text]:
-        """One line per call; parallel calls share the step's dot and result."""
+        """One dotted line per call; parallel calls share the step's result."""
         shown = step.calls if len(step.calls) <= MAX_CALLS else step.calls[: MAX_CALLS - 1]
-        lines = [
-            Text.assemble((f"{DOT} " if i == 0 else "  ", dot), self._call(verb, target))
-            for i, (verb, target) in enumerate(shown)
-        ]
+        lines = [Text.assemble((f"{DOT} ", dot), self._call(verb, target)) for verb, target in shown]
         if hidden := len(step.calls) - len(shown):
             lines.append(Text(f"  +{hidden} more", style="meta"))
         return lines
