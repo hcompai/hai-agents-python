@@ -753,6 +753,9 @@ class _Conversation:
             picked = _pick_session(recent, arg)
         except typer.Exit:
             return
+        if self.session is not None and str(picked.id) == str(self.session.id):
+            ui.ok(err_console, "already on this session")
+            return
         if picked.agent and _local_kinds(self.client, picked.agent):
             ui.error(err_console, "a session that drove this machine cannot be resumed", fix="/new starts a fresh one")
             return
@@ -766,7 +769,7 @@ class _Conversation:
             return
         self._end_session()
         self.session, self.result, self._answer = session, None, session.latest_answer
-        self.next_index = (changes.first_index or 0) + len(changes.new_events or [])
+        self.next_index = 0 if changes is None else (changes.first_index or 0) + len(changes.new_events or [])
         if picked.agent:
             self._use_agent(picked.agent)
         ui.ok(err_console, f"resumed {ui.SEP} {welcome.activity(picked).task}", url=self.view_url)
@@ -801,7 +804,7 @@ class _Conversation:
             )
             return
         try:
-            name = name or _pick_agent(self.client)
+            name = name or _pick_agent(self.client, current=self.agent)
             _save_default_agent(self.client, name)
         except typer.Exit:
             return
@@ -1587,8 +1590,18 @@ def _client(state: AppState) -> Client:
         _raise_cli_error(exc)
 
 
-def _pick_agent(client: Client) -> str:
-    """Pick an agent by number: H's agents first, then your organization's."""
+def _choose(rows: list[tuple[str, str]], headers: dict[int, str] | None = None, current: int = 0) -> int:
+    """The row picked with the arrow keys; cancelling raises typer.Exit."""
+    from hai_agents_cli.prompt import choose
+
+    picked = choose(rows, headers, current)
+    if picked is None:
+        raise typer.Exit(1)
+    return picked
+
+
+def _pick_agent(client: Client, current: str | None = None) -> str:
+    """Pick an agent: H's agents first, then your organization's."""
     try:
         listed = client.agents.list_agents(page=1, size=100).items
     except Exception as exc:
@@ -1597,28 +1610,22 @@ def _pick_agent(client: Client) -> str:
         _raise_cli_error(RuntimeError("No agents available."))
     h_agents = [item for item in listed if item.name.startswith("h/")]
     agents = h_agents + [item for item in listed if not item.name.startswith("h/")]
-    for i, item in enumerate(agents, 1):
-        if i in (1, len(h_agents) + 1):
-            if i > 1:
-                err_console.print()
-            err_console.print(f"  [accent]{'H agents' if i <= len(h_agents) else 'Your organization'}[/accent]")
-        desc = _truncate(" ".join((item.description or "").split()))
-        line = f"  [bold]{i}[/bold]. {escape(item.name)}"
-        err_console.print(f"{line}  [meta]{escape(desc)}[/meta]" if desc else line)
-    choice = typer.prompt("Agent number", type=int, err=True)
-    if not 1 <= choice <= len(agents):
-        _raise_cli_error(RuntimeError(f"Choice must be between 1 and {len(agents)}."))
-    return agents[choice - 1].name
+    headers = {}
+    if h_agents:
+        headers[0] = "H agents"
+    if len(agents) > len(h_agents):
+        headers[len(h_agents)] = "Your organization"
+    rows = [(item.name, _truncate(" ".join((item.description or "").split()))) for item in agents]
+    names = [item.name for item in agents]
+    return agents[_choose(rows, headers, names.index(current) if current in names else 0)].name
 
 
 def _pick_session(recent: list[Any], arg: str) -> Any:
-    """A session by list number or id prefix; with no argument, list them and ask."""
+    """A session by list number or id prefix; with no argument, pick one with the arrow keys."""
     if not arg:
-        for i, summary in enumerate(recent, 1):
-            item = welcome.activity(summary)
-            agent = f"  [meta]{escape(summary.agent)}[/meta]" if summary.agent else ""
-            err_console.print(f"  [bold]{i}[/bold]. {escape(_truncate(item.task))}  [meta]{item.age}[/meta]{agent}")
-        arg = str(typer.prompt("Session number", type=int, err=True))
+        items = [welcome.activity(summary) for summary in recent]
+        rows = [(_truncate(item.task, 60), f"{item.age}  {s.agent or ''}") for item, s in zip(items, recent)]
+        return recent[_choose(rows)]
     if arg.isdigit() and 1 <= int(arg) <= len(recent):
         return recent[int(arg) - 1]
     matches = [summary for summary in recent if str(summary.id).startswith(arg)]

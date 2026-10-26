@@ -3,6 +3,8 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import types
+from datetime import datetime, timezone
 
 import pytest
 from typer.testing import CliRunner
@@ -397,9 +399,43 @@ def test_agent_numbers_follow_the_listed_order_h_agents_first(monkeypatch) -> No
     client = type("Client", (), {})()
     client.agents = type("Agents", (), {})()
     client.agents.list_agents = lambda **_: type("Page", (), {"items": [agent("mine"), agent("h/surfer")]})()
-    monkeypatch.setattr(app_module.typer, "prompt", lambda *a, **k: 2)
+    shown: list = []
+    monkeypatch.setattr("hai_agents_cli.prompt.choose", lambda rows, headers, current: shown.append(rows) or 1)
 
     assert app_module._pick_agent(client) == "mine"
+    assert [name for name, _ in shown[0]] == ["h/surfer", "mine"]
+
+
+def test_resume_switches_sessions_but_keeps_the_current_one_when_picked_again() -> None:
+    summary = lambda id: types.SimpleNamespace(  # noqa: E731
+        id=id,
+        agent=None,
+        status="idle",
+        first_message=None,
+        last_activity_at=None,
+        created_at=datetime.now(timezone.utc),
+        agent_view_url=None,
+    )
+    client = _RunClient()
+    client.sessions.list_sessions = lambda **_: types.SimpleNamespace(items=[summary("sess_2"), summary("sess_1")])
+    client.sessions.get_session = lambda id: types.SimpleNamespace(id=id, latest_answer=None, agent_view_url=None)
+    client.sessions.get_session_changes = lambda id, **_: None
+    convo = app_module._Conversation(
+        app_module.AppState(api_key=None, base_url=None, json_output=False),
+        "h/test-agent",
+        local=False,
+        max_steps=5,
+        max_time_s=60,
+        overrides={},
+        client=client,
+        session=types.SimpleNamespace(id="sess_1"),
+    )
+
+    convo.command("/resume 2")
+    assert (convo.session.id, client.sessions.calls) == ("sess_1", [])
+
+    convo.command("/resume 1")
+    assert (convo.session.id, convo.next_index, client.sessions.calls) == ("sess_2", 0, [("cancel",)])
 
 
 def test_share_session_prints_absolute_url(monkeypatch) -> None:

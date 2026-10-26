@@ -4,7 +4,7 @@ from prompt_toolkit.history import FileHistory
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 
-from hai_agents_cli.prompt import Prompt
+from hai_agents_cli.prompt import Prompt, choose
 
 ENTER, CTRL_C, CTRL_D, TAB, UP, DOWN = "\r", "\x03", "\x04", "\t", "\x1b[A", "\x1b[B"
 
@@ -41,3 +41,13 @@ def test_up_scrolls_history_past_a_recalled_command(monkeypatch, tmp_path) -> No
         pipe.send_text(f"{UP}{UP}{ENTER}")
         prompt = Prompt(tmp_path / "history", lambda: [("/new [task]", "start fresh"), ("/exit", "leave")])
         assert prompt.read(toolbar=lambda: "", placeholder="") == "find flights"
+
+
+@pytest.mark.parametrize(
+    ("keys", "expected"), [(ENTER, 1), (f"{DOWN}{DOWN}{ENTER}", 0), (f"{UP}{ENTER}", 0), (CTRL_C, None)]
+)
+def test_picker_moves_with_the_arrows_and_wraps(monkeypatch, keys, expected) -> None:
+    monkeypatch.setenv("TERM", "xterm-256color")
+    with create_pipe_input() as pipe, create_app_session(input=pipe, output=DummyOutput()):
+        pipe.send_text(keys)
+        assert choose([("a", ""), ("b", ""), ("c", "")], {0: "Letters"}, current=1) == expected

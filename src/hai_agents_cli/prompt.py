@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
 
 from prompt_toolkit import PromptSession
+from prompt_toolkit.application import Application
+from prompt_toolkit.data_structures import Point
 from prompt_toolkit.filters import Condition, to_filter
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
+from prompt_toolkit.layout import HSplit, Layout, Window
+from prompt_toolkit.layout.controls import FormattedTextControl
+from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.styles import Style
 
 from hai_agents_cli import ui
@@ -30,8 +35,68 @@ _STYLE = Style.from_dict(
         "slash.current": f"{ui.IRIS} bold",
         "slash.meta": "#6c6c6c",
         "slash.meta.current": ui.IRIS,
+        "slash.header": f"{ui.IRIS} bold",
     }
 )
+
+PICKER_HEIGHT = 12
+
+
+def choose(rows: Sequence[tuple[str, str]], headers: Mapping[int, str] | None = None, current: int = 0) -> int | None:
+    """Pick a row with the arrow keys; None when cancelled. ``headers`` titles the section starting at a row."""
+    headers = headers or {}
+    state = {"current": current, "lines": [0] * len(rows)}
+
+    def render() -> FormattedText:
+        fragments: list[tuple[str, str]] = []
+        line = 0
+        for index, (label, meta) in enumerate(rows):
+            if index in headers:
+                if index:
+                    fragments.append(("", "\n"))
+                    line += 1
+                fragments.append(("class:slash.header", f"  {headers[index]}\n"))
+                line += 1
+            state["lines"][index] = line
+            suffix, marker = (".current", "›") if index == state["current"] else ("", " ")
+            fragments += [(f"class:slash{suffix}", f"{marker} {label}"), (f"class:slash.meta{suffix}", f"  {meta}")]
+            fragments.append(("", "\n"))
+            line += 1
+        return FormattedText(fragments)
+
+    kb = KeyBindings()
+
+    @kb.add("up")
+    @kb.add("s-tab")
+    def _up(event: KeyPressEvent) -> None:
+        state["current"] = (state["current"] - 1) % len(rows)
+
+    @kb.add("down")
+    @kb.add("tab")
+    def _down(event: KeyPressEvent) -> None:
+        state["current"] = (state["current"] + 1) % len(rows)
+
+    @kb.add("enter")
+    def _pick(event: KeyPressEvent) -> None:
+        event.app.exit(result=state["current"])
+
+    @kb.add("escape")
+    @kb.add("c-c")
+    def _cancel(event: KeyPressEvent) -> None:
+        event.app.exit(result=None)
+
+    listing = FormattedTextControl(
+        render,
+        focusable=True,
+        show_cursor=False,
+        get_cursor_position=lambda: Point(0, state["lines"][state["current"]]),
+    )
+    hint = FormattedTextControl(FormattedText([("class:slash.meta", "  ↑↓ move · enter picks · esc cancels")]))
+    layout = Layout(HSplit([Window(listing, height=Dimension(max=PICKER_HEIGHT)), Window(hint, height=1)]))
+    app: Application[int | None] = Application(
+        layout=layout, key_bindings=kb, style=_STYLE, full_screen=False, erase_when_done=True
+    )
+    return app.run()
 
 
 class _SlashMenu:
