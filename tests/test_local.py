@@ -280,7 +280,8 @@ class TestAutoStart:
             "agent.model": "m",
         }
 
-    def test_follow_up_to_an_ended_session_serves_its_bridges_again(self, monkeypatch):
+    @pytest.mark.parametrize("stop", ["ended", "cancelled"])
+    def test_follow_up_to_a_stopped_session_serves_its_bridges_again(self, monkeypatch, stop):
         from hai_agents.sessions.types import SendSessionMessagesRequestBody_UserMessage
         from hai_agents_local import sessions as sessions_module
 
@@ -306,11 +307,15 @@ class TestAutoStart:
             events.append("send")
 
         monkeypatch.setattr(SessionsClient, "send_session_messages", send)
+        monkeypatch.setattr(SessionsClient, "cancel_session", lambda self, id, **kw: None)
         sessions = Client(api_key=API_KEY).sessions
         sessions.create_session(
             agent={"name": "x", "environments": [{"kind": "desktop", "host": "user_device"}]}, messages="hi"
         )
-        sessions.get_session_status("sess-1")
+        if stop == "ended":
+            sessions.get_session_status("sess-1")
+        else:
+            sessions.cancel_session("sess-1")
         more = SendSessionMessagesRequestBody_UserMessage(message="more")
         with pytest.raises(RuntimeError):
             sessions.send_session_messages("sess-1", request=more)

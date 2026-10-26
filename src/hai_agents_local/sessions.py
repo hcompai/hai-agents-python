@@ -357,21 +357,28 @@ class _LocalSessionsState:
         self._auto_bridges = auto_bridges
         self._owned_bridges: typing.Dict[str, typing.List[str]] = {}
         self._served: typing.Dict[str, typing.List[LocalBridge]] = {}
-        # Sessions whose bridges stopped because the session ended; a follow-up restarts the session, so it serves them again.
-        self._ended: typing.Dict[str, typing.List[LocalBridge]] = {}
+        # Sessions whose bridges stopped because they ended or were cancelled; a message restarts the session, so it
+        # serves them again.
+        self._stopped: typing.Dict[str, typing.List[LocalBridge]] = {}
         # Sessions this client created on a local runtime; they never keep that runtime alive past close().
         self.own_session_ids: typing.Set[str] = set()
 
     @contextlib.contextmanager
     def _reviving(self, session_id: str) -> typing.Iterator[typing.List[LocalBridge]]:
-        """Bridges an ended session needs again; kept for the retry if the follow-up fails."""
-        bridges = self._ended.pop(session_id, [])
+        """Bridges a stopped session needs again; kept for the retry if the follow-up fails."""
+        bridges = self._stopped.pop(session_id, [])
         try:
             yield bridges
         except BaseException:
             if bridges:
-                self._ended[session_id] = bridges
+                self._stopped[session_id] = bridges
             raise
+
+    def _retire(self, session_id: str) -> None:
+        """Its bridges stopped; keep them for a follow-up, which restarts the session."""
+        self._owned_bridges.pop(session_id, None)
+        if session_id in self._served:
+            self._stopped[session_id] = self._served.pop(session_id)
 
     @property
     def _runtime(self) -> typing.Optional[LocalRuntime]:
@@ -404,9 +411,7 @@ class _LocalSessionsState:
         except TimeoutError:
             logger.warning("could not confirm local bridges stopped for ended session %s", session_id, exc_info=True)
         else:
-            self._owned_bridges.pop(session_id, None)
-            if session_id in self._served:
-                self._ended[session_id] = self._served[session_id]
+            self._retire(session_id)
 
     def _track(self, session: typing.Any, bridges: typing.List[LocalBridge], started: typing.List[str]) -> None:
         session_id = getattr(session, "id", None)
@@ -453,7 +458,7 @@ class LocalSessionsClient(_LocalSessionsState, SessionsClient):
         try:
             if owned:
                 stop_bridges(owned)
-                self._owned_bridges.pop(str(id), None)
+            self._retire(str(id))
         finally:
             with _confirming_stop(str(id)):
                 super().cancel_session(id, request_options=request_options)
@@ -525,7 +530,7 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
         try:
             if owned:
                 await asyncio.to_thread(stop_bridges, owned)
-                self._owned_bridges.pop(str(id), None)
+            self._retire(str(id))
         finally:
             with _confirming_stop(str(id)):
                 await super().cancel_session(id, request_options=request_options)
