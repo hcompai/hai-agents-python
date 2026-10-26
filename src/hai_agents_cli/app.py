@@ -750,7 +750,7 @@ class _Conversation:
         """A pause lands at the end of the current step; a message sent before then is overtaken by it."""
         while True:
             status = str(self.client.sessions.get_session_status(session_id).status)
-            if status == "paused" or is_settled_session_status(status):
+            if status in ("paused", "awaiting_tool_results") or is_settled_session_status(status):
                 return status
             time.sleep(0.5)
 

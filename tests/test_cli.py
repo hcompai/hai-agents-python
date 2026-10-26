@@ -4,6 +4,7 @@ import contextlib
 import json
 import os
 
+import pytest
 from typer.testing import CliRunner
 
 import hai_agents_cli.app as app_module
@@ -297,9 +298,18 @@ def test_esc_waits_for_the_pause_then_sends_the_correction_and_resumes(monkeypat
         assert convo._pending == pending
 
 
-def test_esc_resumes_when_the_pause_cannot_be_confirmed() -> None:
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [(RuntimeError("network down"), [("pause",), ("resume",)]), ("awaiting_tool_results", [("pause",)])],
+)
+def test_esc_settles_when_the_pause_cannot_land(status, expected) -> None:
+    def get_session_status(id):
+        if isinstance(status, Exception):
+            raise status
+        return type("Status", (), {"status": status})()
+
     client = _RunClient()
-    client.sessions.get_session_status = lambda id: (_ for _ in ()).throw(RuntimeError("network down"))
+    client.sessions.get_session_status = get_session_status
     convo = app_module._Conversation(
         app_module.AppState(api_key=None, base_url=None, json_output=False),
         "h/test-agent",
@@ -312,7 +322,7 @@ def test_esc_resumes_when_the_pause_cannot_be_confirmed() -> None:
     )
     convo._steer(_Watcher("only the top 2"))
 
-    assert client.sessions.calls == [("pause",), ("resume",)]
+    assert client.sessions.calls == expected
     assert convo._pending == "only the top 2"
 
 
