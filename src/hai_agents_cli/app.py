@@ -544,7 +544,7 @@ class _Conversation:
         if self.session is None:
             try:
                 with self._starting():
-                    self.session = self._create_session(message)
+                    self.session, self.result = self._create_session(message), None
                 self._task = message
             except KeyboardInterrupt:
                 self._cancel_turn(None)
