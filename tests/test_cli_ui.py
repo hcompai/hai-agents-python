@@ -105,6 +105,7 @@ def test_feed_surfaces_environment_and_tool_failures() -> None:
     feed.handle(
         _agent("2026-10-26T12:05:16Z", kind="error_event", origin="failed_observation", error="Screenshot timed out")
     )
+    feed.handle(_agent("2026-10-26T12:05:17Z", kind="error_event", origin="no_tool_called", error="Call a tool"))
     feed.handle(_agent("2026-10-26T12:07:28Z", kind="policy_event", tool_reqs=[run]))
     feed.handle(
         _agent("2026-10-26T12:08:29Z", kind="tool_result", tool_req=run, result="error:\nrun_command timed out")
@@ -114,6 +115,7 @@ def test_feed_surfaces_environment_and_tool_failures() -> None:
     output = buffer.getvalue()
     assert f"{ui.DOT} Screenshot timed out" in output
     assert f"{ui.RESULT}  run_command timed out" in output
+    assert "Call a tool" not in output
 
 
 def test_welcome_drops_failing_and_slow_sources(monkeypatch) -> None:

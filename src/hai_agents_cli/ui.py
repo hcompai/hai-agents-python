@@ -74,6 +74,7 @@ CheckState = Literal["ok", "warn", "fail"]
 _CHECK_GLYPH: dict[CheckState, str] = {"ok": DONE, "warn": ATTENTION, "fail": FAILED}
 
 MAX_CALLS = 4
+_MODEL_NUDGES = frozenset({"no_tool_called", "tool_skipped", "answer_validation", "prompt_too_large_recovery"})
 
 
 def console(*, stderr: bool = False) -> Console:
@@ -392,7 +393,10 @@ class StepFeed:
                 self._finish(ts, _tool_error(result))
         elif kind == "error_event":
             message = _first_line(data.get("error")) or "error"
-            if data.get("origin") == "tool" and self._current is not None:
+            origin = data.get("origin")
+            if origin in _MODEL_NUDGES:
+                pass
+            elif origin in ("tool", "tool_validation") and self._current is not None:
                 self._finish(ts, message)
             else:
                 self._flush()
