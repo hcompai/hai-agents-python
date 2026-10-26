@@ -122,9 +122,7 @@ def welcome(
 ) -> None:
     """Logo and identity on the left, tips and recent activity on the right; stacks when the terminal is narrow."""
     wide = out.width >= 80
-    rows = [Text("Welcome to holo", style="bold")]
-    if wide:
-        rows += [Text(" "), *_logo(), Text(" ")]
+    rows = [*_logo(), Text(" ")] if wide else []
     rows += [_clip(Text(line, style="meta")) for line in about]
     left = Group(*(Align.center(row) for row in rows))
     right: list[RenderableType] = [Text("Tips", style=f"bold {IRIS}"), *(_clip(tip) for tip in tips)]
