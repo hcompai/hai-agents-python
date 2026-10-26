@@ -430,6 +430,9 @@ class _RunClient:
     def __init__(self, capture: dict | None = None) -> None:
         self.sessions = _RunSessions(capture)
 
+    def close(self) -> None:
+        pass
+
 
 class _Answer:
     answer = "done"

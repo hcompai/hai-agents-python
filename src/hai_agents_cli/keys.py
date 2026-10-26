@@ -24,6 +24,7 @@ class EscWatcher:
     def __init__(self, on_esc: Callable[[EscWatcher], None]) -> None:
         self._on_esc = on_esc
         self._stop = threading.Event()
+        self._abandoned = threading.Event()
         self._thread: threading.Thread | None = None
         self._fd: int | None = None
         self._saved: Any = None
@@ -43,16 +44,18 @@ class EscWatcher:
         return self
 
     def __exit__(self, exc_type: object, *_: object) -> None:
-        # On a clean exit, wait out a prompt the user is still typing; on ctrl+c, stop it and leave the daemon behind.
+        # On a clean exit, wait out a prompt the user is still typing; on ctrl+c, abandon it and leave the daemon behind.
+        self._stop.set()
         if self._thread is not None and exc_type is None:
             self._thread.join()
         with self._tty_lock:
-            self._stop.set()
+            self._abandoned.set()
             self._restore()
 
     @property
     def stopped(self) -> bool:
-        return self._stop.is_set()
+        """The turn ended under an open prompt, so whatever was typed belongs to no one."""
+        return self._abandoned.is_set()
 
     @contextlib.contextmanager
     def cooked(self) -> Iterator[None]:
@@ -62,16 +65,16 @@ class EscWatcher:
             yield
         finally:
             with self._tty_lock:
-                if self._fd is not None and not self._stop.is_set():
+                if self._fd is not None and not self._abandoned.is_set():
                     import tty
 
                     tty.setcbreak(self._fd)
 
     def read_line(self) -> str | None:
-        """A line typed in cooked mode; None on EOF or once the watcher stops, so it never eats the next prompt's input."""
+        """A line typed in cooked mode; None on EOF or once abandoned, so it never eats the next prompt's input."""
         assert self._fd is not None
         typed = b""
-        while not self._stop.is_set():
+        while not self._abandoned.is_set():
             ready, _, _ = select.select([self._fd], [], [], _POLL_S)
             if not ready:
                 continue

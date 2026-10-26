@@ -421,6 +421,8 @@ class _Conversation:
         if self._listener is not None:
             self._listener.stop()
             self._listener = None
+        if self.client is not None:
+            self.client.close()
 
     def show_header(self) -> None:
         if self._header_shown or not self.human:
