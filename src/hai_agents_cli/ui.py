@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import sys
 import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
-from urllib.parse import urlparse
 
 from rich import box
 from rich.align import Align
@@ -23,6 +21,8 @@ from rich.rule import Rule
 from rich.table import Column, Table
 from rich.text import Text
 from rich.theme import Theme
+
+from . import tools
 
 IRIS = "#9a5bec"
 SKY = "#5b9cec"
@@ -73,30 +73,7 @@ THEME = Theme(
 CheckState = Literal["ok", "warn", "fail"]
 _CHECK_GLYPH: dict[CheckState, str] = {"ok": DONE, "warn": ATTENTION, "fail": FAILED}
 
-_TOOL_SUFFIX = re.compile(r"(_localizer|_vectorizer)?_(web|desktop)$")
-_VERBS = {
-    "go_to": "navigate",
-    "goto": "navigate",
-    "go_back": "back",
-    "double_click": "click",
-    "right_click": "click",
-    "write": "type",
-    "write_at": "type",
-    "press_keys": "press",
-    "hotkey": "press",
-    "hold_and_tap_key": "press",
-    "move_mouse": "hover",
-    "move_to": "hover",
-    "ctrl_f": "find",
-    "run_command": "run",
-    "crawl": "read",
-    "read_file": "read",
-    "write_file": "write",
-    "upload_file": "upload",
-    "open_app": "open",
-}
-_GERUNDS = {"back": "Going back", "drag": "Dragging", "run": "Running", "hover": "Hovering"}
-_TARGET_KEYS = ("url", "app", "text", "content", "query", "element", "target", "description", "selector", "key", "keys")
+MAX_CALLS = 4
 
 
 def console(*, stderr: bool = False) -> Console:
@@ -305,8 +282,8 @@ def _result(text: Text, *, wrap: bool = False) -> RenderableType:
 @dataclass
 class _Step:
     n: int
-    verb: str
-    target: str
+    calls: list[tools.Label]
+    busy: str
     thought: str | None
     started: float
     started_ts: float | None
@@ -402,7 +379,7 @@ class StepFeed:
             self.steps, self.cost = _metrics(data, self.steps, self.cost)
         elif kind == "observation_event":
             meta = data.get("metadata") or {}
-            title = meta.get("title") or _short_url(meta.get("url"))
+            title = meta.get("title") or tools.short_url(meta.get("url"))
             self._flush(title if title != self.page else None)
             self.page = title or self.page
         elif kind == "policy_event":
@@ -453,12 +430,11 @@ class StepFeed:
         if content:
             self.out.print(_bullet(Text(content)))
             self.out.print()
-        verb, target = _describe(reqs[0])
-        if len(reqs) > 1:
-            target = f"{target}  +{len(reqs) - 1}"
+        calls = [tools.label(req) for req in reqs]
         thought = _first_sentence(data.get("reasoning_content"))
         set_title(self.out, f"holo {SEP} step {self.steps + 1 - self._turn_from_steps}")
-        self._current = _Step(self.steps + 1, verb, target, thought, self._last_end, self._last_end_ts)
+        busy = tools.busy(reqs[0])
+        self._current = _Step(self.steps + 1, calls, busy, thought, self._last_end, self._last_end_ts)
 
     def _finish(self, end_ts: float | None, error: str | None) -> None:
         step = self._current
@@ -486,16 +462,26 @@ class StepFeed:
         if outcome.plain:
             outcome.append(f" {SEP} ", style="meta")
         outcome.append(duration(done.seconds), style="meta")
-        return [Text.assemble((f"{DOT} ", style), self._call(done.step)), _result(outcome), Text("")]
+        return [*self._calls(done.step, style), _result(outcome), Text("")]
 
-    def _call(self, step: _Step) -> Text:
-        name = step.verb.capitalize()
+    def _calls(self, step: _Step, dot: str) -> list[Text]:
+        """One line per call; parallel calls share the step's dot and result."""
+        shown = step.calls if len(step.calls) <= MAX_CALLS else step.calls[: MAX_CALLS - 1]
+        lines = [
+            Text.assemble((f"{DOT} " if i == 0 else "  ", dot), self._call(verb, target))
+            for i, (verb, target) in enumerate(shown)
+        ]
+        if hidden := len(step.calls) - len(shown):
+            lines.append(Text(f"  +{hidden} more", style="meta"))
+        return lines
+
+    def _call(self, verb: str, target: str) -> Text:
+        name = verb.capitalize()
         call = Text(no_wrap=True, overflow="ellipsis")
         call.append(name, style="bold")
-        if step.target:
+        if target:
             room = max(10, self.out.width - len(name) - 6)
-            target = step.target if len(step.target) <= room else step.target[: room - 1] + "…"
-            call.append(f"({target})")
+            call.append(f"({target if len(target) <= room else target[: room - 1] + '…'})")
         return call
 
     def _render_live(self) -> RenderableType:
@@ -506,10 +492,10 @@ class StepFeed:
             lines += self._block(done, None)
         if current is not None:
             dot = "accent" if int(now * 2) % 2 == 0 else "meta"
-            lines.append(Text.assemble((f"{DOT} ", dot), self._call(current)))
+            lines += self._calls(current, dot)
             lines.append(_result(Text(current.thought or "Running…", style="meta italic")))
             lines.append(Text(""))
-        verb = _gerund(current.verb) if current else "Thinking"
+        verb = current.busy if current else "Thinking"
         n = current.n if current else self.steps + 1
         parts = [
             _clock(self.elapsed),
@@ -592,13 +578,6 @@ def summary(
         out.print(_result(Text(error_text, style="fail"), wrap=True))
 
 
-def _gerund(verb: str) -> str:
-    if verb in _GERUNDS:
-        return _GERUNDS[verb]
-    stem = verb[:-1] if verb.endswith("e") and not verb.endswith("ee") else verb
-    return f"{stem}ing".capitalize()
-
-
 def usage(events: list[Any]) -> tuple[int, float | None]:
     """Steps and cost as of the latest metrics event."""
     steps, cost = 0, None
@@ -637,34 +616,6 @@ def _timestamp(value: Any) -> float | None:
         return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
     except ValueError:
         return None
-
-
-def _describe(req: dict[str, Any]) -> tuple[str, str]:
-    name = str(req.get("tool_name") or "tool")
-    args = req.get("args") or {}
-    base = _TOOL_SUFFIX.sub("", name)
-    verb = _VERBS.get(base) or base.split("_")[0]
-    for key in _TARGET_KEYS:
-        value = args.get(key)
-        if value:
-            if key == "url":
-                return verb, _short_url(str(value)) or str(value)
-            text = " ".join(str(value).split())
-            return verb, f'"{text}"' if key in ("text", "content", "query") else text
-    if "x" in args and "y" in args:
-        return verb, f"{args['x']}, {args['y']}"
-    if "coordinates" in args:
-        return verb, str(args["coordinates"])
-    return verb, ""
-
-
-def _short_url(url: str | None) -> str | None:
-    if not url:
-        return None
-    parsed = urlparse(url)
-    host = parsed.netloc.removeprefix("www.")
-    path = parsed.path.rstrip("/")
-    return f"{host}{path}" if host else url
 
 
 def _first_sentence(text: Any) -> str | None:

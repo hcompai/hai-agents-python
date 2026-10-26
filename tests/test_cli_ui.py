@@ -72,6 +72,31 @@ def test_feed_renders_one_block_per_action_with_server_timings() -> None:
     assert (feed.steps, feed.cost) == (3, 0.004)
 
 
+def test_feed_names_every_parallel_call_and_unknown_tools() -> None:
+    buffer = io.StringIO()
+    feed = ui.StepFeed(Console(file=buffer, width=100, color_system=None))
+    spawns = [
+        {"tool_name": "spawn", "args": {"agent_id": f"Reader{n}", "task_summary": f"Read story {n}", "task": "..."}}
+        for n in range(1, 3)
+    ]
+    searches = [{"tool_name": "web_search", "args": {"query": f"q{n}"}} for n in range(1, 7)]
+    custom = [{"tool_name": "get_weather", "args": {"city": "Paris"}}]
+    for second, reqs in enumerate((spawns, searches, custom)):
+        feed.handle(_agent(f"2026-10-26T12:00:0{second}Z", kind="policy_event", tool_reqs=reqs))
+    feed.close()
+
+    lines = [line.rstrip() for line in buffer.getvalue().splitlines() if line.strip()]
+    assert [line for line in lines if ui.RESULT not in line] == [
+        f"{ui.DOT} Spawn(Reader1 · Read story 1)",
+        "  Spawn(Reader2 · Read story 2)",
+        f'{ui.DOT} Search("q1")',
+        '  Search("q2")',
+        '  Search("q3")',
+        "  +3 more",
+        f"{ui.DOT} Get weather(Paris)",
+    ]
+
+
 def test_feed_surfaces_environment_and_tool_failures() -> None:
     buffer = io.StringIO()
     feed = ui.StepFeed(Console(file=buffer, width=200, color_system=None))
