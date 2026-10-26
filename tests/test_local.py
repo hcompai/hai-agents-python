@@ -268,6 +268,36 @@ class TestAutoStart:
             "agent.model": "m",
         }
 
+    def test_follow_up_to_an_ended_session_serves_its_bridges_again(self, monkeypatch):
+        from hai_agents.sessions.types import SendSessionMessagesRequestBody_UserMessage
+        from hai_agents_local import sessions as sessions_module
+
+        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        monkeypatch.setattr(sessions_module, "_exit_cancels", {})
+        events: list = []
+
+        def ensure(bridges):
+            events.append(("start", [bridge.environment_kind for bridge in bridges]))
+            return [bridge.session_id for bridge in bridges]
+
+        monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", ensure)
+        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", lambda ids=None: events.append("stop"))
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: types.SimpleNamespace(id="sess-1"))
+        monkeypatch.setattr(
+            SessionsClient, "get_session_status", lambda self, id, **kw: types.SimpleNamespace(status="completed")
+        )
+        monkeypatch.setattr(SessionsClient, "send_session_messages", lambda self, id, **kw: events.append("send"))
+        sessions = Client(api_key=API_KEY).sessions
+        sessions.create_session(
+            agent={"name": "x", "environments": [{"kind": "desktop", "host": "user_device"}]}, messages="hi"
+        )
+        sessions.get_session_status("sess-1")
+        sessions.send_session_messages("sess-1", request=SendSessionMessagesRequestBody_UserMessage(message="more"))
+        sessions.send_session_messages("sess-1", request=SendSessionMessagesRequestBody_UserMessage(message="again"))
+
+        assert events == [("start", ["desktop"]), "stop", ("start", ["desktop"]), "send", "send"]
+        assert list(sessions_module._exit_cancels) == ["sess-1"]
+
     def test_create_session_failure_stops_newly_started_bridges(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
         stopped: list = []
