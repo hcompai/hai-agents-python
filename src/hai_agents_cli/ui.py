@@ -24,13 +24,14 @@ from rich.theme import Theme
 IRIS = "#9a5bec"
 SKY = "#5b9cec"
 
-WORDMARK = (
-    "██╗  ██╗ ██████╗ ██╗      ██████╗ ",
-    "██║  ██║██╔═══██╗██║     ██╔═══██╗",
-    "███████║██║   ██║██║     ██║   ██║",
-    "██╔══██║██║   ██║██║     ██║   ██║",
-    "██║  ██║╚██████╔╝███████╗╚██████╔╝",
-    "╚═╝  ╚═╝ ╚═════╝ ╚══════╝ ╚═════╝ ",
+LOGO = (
+    "   ▄▄█████▄▄           ",
+    " ▄███████████▄         ",
+    "▄█████████████▄   ██ ██",
+    "███████████████   █████",
+    "▀█████████████▀   ██ ██",
+    " ▀███████████▀         ",
+    "   ▀▀█████▀▀           ",
 )
 
 DOT = "●"
@@ -97,12 +98,12 @@ def interactive(out: Console) -> bool:
 
 
 def banner(out: Console) -> None:
-    width = len(WORDMARK[0])
+    width = len(LOGO[0])
     if not interactive(out) or out.width < width + 4:
         return
     gradient = [_blend(IRIS, SKY, i / (width - 1)) for i in range(width)]
     out.print()
-    for row in WORDMARK:
+    for row in LOGO:
         line = Text("  ")
         for char, color in zip(row, gradient, strict=True):
             line.append(char, style=color)

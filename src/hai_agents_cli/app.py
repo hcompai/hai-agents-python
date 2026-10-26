@@ -44,6 +44,8 @@ if TYPE_CHECKING:
 
 CLEAN_STATUSES = ("completed", "idle")
 IDLE_TIMEOUT_S = 600
+LOCAL_MAX_STEPS = 150
+LOCAL_MAX_TIME_S = 1800.0
 
 console = ui.console()
 err_console = ui.console(stderr=True)
@@ -293,10 +295,10 @@ def run(
     agent: str | None = typer.Option(None, "--agent", "-a", help=AGENT_HELP),
     local: bool = typer.Option(False, "--local", help="Drive this machine's desktop through the local runtime."),
     max_steps: int | None = typer.Option(
-        None, "--max-steps", min=1, max=200, help="Maximum reasoning steps. Default 20, or 150 with --local."
+        None, "--max-steps", min=1, max=200, help="Maximum reasoning steps. Uncapped, or 150 with --local."
     ),
     max_time_s: float | None = typer.Option(
-        None, "--max-time", min=1.0, max=1800.0, help="Maximum run seconds. Default 180, or 1800 with --local."
+        None, "--max-time", min=1.0, max=1800.0, help="Maximum run seconds. Uncapped, or 1800 with --local."
     ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Print only the answer."),
     override: list[str] = typer.Option(
@@ -314,8 +316,8 @@ def run(
         _state(ctx),
         _resolve_agent(agent, local),
         local=local,
-        max_steps=max_steps or (150 if local else 20),
-        max_time_s=max_time_s or (1800.0 if local else 180.0),
+        max_steps=max_steps or (LOCAL_MAX_STEPS if local else None),
+        max_time_s=max_time_s or (LOCAL_MAX_TIME_S if local else None),
         overrides=_parse_overrides(override or []),
         quiet=quiet,
     )
@@ -347,8 +349,8 @@ def chat(
         state,
         _resolve_agent(agent, local),
         local=local,
-        max_steps=150 if local else 20,
-        max_time_s=1800.0 if local else 180.0,
+        max_steps=LOCAL_MAX_STEPS if local else None,
+        max_time_s=LOCAL_MAX_TIME_S if local else None,
         overrides={},
     )
     convo.open()
@@ -366,8 +368,8 @@ class _Conversation:
     state: AppState
     agent: Any
     local: bool
-    max_steps: int
-    max_time_s: float
+    max_steps: int | None
+    max_time_s: float | None
     overrides: dict[str, Any]
     quiet: bool = False
     client: Any = None
@@ -398,9 +400,11 @@ class _Conversation:
         params: dict[str, Any] = {
             "agent": self.agent,
             "messages": message,
-            "max_steps": self.max_steps,
-            "max_time_s": self.max_time_s,
         }
+        if self.max_steps:
+            params["max_steps"] = self.max_steps
+        if self.max_time_s:
+            params["max_time_s"] = self.max_time_s
         if self.overrides:
             params["overrides"] = self.overrides
         if self.followups:
@@ -422,7 +426,7 @@ class _Conversation:
             return
         self._header_shown = True
         label = "local desktop" if self.local else str(self.agent)
-        where = ("esc esc stops" if self._listener else None) if self.local else _endpoint_host(self.state)
+        where = ("esc esc stops" if self._listener else None) if self.local else _custom_endpoint_host(self.state)
         hint = "/help for commands" if self.followups else None
         if self.followups:
             ui.banner(err_console)
@@ -458,7 +462,7 @@ class _Conversation:
                 err_console, max_steps=self.max_steps, steps=self.steps, cost=self.cost, stop_hint=stop_hint
             )
         self._feed, self._turn_done = feed, False
-        timeout = self.max_time_s + 30.0
+        timeout = self.max_time_s + 30.0 if self.max_time_s else None
         try:
             if feed is not None:
                 with self._esc_watcher():
@@ -632,7 +636,7 @@ def _follow(
     session_id: str,
     feed: ui.StepFeed,
     *,
-    timeout_s: float,
+    timeout_s: float | None,
     from_index: int = 0,
     stop_at_tool_wait: bool = False,
 ) -> None:
@@ -654,10 +658,12 @@ def _awaits_tool_results(event: Any) -> bool:
     )
 
 
-def _endpoint_host(state: AppState) -> str:
+def _custom_endpoint_host(state: AppState) -> str | None:
     from urllib.parse import urlparse
 
-    base = credentials.resolve_base_url(state.base_url) or HaiAgentsEnvironment.EU.value
+    base = credentials.resolve_base_url(state.base_url)
+    if not base or base.rstrip("/") == HaiAgentsEnvironment.EU.value.rstrip("/"):
+        return None
     return urlparse(base).netloc or base
 
 

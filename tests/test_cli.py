@@ -200,7 +200,7 @@ def test_new_releases_the_idle_session_before_starting_another(monkeypatch) -> N
     assert client.sessions.created == 2
 
 
-def test_run_without_agent_uses_the_default(monkeypatch, tmp_path) -> None:
+def test_run_without_options_uses_the_default_agent_uncapped(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", tmp_path / "global.env")
     monkeypatch.delenv(credentials.AGENT_VAR, raising=False)
     captured: dict = {}
@@ -212,7 +212,7 @@ def test_run_without_agent_uses_the_default(monkeypatch, tmp_path) -> None:
 
     assert result.exit_code == 0, result.output
     assert captured["agent"] == "h/web-surfer-flash"
-    assert "idle_timeout_s" not in captured
+    assert not {"idle_timeout_s", "max_steps", "max_time_s"} & captured.keys()
 
     credentials.save_default_agent("h/web-surfer-pro")
     runner.invoke(app, ["run", "hello"], env={"HAI_API_KEY": "hk-test"})
