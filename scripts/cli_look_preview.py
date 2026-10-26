@@ -53,8 +53,21 @@ def main() -> None:
     out = ui.console()
     err = ui.console(stderr=True)
 
-    ui.banner(err)
-    ui.header(err, "holo", ["local desktop", "holo4-35b-a3b", "approve risky", "Esc Esc stops"])
+    ui.welcome(
+        err,
+        "1.3.0",
+        ["h/web-surfer", "runs tasks in a cloud browser", "1.2M of 5M tokens left · resets Nov 1"],
+        [
+            ui.Text("esc pauses the agent so you can steer it"),
+            ui.Text("follow up in plain words; /new starts a fresh task"),
+            ui.Text("holo 1.3.2 is available · pip install -U hai-agents", style="warn"),
+        ],
+        [
+            ui.Activity("completed", "Find the cheapest flight from Paris to Lisbon next Friday", "2h ago"),
+            ui.Activity("failed", "Compare pricing pages of HubSpot, Salesforce and Pipedrive", "1d ago"),
+            ui.Activity("running", "Summarize the top 5 stories on Hacker News", "just now"),
+        ],
+    )
     ui.user(err, "Export the Q3 report from SAP GUI to ~/Reports as PDF")
     feed = ui.StepFeed(err, max_steps=150)
     feed.handle(event(0.0, kind="observation_event", metadata={"title": "Desktop"}))

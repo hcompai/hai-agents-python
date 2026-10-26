@@ -38,7 +38,7 @@ from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
 from hai_agents_local import desktop as desktop_defaults
 
-from . import auth, keys, mcp_hosts, ui
+from . import auth, keys, mcp_hosts, ui, welcome
 
 if TYPE_CHECKING:
     from hai_agents_local import LocalBridge
@@ -426,14 +426,28 @@ class _Conversation:
         if self._header_shown or not self.human:
             return
         self._header_shown = True
-        if self.local:
-            does = "drives this desktop" + (f" {ui.SEP} esc esc stops it" if self._listener else "")
-        else:
-            does = "runs tasks in a cloud browser"
-        hint = f"? for shortcuts {ui.SEP} / for commands" if self.followups else None
+        does = "drives this desktop" if self.local else "runs tasks in a cloud browser"
         if self.followups:
-            ui.banner(err_console)
-        ui.header(err_console, "holo", [self.label, does, _custom_endpoint_host(self.state), hint])
+            self._show_welcome(does)
+            return
+        stop = f" {ui.SEP} esc esc stops it" if self.local and self._listener else ""
+        ui.header(err_console, "holo", [self.label, does + stop, _custom_endpoint_host(self.state)])
+
+    def _show_welcome(self, does: str) -> None:
+        facts = welcome.gather(self.client, cloud=not self.local)
+        current = welcome.current_version()
+        if self.local:
+            stop = "esc esc stops the agent, from any app" if self._listener else "ctrl+c stops the agent"
+        else:
+            stop = "esc pauses the agent so you can steer it"
+        tips = [Text(stop), Text("follow up in plain words; /new starts a fresh task")]
+        if welcome.is_newer(facts.latest, current):
+            tips.append(Text(f"holo {facts.latest} is available {ui.SEP} pip install -U hai-agents", style="warn"))
+        if self.local and (missing := welcome.missing_grants()):
+            tips.append(Text(f"missing macOS grants: {', '.join(missing)} {ui.SEP} run holo doctor", style="warn"))
+        about = [self.label, does, welcome.quota_line(facts.quota), _custom_endpoint_host(self.state)]
+        recent = None if self.local or facts.recent is None else [welcome.activity(s) for s in facts.recent]
+        ui.welcome(err_console, current, [line for line in about if line], tips, recent)
 
     @property
     def label(self) -> str:

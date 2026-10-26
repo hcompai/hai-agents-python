@@ -70,3 +70,28 @@ def test_feed_renders_one_block_per_action_with_server_timings() -> None:
     ]
     assert feed.answer == "Dolly Parton's Imagination Library"
     assert (feed.steps, feed.cost) == (3, 0.004)
+
+
+def test_welcome_drops_failing_and_slow_sources(monkeypatch) -> None:
+    import time
+    from types import SimpleNamespace
+
+    from hai_agents_cli import welcome
+
+    def broken(**_):
+        raise RuntimeError("503")
+
+    def slow(**_):
+        time.sleep(1)
+
+    monkeypatch.setattr(welcome, "FETCH_TIMEOUT_S", 0.1)
+    monkeypatch.setattr(welcome, "latest_version", lambda: "9.0.0")
+    client = SimpleNamespace(
+        quota=SimpleNamespace(get_token_quota=broken), sessions=SimpleNamespace(list_sessions=slow)
+    )
+
+    started = time.monotonic()
+    facts = welcome.gather(client, cloud=True)
+
+    assert time.monotonic() - started < 0.5
+    assert (facts.quota, facts.recent, facts.latest) == (None, None, "9.0.0")
