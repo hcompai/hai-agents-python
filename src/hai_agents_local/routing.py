@@ -109,7 +109,7 @@ class _Walk:
         if kind is None or _read(env, "session_id"):
             return env
         key = f"{path}.environments[kind={kind}].session_id"
-        if key in self.claimed:
+        if any(key == claim or key.startswith(f"{claim}.") for claim in self.claimed):
             return env
         if not by_name:
             return _replace(env, kind=kind, session_id=self.bridge(kind, env).session_id)

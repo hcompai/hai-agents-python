@@ -7,19 +7,24 @@ import atexit
 import concurrent.futures
 import contextlib
 import functools
+import hashlib
+import hmac
 import inspect
 import json
 import logging
 import threading
+import types
 import typing
 
 import httpx
 
 from hai_agents.base_client import BaseClient
 from hai_agents.core.api_error import ApiError
+from hai_agents.core.parse_error import ParsingError
 from hai_agents.core.request_options import RequestOptions
 from hai_agents.polling import is_terminal_session_status
 from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
+from hai_agents.sessions.types.send_session_messages_request_body import SendSessionMessagesRequestBody
 from hai_agents.types.session_status import SessionStatus
 
 from .bridge import LocalBridge, TokenSource
@@ -77,6 +82,11 @@ def _resolve_token(source: TokenSource) -> str:
         return pool.submit(lambda: asyncio.run(consume())).result()
 
 
+def _caller(api_key: TokenSource, base_url: typing.Optional[str]) -> str:
+    """Idempotency keys are scoped per caller on the platform, so bridge ids seeded from them must be too."""
+    return hmac.new(_resolve_token(api_key).encode(), f"{base_url}".encode(), hashlib.sha256).hexdigest()
+
+
 def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) -> None:
     overrides = kwargs.get("overrides")
     if overrides and "user_device" in json.dumps(overrides, default=str):
@@ -88,6 +98,9 @@ def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) 
 
 def _wants_bridges(auto_bridges: bool, kwargs: typing.Dict[str, typing.Any]) -> bool:
     return auto_bridges and kwargs.get("agent") is not None and auto_bridges_enabled()
+
+
+_LOOKUP_ERRORS = (ApiError, ParsingError, httpx.HTTPError)
 
 
 def _resolve_references(client_wrapper: typing.Any, agent: typing.Any) -> typing.Dict[Reference, typing.Any]:
@@ -108,7 +121,7 @@ def _resolve_references(client_wrapper: typing.Any, agent: typing.Any) -> typing
                 resolved[reference] = agents.get_agent(agent_name, revision=revision, resolve=True)
             else:
                 resolved[reference] = environments.get_environment(name)
-        except ApiError as exc:
+        except _LOOKUP_ERRORS as exc:
             logger.debug("cannot fetch %s %r to look for user_device environments: %s", kind, name, exc)
     return resolved
 
@@ -129,13 +142,23 @@ async def _resolve_references_async(
                 agent_name, revision = split_revision(name)
                 return await agents.get_agent(agent_name, revision=revision, resolve=True)
             return await environments.get_environment(name)
-        except ApiError as exc:
+        except _LOOKUP_ERRORS as exc:
             logger.debug("cannot fetch %s %r to look for user_device environments: %s", kind, name, exc)
             return None
 
     found = references(agent)
     specs = await asyncio.gather(*(fetch(reference) for reference in found))
     return {reference: spec for reference, spec in zip(found, specs) if spec is not None}
+
+
+def local_environment_kinds(client: typing.Any, agent: typing.Any) -> typing.List[str]:
+    """Kinds of the user_device environments a run of ``agent`` would serve from this machine; fetches named specs."""
+    wrapper = client.sessions._client_wrapper
+    resolved = _resolve_references(wrapper, agent)
+    localized = localize_agent(
+        agent, api_key=_token_source(wrapper), base_url=wrapper.get_base_url(), resolved=resolved
+    )
+    return [bridge.environment_kind for bridge in localized.bridges]
 
 
 def _localize(
@@ -151,13 +174,14 @@ def _localize(
         api_key, base_url = _token_source(client_wrapper), client_wrapper.get_base_url()
     else:
         api_key, base_url = runtime.api_key, runtime.base_url
+    idempotency_key = kwargs.get("idempotency_key")
     localized = localize_agent(
         kwargs["agent"],
         api_key=api_key,
         base_url=base_url,
         resolved=resolved,
         claimed=overrides,
-        seed=kwargs.get("idempotency_key"),
+        seed=None if idempotency_key is None else f"{_caller(api_key, base_url)}:{idempotency_key}",
     )
     kwargs["agent"] = localized.agent
     if localized.overrides:
@@ -263,8 +287,10 @@ def _register_exit_cancel(cancel_remote: RemoteCancel, session_id: str) -> None:
 
 def _panic_stop() -> None:
     logger.warning("kill switch fired: stopping bridges and cancelling local sessions")
-    stop_bridges()
-    _cancel_sessions_at_exit()
+    try:
+        stop_bridges()
+    finally:
+        _cancel_sessions_at_exit()
 
 
 def _deregister_exit_cancel(session_id: str) -> None:
@@ -330,8 +356,29 @@ class _LocalSessionsState:
         self._client_wrapper = client_wrapper
         self._auto_bridges = auto_bridges
         self._owned_bridges: typing.Dict[str, typing.List[str]] = {}
+        self._served: typing.Dict[str, typing.List[LocalBridge]] = {}
+        # Sessions whose bridges stopped because they ended or were cancelled; a message restarts the session, so it
+        # serves them again.
+        self._stopped: typing.Dict[str, typing.List[LocalBridge]] = {}
         # Sessions this client created on a local runtime; they never keep that runtime alive past close().
         self.own_session_ids: typing.Set[str] = set()
+
+    @contextlib.contextmanager
+    def _reviving(self, session_id: str) -> typing.Iterator[typing.List[LocalBridge]]:
+        """Bridges a stopped session needs again; kept for the retry if the follow-up fails."""
+        bridges = self._stopped.pop(session_id, [])
+        try:
+            yield bridges
+        except BaseException:
+            if bridges:
+                self._stopped[session_id] = bridges
+            raise
+
+    def _retire(self, session_id: str) -> None:
+        """Its bridges stopped; keep them for a follow-up, which restarts the session."""
+        self._owned_bridges.pop(session_id, None)
+        if session_id in self._served:
+            self._stopped[session_id] = self._served.pop(session_id)
 
     @property
     def _runtime(self) -> typing.Optional[LocalRuntime]:
@@ -364,13 +411,37 @@ class _LocalSessionsState:
         except TimeoutError:
             logger.warning("could not confirm local bridges stopped for ended session %s", session_id, exc_info=True)
         else:
-            self._owned_bridges.pop(session_id, None)
+            self._retire(session_id)
 
-    def _track(self, session: typing.Any, started: typing.List[str]) -> None:
+    def _track(self, session: typing.Any, bridges: typing.List[LocalBridge], started: typing.List[str]) -> None:
+        session_id = getattr(session, "id", None)
+        if session_id is None:
+            return
         if self._runtime is not None:
-            self.own_session_ids.add(str(session.id))
+            self.own_session_ids.add(str(session_id))
         if started:
-            self._owned_bridges[str(session.id)] = started
+            self._owned_bridges[str(session_id)] = started
+        if bridges:
+            self._served[str(session_id)] = bridges
+
+    def _guard(
+        self,
+        session: typing.Any,
+        bridges: typing.Sequence[LocalBridge],
+        watcher: _LossWatcher,
+        stop_watcher: typing.Optional[StopWatcher],
+    ) -> typing.Optional[typing.Callable[[], None]]:
+        """Arm the crash and exit cancels of ``session``; returns a stop that already landed and must run now."""
+        cancel = _cancel_action(self._cancel_remote, bridges, session)
+        if cancel is None:
+            return None
+        if watcher.attach(cancel):
+            return cancel
+        _register_exit_cancel(self._cancel_remote, session.id)
+        if stop_watcher is not None and not stop_watcher.active:
+            # A stop was filed while bridges or the session were starting.
+            return _panic_stop
+        return None
 
 
 class LocalSessionsClient(_LocalSessionsState, SessionsClient):
@@ -387,7 +458,7 @@ class LocalSessionsClient(_LocalSessionsState, SessionsClient):
         try:
             if owned:
                 stop_bridges(owned)
-                self._owned_bridges.pop(str(id), None)
+            self._retire(str(id))
         finally:
             with _confirming_stop(str(id)):
                 super().cancel_session(id, request_options=request_options)
@@ -417,18 +488,33 @@ class LocalSessionsClient(_LocalSessionsState, SessionsClient):
         except BaseException:
             _stop_bridges_keeping_error(started)
             raise
-        if bridges:
-            cancel = _cancel_action(self._cancel_remote, bridges, session)
-            if cancel is not None:
-                if watcher.attach(cancel):
-                    cancel()
-                else:
-                    _register_exit_cancel(self._cancel_remote, session.id)
-                    if stop_watcher is not None and not stop_watcher.active:
-                        # A stop was filed while bridges or the session were starting; apply it now.
-                        _panic_stop()
-        self._track(session, started)
+        if bridges and (landed := self._guard(session, bridges, watcher, stop_watcher)):
+            landed()
+        self._track(session, bridges, started)
         return session
+
+    def send_session_messages(
+        self,
+        id: str,
+        *,
+        request: SendSessionMessagesRequestBody,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
+        with self._reviving(str(id)) as bridges:
+            started: typing.List[str] = []
+            if bridges:
+                stop_watcher, watcher = _ensure_stop_watcher(), _LossWatcher(bridges)
+                started = ensure_bridges(bridges)
+            try:
+                super().send_session_messages(id, request=request, request_options=request_options)
+            except BaseException:
+                _stop_bridges_keeping_error(started)
+                raise
+        if bridges:
+            session = types.SimpleNamespace(id=str(id))
+            if landed := self._guard(session, bridges, watcher, stop_watcher):
+                landed()
+            self._track(session, bridges, started)
 
 
 class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
@@ -444,7 +530,7 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
         try:
             if owned:
                 await asyncio.to_thread(stop_bridges, owned)
-                self._owned_bridges.pop(str(id), None)
+            self._retire(str(id))
         finally:
             with _confirming_stop(str(id)):
                 await super().cancel_session(id, request_options=request_options)
@@ -480,16 +566,33 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
         except BaseException:
             await asyncio.to_thread(_stop_bridges_keeping_error, started)
             raise
-        if bridges:
-            cancel = _cancel_action(self._cancel_remote, bridges, session)
-            if cancel is not None:
-                if watcher.attach(cancel):
-                    # cancel_session blocks on HTTP; keep it off the event loop thread.
-                    await asyncio.to_thread(cancel)
-                else:
-                    _register_exit_cancel(self._cancel_remote, session.id)
-                    if stop_watcher is not None and not stop_watcher.active:
-                        # A stop was filed while bridges or the session were starting; apply it now.
-                        await asyncio.to_thread(_panic_stop)
-        self._track(session, started)
+        if bridges and (landed := self._guard(session, bridges, watcher, stop_watcher)):
+            # Cancelling blocks on HTTP; keep it off the event loop thread.
+            await asyncio.to_thread(landed)
+        self._track(session, bridges, started)
         return session
+
+    async def send_session_messages(
+        self,
+        id: str,
+        *,
+        request: SendSessionMessagesRequestBody,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
+        with self._reviving(str(id)) as bridges:
+            started: typing.List[str] = []
+            if bridges:
+                for bridge in bridges:
+                    bridge.preflight()
+                stop_watcher, watcher = _ensure_stop_watcher(), _LossWatcher(bridges)
+                started = await asyncio.to_thread(ensure_bridges, bridges)
+            try:
+                await super().send_session_messages(id, request=request, request_options=request_options)
+            except BaseException:
+                await asyncio.to_thread(_stop_bridges_keeping_error, started)
+                raise
+        if bridges:
+            session = types.SimpleNamespace(id=str(id))
+            if landed := self._guard(session, bridges, watcher, stop_watcher):
+                await asyncio.to_thread(landed)
+            self._track(session, bridges, started)

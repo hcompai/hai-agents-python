@@ -94,7 +94,7 @@ class TestLocalizeAgent:
             "environments": ["my-laptop", "cloud-browser", {"id": "vm", "kind": "desktop"}],
             "subagents": ["helper", "claimed"],
         }
-        claimed = {"agent.subagents[name=claimed].environments[kind=web].session_id": "elsewhere"}
+        claimed = {"agent.subagents[name=claimed].environments[kind=web]": {"kind": "web", "host": "cloud"}}
         localized, [web, desktop], overrides = localize_agent(
             agent, api_key=API_KEY, resolved=resolved, claimed=claimed
         )
@@ -112,6 +112,17 @@ class TestLocalizeAgent:
 
         assert session_id("key-1") == session_id("key-1") != session_id("key-2")
         assert session_id(None) != session_id(None)
+
+    def test_seeded_bridge_ids_are_scoped_to_the_caller(self):
+        from hai_agents_local.sessions import _localize
+
+        def session_id(api_key):
+            wrapper = types.SimpleNamespace(_get_api_key=lambda: api_key, get_base_url=lambda: "https://agp.test")
+            kwargs = {"agent": {"name": "x", "environments": [{"kind": "desktop", "host": "user_device"}]}}
+            [bridge] = _localize(wrapper, None, {**kwargs, "idempotency_key": "retry-1"}, {})
+            return bridge.session_id
+
+        assert session_id("hk-org-a") == session_id("hk-org-a") != session_id("hk-org-b")
 
     def test_unaddressable_named_env_raises(self):
         resolved = {("agent", "v1.2"): {"name": "v1.2", "environments": [{"kind": "web", "host": "user_device"}]}}
@@ -208,6 +219,7 @@ def _registry(monkeypatch, agents: dict | None = None, environments: dict | None
         return table[name]
 
     def get_agent(self, name, *, revision=None, resolve=None, **_):
+        assert resolve is True, "only the resolved spec names its nested subagents and environments"
         fetched.append((name, revision))
         return lookup(agents, name)
 
@@ -267,6 +279,52 @@ class TestAutoStart:
             "agent.environments[kind=desktop].session_id": bridge.session_id,
             "agent.model": "m",
         }
+
+    @pytest.mark.parametrize("stop", ["ended", "cancelled"])
+    def test_follow_up_to_a_stopped_session_serves_its_bridges_again(self, monkeypatch, stop):
+        from hai_agents.sessions.types import SendSessionMessagesRequestBody_UserMessage
+        from hai_agents_local import sessions as sessions_module
+
+        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        monkeypatch.setattr(sessions_module, "_exit_cancels", {})
+        events: list = []
+
+        def ensure(bridges):
+            events.append(("start", [bridge.environment_kind for bridge in bridges]))
+            return [bridge.session_id for bridge in bridges]
+
+        monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", ensure)
+        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", lambda ids=None: events.append("stop"))
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: types.SimpleNamespace(id="sess-1"))
+        monkeypatch.setattr(
+            SessionsClient, "get_session_status", lambda self, id, **kw: types.SimpleNamespace(status="completed")
+        )
+        failures = iter([RuntimeError("network down")])
+
+        def send(self, id, **kw):
+            if failure := next(failures, None):
+                raise failure
+            events.append("send")
+
+        monkeypatch.setattr(SessionsClient, "send_session_messages", send)
+        monkeypatch.setattr(SessionsClient, "cancel_session", lambda self, id, **kw: None)
+        sessions = Client(api_key=API_KEY).sessions
+        sessions.create_session(
+            agent={"name": "x", "environments": [{"kind": "desktop", "host": "user_device"}]}, messages="hi"
+        )
+        if stop == "ended":
+            sessions.get_session_status("sess-1")
+        else:
+            sessions.cancel_session("sess-1")
+        more = SendSessionMessagesRequestBody_UserMessage(message="more")
+        with pytest.raises(RuntimeError):
+            sessions.send_session_messages("sess-1", request=more)
+        sessions.send_session_messages("sess-1", request=more)
+        sessions.send_session_messages("sess-1", request=SendSessionMessagesRequestBody_UserMessage(message="again"))
+
+        restart = ("start", ["desktop"])
+        assert events == [restart, "stop", restart, "stop", restart, "send", "send"]
+        assert list(sessions_module._exit_cancels) == ["sess-1"]
 
     def test_create_session_failure_stops_newly_started_bridges(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
@@ -398,7 +456,7 @@ class TestAutoStart:
         client.sessions.create_session(agent="named-agent", messages="hi")
         assert "max_steps" not in captured and "max_time_s" not in captured
 
-    def test_kill_switch_stops_bridges_then_cancels_local_sessions(self, monkeypatch, tmp_path):
+    def test_kill_switch_stops_bridges_then_cancels_local_sessions_even_if_a_bridge_hangs(self, monkeypatch, tmp_path):
         import time as _time
 
         from hai_agents_local import killswitch
@@ -412,7 +470,12 @@ class TestAutoStart:
         monkeypatch.setattr(sessions_module, "_stop_watcher", None)
         events: list = []
         self._crash_wiring(monkeypatch, events, [], [])
-        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", lambda *args: events.append(("stop", args)))
+
+        def hanging_stop(*args):
+            events.append(("stop", args))
+            raise TimeoutError("bridge did not stop")
+
+        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", hanging_stop)
         monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: type("S", (), {"id": "sess-ks"})())
         Client(api_key=API_KEY).sessions.create_session(agent=dict(self._TWO_ENV_AGENT), messages="hi")
         killswitch.request_stop()
