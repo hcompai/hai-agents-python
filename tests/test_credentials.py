@@ -14,6 +14,7 @@ from hai_agents import AsyncClient, Client
 from hai_agents.core.api_error import ApiError
 from hai_agents_cli import auth
 from hai_agents_cli.app import app
+from hai_agents_cli.welcome import latest_version
 from hai_agents_common import credentials
 
 runner = CliRunner()
@@ -82,6 +83,18 @@ def test_saved_key_is_owner_only(tmp_path, monkeypatch):
 
     assert stat.S_IMODE(directory.stat().st_mode) == 0o700
     assert stat.S_IMODE(credentials.GLOBAL_ENV_PATH.stat().st_mode) == 0o600
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permissions")
+def test_update_check_creates_the_config_dir_owner_only(tmp_path, monkeypatch):
+    directory = tmp_path / "hai"
+    monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", directory / ".env")
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: (_ for _ in ()).throw(httpx.ConnectError("offline")))
+
+    latest_version()
+
+    assert (directory / "latest-version.json").exists()
+    assert stat.S_IMODE(directory.stat().st_mode) == 0o700
 
 
 def test_absolute_share_url_prepends_base():

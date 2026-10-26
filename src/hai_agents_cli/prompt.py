@@ -141,7 +141,6 @@ class Prompt:
     """One prompt per conversation; `read` returns the submitted text, or None when the user leaves."""
 
     def __init__(self, history_path: Path, commands: Rows) -> None:
-        history_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         self._menu = _SlashMenu(commands)
         self._exit_armed_at = 0.0
         self._session: PromptSession[str] = PromptSession(

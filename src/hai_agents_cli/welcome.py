@@ -15,7 +15,7 @@ from typing import Any
 
 import httpx
 
-from hai_agents.client import credentials_path
+from hai_agents_common import credentials
 
 from . import ui
 
@@ -61,7 +61,7 @@ def gather(client: Any, *, cloud: bool) -> Facts:
 
 
 def latest_version() -> str | None:
-    cache = credentials_path().parent / "latest-version.json"
+    cache = credentials.GLOBAL_ENV_PATH.parent / "latest-version.json"
     with contextlib.suppress(OSError, ValueError, KeyError, TypeError):
         cached = json.loads(cache.read_text())
         if time.time() - cached["checked_at"] < UPDATE_CHECK_EVERY_S:
@@ -70,7 +70,7 @@ def latest_version() -> str | None:
     with contextlib.suppress(Exception):
         latest = str(httpx.get(PYPI_URL, timeout=FETCH_TIMEOUT_S).json()["info"]["version"])
     with contextlib.suppress(OSError):
-        cache.parent.mkdir(parents=True, exist_ok=True)
+        credentials.private_config_dir()
         cache.write_text(json.dumps({"version": latest, "checked_at": time.time()}))
     return latest
 

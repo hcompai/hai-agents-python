@@ -92,9 +92,16 @@ def save_default_agent(name: str) -> Path:
     return _save(AGENT_VAR, name)
 
 
+def private_config_dir() -> Path:
+    """The CLI's config directory, owner-only: it holds the API key and prompt history."""
+    path = GLOBAL_ENV_PATH.parent
+    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    path.chmod(0o700)  # mkdir leaves an existing directory's mode untouched, so we set it explicitly
+    return path
+
+
 def _save(name: str, value: str) -> Path:
-    GLOBAL_ENV_PATH.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    GLOBAL_ENV_PATH.parent.chmod(0o700)  # mkdir leaves an existing directory's mode untouched, so we set it explicitly
+    private_config_dir()
     # Create owner-only from the start
     os.close(os.open(GLOBAL_ENV_PATH, os.O_WRONLY | os.O_CREAT, 0o600))
     GLOBAL_ENV_PATH.chmod(0o600)  # tighten a file that already existed

@@ -934,7 +934,7 @@ def _read_message(convo: _Conversation) -> str | None:
             ui.error(err_console, _CLI_HINT)
             raise typer.Exit(1) from None
 
-        convo._prompt = Prompt(credentials.GLOBAL_ENV_PATH.parent / "history", convo.commands)
+        convo._prompt = Prompt(credentials.private_config_dir() / "history", convo.commands)
     return convo._prompt.read(toolbar=convo.toolbar, placeholder=convo.placeholder())
 
 
