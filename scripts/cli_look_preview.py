@@ -53,6 +53,7 @@ def main() -> None:
     out = ui.console()
     err = ui.console(stderr=True)
 
+    ui.banner(err)
     ui.header(err, "holo", ["local desktop", "holo4-35b-a3b", "approve risky", "Esc Esc stops"])
     ui.user(err, "Export the Q3 report from SAP GUI to ~/Reports as PDF")
     feed = ui.StepFeed(err, max_steps=150)

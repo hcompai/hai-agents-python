@@ -424,6 +424,8 @@ class _Conversation:
         label = "local desktop" if self.local else str(self.agent)
         where = ("esc esc stops" if self._listener else None) if self.local else _endpoint_host(self.state)
         hint = "/help for commands" if self.followups else None
+        if self.followups:
+            ui.banner(err_console)
         ui.header(err_console, "holo", [label, where, hint], link=self.view_url)
 
     def turn(self, message: str, *, echo: bool = False) -> None:

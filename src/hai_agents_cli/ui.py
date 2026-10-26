@@ -22,6 +22,16 @@ from rich.text import Text
 from rich.theme import Theme
 
 IRIS = "#9a5bec"
+SKY = "#5b9cec"
+
+WORDMARK = (
+    "██╗  ██╗ ██████╗ ██╗      ██████╗ ",
+    "██║  ██║██╔═══██╗██║     ██╔═══██╗",
+    "███████║██║   ██║██║     ██║   ██║",
+    "██╔══██║██║   ██║██║     ██║   ██║",
+    "██║  ██║╚██████╔╝███████╗╚██████╔╝",
+    "╚═╝  ╚═╝ ╚═════╝ ╚══════╝ ╚═════╝ ",
+)
 
 DOT = "●"
 RESULT = "⎿"
@@ -84,6 +94,25 @@ def interactive(out: Console) -> bool:
     """A real TTY; `is_terminal` alone is also true under FORCE_COLOR, where live redraws garble CI logs."""
     isatty = getattr(out.file, "isatty", None)
     return out.is_terminal and bool(isatty and isatty())
+
+
+def banner(out: Console) -> None:
+    width = len(WORDMARK[0])
+    if not interactive(out) or out.width < width + 4:
+        return
+    gradient = [_blend(IRIS, SKY, i / (width - 1)) for i in range(width)]
+    out.print()
+    for row in WORDMARK:
+        line = Text("  ")
+        for char, color in zip(row, gradient, strict=True):
+            line.append(char, style=color)
+        out.print(line)
+    out.print()
+
+
+def _blend(start: str, end: str, t: float) -> str:
+    a, b = (tuple(int(c[i : i + 2], 16) for i in (1, 3, 5)) for c in (start, end))
+    return "#" + "".join(f"{round(x + (y - x) * t):02x}" for x, y in zip(a, b, strict=True))
 
 
 def header(out: Console, name: str, parts: list[str | None], link: str | None = None) -> None:
