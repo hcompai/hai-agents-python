@@ -19,10 +19,16 @@ def supported() -> bool:
 
 
 class EscWatcher:
-    """Calls ``on_esc(watcher)`` on its own thread when Esc is pressed; a no-op off a TTY or on Windows."""
+    """On its own thread, calls ``on_esc(watcher)`` on Esc and ``on_text(watcher, typed)`` once typing starts.
 
-    def __init__(self, on_esc: Callable[[EscWatcher], None]) -> None:
+    A no-op off a TTY or on Windows.
+    """
+
+    def __init__(
+        self, on_esc: Callable[[EscWatcher], None], on_text: Callable[[EscWatcher, str], None] | None = None
+    ) -> None:
         self._on_esc = on_esc
+        self._on_text = on_text
         self._stop = threading.Event()
         self._abandoned = threading.Event()
         self._thread: threading.Thread | None = None
@@ -94,8 +100,14 @@ class EscWatcher:
         assert self._fd is not None
         while not self._stop.is_set():
             ready, _, _ = select.select([self._fd], [], [], _POLL_S)
-            if ready and os.read(self._fd, 32) == ESC:
+            if not ready:
+                continue
+            chunk = os.read(self._fd, 1024)
+            typed = chunk.decode(errors="ignore")
+            if chunk == ESC:
                 self._on_esc(self)
+            elif self._on_text is not None and typed and typed[0].isprintable():
+                self._on_text(self, typed)
 
     def _restore(self) -> None:
         if self._fd is not None and self._saved is not None:

@@ -477,7 +477,7 @@ class _Conversation:
         if self.controls_machine:
             stop = "esc esc stops the agent, from any app" if self._listener else "ctrl+c stops the agent"
         else:
-            stop = "esc pauses the agent so you can steer it" if keys.supported() else "ctrl+c stops the agent"
+            stop = "type while it works to add context; esc pauses it" if keys.supported() else "ctrl+c stops the agent"
         tips = [Text(stop), Text("follow up in plain words; / lists commands")]
         if welcome.is_newer(facts.latest, current):
             upgrade = f"holo {facts.latest} is available {ui.SEP} pip install -U 'hai-agents[cli]'"
@@ -511,7 +511,11 @@ class _Conversation:
         if self.controls_machine:
             stop = [("esc esc", "stop the agent")]
         elif keys.supported():
-            stop = [("esc", "pause the agent and tell it what to do instead"), ("esc, then /answer", "answer now")]
+            stop = [
+                ("type", "message the agent while it works"),
+                ("esc", "pause the agent and tell it what to do instead"),
+                ("esc, then /answer", "answer now"),
+            ]
         else:
             stop = []
         return [
@@ -858,7 +862,7 @@ class _Conversation:
     def _esc_watcher(self) -> Any:
         if self.controls_machine or not _interactive():
             return contextlib.nullcontext()
-        return keys.EscWatcher(self._steer)
+        return keys.EscWatcher(self._steer, self._send_typed)
 
     def _steer(self, watcher: keys.EscWatcher) -> None:
         """Pause the agent, ask what to do instead, then send that once the pause lands and resume."""
@@ -895,6 +899,33 @@ class _Conversation:
             if status is None or status == "paused":
                 self._resume(session_id)
             self._pending = None if text == "/answer" else text or None
+        if feed is not None:
+            err_console.print()
+            feed.release()
+
+    def _send_typed(self, watcher: keys.EscWatcher, typed: str) -> None:
+        """Typing mid-run sends without pausing: the agent reads the message at its next step."""
+        feed, session_id = self._feed, self.session.id
+        if feed is not None:
+            feed.hold()
+        line, newline, _ = typed.replace("\r", "\n").partition("\n")
+        if not newline:
+            with watcher.cooked():
+                err_console.print(Text.assemble(ui.prompt_text(), line), end="")
+                rest = watcher.read_line()
+            if watcher.stopped:
+                return
+            line += rest or ""
+        text = line.strip()
+        if text and self._turn_done:
+            self._pending = text
+        elif text:
+            try:
+                request = SendSessionMessagesRequestBody_UserMessage(message=text)
+                self.client.sessions.send_session_messages(session_id, request=request)
+                ui.hint(err_console, "sent; the agent reads it at its next step")
+            except Exception as exc:
+                ui.error(err_console, f"message not sent: {exc}")
         if feed is not None:
             err_console.print()
             feed.release()

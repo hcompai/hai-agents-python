@@ -387,6 +387,29 @@ def test_esc_waits_for_the_pause_then_sends_the_correction_and_resumes(monkeypat
 
 
 @pytest.mark.parametrize(
+    ("turn_done", "calls", "pending"),
+    [(False, [("send", "only the top 2")], None), (True, [], "only the top 2")],
+    ids=["while it works", "after the turn"],
+)
+def test_typing_mid_run_sends_without_pausing(turn_done, calls, pending) -> None:
+    client = _RunClient()
+    convo = app_module._Conversation(
+        app_module.AppState(api_key=None, base_url=None, json_output=False),
+        "h/test-agent",
+        local=False,
+        max_steps=5,
+        max_time_s=60,
+        overrides={},
+        client=client,
+        session=type("Session", (), {"id": "sess_1"})(),
+    )
+    convo._turn_done = turn_done
+    convo._send_typed(_Watcher("nly the top 2"), "o")
+
+    assert (client.sessions.calls, convo._pending) == (calls, pending)
+
+
+@pytest.mark.parametrize(
     ("status", "expected"),
     [(RuntimeError("network down"), [("pause",), ("resume",)]), ("awaiting_tool_results", [("pause",)])],
 )
