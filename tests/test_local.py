@@ -298,16 +298,27 @@ class TestAutoStart:
         monkeypatch.setattr(
             SessionsClient, "get_session_status", lambda self, id, **kw: types.SimpleNamespace(status="completed")
         )
-        monkeypatch.setattr(SessionsClient, "send_session_messages", lambda self, id, **kw: events.append("send"))
+        failures = iter([RuntimeError("network down")])
+
+        def send(self, id, **kw):
+            if failure := next(failures, None):
+                raise failure
+            events.append("send")
+
+        monkeypatch.setattr(SessionsClient, "send_session_messages", send)
         sessions = Client(api_key=API_KEY).sessions
         sessions.create_session(
             agent={"name": "x", "environments": [{"kind": "desktop", "host": "user_device"}]}, messages="hi"
         )
         sessions.get_session_status("sess-1")
-        sessions.send_session_messages("sess-1", request=SendSessionMessagesRequestBody_UserMessage(message="more"))
+        more = SendSessionMessagesRequestBody_UserMessage(message="more")
+        with pytest.raises(RuntimeError):
+            sessions.send_session_messages("sess-1", request=more)
+        sessions.send_session_messages("sess-1", request=more)
         sessions.send_session_messages("sess-1", request=SendSessionMessagesRequestBody_UserMessage(message="again"))
 
-        assert events == [("start", ["desktop"]), "stop", ("start", ["desktop"]), "send", "send"]
+        restart = ("start", ["desktop"])
+        assert events == [restart, "stop", restart, "stop", restart, "send", "send"]
         assert list(sessions_module._exit_cancels) == ["sess-1"]
 
     def test_create_session_failure_stops_newly_started_bridges(self, monkeypatch):

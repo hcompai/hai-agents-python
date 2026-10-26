@@ -8,6 +8,7 @@ import concurrent.futures
 import contextlib
 import functools
 import hashlib
+import hmac
 import inspect
 import json
 import logging
@@ -83,7 +84,7 @@ def _resolve_token(source: TokenSource) -> str:
 
 def _caller(api_key: TokenSource, base_url: typing.Optional[str]) -> str:
     """Idempotency keys are scoped per caller on the platform, so bridge ids seeded from them must be too."""
-    return hashlib.sha256(f"{base_url}\n{_resolve_token(api_key)}".encode()).hexdigest()
+    return hmac.new(_resolve_token(api_key).encode(), f"{base_url}".encode(), hashlib.sha256).hexdigest()
 
 
 def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) -> None:
@@ -361,6 +362,17 @@ class _LocalSessionsState:
         # Sessions this client created on a local runtime; they never keep that runtime alive past close().
         self.own_session_ids: typing.Set[str] = set()
 
+    @contextlib.contextmanager
+    def _reviving(self, session_id: str) -> typing.Iterator[typing.List[LocalBridge]]:
+        """Bridges an ended session needs again; kept for the retry if the follow-up fails."""
+        bridges = self._ended.pop(session_id, [])
+        try:
+            yield bridges
+        except BaseException:
+            if bridges:
+                self._ended[session_id] = bridges
+            raise
+
     @property
     def _runtime(self) -> typing.Optional[LocalRuntime]:
         return None if self._hold is None else self._hold.runtime
@@ -483,16 +495,16 @@ class LocalSessionsClient(_LocalSessionsState, SessionsClient):
         request: SendSessionMessagesRequestBody,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
-        bridges = self._ended.pop(str(id), [])
-        started: typing.List[str] = []
-        if bridges:
-            stop_watcher, watcher = _ensure_stop_watcher(), _LossWatcher(bridges)
-            started = ensure_bridges(bridges)
-        try:
-            super().send_session_messages(id, request=request, request_options=request_options)
-        except BaseException:
-            _stop_bridges_keeping_error(started)
-            raise
+        with self._reviving(str(id)) as bridges:
+            started: typing.List[str] = []
+            if bridges:
+                stop_watcher, watcher = _ensure_stop_watcher(), _LossWatcher(bridges)
+                started = ensure_bridges(bridges)
+            try:
+                super().send_session_messages(id, request=request, request_options=request_options)
+            except BaseException:
+                _stop_bridges_keeping_error(started)
+                raise
         if bridges:
             session = types.SimpleNamespace(id=str(id))
             if landed := self._guard(session, bridges, watcher, stop_watcher):
@@ -562,18 +574,18 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
         request: SendSessionMessagesRequestBody,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
-        bridges = self._ended.pop(str(id), [])
-        started: typing.List[str] = []
-        if bridges:
-            for bridge in bridges:
-                bridge.preflight()
-            stop_watcher, watcher = _ensure_stop_watcher(), _LossWatcher(bridges)
-            started = await asyncio.to_thread(ensure_bridges, bridges)
-        try:
-            await super().send_session_messages(id, request=request, request_options=request_options)
-        except BaseException:
-            await asyncio.to_thread(_stop_bridges_keeping_error, started)
-            raise
+        with self._reviving(str(id)) as bridges:
+            started: typing.List[str] = []
+            if bridges:
+                for bridge in bridges:
+                    bridge.preflight()
+                stop_watcher, watcher = _ensure_stop_watcher(), _LossWatcher(bridges)
+                started = await asyncio.to_thread(ensure_bridges, bridges)
+            try:
+                await super().send_session_messages(id, request=request, request_options=request_options)
+            except BaseException:
+                await asyncio.to_thread(_stop_bridges_keeping_error, started)
+                raise
         if bridges:
             session = types.SimpleNamespace(id=str(id))
             if landed := self._guard(session, bridges, watcher, stop_watcher):
