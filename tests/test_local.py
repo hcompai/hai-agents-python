@@ -12,7 +12,8 @@ import pytest
 from hai_agents import Client
 from hai_agents.core.api_error import ApiError
 from hai_agents.sessions.client import SessionsClient
-from hai_agents.types import Desktop, Workstation
+from hai_agents.types import Agent, Desktop, Workstation
+from hai_agents.types.browser import Browser
 from hai_agents_local import (
     BridgeManager,
     LocalBridge,
@@ -37,7 +38,7 @@ class TestLocalizeAgent:
                 {"id": "box", "kind": "desktop", "host": "user_device"},
             ],
         }
-        localized, bridges = localize_agent(agent, api_key=API_KEY)
+        localized, bridges, _ = localize_agent(agent, api_key=API_KEY)
         envs = localized["environments"]
         assert [type(b) for b in bridges] == [SeleniumBrowserBridge, PyautoguiDesktopBridge]
         assert [e["session_id"] for e in envs] == [b.session_id for b in bridges]
@@ -64,7 +65,7 @@ class TestLocalizeAgent:
                 {"id": "laptop", "kind": "web", "host": "user_device"},
             ],
         }
-        localized, bridges = localize_agent(agent, api_key=API_KEY)
+        localized, bridges, _ = localize_agent(agent, api_key=API_KEY)
         [bridge] = bridges
         assert localized["environments"][1]["session_id"] == bridge.session_id
 
@@ -77,17 +78,48 @@ class TestLocalizeAgent:
             ],
             "subagents": ["registered-agent"],
         }
-        localized, bridges = localize_agent(agent, api_key=API_KEY)
+        localized, bridges, _ = localize_agent(agent, api_key=API_KEY)
         assert localized is agent
         assert bridges == []
-        assert localize_agent("named-agent", api_key=API_KEY) == ("named-agent", [])
+        assert localize_agent("named-agent", api_key=API_KEY) == ("named-agent", [], {})
+
+    def test_named_leaves_are_routed_by_override_unless_claimed(self):
+        resolved = {
+            ("environment", "my-laptop"): Browser(id="my-laptop", host="user_device"),
+            ("agent", "helper"): {"name": "helper", "environments": [{"kind": "desktop", "host": "user_device"}]},
+            ("agent", "claimed"): {"name": "claimed", "environments": [{"kind": "web", "host": "user_device"}]},
+        }
+        agent = {"name": "x", "environments": ["my-laptop", "cloud-browser"], "subagents": ["helper", "claimed"]}
+        claimed = {"agent.subagents[name=claimed].environments[kind=web].session_id": "elsewhere"}
+        localized, [web, desktop], overrides = localize_agent(
+            agent, api_key=API_KEY, resolved=resolved, claimed=claimed
+        )
+        assert localized == agent
+        assert overrides == {
+            "agent.environments[kind=web].session_id": web.session_id,
+            "agent.subagents[name=helper].environments[kind=desktop].session_id": desktop.session_id,
+        }
+
+    def test_seed_makes_bridge_ids_reproducible_for_idempotent_retries(self):
+        agent = {"name": "x", "environments": [{"kind": "desktop", "host": "user_device"}]}
+
+        def session_id(seed):
+            return localize_agent(agent, api_key=API_KEY, seed=seed).bridges[0].session_id
+
+        assert session_id("key-1") == session_id("key-1") != session_id("key-2")
+        assert session_id(None) != session_id(None)
+
+    def test_unaddressable_named_env_raises(self):
+        resolved = {("agent", "v1.2"): {"name": "v1.2", "environments": [{"kind": "web", "host": "user_device"}]}}
+        with pytest.raises(ValueError, match="cannot be addressed"):
+            localize_agent({"name": "x", "subagents": ["v1.2"]}, api_key=API_KEY, resolved=resolved)
 
     def test_inline_subagents_are_walked(self):
         agent = {
             "name": "orchestrator",
             "subagents": [{"name": "child", "environments": [{"id": "box", "kind": "desktop", "host": "user_device"}]}],
         }
-        localized, bridges = localize_agent(agent, api_key=API_KEY)
+        localized, bridges, _ = localize_agent(agent, api_key=API_KEY)
         [bridge] = bridges
         assert isinstance(bridge, PyautoguiDesktopBridge)
         assert localized["subagents"][0]["environments"][0]["session_id"] == bridge.session_id
@@ -103,7 +135,7 @@ class TestLocalizeAgent:
         from hai_agents.types.browser import Browser
 
         agent = {"name": "x", "environments": [Browser(id="laptop", host="user_device")]}
-        localized, [bridge] = localize_agent(agent, api_key=API_KEY)
+        localized, [bridge], _ = localize_agent(agent, api_key=API_KEY)
         env = localized["environments"][0]
         assert env.session_id == bridge.session_id
         assert env.model_dump()["kind"] == "web"
@@ -113,7 +145,7 @@ class TestLocalizeAgent:
     )
     def test_bare_env_model_gets_its_bridge_and_kind_tag(self, model, bridge_type):
         agent = {"name": "x", "environments": [model(id="box", host="user_device")]}
-        localized, [bridge] = localize_agent(agent, api_key=API_KEY)
+        localized, [bridge], _ = localize_agent(agent, api_key=API_KEY)
         assert isinstance(bridge, bridge_type)
         env = localized["environments"][0]
         assert env.session_id == bridge.session_id
@@ -159,6 +191,27 @@ def _stub_local_driver(monkeypatch):
     monkeypatch.setattr("hai_agents_local.desktop.ensure_macos_input_permissions", lambda prompt=True: None)
 
 
+def _registry(monkeypatch, agents: dict | None = None, environments: dict | None = None) -> list:
+    """Serve ``get_agent`` and ``get_environment`` from dicts, 404 otherwise; returns the agent fetches."""
+    from hai_agents.agents.client import AgentsClient
+    from hai_agents.environments.client import EnvironmentsClient
+
+    fetched: list = []
+
+    def lookup(table, name):
+        if name not in (table or {}):
+            raise ApiError(status_code=404, body={"detail": "not found"})
+        return table[name]
+
+    def get_agent(self, name, *, revision=None, resolve=None, **_):
+        fetched.append((name, revision))
+        return lookup(agents, name)
+
+    monkeypatch.setattr(AgentsClient, "get_agent", get_agent)
+    monkeypatch.setattr(EnvironmentsClient, "get_environment", lambda self, name, **_: lookup(environments, name))
+    return fetched
+
+
 class TestAutoStart:
     def test_create_session_starts_bridges_and_stamps_matching_session_ids(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
@@ -181,15 +234,35 @@ class TestAutoStart:
         assert captured["agent"]["environments"][0]["session_id"] == desktop.session_id
         assert captured["agent"]["subagents"][0]["environments"][0]["session_id"] == web.session_id
 
-    def test_named_agent_is_passed_through_without_bridges(self, monkeypatch):
+    def test_named_agent_routes_its_user_device_env_through_an_override(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
         started: list = []
         captured: dict = {}
+        fetched = _registry(
+            monkeypatch,
+            agents={
+                "my-agent": Agent.model_validate(
+                    {
+                        "name": "my-agent",
+                        "description": "",
+                        "environments": [{"kind": "desktop", "id": "box", "host": "user_device"}],
+                    }
+                )
+            },
+        )
         monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: started.extend(bridges) or [])
         monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: captured.update(kw))
-        Client(api_key=API_KEY).sessions.create_session(agent="my-agent", messages="hi")
-        assert started == []
-        assert captured["agent"] == "my-agent"
+        Client(api_key=API_KEY).sessions.create_session(
+            agent="my-agent:3", messages="hi", overrides={"agent.model": "m"}
+        )
+        [bridge] = started
+        assert isinstance(bridge, PyautoguiDesktopBridge)
+        assert fetched == [("my-agent", 3)]
+        assert captured["agent"] == "my-agent:3"
+        assert captured["overrides"] == {
+            "agent.environments[kind=desktop].session_id": bridge.session_id,
+            "agent.model": "m",
+        }
 
     def test_create_session_failure_stops_newly_started_bridges(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
@@ -317,10 +390,11 @@ class TestAutoStart:
         client.sessions.create_session(agent=dict(self._TWO_ENV_AGENT), messages="hi", max_steps=None, max_time_s=10)
         assert captured["max_steps"] is None and captured["max_time_s"] == 10
         captured.clear()
+        _registry(monkeypatch)
         client.sessions.create_session(agent="named-agent", messages="hi")
         assert "max_steps" not in captured and "max_time_s" not in captured
 
-    def test_kill_switch_stop_cancels_local_sessions(self, monkeypatch, tmp_path):
+    def test_kill_switch_stops_bridges_then_cancels_local_sessions(self, monkeypatch, tmp_path):
         import time as _time
 
         from hai_agents_local import killswitch
@@ -332,19 +406,16 @@ class TestAutoStart:
         if sessions_module._stop_watcher is not None:
             sessions_module._stop_watcher.stop()
         monkeypatch.setattr(sessions_module, "_stop_watcher", None)
-        cancelled: list = []
-        stopped: list = []
-        bridges: list = []
-        self._crash_wiring(monkeypatch, cancelled, stopped, bridges)
-        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", lambda *args: stopped.append(args))
+        events: list = []
+        self._crash_wiring(monkeypatch, events, [], [])
+        monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", lambda *args: events.append(("stop", args)))
         monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: type("S", (), {"id": "sess-ks"})())
         Client(api_key=API_KEY).sessions.create_session(agent=dict(self._TWO_ENV_AGENT), messages="hi")
         killswitch.request_stop()
         deadline = _time.monotonic() + 3.0
-        while not stopped and _time.monotonic() < deadline:
+        while len(events) < 2 and _time.monotonic() < deadline:
             _time.sleep(0.02)
-        assert cancelled == ["sess-ks"]
-        assert stopped == [()]
+        assert events == [("stop", ()), "sess-ks"]
 
     def test_stop_filed_during_session_creation_cancels_the_new_session(self, monkeypatch, tmp_path):
         import time as _time
