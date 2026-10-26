@@ -32,13 +32,14 @@ def test_prompt_keys(monkeypatch, tmp_path, keys, expected) -> None:
         assert prompt.read(toolbar=lambda: "", placeholder="") == expected
 
 
-def test_up_scrolls_history_past_a_recalled_command(monkeypatch, tmp_path) -> None:
+@pytest.mark.parametrize("keys", [f"{UP}{UP}{ENTER}", f"\x12flig{ENTER}{ENTER}"])
+def test_history_is_reachable_past_a_recalled_command(monkeypatch, tmp_path, keys) -> None:
     monkeypatch.setenv("TERM", "xterm-256color")
     history = FileHistory(str(tmp_path / "history"))
     history.store_string("find flights")
     history.store_string("/exit")
     with create_pipe_input() as pipe, create_app_session(input=pipe, output=DummyOutput()):
-        pipe.send_text(f"{UP}{UP}{ENTER}")
+        pipe.send_text(keys)
         prompt = Prompt(tmp_path / "history", lambda: [("/new [task]", "start fresh"), ("/exit", "leave")])
         assert prompt.read(toolbar=lambda: "", placeholder="") == "find flights"
 

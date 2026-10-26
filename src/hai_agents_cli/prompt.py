@@ -8,8 +8,9 @@ from pathlib import Path
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.application import Application
+from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.data_structures import Point
-from prompt_toolkit.filters import Condition, to_filter
+from prompt_toolkit.filters import Condition, is_searching, to_filter
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
@@ -145,6 +146,7 @@ class Prompt:
         self._exit_armed_at = 0.0
         self._session: PromptSession[str] = PromptSession(
             history=FileHistory(str(history_path)),
+            auto_suggest=AutoSuggestFromHistory(),
             key_bindings=self._key_bindings(),
             style=_STYLE,
             multiline=True,
@@ -185,7 +187,7 @@ class Prompt:
         empty = Condition(lambda: not self._session.default_buffer.text)
         menu_open = Condition(lambda: bool(self._menu.matches(self._menu_text())))
 
-        @kb.add("enter")
+        @kb.add("enter", filter=~is_searching)
         def _submit(event: KeyPressEvent) -> None:
             buf = event.current_buffer
             if not buf.text.strip():

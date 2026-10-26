@@ -180,6 +180,25 @@ def test_a_lost_stream_cancels_the_session_and_the_chat_continues(monkeypatch) -
     assert ("cancel",) in client.sessions.calls
 
 
+def test_retry_runs_the_first_task_again_in_a_new_session(monkeypatch) -> None:
+    captured: dict = {}
+    client = _RunClient(capture=captured)
+    idle = SessionRunResult(id="sess_1", status="idle", events=[], next_from_index=1)
+    replies = iter(["only direct ones", "/retry", None])
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module, "wait_for_session", lambda *a, **k: idle)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+    monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
+
+    result = runner.invoke(app, ["run", "find flights", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 0, result.output
+    assert client.sessions.created == 2
+    assert "find flights" in json.dumps(captured["messages"], default=str)
+    assert ("cancel",) in client.sessions.calls
+
+
 def test_ctrl_c_while_starting_cancels_the_new_session_and_the_chat_continues(monkeypatch) -> None:
     client = _RunClient()
 

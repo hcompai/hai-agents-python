@@ -388,6 +388,7 @@ class _Conversation:
     _pending: str | None = None
     _kinds: list[str] | None = None
     _answer: Any = None
+    _task: str | None = None
 
     @property
     def human(self) -> bool:
@@ -490,7 +491,10 @@ class _Conversation:
         return "local desktop" if self.local else str(self.agent)
 
     def commands(self) -> list[tuple[str, str]]:
-        rows = [("/new [task]", "end this session; start fresh, optionally with a task")]
+        rows = [
+            ("/new [task]", "end this session; start fresh, optionally with a task"),
+            ("/retry", "run the session's first task again, fresh"),
+        ]
         if not self.local:
             rows += [
                 ("/resume [n]", "continue one of your recent sessions"),
@@ -514,6 +518,8 @@ class _Conversation:
             ("ctrl+c", "cancel the turn or clear the input; twice to exit"),
             ("ctrl+d", "exit"),
             ("up / down", "history"),
+            ("ctrl+r", "search history"),
+            ("→", "accept the grey suggestion"),
             ("\\ enter", "new line"),
         ]
 
@@ -537,6 +543,7 @@ class _Conversation:
             try:
                 with self._starting():
                     self.session = self._create_session(message)
+                self._task = message
             except KeyboardInterrupt:
                 self._cancel_turn(None)
                 return
@@ -725,6 +732,12 @@ class _Conversation:
                 ui.error(err_console, "no session yet", fix="send a task first")
         elif name == "share":
             self._share()
+        elif name == "retry":
+            if self._task is None:
+                ui.error(err_console, "nothing to retry yet", fix="send a task first")
+            else:
+                self._end_session()
+                self._send(self._task)
         elif name == "resume" and not self.local:
             try:
                 self._resume_session(arg)
@@ -769,6 +782,7 @@ class _Conversation:
             return
         self._end_session()
         self.session, self.result, self._answer = session, None, session.latest_answer
+        self._task = picked.first_message.message if picked.first_message else None
         self.next_index = 0 if changes is None else (changes.first_index or 0) + len(changes.new_events or [])
         if picked.agent:
             self._use_agent(picked.agent)
@@ -1624,7 +1638,10 @@ def _pick_session(recent: list[Any], arg: str) -> Any:
     """A session by list number or id prefix; with no argument, pick one with the arrow keys."""
     if not arg:
         items = [welcome.activity(summary) for summary in recent]
-        rows = [(_truncate(item.task, 60), f"{item.age}  {s.agent or ''}") for item, s in zip(items, recent)]
+        rows = [
+            (_truncate(item.task, 60), f" {ui.SEP} ".join(filter(None, [item.status, item.age, summary.agent])))
+            for item, summary in zip(items, recent)
+        ]
         return recent[_choose(rows)]
     if arg.isdigit() and 1 <= int(arg) <= len(recent):
         return recent[int(arg) - 1]
