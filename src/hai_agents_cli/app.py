@@ -880,7 +880,7 @@ class _Conversation:
             err_console.print()
         text = (line or "").strip()
         try:
-            status: str | None = self._await_pause(session_id)
+            status = self._await_pause(session_id, watcher)
         except Exception as exc:
             ui.error(err_console, str(exc))
             status = None
@@ -923,13 +923,14 @@ class _Conversation:
         except Exception as exc:
             ui.error(err_console, f"could not resume: {exc}", fix="ctrl+c cancels the turn")
 
-    def _await_pause(self, session_id: str) -> str:
+    def _await_pause(self, session_id: str, watcher: keys.EscWatcher) -> str | None:
         """A pause lands at the end of the current step; a message sent before then is overtaken by it."""
-        while True:
+        while not watcher.stopped:
             status = str(self.client.sessions.get_session_status(session_id).status)
             if status in ("paused", "awaiting_tool_results") or is_settled_session_status(status):
                 return status
             time.sleep(0.5)
+        return None
 
 
 def _read_message(convo: _Conversation) -> str | None:
