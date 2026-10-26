@@ -89,7 +89,11 @@ class TestLocalizeAgent:
             ("agent", "helper"): {"name": "helper", "environments": [{"kind": "desktop", "host": "user_device"}]},
             ("agent", "claimed"): {"name": "claimed", "environments": [{"kind": "web", "host": "user_device"}]},
         }
-        agent = {"name": "x", "environments": ["my-laptop", "cloud-browser"], "subagents": ["helper", "claimed"]}
+        agent = {
+            "name": "x",
+            "environments": ["my-laptop", "cloud-browser", {"id": "vm", "kind": "desktop"}],
+            "subagents": ["helper", "claimed"],
+        }
         claimed = {"agent.subagents[name=claimed].environments[kind=web].session_id": "elsewhere"}
         localized, [web, desktop], overrides = localize_agent(
             agent, api_key=API_KEY, resolved=resolved, claimed=claimed

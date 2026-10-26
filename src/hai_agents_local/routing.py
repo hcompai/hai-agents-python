@@ -103,7 +103,7 @@ class _Walk:
         if isinstance(env, str):
             spec = self.resolved.get(("environment", env))
             if spec is not None:
-                self.environment(spec, path, [self.resolved.get(("environment", s), s) for s in siblings], by_name=True)
+                self.environment(spec, path, [self.lookup(sibling) for sibling in siblings], by_name=True)
             return env
         kind = _local_kind(env)
         if kind is None or _read(env, "session_id"):
@@ -126,6 +126,9 @@ class _Walk:
             )
         self.overrides[key] = self.bridge(kind, env).session_id
         return env
+
+    def lookup(self, env: EnvironmentLike) -> Any:
+        return self.resolved.get(("environment", env), env) if isinstance(env, str) else env
 
     def bridge(self, kind: str, env: EnvironmentLike) -> LocalBridge:
         if any(bridge.environment_kind == kind for bridge in self.bridges):
