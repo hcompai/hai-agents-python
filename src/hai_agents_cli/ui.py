@@ -411,9 +411,15 @@ class StepFeed:
             req = data.get("tool_req") or {}
             result = data.get("result")
             if self._current is not None and req.get("tool_name") != "answer":
-                self._finish(ts, _first_line(result.get("error")) if isinstance(result, dict) else None)
-        elif kind == "error_event" and data.get("origin") == "tool" and self._current is not None:
-            self._finish(ts, _first_line(data.get("error")) or "tool failed")
+                self._finish(ts, _tool_error(result))
+        elif kind == "error_event":
+            message = _first_line(data.get("error")) or "error"
+            if data.get("origin") == "tool" and self._current is not None:
+                self._finish(ts, message)
+            else:
+                self._flush()
+                self.out.print(_bullet(Text(message, style="warn"), "warn"))
+                self.out.print()
         elif kind == "answer_event":
             self.answer = data.get("answer")
         if self._live is not None:
@@ -443,7 +449,7 @@ class StepFeed:
             self._flush()
         content = " ".join(str(data.get("content") or "").split())
         if content:
-            self.out.print(Text.assemble(f"{DOT} ", content))
+            self.out.print(_bullet(Text(content)))
             self.out.print()
         verb, target = _describe(reqs[0])
         if len(reqs) > 1:
@@ -523,14 +529,18 @@ def print_answer(out: Console, answer: Any) -> None:
     if not isinstance(answer, str):
         out.print(json.dumps(answer, indent=2, default=str), markup=False, highlight=False, soft_wrap=True)
     elif interactive(out):
-        grid = Table.grid()
-        grid.add_column(width=2, no_wrap=True)
-        grid.add_column()
-        grid.add_row(Text(DOT, style="accent"), Markdown(answer))
         out.print()
-        out.print(grid)
+        out.print(_bullet(Markdown(answer), "accent"))
     else:
         out.print(answer, markup=False, highlight=False, soft_wrap=True)
+
+
+def _bullet(body: RenderableType, style: str = "") -> Table:
+    grid = Table.grid()
+    grid.add_column(width=2, no_wrap=True)
+    grid.add_column()
+    grid.add_row(Text(DOT, style=style), body)
+    return grid
 
 
 def set_title(out: Console, text: str) -> None:
@@ -645,6 +655,14 @@ def _first_sentence(text: Any) -> str | None:
         if 0 < cut < 160:
             return text[: cut + 1]
     return text[:160]
+
+
+def _tool_error(result: Any) -> str | None:
+    if isinstance(result, dict):
+        return _first_line(result.get("error"))
+    if isinstance(result, str) and result.startswith("error:\n"):
+        return _first_line(result.removeprefix("error:\n")) or "failed"
+    return None
 
 
 def _first_line(text: Any) -> str | None:
