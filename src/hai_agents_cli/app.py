@@ -599,26 +599,36 @@ class _Conversation:
         with watcher.cooked():
             text = (_ask() or "").strip()
         try:
-            status = self._await_pause(session_id)
-            if self._turn_done or is_settled_session_status(status):
-                self._pending = text or None
-            else:
-                if text:
-                    request = SendSessionMessagesRequestBody_UserMessage(message=text)
-                    self.client.sessions.send_session_messages(session_id, request=request)
-                self.client.sessions.resume_session(session_id)
+            status: str | None = self._await_pause(session_id)
         except Exception as exc:
             ui.error(err_console, str(exc))
+            status = None
+        if self._turn_done or (status is not None and is_settled_session_status(status)):
+            self._pending = text or None
+        else:
+            self._correct_and_resume(session_id, text)
         if feed is not None:
             err_console.print()
             feed.release()
 
-    def _await_pause(self, session_id: str, timeout_s: float = 30.0) -> str:
+    def _correct_and_resume(self, session_id: str, text: str) -> None:
+        """Resume even if the correction fails: a paused session never settles, so the turn would wait forever."""
+        if text:
+            try:
+                request = SendSessionMessagesRequestBody_UserMessage(message=text)
+                self.client.sessions.send_session_messages(session_id, request=request)
+            except Exception as exc:
+                ui.error(err_console, f"correction not sent: {exc}")
+        try:
+            self.client.sessions.resume_session(session_id)
+        except Exception as exc:
+            ui.error(err_console, f"could not resume: {exc}", fix="ctrl+c cancels the turn")
+
+    def _await_pause(self, session_id: str) -> str:
         """A pause lands at the end of the current step; a message sent before then is overtaken by it."""
-        deadline = time.monotonic() + timeout_s
         while True:
             status = str(self.client.sessions.get_session_status(session_id).status)
-            if status == "paused" or is_settled_session_status(status) or time.monotonic() > deadline:
+            if status == "paused" or is_settled_session_status(status):
                 return status
             time.sleep(0.5)
 

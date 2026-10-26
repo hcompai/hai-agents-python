@@ -246,8 +246,14 @@ def test_follow_up_continues_the_same_session_from_the_last_event(monkeypatch) -
 
 def test_esc_waits_for_the_pause_then_sends_the_correction_and_resumes(monkeypatch) -> None:
     monkeypatch.setattr(app_module.time, "sleep", lambda s: None)
-    for typed, expected in (("only the top 2", [("send", "only the top 2"), ("resume",)]), ("", [("resume",)])):
+    cases = (
+        ("only the top 2", False, [("send", "only the top 2"), ("resume",)]),
+        ("", False, [("resume",)]),
+        ("only the top 2", True, [("resume",)]),
+    )
+    for typed, send_fails, expected in cases:
         client = _RunClient()
+        client.sessions.send_fails = send_fails
         convo = app_module._Conversation(
             app_module.AppState(api_key=None, base_url=None, json_output=False),
             "h/test-agent",
@@ -372,6 +378,7 @@ class _RunSessions:
         self.created = 0
         self.sent: list[tuple[str, str]] = []
         self.calls: list[tuple] = []
+        self.send_fails = False
 
     def create_session(self, **kwargs):
         self.created += 1
@@ -384,6 +391,8 @@ class _RunSessions:
         )()
 
     def send_session_messages(self, id, *, request):
+        if self.send_fails:
+            raise RuntimeError("network down")
         self.sent.append((id, request.message))
         self.calls.append(("send", request.message))
 
