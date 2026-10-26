@@ -128,6 +128,29 @@ def test_kill_switch_stops_that_turn_and_the_next_message_starts_a_new_session(m
     assert client.sessions.sent == []
 
 
+def test_a_client_tool_wait_ends_the_session_and_the_next_message_starts_a_new_one(monkeypatch) -> None:
+    client = _RunClient()
+    results = iter(
+        [
+            SessionRunResult(id="sess_1", status="awaiting_tool_results", events=[], next_from_index=0),
+            SessionRunResult(id="sess_1", status="idle", events=[], next_from_index=3, answer="ok"),
+        ]
+    )
+    replies = iter(["try again", None])
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
+    monkeypatch.setattr(app_module, "_follow", _no_events)
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+    monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
+
+    result = runner.invoke(app, ["run", "use my tool", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 0, result.output
+    assert client.sessions.created == 2
+    assert client.sessions.sent == []
+    assert ("cancel",) in client.sessions.calls
+
+
 def test_a_turn_stops_following_at_a_client_tool_wait_but_watch_does_not(monkeypatch) -> None:
     awaiting = {"type": "ActiveStateChangeEvent", "data": {"state": "awaiting_tool_results"}}
     answered = {"type": "ActiveStateChangeEvent", "data": {"state": "running"}}
@@ -272,6 +295,25 @@ def test_esc_waits_for_the_pause_then_sends_the_correction_and_resumes(monkeypat
 
         assert client.sessions.calls == [("pause",), *expected]
         assert convo._pending == pending
+
+
+def test_esc_resumes_when_the_pause_cannot_be_confirmed() -> None:
+    client = _RunClient()
+    client.sessions.get_session_status = lambda id: (_ for _ in ()).throw(RuntimeError("network down"))
+    convo = app_module._Conversation(
+        app_module.AppState(api_key=None, base_url=None, json_output=False),
+        "h/test-agent",
+        local=False,
+        max_steps=5,
+        max_time_s=60,
+        overrides={},
+        client=client,
+        session=type("Session", (), {"id": "sess_1"})(),
+    )
+    convo._steer(_Watcher("only the top 2"))
+
+    assert client.sessions.calls == [("pause",), ("resume",)]
+    assert convo._pending == "only the top 2"
 
 
 def test_share_session_prints_absolute_url(monkeypatch) -> None:

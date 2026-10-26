@@ -572,7 +572,7 @@ class _Conversation:
         )
         if feed is not None and feed.elapsed >= NOTIFY_AFTER_S:
             ui.notify(err_console, f"holo: {_status_text(result.status)} in {ui.duration(feed.elapsed)}")
-        if stopped or is_terminal_session_status(str(result.status)):
+        if stopped or is_terminal_session_status(str(result.status)) or _awaits_tools(result):
             self._end_session()
             if self.followups:
                 ui.hint(err_console, "session ended; the next message starts a new one")
@@ -723,7 +723,7 @@ class _Conversation:
         if status == "paused" and not self._turn_done:
             self._correct_and_resume(session_id, text)
         else:
-            if status == "paused":
+            if status is None or status == "paused":
                 self._resume(session_id)
             self._pending = text or None
         if feed is not None:
@@ -1487,7 +1487,7 @@ def _print_run_result(
     if answer is not None:
         ui.print_answer(console, answer)
     error_text = _error_line(result.error, result.error_code)
-    if status == "awaiting_tool_results":
+    if _awaits_tools(result):
         error_text = "the agent is waiting on client-side tools the CLI cannot run; drive it from the SDK with tools"
     if stopped:
         error_text = "stopped by the kill switch"
@@ -1497,6 +1497,11 @@ def _print_run_result(
         ui.summary(err_console, status, feed, error_text=error_text, session_id=result.id if show_session_id else None)
     elif error_text or status not in CLEAN_STATUSES:
         ui.error(err_console, error_text or f"session {status}")
+
+
+def _awaits_tools(result) -> bool:
+    """The CLI cannot run client-side tools, so a session waiting on them can never progress."""
+    return _status_text(result.status) == "awaiting_tool_results"
 
 
 def _error_line(error: str | None, error_code: str | None) -> str | None:
