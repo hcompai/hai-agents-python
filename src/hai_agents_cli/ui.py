@@ -399,9 +399,7 @@ class StepFeed:
             if self._last_end_ts is None and kind in ("observation_event", "message_event"):
                 self._last_end_ts = ts
         if kind == "metrics":
-            metrics = data.get("metrics") or {}
-            self.steps = int(metrics.get("steps") or self.steps)
-            self.cost = metrics.get("total_cost", self.cost)
+            self.steps, self.cost = _metrics(data, self.steps, self.cost)
         elif kind == "observation_event":
             meta = data.get("metadata") or {}
             title = meta.get("title") or _short_url(meta.get("url"))
@@ -599,6 +597,21 @@ def _gerund(verb: str) -> str:
         return _GERUNDS[verb]
     stem = verb[:-1] if verb.endswith("e") and not verb.endswith("ee") else verb
     return f"{stem}ing".capitalize()
+
+
+def usage(events: list[Any]) -> tuple[int, float | None]:
+    """Steps and cost as of the latest metrics event."""
+    steps, cost = 0, None
+    for event in events:
+        kind, data, _ = _unwrap(event)
+        if kind == "metrics":
+            steps, cost = _metrics(data, steps, cost)
+    return steps, cost
+
+
+def _metrics(data: dict[str, Any], steps: int, cost: float | None) -> tuple[int, float | None]:
+    metrics = data.get("metrics") or {}
+    return int(metrics.get("steps") or steps), metrics.get("total_cost", cost)
 
 
 def _unwrap(event: Any) -> tuple[str, dict[str, Any], float | None]:

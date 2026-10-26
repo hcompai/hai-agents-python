@@ -436,10 +436,17 @@ def test_resume_switches_sessions_but_keeps_the_current_one_when_picked_again() 
         created_at=datetime.now(timezone.utc),
         agent_view_url=None,
     )
+    on_device = {"environments": [{"kind": "desktop", "host": "user_device", "session_id": "bridge_1"}]}
+    agents = {"sess_3": on_device}
+    metrics = {"type": "MetricsUpdateEvent", "data": {"metrics": {"steps": 4, "total_cost": 0.12}}}
     client = _RunClient()
-    client.sessions.list_sessions = lambda **_: types.SimpleNamespace(items=[summary("sess_2"), summary("sess_1")])
-    client.sessions.get_session = lambda id: types.SimpleNamespace(id=id, latest_answer=None, agent_view_url=None)
-    client.sessions.get_session_changes = lambda id, **_: None
+    client.sessions.list_sessions = lambda **_: types.SimpleNamespace(
+        items=[summary("sess_2"), summary("sess_1"), summary("sess_3")]
+    )
+    client.sessions.get_session = lambda id: types.SimpleNamespace(
+        id=id, latest_answer=None, agent_view_url=None, request=types.SimpleNamespace(agent=agents.get(id, "h/x"))
+    )
+    client.sessions.get_session_changes = lambda id, **_: types.SimpleNamespace(first_index=0, new_events=[metrics])
     convo = app_module._Conversation(
         app_module.AppState(api_key=None, base_url=None, json_output=False),
         "h/test-agent",
@@ -455,7 +462,11 @@ def test_resume_switches_sessions_but_keeps_the_current_one_when_picked_again() 
     assert (convo.session.id, client.sessions.calls) == ("sess_1", [])
 
     convo.command("/resume 1")
-    assert (convo.session.id, convo.next_index, client.sessions.calls) == ("sess_2", 0, [("cancel",)])
+    assert (convo.session.id, convo.next_index, client.sessions.calls) == ("sess_2", 1, [("cancel",)])
+    assert (convo.steps, convo.cost) == (4, 0.12)
+
+    convo.command("/resume 3")
+    assert convo.session.id == "sess_2"
 
 
 def test_share_session_prints_absolute_url(monkeypatch) -> None:

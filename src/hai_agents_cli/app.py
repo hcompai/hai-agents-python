@@ -774,9 +774,6 @@ class _Conversation:
         if self.session is not None and str(picked.id) == str(self.session.id):
             ui.ok(err_console, "already on this session")
             return
-        if picked.agent and _local_kinds(self.client, picked.agent):
-            ui.error(err_console, "a session that drove this machine cannot be resumed", fix="/new starts a fresh one")
-            return
         try:
             session = self.client.sessions.get_session(picked.id)
             changes = self.client.sessions.get_session_changes(
@@ -785,10 +782,15 @@ class _Conversation:
         except Exception as exc:
             ui.error(err_console, str(exc))
             return
+        if _drives_a_machine(self.client, session.request.agent):
+            ui.error(err_console, "a session that drove a machine cannot be resumed", fix="/new starts a fresh one")
+            return
         self._end_session()
         self.session, self.result, self._answer = session, None, session.latest_answer
         self._task = picked.first_message.message if picked.first_message else None
-        self.next_index = 0 if changes is None else (changes.first_index or 0) + len(changes.new_events or [])
+        events = [] if changes is None else changes.new_events or []
+        self.next_index = 0 if changes is None else (changes.first_index or 0) + len(events)
+        self.steps, self.cost = ui.usage(events)
         if picked.agent:
             self._use_agent(picked.agent)
         ui.ok(err_console, f"resumed {ui.SEP} {welcome.activity(picked).task}", url=self.view_url)
@@ -797,8 +799,15 @@ class _Conversation:
         if self.session is None:
             ui.ok(err_console, f"{self.label} {ui.SEP} {self.does} {ui.SEP} no session yet")
         else:
-            status = _status_text(getattr(self.result, "status", None) or "running")
-            parts = [f"session {str(self.session.id)[:8]}", status, ui.count(self.steps, "step"), ui.money(self.cost)]
+            status = getattr(self.result, "status", None) or "running"
+            with contextlib.suppress(Exception):
+                status = self.client.sessions.get_session_status(self.session.id).status
+            parts = [
+                f"session {str(self.session.id)[:8]}",
+                _status_text(status),
+                ui.count(self.steps, "step"),
+                ui.money(self.cost),
+            ]
             ui.ok(err_console, f" {ui.SEP} ".join(p for p in parts if p), url=self.view_url)
             ui.hint(err_console, f"{self.label} {ui.SEP} {self.does}")
         if not self.local:
@@ -1664,6 +1673,17 @@ def _local_kinds(client: Any, agent: Any) -> list[str]:
         return local_environment_kinds(client, agent)
     except Exception:
         return []
+
+
+def _drives_a_machine(client: Any, agent: Any) -> bool:
+    """Read-back specs carry their bridges' session ids, which `_local_kinds` skips, so scan for the host too."""
+    return _has_user_device(to_jsonable(agent)) or bool(_local_kinds(client, agent))
+
+
+def _has_user_device(value: Any) -> bool:
+    if isinstance(value, dict):
+        return value.get("host") == "user_device" or any(map(_has_user_device, value.values()))
+    return isinstance(value, list) and any(map(_has_user_device, value))
 
 
 _CLIPBOARD_TOOLS = (
