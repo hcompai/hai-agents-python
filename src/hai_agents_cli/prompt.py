@@ -92,7 +92,7 @@ class Prompt:
         def bottom() -> FormattedText:
             if self._exit_pending():
                 return FormattedText([("class:bottom-toolbar.warn", "  press ctrl+c again to exit")])
-            text = self._session.default_buffer.text
+            text = self._menu_text()
             if self._menu.matches(text):
                 return self._menu.render(text)
             return FormattedText([("", toolbar())])
@@ -107,13 +107,18 @@ class Prompt:
         except (EOFError, KeyboardInterrupt):
             return None
 
+    def _menu_text(self) -> str:
+        """Empty while browsing history, so up and down keep scrolling past recalled commands."""
+        buf = self._session.default_buffer
+        return buf.text if buf.working_index == len(buf._working_lines) - 1 else ""
+
     def _exit_pending(self) -> bool:
         return time.monotonic() - self._exit_armed_at < EXIT_WINDOW_S
 
     def _key_bindings(self) -> KeyBindings:
         kb = KeyBindings()
         empty = Condition(lambda: not self._session.default_buffer.text)
-        menu_open = Condition(lambda: bool(self._menu.matches(self._session.default_buffer.text)))
+        menu_open = Condition(lambda: bool(self._menu.matches(self._menu_text())))
 
         @kb.add("enter")
         def _submit(event: KeyPressEvent) -> None:
@@ -124,7 +129,7 @@ class Prompt:
                 buf.delete_before_cursor()
                 buf.newline(copy_margin=False)
                 return
-            usage = self._menu.selected(buf.text)
+            usage = self._menu.selected(self._menu_text())
             if usage:
                 buf.text = usage.split()[0]
             buf.validate_and_handle()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import contextlib
 import difflib
 import json
@@ -39,7 +40,7 @@ from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
 from hai_agents_local import desktop as desktop_defaults
 
-from . import auth, keys, mcp_hosts, ui, welcome
+from . import _CLI_HINT, auth, keys, mcp_hosts, ui, welcome
 
 if TYPE_CHECKING:
     from hai_agents_local import LocalBridge
@@ -473,10 +474,11 @@ class _Conversation:
         if self.controls_machine:
             stop = "esc esc stops the agent, from any app" if self._listener else "ctrl+c stops the agent"
         else:
-            stop = "esc pauses the agent so you can steer it"
+            stop = "esc pauses the agent so you can steer it" if keys.supported() else "ctrl+c stops the agent"
         tips = [Text(stop), Text("follow up in plain words; / lists commands")]
         if welcome.is_newer(facts.latest, current):
-            tips.append(Text(f"holo {facts.latest} is available {ui.SEP} pip install -U hai-agents", style="warn"))
+            upgrade = f"holo {facts.latest} is available {ui.SEP} pip install -U 'hai-agents[cli]'"
+            tips.append(Text(upgrade, style="warn"))
         if self.drives_desktop and (missing := welcome.missing_grants()):
             tips.append(Text(f"missing macOS grants: {', '.join(missing)} {ui.SEP} run holo doctor", style="warn"))
         about = [self.label, self.does, welcome.quota_line(facts.quota), _custom_endpoint_host(self.state)]
@@ -502,8 +504,10 @@ class _Conversation:
     def keys(self) -> list[tuple[str, str]]:
         if self.controls_machine:
             stop = [("esc esc", "stop the agent")]
-        else:
+        elif keys.supported():
             stop = [("esc", "pause the agent and tell it what to do instead"), ("esc, then /answer", "answer now")]
+        else:
+            stop = []
         return [
             ("enter", "send"),
             *stop,
@@ -532,7 +536,10 @@ class _Conversation:
         if self.session is None:
             try:
                 with self._starting():
-                    self.session = self.client.sessions.create_session(**self.params(message))
+                    self.session = self._create_session(message)
+            except KeyboardInterrupt:
+                self._cancel_turn(None)
+                return
             except Exception as exc:
                 _raise_cli_error(exc)
             self.next_index = 0
@@ -542,6 +549,9 @@ class _Conversation:
             request = SendSessionMessagesRequestBody_UserMessage(message=message)
             try:
                 self.client.sessions.send_session_messages(self.session.id, request=request)
+            except KeyboardInterrupt:
+                self._cancel_turn(None)
+                return
             except Exception as exc:
                 if not self._session_ended():
                     _raise_cli_error(exc)
@@ -577,18 +587,13 @@ class _Conversation:
                     self._turn_done = True
             result = wait_for_session(self.client, self.session.id, from_index=self.next_index, timeout_seconds=timeout)
         except KeyboardInterrupt:
-            _cancel_quietly(self.client, self.session.id)
-            if feed is not None:
-                feed.close()
-            if not self.followups:
-                ui.error(err_console, "interrupted; session cancelled")
-                raise typer.Exit(130) from None
-            ui.error(err_console, "turn cancelled; the next message starts a new session")
-            self.session, self.result, self.steps, self.cost = None, None, 0, None
+            self._cancel_turn(feed)
             return
         except Exception as exc:
             if feed is not None:
                 feed.close()
+            if self.followups:
+                self._end_session()
             _raise_cli_error(exc)
         if feed is not None:
             feed.close()
@@ -609,11 +614,34 @@ class _Conversation:
             show_session_id=not self.followups,
         )
         if feed is not None and feed.elapsed >= NOTIFY_AFTER_S:
-            ui.notify(err_console, f"holo: {_status_text(result.status)} in {ui.duration(feed.elapsed)}")
+            ui.notify(err_console, f"holo: {ui.outcome(_status_text(result.status))} in {ui.duration(feed.elapsed)}")
         if stopped or is_terminal_session_status(str(result.status)) or _awaits_tools(result):
             self._end_session()
             if self.followups:
                 ui.hint(err_console, "session ended; the next message starts a new one")
+
+    def _create_session(self, message: str) -> Any:
+        """Ctrl+c still waits for the create call, so the session it made is cancelled rather than left running."""
+        params = self.params(message)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            created = pool.submit(self.client.sessions.create_session, **params)
+            try:
+                return created.result()
+            except KeyboardInterrupt:
+                with contextlib.suppress(Exception):
+                    _cancel_quietly(self.client, created.result().id)
+                raise
+
+    def _cancel_turn(self, feed: ui.StepFeed | None) -> None:
+        if self.session is not None:
+            _cancel_quietly(self.client, self.session.id)
+        if feed is not None:
+            feed.close()
+        if not self.followups:
+            ui.error(err_console, "interrupted; session cancelled")
+            raise typer.Exit(130) from None
+        ui.error(err_console, "turn cancelled; the next message starts a new session")
+        self.session, self.result, self.steps, self.cost = None, None, 0, None
 
     def _end_session(self) -> None:
         """Release the session's browser or desktop; the next message starts a new one."""
@@ -873,7 +901,13 @@ class _Conversation:
 def _read_message(convo: _Conversation) -> str | None:
     """The conversation prompt; None means the user left."""
     if convo._prompt is None:
-        from hai_agents_cli.prompt import Prompt
+        try:
+            from hai_agents_cli.prompt import Prompt
+        except ModuleNotFoundError as exc:
+            if (exc.name or "").split(".")[0] != "prompt_toolkit":
+                raise
+            ui.error(err_console, _CLI_HINT)
+            raise typer.Exit(1) from None
 
         convo._prompt = Prompt(credentials.GLOBAL_ENV_PATH.parent / "history", convo.commands)
     return convo._prompt.read(toolbar=convo.toolbar, placeholder=convo.placeholder())

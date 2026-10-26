@@ -152,6 +152,70 @@ def test_a_client_tool_wait_ends_the_session_and_the_next_message_starts_a_new_o
     assert ("cancel",) in client.sessions.calls
 
 
+def test_a_lost_stream_cancels_the_session_and_the_chat_continues(monkeypatch) -> None:
+    client = _RunClient()
+    idle = SessionRunResult(id="sess_1", status="idle", events=[], next_from_index=1)
+    results = iter([idle, RuntimeError("stream lost"), idle])
+
+    def wait(client_, id, **_):
+        result = next(results)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    replies = iter(["only direct ones", "try again", None])
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module, "wait_for_session", wait)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+    monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
+
+    result = runner.invoke(app, ["run", "find flights", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 0, result.output
+    assert client.sessions.sent == [("sess_1", "only direct ones")]
+    assert client.sessions.created == 2
+    assert ("cancel",) in client.sessions.calls
+
+
+def test_ctrl_c_while_starting_cancels_the_new_session_and_the_chat_continues(monkeypatch) -> None:
+    client = _RunClient()
+
+    class InterruptedFuture:
+        def __init__(self, call, kwargs) -> None:
+            self.session, self.waits = call(**kwargs), 0
+
+        def result(self):
+            self.waits += 1
+            if self.waits == 1:
+                raise KeyboardInterrupt
+            return self.session
+
+    class Pool:
+        def __init__(self, **_) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_) -> None:
+            pass
+
+        def submit(self, call, **kwargs):
+            return InterruptedFuture(call, kwargs)
+
+    replies = iter([None])
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module.concurrent.futures, "ThreadPoolExecutor", Pool)
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+    monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
+
+    result = runner.invoke(app, ["run", "find flights", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 0, result.output
+    assert client.sessions.calls == [("cancel",)]
+
+
 def test_a_turn_stops_following_at_a_client_tool_wait_but_watch_does_not(monkeypatch) -> None:
     awaiting = {"type": "ActiveStateChangeEvent", "data": {"state": "awaiting_tool_results"}}
     answered = {"type": "ActiveStateChangeEvent", "data": {"state": "running"}}
@@ -226,7 +290,8 @@ def test_new_releases_the_idle_session_before_starting_another(monkeypatch) -> N
 
 def test_run_without_options_uses_the_default_agent_uncapped(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", tmp_path / "global.env")
-    monkeypatch.delenv(credentials.AGENT_VAR, raising=False)
+    monkeypatch.setenv(credentials.AGENT_VAR, "")
+    monkeypatch.delenv(credentials.AGENT_VAR)
     captured: dict = {}
     monkeypatch.setattr(app_module, "_client", lambda state: _RunClient(capture=captured))
     monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)

@@ -5,9 +5,9 @@ from __future__ import annotations
 import contextlib
 import json
 import sys
+import threading
 import time
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
@@ -44,11 +44,20 @@ def gather(client: Any, *, cloud: bool) -> Facts:
     if cloud:
         jobs["quota"] = lambda: client.quota.get_token_quota(request_options=_REQUEST_OPTIONS)
         jobs["recent"] = lambda: client.sessions.list_sessions(page=1, size=3, request_options=_REQUEST_OPTIONS).items
-    pool = ThreadPoolExecutor(len(jobs))
-    futures = {name: pool.submit(job) for name, job in jobs.items()}
-    wait(futures.values(), timeout=FETCH_TIMEOUT_S)
-    pool.shutdown(wait=False, cancel_futures=True)
-    return Facts(**{name: f.result() for name, f in futures.items() if f.done() and f.exception() is None})
+    found: dict[str, Any] = {}
+
+    def run(name: str, job: Callable[[], Any]) -> None:
+        with contextlib.suppress(Exception):
+            found[name] = job()
+
+    # Daemon threads, so a fetch stuck past the deadline (DNS has no timeout) never holds up exit.
+    threads = [threading.Thread(target=run, args=job, daemon=True) for job in jobs.items()]
+    for thread in threads:
+        thread.start()
+    deadline = time.monotonic() + FETCH_TIMEOUT_S
+    for thread in threads:
+        thread.join(max(0.0, deadline - time.monotonic()))
+    return Facts(**found.copy())
 
 
 def latest_version() -> str | None:
@@ -56,8 +65,10 @@ def latest_version() -> str | None:
     with contextlib.suppress(OSError, ValueError, KeyError, TypeError):
         cached = json.loads(cache.read_text())
         if time.time() - cached["checked_at"] < UPDATE_CHECK_EVERY_S:
-            return str(cached["version"])
-    latest = str(httpx.get(PYPI_URL, timeout=FETCH_TIMEOUT_S).json()["info"]["version"])
+            return None if cached["version"] is None else str(cached["version"])
+    latest = None
+    with contextlib.suppress(Exception):
+        latest = str(httpx.get(PYPI_URL, timeout=FETCH_TIMEOUT_S).json()["info"]["version"])
     with contextlib.suppress(OSError):
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(json.dumps({"version": latest, "checked_at": time.time()}))

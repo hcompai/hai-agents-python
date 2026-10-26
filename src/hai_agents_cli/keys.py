@@ -46,11 +46,13 @@ class EscWatcher:
     def __exit__(self, exc_type: object, *_: object) -> None:
         # On a clean exit, wait out a prompt the user is still typing; on ctrl+c, abandon it and leave the daemon behind.
         self._stop.set()
-        if self._thread is not None and exc_type is None:
-            self._thread.join()
-        with self._tty_lock:
-            self._abandoned.set()
-            self._restore()
+        try:
+            if self._thread is not None and exc_type is None:
+                self._thread.join()
+        finally:
+            with self._tty_lock:
+                self._abandoned.set()
+                self._restore()
 
     @property
     def stopped(self) -> bool:
@@ -60,7 +62,9 @@ class EscWatcher:
     @contextlib.contextmanager
     def cooked(self) -> Iterator[None]:
         """Normal line editing for a prompt typed mid-turn."""
-        self._restore()
+        with self._tty_lock:
+            if not self._abandoned.is_set():
+                self._restore()
         try:
             yield
         finally:

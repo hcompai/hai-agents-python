@@ -106,7 +106,7 @@ def console(*, stderr: bool = False) -> Console:
 def interactive(out: Console) -> bool:
     """A real TTY; `is_terminal` alone is also true under FORCE_COLOR, where live redraws garble CI logs."""
     isatty = getattr(out.file, "isatty", None)
-    return out.is_terminal and bool(isatty and isatty())
+    return out.is_terminal and not out.is_dumb_terminal and bool(isatty and isatty())
 
 
 @dataclass
@@ -227,7 +227,9 @@ def _link(url: str | None) -> tuple[tuple[str, str], ...]:
 def paused(out: Console) -> None:
     out.print()
     out.print(
-        Text.assemble((f"{DOT} ", "warn"), "Paused", (" · say what to do instead, /answer to wrap up, or enter to resume", "meta"))
+        Text.assemble(
+            (f"{DOT} ", "warn"), "Paused", (" · say what to do instead, /answer to wrap up, or enter to resume", "meta")
+        )
     )
 
 
@@ -340,6 +342,7 @@ class StepFeed:
     _started: float = field(default_factory=time.monotonic)
     _live: Live | None = None
     _held: list[Any] | None = None
+    _closed: bool = False
     _lock: threading.RLock = field(default_factory=threading.RLock)
     _turn_from_steps: int = 0
     _turn_from_cost: float = 0.0
@@ -371,6 +374,8 @@ class StepFeed:
 
     def release(self) -> None:
         with self._lock:
+            if self._closed:
+                return
             held, self._held = self._held or [], None
             self._start_live()
             for event in held:
@@ -425,6 +430,7 @@ class StepFeed:
 
     def close(self) -> None:
         with self._lock:
+            self._closed = True
             for event in self._held or []:
                 self._handle(event)
             self._held = None
@@ -546,6 +552,10 @@ def set_title(out: Console, text: str) -> None:
         out.set_window_title(text)
 
 
+def outcome(status: str) -> str:
+    return "done" if status in ("completed", "idle") else status
+
+
 def notify(out: Console, message: str) -> None:
     """Desktop notification where the terminal supports OSC 9, else the bell (dock bounce or tab badge)."""
     if not interactive(out):
@@ -572,7 +582,7 @@ def summary(
         parts.append(f"session {session_id}")
     meta = "".join(f" {SEP} {p}" for p in parts if p)
     took = duration(feed.elapsed) if feed is not None else None
-    set_title(out, f"holo {SEP} {f'{DONE} done' if status in ('completed', 'idle') else f'{FAILED} {status}'}")
+    set_title(out, f"holo {SEP} {f'{DONE} done' if outcome(status) == 'done' else f'{FAILED} {status}'}")
     if status in ("completed", "idle"):
         line = Text.assemble((f"{SPARK} ", "accent"), f"Done in {took}" if took else "Done", (meta, "meta"))
     elif status == "failed":
