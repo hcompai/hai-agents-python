@@ -246,13 +246,15 @@ def test_follow_up_continues_the_same_session_from_the_last_event(monkeypatch) -
 
 def test_esc_waits_for_the_pause_then_sends_the_correction_and_resumes(monkeypatch) -> None:
     monkeypatch.setattr(app_module.time, "sleep", lambda s: None)
+    send_and_resume = [("send", "only the top 2"), ("resume",)]
     cases = (
-        ("only the top 2", False, False, [("send", "only the top 2"), ("resume",)]),
-        ("", False, False, [("resume",)]),
-        ("only the top 2", True, False, [("resume",)]),
-        ("only the top 2", False, True, []),
+        ("only the top 2", False, False, False, send_and_resume, None),
+        ("", False, False, False, [("resume",)], None),
+        ("only the top 2", True, False, False, [("resume",)], None),
+        ("only the top 2", False, True, False, [], None),
+        ("only the top 2", False, False, True, [("resume",)], "only the top 2"),
     )
-    for typed, send_fails, interrupted, expected in cases:
+    for typed, send_fails, interrupted, stream_stopped, expected, pending in cases:
         client = _RunClient()
         client.sessions.send_fails = send_fails
         convo = app_module._Conversation(
@@ -265,10 +267,11 @@ def test_esc_waits_for_the_pause_then_sends_the_correction_and_resumes(monkeypat
             client=client,
             session=type("Session", (), {"id": "sess_1"})(),
         )
+        convo._turn_done = stream_stopped
         convo._steer(_Watcher(typed, stopped=interrupted))
 
         assert client.sessions.calls == [("pause",), *expected]
-        assert convo._pending is None
+        assert convo._pending == pending
 
 
 def test_share_session_prints_absolute_url(monkeypatch) -> None:

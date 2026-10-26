@@ -718,10 +718,12 @@ class _Conversation:
             status = None
         if watcher.stopped:
             return
-        if self._turn_done or (status is not None and is_settled_session_status(status)):
-            self._pending = text or None
-        else:
+        if status == "paused" and not self._turn_done:
             self._correct_and_resume(session_id, text)
+        else:
+            if status == "paused":
+                self._resume(session_id)
+            self._pending = text or None
         if feed is not None:
             err_console.print()
             feed.release()
@@ -734,6 +736,9 @@ class _Conversation:
                 self.client.sessions.send_session_messages(session_id, request=request)
             except Exception as exc:
                 ui.error(err_console, f"correction not sent: {exc}")
+        self._resume(session_id)
+
+    def _resume(self, session_id: str) -> None:
         try:
             self.client.sessions.resume_session(session_id)
         except Exception as exc:
