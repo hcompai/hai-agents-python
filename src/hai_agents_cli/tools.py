@@ -1,4 +1,4 @@
-"""How the step feed names a tool call: `label(tool_req)` is a `(verb, target)` pair, shown as `Verb(target)`."""
+"""How the step feed names a tool call: `label(tool_req)` is a `(verb, target)` pair, shown as `Verb target`."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ def _text(args: dict[str, Any], *keys: str) -> str:
 
 def _quoted(args: dict[str, Any], *keys: str) -> str:
     text = _text(args, *keys)
-    return f'"{text}"' if text else ""
+    return f'"{text}"' if text and '"' not in text else text
 
 
 def _url(args: dict[str, Any], key: str = "url") -> str:
@@ -81,7 +81,7 @@ def _in(what: str, args: dict[str, Any]) -> str:
 def _names(values: Any, limit: int = 2) -> str:
     names = [str(value) for value in values] if isinstance(values, list) else []
     shown = ", ".join(names[:limit])
-    return f"{shown}, +{len(names) - limit}" if len(names) > limit else shown
+    return f"{shown} and {len(names) - limit} more" if len(names) > limit else shown
 
 
 def _keys(args: dict[str, Any], key: str = "keys") -> str:
@@ -142,7 +142,7 @@ def _command(args: dict[str, Any]) -> Label:
     command = _text(args, "command")
     if call := _MCPORTER_CALL.match(command):
         server, tool = call.groups()
-        return "call", f"{server} · {tool.removeprefix(f'{server}_')}"
+        return "call", f"{server} {tool.removeprefix(f'{server}_')}"
     return "run", command
 
 
@@ -159,22 +159,24 @@ def _zoom(args: dict[str, Any]) -> Label:
 def _spawn(args: dict[str, Any]) -> Label:
     what = _text(args, "task_summary") or _text(args, "task")
     who = _text(args, "agent_id") or _text(args, "agent_type")
-    return "spawn", f"{who} · {what}" if who and what else who or what
+    return "spawn", f"{who}: {what}" if who and what else who or what
 
 
 def _sleep(args: dict[str, Any]) -> Label:
-    return "wait", _names(args.get("wait_for_ids")) or ("any agent" if args.get("wait_for_any") else "")
+    return "wait for", _names(args.get("wait_for_ids")) or ("any agent" if args.get("wait_for_any") else "")
 
 
 def _plan(args: dict[str, Any]) -> Label:
     goals = [goal for goal in args.get("goals") or [] if isinstance(goal, dict)]
     running = next((_text(goal, "title") for goal in goals if goal.get("status") == "running"), "")
-    return "plan", running or (f"{len(goals)} goal" + ("s" if len(goals) != 1 else "") if goals else "")
+    return "plan", f"→ {running}" if running else (
+        f"{len(goals)} goal" + ("s" if len(goals) != 1 else "") if goals else ""
+    )
 
 
 def _connector_call(args: dict[str, Any]) -> Label:
     connector, tool = _text(args, "connector"), _text(args, "tool")
-    return "call", f"{connector} · {tool}" if connector and tool else connector or tool
+    return "call", f"{connector} {tool}" if connector and tool else connector or tool
 
 
 def _fallback(name: str, args: dict[str, Any]) -> Label:

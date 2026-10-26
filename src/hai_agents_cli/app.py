@@ -553,7 +553,7 @@ class _Conversation:
                 _raise_cli_error(exc)
             self.next_index = 0
             if self.human and self.view_url:
-                ui.hint(err_console, "live view", url=self.view_url)
+                ui.url(err_console, self.view_url)
         else:
             request = SendSessionMessagesRequestBody_UserMessage(message=message)
             try:

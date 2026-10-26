@@ -190,16 +190,20 @@ def prompt_text() -> Text:
 
 
 def ok(out: Console, message: str, *, url: str | None = None) -> None:
-    out.print(Text.assemble((f"{DONE} ", "ok"), message, *_link(url)))
+    out.print(Text.assemble((f"{DONE} ", "ok"), message, *_link(url)), soft_wrap=url is not None)
 
 
 def hint(out: Console, message: str, *, url: str | None = None) -> None:
-    out.print(Text.assemble((f"  {message}", "meta"), *_link(url)))
+    out.print(Text.assemble((f"  {message}", "meta"), *_link(url)), soft_wrap=url is not None)
+
+
+def url(out: Console, address: str) -> None:
+    out.print(Text.assemble("  ", *_link(address)[1:]), soft_wrap=True)
 
 
 def _link(url: str | None) -> tuple[tuple[str, str], ...]:
-    """An OSC 8 hyperlink that still shows the URL, for terminals that only auto-detect plain URLs."""
-    return ((" ", ""), (url, f"underline link {url}")) if url else ()
+    """An OSC 8 hyperlink that still shows the URL; printed soft-wrapped, so a terminal's own URL detection sees it whole."""
+    return ((" ", ""), (url, f"meta underline link {url}")) if url else ()
 
 
 def paused(out: Console) -> None:
@@ -435,7 +439,7 @@ class StepFeed:
             self.out.print(_bullet(Text(content)))
             self.out.print()
         calls = [tools.label(req) for req in reqs]
-        thought = _first_sentence(data.get("reasoning_content"))
+        thought = None if content else _first_sentence(data.get("reasoning_content"))
         set_title(self.out, f"holo {SEP} step {self.steps + 1 - self._turn_from_steps}")
         busy = tools.busy(reqs[0])
         self._current = _Step(self.steps + 1, calls, busy, thought, self._last_end, self._last_end_ts)
@@ -481,8 +485,7 @@ class StepFeed:
         call = Text(no_wrap=True, overflow="ellipsis")
         call.append(name, style="bold")
         if target:
-            room = max(10, self.out.width - len(name) - 6)
-            call.append(f"({target if len(target) <= room else target[: room - 1] + '…'})")
+            call.append(f" {target}")
         return call
 
     def _render_live(self) -> RenderableType:

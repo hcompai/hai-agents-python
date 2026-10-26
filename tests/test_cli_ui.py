@@ -63,7 +63,7 @@ def test_feed_renders_one_block_per_action_with_server_timings() -> None:
 
     lines = [line.rstrip() for line in buffer.getvalue().splitlines() if line.strip()]
     assert lines == [
-        f"{ui.DOT} Navigate(news.ycombinator.com)",
+        f"{ui.DOT} Navigate news.ycombinator.com",
         f"  {ui.RESULT}  Hacker News · 6.3s",
         f"{ui.DOT} Back",
         f"  {ui.RESULT}  Error navigating back: Page.go_back: Timeout 10000ms exceeded. · 10.1s",
@@ -87,13 +87,13 @@ def test_feed_names_every_parallel_call_and_unknown_tools() -> None:
 
     lines = [line.rstrip() for line in buffer.getvalue().splitlines() if line.strip()]
     assert [line for line in lines if ui.RESULT not in line] == [
-        f"{ui.DOT} Spawn(Reader1 · Read story 1)",
-        f"{ui.DOT} Spawn(Reader2 · Read story 2)",
-        f'{ui.DOT} Search("q1")',
-        f'{ui.DOT} Search("q2")',
-        f'{ui.DOT} Search("q3")',
+        f"{ui.DOT} Spawn Reader1: Read story 1",
+        f"{ui.DOT} Spawn Reader2: Read story 2",
+        f'{ui.DOT} Search "q1"',
+        f'{ui.DOT} Search "q2"',
+        f'{ui.DOT} Search "q3"',
         "  +3 more",
-        f"{ui.DOT} Get weather(Paris)",
+        f"{ui.DOT} Get weather Paris",
     ]
 
 
