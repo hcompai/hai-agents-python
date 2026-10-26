@@ -65,6 +65,7 @@ class Prompt:
             style=_STYLE,
             multiline=True,
             prompt_continuation="  ",
+            reserve_space_for_menu=0,
         )
 
     def read(self, *, toolbar: Callable[[], str], placeholder: str) -> str | None:

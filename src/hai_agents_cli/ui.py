@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import threading
@@ -43,6 +44,8 @@ DONE = "✓"
 FAILED = "✗"
 ATTENTION = "!"
 SEP = "·"
+
+_OSC9_TERMINALS = frozenset({"iTerm.app", "WezTerm", "ghostty"})
 
 _SPINNER = "·✢✳✶✻✽" if sys.platform == "darwin" else "·✢*✶✻✽"
 _FRAMES = _SPINNER + _SPINNER[-2:0:-1]
@@ -143,12 +146,17 @@ def prompt_text() -> Text:
     return Text(f"{PROMPT} ", style="accent")
 
 
-def ok(out: Console, message: str) -> None:
-    out.print(Text.assemble((f"{DONE} ", "ok"), message))
+def ok(out: Console, message: str, *, url: str | None = None) -> None:
+    out.print(Text.assemble((f"{DONE} ", "ok"), message, *_link(url)))
 
 
-def hint(out: Console, message: str) -> None:
-    out.print(Text(f"  {message}", style="meta"))
+def hint(out: Console, message: str, *, url: str | None = None) -> None:
+    out.print(Text.assemble((f"  {message}", "meta"), *_link(url)))
+
+
+def _link(url: str | None) -> tuple[tuple[str, str], ...]:
+    """An OSC 8 hyperlink that still shows the URL, for terminals that only auto-detect plain URLs."""
+    return ((" ", ""), (url, f"underline link {url}")) if url else ()
 
 
 def paused(out: Console) -> None:
@@ -374,6 +382,7 @@ class StepFeed:
         if len(reqs) > 1:
             target = f"{target}  +{len(reqs) - 1}"
         thought = _first_sentence(data.get("reasoning_content"))
+        set_title(self.out, f"holo {SEP} step {self.steps + 1 - self._turn_from_steps}")
         self._current = _Step(self.steps + 1, verb, target, thought, self._last_end, self._last_end_ts)
 
     def _finish(self, end_ts: float | None, error: str | None) -> None:
@@ -393,13 +402,15 @@ class StepFeed:
         done, self._done = self._done, None
         if done is None:
             return
-        for line in self._block(done, title or "Done"):
+        for line in self._block(done, title):
             self.out.print(line)
 
-    def _block(self, done: _Done, title: str) -> list[RenderableType]:
+    def _block(self, done: _Done, title: str | None) -> list[RenderableType]:
         style = "fail" if done.error else "ok"
-        outcome = Text(done.error, style="fail") if done.error else Text(title)
-        outcome.append(f" {SEP} {duration(done.seconds)}", style="meta")
+        outcome = Text(done.error, style="fail") if done.error else Text(title or "")
+        if outcome.plain:
+            outcome.append(f" {SEP} ", style="meta")
+        outcome.append(duration(done.seconds), style="meta")
         return [Text.assemble((f"{DOT} ", style), self._call(done.step)), _result(outcome), Text("")]
 
     def _call(self, step: _Step) -> Text:
@@ -417,7 +428,7 @@ class StepFeed:
         current, done = self._current, self._done
         lines: list[RenderableType] = []
         if done is not None:
-            lines += self._block(done, "Done")
+            lines += self._block(done, None)
         if current is not None:
             dot = "accent" if int(now * 2) % 2 == 0 else "meta"
             lines.append(Text.assemble((f"{DOT} ", dot), self._call(current)))
@@ -448,10 +459,27 @@ def print_answer(out: Console, answer: Any) -> None:
         grid = Table.grid()
         grid.add_column(width=2, no_wrap=True)
         grid.add_column()
-        grid.add_row(DOT, Markdown(answer))
+        grid.add_row(Text(DOT, style="accent"), Markdown(answer))
+        out.print()
         out.print(grid)
     else:
         out.print(answer, markup=False, highlight=False, soft_wrap=True)
+
+
+def set_title(out: Console, text: str) -> None:
+    if interactive(out):
+        out.set_window_title(text)
+
+
+def notify(out: Console, message: str) -> None:
+    """Desktop notification where the terminal supports OSC 9, else the bell (dock bounce or tab badge)."""
+    if not interactive(out):
+        return
+    if os.environ.get("TERM_PROGRAM") in _OSC9_TERMINALS:
+        out.file.write(f"\x1b]9;{message}\x07")
+    else:
+        out.file.write("\a")
+    out.file.flush()
 
 
 def summary(
@@ -469,6 +497,7 @@ def summary(
         parts.append(f"session {session_id}")
     meta = "".join(f" {SEP} {p}" for p in parts if p)
     took = duration(feed.elapsed) if feed is not None else None
+    set_title(out, f"holo {SEP} {f'{DONE} done' if status in ('completed', 'idle') else f'{FAILED} {status}'}")
     if status in ("completed", "idle"):
         line = Text.assemble((f"{SPARK} ", "accent"), f"Done in {took}" if took else "Done", (meta, "meta"))
     elif status == "failed":

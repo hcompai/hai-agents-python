@@ -47,6 +47,7 @@ CLEAN_STATUSES = ("completed", "idle")
 IDLE_TIMEOUT_S = 600
 LOCAL_MAX_STEPS = 150
 LOCAL_MAX_TIME_S = 1800.0
+NOTIFY_AFTER_S = 30.0
 
 console = ui.console()
 err_console = ui.console(stderr=True)
@@ -485,7 +486,7 @@ class _Conversation:
                 _raise_cli_error(exc)
             self.next_index = 0
             if self.human and self.view_url:
-                ui.hint(err_console, f"live view {self.view_url}")
+                ui.hint(err_console, "live view", url=self.view_url)
         else:
             request = SendSessionMessagesRequestBody_UserMessage(message=message)
             try:
@@ -553,6 +554,8 @@ class _Conversation:
             stopped=stopped,
             show_session_id=not self.followups,
         )
+        if feed is not None and feed.elapsed >= NOTIFY_AFTER_S:
+            ui.notify(err_console, f"holo: {_status_text(result.status)} in {ui.duration(feed.elapsed)}")
         if stopped or is_terminal_session_status(str(result.status)):
             self._end_session()
             if self.followups:
@@ -633,7 +636,7 @@ class _Conversation:
         elif name == "live":
             if self.view_url:
                 webbrowser.open(self.view_url)
-                ui.ok(err_console, f"opened {self.view_url}")
+                ui.ok(err_console, "opened", url=self.view_url)
             elif self.session is not None:
                 ui.error(err_console, "this session has no live view")
             else:
@@ -668,7 +671,7 @@ class _Conversation:
         except Exception as exc:
             ui.error(err_console, str(exc))
             return
-        ui.ok(err_console, absolute_share_url(self.client, share.share_url))
+        ui.ok(err_console, "share link", url=absolute_share_url(self.client, share.share_url))
 
     def _esc_watcher(self) -> Any:
         if self.local or not _interactive():
