@@ -219,6 +219,7 @@ def _registry(monkeypatch, agents: dict | None = None, environments: dict | None
         return table[name]
 
     def get_agent(self, name, *, revision=None, resolve=None, **_):
+        assert resolve is True, "only the resolved spec names its nested subagents and environments"
         fetched.append((name, revision))
         return lookup(agents, name)
 
