@@ -704,12 +704,20 @@ class _Conversation:
             feed.hold()
         ui.paused(err_console)
         with watcher.cooked():
-            text = (_ask() or "").strip()
+            err_console.print(ui.prompt_text(), end="")
+            line = watcher.read_line()
+        if watcher.stopped:
+            return
+        if line is None:
+            err_console.print()
+        text = (line or "").strip()
         try:
             status: str | None = self._await_pause(session_id)
         except Exception as exc:
             ui.error(err_console, str(exc))
             status = None
+        if watcher.stopped:
+            return
         if self._turn_done or (status is not None and is_settled_session_status(status)):
             self._pending = text or None
         else:
@@ -755,14 +763,6 @@ def _is_command(text: str) -> bool:
         return False
     name = text[1:].split(maxsplit=1)[0] if text[1:].strip() else ""
     return name in COMMAND_NAMES or ("/" not in name and "." not in name)
-
-
-def _ask() -> str | None:
-    try:
-        return err_console.input(ui.prompt_text())
-    except EOFError:
-        err_console.print()
-        return None
 
 
 def _follow(

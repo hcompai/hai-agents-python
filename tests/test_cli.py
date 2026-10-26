@@ -247,11 +247,12 @@ def test_follow_up_continues_the_same_session_from_the_last_event(monkeypatch) -
 def test_esc_waits_for_the_pause_then_sends_the_correction_and_resumes(monkeypatch) -> None:
     monkeypatch.setattr(app_module.time, "sleep", lambda s: None)
     cases = (
-        ("only the top 2", False, [("send", "only the top 2"), ("resume",)]),
-        ("", False, [("resume",)]),
-        ("only the top 2", True, [("resume",)]),
+        ("only the top 2", False, False, [("send", "only the top 2"), ("resume",)]),
+        ("", False, False, [("resume",)]),
+        ("only the top 2", True, False, [("resume",)]),
+        ("only the top 2", False, True, []),
     )
-    for typed, send_fails, expected in cases:
+    for typed, send_fails, interrupted, expected in cases:
         client = _RunClient()
         client.sessions.send_fails = send_fails
         convo = app_module._Conversation(
@@ -264,11 +265,10 @@ def test_esc_waits_for_the_pause_then_sends_the_correction_and_resumes(monkeypat
             client=client,
             session=type("Session", (), {"id": "sess_1"})(),
         )
-        monkeypatch.setattr(app_module, "_ask", lambda typed=typed: typed)
-
-        convo._steer(_Watcher())
+        convo._steer(_Watcher(typed, stopped=interrupted))
 
         assert client.sessions.calls == [("pause",), *expected]
+        assert convo._pending is None
 
 
 def test_share_session_prints_absolute_url(monkeypatch) -> None:
@@ -412,9 +412,15 @@ class _RunSessions:
 
 
 class _Watcher:
+    def __init__(self, typed: str, *, stopped: bool = False) -> None:
+        self.typed, self.stopped = typed, stopped
+
     @contextlib.contextmanager
     def cooked(self):
         yield
+
+    def read_line(self) -> str:
+        return self.typed
 
 
 class _RunClient:

@@ -27,6 +27,7 @@ class EscWatcher:
         self._thread: threading.Thread | None = None
         self._fd: int | None = None
         self._saved: Any = None
+        self._tty_lock = threading.Lock()
 
     def __enter__(self) -> EscWatcher:
         if not supported():
@@ -42,11 +43,16 @@ class EscWatcher:
         return self
 
     def __exit__(self, exc_type: object, *_: object) -> None:
-        self._stop.set()
-        # On a clean exit, wait out a prompt the user is still typing; on ctrl+c, leave the daemon behind.
+        # On a clean exit, wait out a prompt the user is still typing; on ctrl+c, stop it and leave the daemon behind.
         if self._thread is not None and exc_type is None:
             self._thread.join()
-        self._restore()
+        with self._tty_lock:
+            self._stop.set()
+            self._restore()
+
+    @property
+    def stopped(self) -> bool:
+        return self._stop.is_set()
 
     @contextlib.contextmanager
     def cooked(self) -> Iterator[None]:
@@ -55,10 +61,27 @@ class EscWatcher:
         try:
             yield
         finally:
-            if self._fd is not None:
-                import tty
+            with self._tty_lock:
+                if self._fd is not None and not self._stop.is_set():
+                    import tty
 
-                tty.setcbreak(self._fd)
+                    tty.setcbreak(self._fd)
+
+    def read_line(self) -> str | None:
+        """A line typed in cooked mode; None on EOF or once the watcher stops, so it never eats the next prompt's input."""
+        assert self._fd is not None
+        typed = b""
+        while not self._stop.is_set():
+            ready, _, _ = select.select([self._fd], [], [], _POLL_S)
+            if not ready:
+                continue
+            chunk = os.read(self._fd, 1024)
+            if not chunk:
+                return None
+            typed += chunk
+            if typed.endswith(b"\n"):
+                return typed.decode(errors="replace").rstrip("\n")
+        return None
 
     def _run(self) -> None:
         assert self._fd is not None
