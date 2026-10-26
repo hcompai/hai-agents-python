@@ -388,10 +388,13 @@ def test_esc_waits_for_the_pause_then_sends_the_correction_and_resumes(monkeypat
 
 @pytest.mark.parametrize(
     ("turn_done", "calls", "pending"),
-    [(False, [("send", "only the top 2")], None), (True, [], "only the top 2")],
+    [(False, [("pause",), ("send", "only the top 2"), ("resume",)], None), (True, [], "only the top 2")],
     ids=["while it works", "after the turn"],
 )
-def test_typing_mid_run_sends_without_pausing(turn_done, calls, pending) -> None:
+def test_typing_mid_run_pauses_so_the_agent_cannot_answer_past_the_message(
+    monkeypatch, turn_done, calls, pending
+) -> None:
+    monkeypatch.setattr(app_module.time, "sleep", lambda s: None)
     client = _RunClient()
     convo = app_module._Conversation(
         app_module.AppState(api_key=None, base_url=None, json_output=False),

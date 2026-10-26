@@ -884,7 +884,43 @@ class _Conversation:
             return
         if line is None:
             err_console.print()
-        text = (line or "").strip()
+        self._deliver(session_id, (line or "").strip(), watcher)
+        if feed is not None:
+            err_console.print()
+            feed.release()
+
+    def _send_typed(self, watcher: keys.EscWatcher, typed: str) -> None:
+        """Typing mid-run messages the agent; it is shown after the step in flight, where the agent reads it."""
+        feed, session_id = self._feed, self.session.id
+        if feed is not None:
+            feed.hold()
+        line, newline, _ = typed.replace("\r", "\n").partition("\n")
+        rest: str | None = ""
+        if not newline:
+            with watcher.cooked():
+                err_console.print(Text.assemble(ui.prompt_text(), line), end="")
+                rest = watcher.read_line()
+            if watcher.stopped:
+                return
+            _erase_typed(Text.assemble(ui.prompt_text(), line, rest or ""), entered=rest is not None)
+        text = "" if rest is None else (line + rest).strip()
+        if text and not self._turn_done:
+            try:
+                self.client.sessions.pause_session(session_id)
+            except Exception as exc:
+                ui.error(err_console, f"message not sent: {exc}")
+                text = ""
+        if feed is not None:
+            if text:
+                feed.note(text)
+            feed.release()
+        if text and self._turn_done:
+            self._pending = text
+        elif text:
+            self._deliver(session_id, text, watcher)
+
+    def _deliver(self, session_id: str, text: str, watcher: keys.EscWatcher) -> None:
+        """Send once the pause lands and resume; a pause drops a model call in flight, so its answer can't skip the message."""
         try:
             status = self._await_pause(session_id, watcher)
         except Exception as exc:
@@ -901,36 +937,6 @@ class _Conversation:
             if status is None or status == "paused":
                 self._resume(session_id)
             self._pending = None if text == "/answer" else text or None
-        if feed is not None:
-            err_console.print()
-            feed.release()
-
-    def _send_typed(self, watcher: keys.EscWatcher, typed: str) -> None:
-        """Typing mid-run sends without pausing: the agent reads the message at its next step."""
-        feed, session_id = self._feed, self.session.id
-        if feed is not None:
-            feed.hold()
-        line, newline, _ = typed.replace("\r", "\n").partition("\n")
-        if not newline:
-            with watcher.cooked():
-                err_console.print(Text.assemble(ui.prompt_text(), line), end="")
-                rest = watcher.read_line()
-            if watcher.stopped:
-                return
-            line += rest or ""
-        text = line.strip()
-        if text and self._turn_done:
-            self._pending = text
-        elif text:
-            try:
-                request = SendSessionMessagesRequestBody_UserMessage(message=text)
-                self.client.sessions.send_session_messages(session_id, request=request)
-                ui.hint(err_console, "sent; the agent reads it at its next step")
-            except Exception as exc:
-                ui.error(err_console, f"message not sent: {exc}")
-        if feed is not None:
-            err_console.print()
-            feed.release()
 
     def _correct_and_resume(self, session_id: str, text: str) -> None:
         """Resume even if the correction fails: a paused session never settles, so the turn would wait forever."""
@@ -964,6 +970,13 @@ class _Conversation:
                 return status
             time.sleep(0.5)
         return None
+
+
+def _erase_typed(typed: Text, *, entered: bool) -> None:
+    rows = max(1, -(-typed.cell_len // max(1, err_console.width)))
+    up = "\x1b[1A\x1b[2K"
+    err_console.file.write(f"\r{up * rows}" if entered else f"\r\x1b[2K{up * (rows - 1)}")
+    err_console.file.flush()
 
 
 def _read_message(convo: _Conversation) -> str | None:

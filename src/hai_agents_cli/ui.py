@@ -178,12 +178,16 @@ def header(out: Console, name: str, parts: list[str | None], link: str | None = 
 
 
 def user(out: Console, text: str) -> None:
+    out.print(user_message(text))
+    out.print()
+
+
+def user_message(text: str) -> Table:
     grid = Table.grid()
     grid.add_column(width=2, no_wrap=True)
     grid.add_column()
     grid.add_row(Text(PROMPT, style="meta"), Text(text, style="meta"))
-    out.print(grid)
-    out.print()
+    return grid
 
 
 def prompt_text() -> Text:
@@ -338,6 +342,7 @@ class StepFeed:
     _lock: threading.RLock = field(default_factory=threading.RLock)
     _agents: dict[str, _Agent] = field(default_factory=dict)
     _tail: list[_Done | RenderableType] = field(default_factory=list)
+    _notes: list[RenderableType] = field(default_factory=list)
     _turn_from_steps: int = 0
     _turn_from_cost: float = 0.0
 
@@ -375,6 +380,13 @@ class StepFeed:
             for event in held:
                 self._handle(event)
             self._settle()
+
+    def note(self, text: str) -> None:
+        """Show a message typed mid-run after the step in flight, which is where the agent reads it."""
+        with self._lock:
+            self._notes += [user_message(text), Text("")]
+            if self._current is None and self._done is None:
+                self._flush()
 
     def running_agents(self) -> list[str]:
         """Session ids of the spawned subagents still running."""
@@ -537,6 +549,9 @@ class StepFeed:
         if done is not None:
             done.title = title
             self._emit(done)
+        notes, self._notes = self._notes, []
+        for item in notes:
+            self._emit(item)
 
     def _block(self, done: _Done, *, live: bool = False) -> list[RenderableType]:
         style = "fail" if done.error else "ok"
@@ -585,6 +600,7 @@ class StepFeed:
             lines += self._calls(current, _blink(), live=True)
             lines.append(_result(Text(current.thought or "Running…", style="meta italic")))
             lines.append(Text(""))
+        lines += self._notes
         verb = current.busy if current else "Thinking"
         n = current.n if current else self.steps + 1
         parts = [
