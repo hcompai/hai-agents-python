@@ -26,10 +26,10 @@ _STYLE = Style.from_dict(
         "placeholder": "#6c6c6c",
         "bottom-toolbar": "noreverse #8a8a8a",
         "bottom-toolbar.warn": "noreverse #d7af00",
-        "menu": "#bcbcbc",
-        "menu.current": f"{ui.IRIS} bold",
-        "menu.meta": "#6c6c6c",
-        "menu.meta.current": ui.IRIS,
+        "slash": "#bcbcbc",
+        "slash.current": f"{ui.IRIS} bold",
+        "slash.meta": "#6c6c6c",
+        "slash.meta.current": ui.IRIS,
     }
 )
 
@@ -64,7 +64,7 @@ class _SlashMenu:
             suffix = ".current" if index == current else ""
             if fragments:
                 fragments.append(("", "\n"))
-            fragments += [(f"class:menu{suffix}", f"  {usage.ljust(width)}   "), (f"class:menu.meta{suffix}", about)]
+            fragments += [(f"class:slash{suffix}", f"  {usage.ljust(width)}   "), (f"class:slash.meta{suffix}", about)]
         return FormattedText(fragments)
 
     def _current(self, text: str, rows: list[tuple[str, str]]) -> int:
