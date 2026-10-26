@@ -97,6 +97,26 @@ def test_feed_names_every_parallel_call_and_unknown_tools() -> None:
     ]
 
 
+def test_feed_tracks_each_subagent_until_it_reports_or_ends() -> None:
+    buffer = io.StringIO()
+    feed = ui.StepFeed(Console(file=buffer, width=100, color_system=None))
+    names = ("Blog", "News", "Wiki")
+    feed.handle(_agent("2026-10-26T12:00:00Z", kind="policy_event", tool_reqs=[{"tool_name": "spawn"}] * 3))
+    for name in names:
+        result = {"agent_id": name, "agent_type": "h/web-scraper-pro", "trajectory_id": f"sess_{name}"}
+        feed.handle(_agent("2026-10-26T12:00:01Z", kind="tool_result", tool_req={"tool_name": "spawn"}, result=result))
+    assert feed.running_agents() == ["sess_Blog", "sess_News", "sess_Wiki"]
+
+    feed.agent_status("sess_News", "failed", 2)
+    feed.handle(_agent("2026-10-26T12:01:41Z", kind="message_event", caller_id="Blog", content=["report"]))
+    feed.agent_status("sess_Blog", "completed", 5)
+    feed.close()
+
+    rows = [line.strip() for line in buffer.getvalue().splitlines() if line.strip().startswith(("✓", "✗", "◦"))]
+    assert [row.split(" · ")[0] for row in rows] == ["✓ Blog", "✗ News failed", "◦ Wiki still running"]
+    assert rows[0] == "✓ Blog · 1m 40s"
+
+
 def test_feed_surfaces_environment_and_tool_failures() -> None:
     buffer = io.StringIO()
     feed = ui.StepFeed(Console(file=buffer, width=200, color_system=None))

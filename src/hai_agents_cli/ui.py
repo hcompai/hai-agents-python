@@ -302,6 +302,17 @@ class _Done:
 
 
 @dataclass
+class _Agent:
+    name: str
+    started: float
+    started_ts: float | None
+    steps: int | None = None
+    status: str = "running"
+    seconds: float | None = None
+    shown: bool = False
+
+
+@dataclass
 class StepFeed:
     """Renders session events as one `⏺ Tool(args)` block per step, with a live spinner on a terminal.
 
@@ -326,6 +337,7 @@ class StepFeed:
     _held: list[Any] | None = None
     _closed: bool = False
     _lock: threading.RLock = field(default_factory=threading.RLock)
+    _agents: dict[str, _Agent] = field(default_factory=dict)
     _turn_from_steps: int = 0
     _turn_from_cost: float = 0.0
 
@@ -363,6 +375,29 @@ class StepFeed:
             for event in held:
                 self._handle(event)
 
+    def running_agents(self) -> list[str]:
+        """Session ids of the spawned subagents still running."""
+        with self._lock:
+            return [session_id for session_id, agent in self._agents.items() if agent.status == "running"]
+
+    def agent_status(self, session_id: str, status: str, steps: int | None) -> None:
+        with self._lock:
+            agent = self._agents.get(session_id)
+            if agent is None or agent.status != "running":
+                return
+            agent.steps = steps or agent.steps
+            if status in _ACTIVITY_GLYPH:
+                self._end_agent(agent, status, None)
+            if self._live is not None:
+                self._live.refresh()
+
+    def _end_agent(self, agent: _Agent, status: str, ts: float | None) -> None:
+        agent.status = status
+        if ts is not None and agent.started_ts is not None:
+            agent.seconds = max(0.0, ts - agent.started_ts)
+        else:
+            agent.seconds = time.monotonic() - agent.started
+
     def _start_live(self) -> None:
         if self._live is None and interactive(self.out):
             self._live = Live(console=self.out, transient=True, refresh_per_second=12, get_renderable=self._render_live)
@@ -393,8 +428,16 @@ class StepFeed:
         elif kind == "tool_result":
             req = data.get("tool_req") or {}
             result = data.get("result")
+            if req.get("tool_name") == "spawn" and isinstance(result, dict) and result.get("trajectory_id"):
+                name = str(result.get("agent_id") or result["trajectory_id"])
+                self._agents[result["trajectory_id"]] = _Agent(name, time.monotonic(), ts)
             if self._current is not None and req.get("tool_name") != "answer":
                 self._finish(ts, _tool_error(result))
+        elif kind == "message_event":
+            caller = data.get("caller_id")
+            for agent in self._agents.values():
+                if agent.name == caller and agent.status == "running":
+                    self._end_agent(agent, "completed", ts)
         elif kind == "error_event":
             message = _first_line(data.get("error")) or "error"
             origin = data.get("origin")
@@ -420,6 +463,7 @@ class StepFeed:
             if self._current is not None:
                 self._finish(None, None)
             self._flush()
+            self._print_agents(final=True)
             self._stop_live()
 
     @property
@@ -463,6 +507,31 @@ class StepFeed:
             return
         for line in self._block(done, title):
             self.out.print(line)
+        self._print_agents()
+
+    def _print_agents(self, *, final: bool = False) -> None:
+        """Print each subagent once it ends; at the end of a turn, also those still running."""
+        agents = [a for a in self._agents.values() if not a.shown and (final or a.status != "running")]
+        for agent in agents:
+            agent.shown = True
+            self.out.print(self._agent_row(agent, time.monotonic()))
+        if agents:
+            self.out.print()
+
+    def _agent_row(self, agent: _Agent, now: float, *, live: bool = False) -> Text:
+        if agent.status == "running":
+            glyph, style = (_FRAMES[int(now * 8) % len(_FRAMES)], "accent") if live else ("◦", "meta")
+            word = None if live else "still running"
+            parts = [f"step {agent.steps}" if agent.steps else None, _clock(now - agent.started)]
+        else:
+            glyph, style = _ACTIVITY_GLYPH[agent.status]
+            word = None if style == "ok" else agent.status.replace("_", " ")
+            parts = [count(agent.steps, "step") if agent.steps else None, duration(agent.seconds or 0.0)]
+        row = Text.assemble("  ", (f"{glyph} ", style), (agent.name, "bold"), no_wrap=True, overflow="ellipsis")
+        if word:
+            row.append(f" {word}", style=style)
+        row.append(f" {SEP} " + f" {SEP} ".join(p for p in parts if p), style="meta")
+        return row
 
     def _block(self, done: _Done, title: str | None) -> list[RenderableType]:
         style = "fail" if done.error else "ok"
@@ -498,6 +567,9 @@ class StepFeed:
             dot = "accent" if int(now * 2) % 2 == 0 else "meta"
             lines += self._calls(current, dot)
             lines.append(_result(Text(current.thought or "Running…", style="meta italic")))
+            lines.append(Text(""))
+        if agents := [a for a in self._agents.values() if not a.shown]:
+            lines += [self._agent_row(agent, now, live=True) for agent in agents]
             lines.append(Text(""))
         verb = current.busy if current else "Thinking"
         n = current.n if current else self.steps + 1

@@ -163,7 +163,9 @@ def _spawn(args: dict[str, Any]) -> Label:
 
 
 def _sleep(args: dict[str, Any]) -> Label:
-    return "wait for", _names(args.get("wait_for_ids")) or ("any agent" if args.get("wait_for_any") else "")
+    n = args.get("wait_for_any")
+    who = _names(args.get("wait_for_ids")) or (f"any {n} agents" if isinstance(n, int) and n > 1 else "any agent")
+    return "wait", f"for {who}"
 
 
 def _plan(args: dict[str, Any]) -> Label:

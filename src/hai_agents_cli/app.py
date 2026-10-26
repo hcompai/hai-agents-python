@@ -12,6 +12,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
 import time
 import webbrowser
 from dataclasses import dataclass
@@ -45,6 +46,7 @@ from . import _CLI_HINT, auth, keys, mcp_hosts, ui, welcome
 if TYPE_CHECKING:
     from hai_agents_local import LocalBridge
 
+_AGENT_POLL_S = 3.0
 CLEAN_STATUSES = ("completed", "idle")
 IDLE_TIMEOUT_S = 600
 LOCAL_MAX_STEPS = 150
@@ -996,10 +998,26 @@ def _follow(
     from_index: int = 0,
     stop_at_tool_wait: bool = False,
 ) -> None:
-    for event in stream_session(client, session_id, from_index=from_index, timeout_seconds=timeout_s):
-        feed.handle(event)
-        if stop_at_tool_wait and _awaits_tool_results(event):
-            return
+    stop = threading.Event()
+    threading.Thread(target=_poll_agents, args=(client, feed, stop), daemon=True).start()
+    try:
+        for event in stream_session(client, session_id, from_index=from_index, timeout_seconds=timeout_s):
+            feed.handle(event)
+            if stop_at_tool_wait and _awaits_tool_results(event):
+                return
+    finally:
+        stop.set()
+
+
+def _poll_agents(client: Any, feed: ui.StepFeed, stop: threading.Event) -> None:
+    """Refresh spawned subagents' state: the parent emits nothing while it waits on them."""
+    while not stop.wait(_AGENT_POLL_S):
+        for session_id in feed.running_agents():
+            try:
+                status = client.sessions.get_session_status(session_id)
+            except Exception:
+                continue
+            feed.agent_status(session_id, status.status, status.steps)
 
 
 def _awaits_tool_results(event: Any) -> bool:
