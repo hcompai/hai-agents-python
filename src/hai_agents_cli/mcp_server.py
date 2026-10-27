@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import signal
 from collections.abc import AsyncIterator
 from typing import Any
@@ -45,38 +46,49 @@ async def _kill_switch(ctx: Context, kinds: list[str]) -> AsyncIterator[None]:
 
 
 @contextlib.asynccontextmanager
-async def _lifespan(_: FastMCP) -> AsyncIterator[dict[str, AsyncClient]]:
-    clients: dict[str, AsyncClient] = {}
+async def _lifespan(_: FastMCP) -> AsyncIterator[dict[bool, AsyncClient]]:
+    clients: dict[bool, AsyncClient] = {}
     try:
         yield clients
     finally:
-        if "client" in clients:
-            await clients["client"].aclose()
+        for client in clients.values():
+            await client.aclose()
 
 
 server = FastMCP("holo", instructions=INSTRUCTIONS, lifespan=_lifespan, log_level="WARNING")
 
 
-def _client(ctx: Context) -> AsyncClient:
+async def _client(ctx: Context, local: bool = False) -> AsyncClient:
+    """The local runtime runs sessions only; agents and their specs come from the cloud client."""
     clients = ctx.request_context.lifespan_context
-    if "client" not in clients:
-        clients["client"] = credentials.make_async_client()
-    return clients["client"]
+    if local not in clients:
+        if local and (base_url := credentials.resolve_base_url()):
+            # The spawned runtime reads its endpoint from the environment.
+            os.environ[credentials.BASE_URL_VAR] = base_url
+        clients[local] = await AsyncClient.local() if local else credentials.make_async_client()
+    return clients[local]
 
 
 @server.tool()
-async def run_agent(task: str, ctx: Context, agent: str | None = None) -> str:
+async def run_agent(task: str, ctx: Context, agent: str | None = None, local: bool = False) -> str:
     """Run `task` and return the answer; blocks until the agent finishes.
 
-    `agent` is a name from list_agents, by default the user's default agent.
+    `agent` is a name from list_agents, by default the user's default agent. `local` runs the agent loop on
+    this machine rather than in the cloud.
     """
-    client, agent = _client(ctx), agent or credentials.default_agent()
+    cloud, agent = await _client(ctx), agent or credentials.default_agent()
     params: dict[str, Any] = {"agent": agent, "messages": task}
-    if holo_dir.customized():
+    if local or holo_dir.customized():
         name, revision = split_revision(agent)
-        spec = await client.agents.get_agent(name, revision=revision)
-        params["overrides"] = holo_dir.overrides(spec.model_dump(mode="json"))
-    kinds = await local_environment_kinds_async(client, agent)
+        spec = (await cloud.agents.get_agent(name, revision=revision, resolve=local)).model_dump(
+            mode="json", exclude_none=True
+        )
+        if local:
+            params["agent"] = spec
+        if holo_dir.customized():
+            params["overrides"] = holo_dir.overrides(spec)
+    kinds = await local_environment_kinds_async(cloud, agent)
+    client = await _client(ctx, local)
     async with _this_machine if kinds else contextlib.nullcontext(), _kill_switch(ctx, kinds):
         handle = await client.start_session(**params)
         try:
@@ -105,7 +117,7 @@ async def _report(ctx: Context, event: Any) -> None:
 @server.tool()
 async def list_agents(ctx: Context, search: str | None = None) -> str:
     """Agents `run_agent` can use, one `name: description` per line."""
-    page = await _client(ctx).agents.list_agents(search=search, size=100)
+    page = await (await _client(ctx)).agents.list_agents(search=search, size=100)
     return "\n".join(f"{item.name}: {item.description or ''}".strip() for item in page.items)
 
 

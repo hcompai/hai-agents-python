@@ -92,12 +92,15 @@ holo "What's the top story on Hacker News?"      # run one task
 holo                                            # interactive session
 holo -a h/web-surfer-pro "Compare 3 laptops"    # pick an agent for one run
 holo agents use h/web-surfer-pro                # change the default agent
-holo --local "Open Calculator and compute 2+2"  # drive this machine's desktop
+holo -a h/holo-desktop "Open Calculator"        # drive this machine's desktop
+holo --local "Summarize news.ycombinator.com"   # run the agent loop on this machine
 holo sessions watch <session-id>                # follow a running session
 holo mcp install                                # add the MCP server to your editor
 ```
 
 Tasks run on `h/web-surfer-flash` unless you pass `--agent` or set a default with `holo agents use`. Run `holo --help`, or `holo <command> --help`, for every option.
+
+`~/.holo/agents.md` joins the instructions of every agent holo runs, and `~/.holo/skills/<name>/SKILL.md` joins its skills.
 
 ### Interactive sessions
 
@@ -112,7 +115,7 @@ Tasks run on `h/web-surfer-flash` unless you pass `--agent` or set a default wit
 | `?` | all shortcuts |
 | ctrl+c | cancel the turn; twice to exit |
 
-With `--local`, the agent drives your mouse and keyboard, so typing goes to your apps instead: press esc twice, from any app, to stop it.
+An agent that drives this desktop, like `h/holo-desktop`, uses your mouse and keyboard, so typing goes to your apps instead: press esc twice, from any app, to stop it.
 
 ### Commands
 

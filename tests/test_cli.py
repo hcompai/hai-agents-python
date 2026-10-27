@@ -131,7 +131,7 @@ def test_kill_switch_stops_that_turn_and_the_next_message_starts_a_new_session(m
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
 
-    result = runner.invoke(app, ["run", "open calculator", "--local"], env={"HAI_API_KEY": "hk-test"})
+    result = runner.invoke(app, ["run", "open calculator", "-a", "h/holo-desktop"], env={"HAI_API_KEY": "hk-test"})
 
     assert result.output.count("stopped by the kill switch") == 1
     assert client.sessions.created == 2
@@ -281,11 +281,23 @@ def test_a_follow_up_after_a_failed_turn_starts_a_new_session(monkeypatch) -> No
     assert client.sessions.sent == []
 
 
-def test_local_rejects_a_named_agent() -> None:
-    result = runner.invoke(app, ["run", "x", "--local", "--agent", "h/web-surfer-pro"], env={"HAI_API_KEY": "hk-t"})
+def test_local_runs_any_agent_inline_on_the_local_runtime(monkeypatch) -> None:
+    captured: dict = {}
+    cloud, runtime = _RunClient(), _RunClient(captured)
+    fetched: list = []
+    spec = types.SimpleNamespace(model_dump=lambda **_: {"name": "h/web-surfer-pro", "instructions": "Browse."})
+    cloud.agents = types.SimpleNamespace(get_agent=lambda *a, **kw: fetched.append((a, kw)) or spec)
+    monkeypatch.setattr(app_module, "_client", lambda state: cloud)
+    monkeypatch.setattr(app_module, "_local_client", lambda state: runtime)
+    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
 
-    assert result.exit_code != 0
-    assert "drop --agent" in _error_text(result)
+    result = runner.invoke(app, ["run", "x", "--local", "-a", "h/web-surfer-pro"], env={"HAI_API_KEY": "hk-t"})
+
+    assert result.exit_code == 0, result.output
+    assert fetched == [(("h/web-surfer-pro",), {"revision": None, "resolve": True})]
+    assert captured["agent"] == {"name": "h/web-surfer-pro", "instructions": "Browse."}
+    assert cloud.sessions.created == 0
 
 
 def test_new_releases_the_idle_session_before_starting_another(monkeypatch) -> None:
@@ -334,7 +346,9 @@ def test_every_run_adds_the_users_holo_dir_to_its_agent(monkeypatch, holo_home) 
     client = _RunClient(captured)
     fetched: list = []
     spec = types.SimpleNamespace(model_dump=lambda **_: {"instructions": "Be brief.", "skills": ["h/web"]})
-    client.agents = types.SimpleNamespace(get_agent=lambda name, revision: fetched.append((name, revision)) or spec)
+    client.agents = types.SimpleNamespace(
+        get_agent=lambda name, revision, resolve: fetched.append((name, revision)) or spec
+    )
     monkeypatch.setattr(app_module, "_client", lambda state: client)
     monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
     monkeypatch.setattr(app_module, "_follow", _no_events)
