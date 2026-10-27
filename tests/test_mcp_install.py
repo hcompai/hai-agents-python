@@ -113,7 +113,7 @@ def test_install_writes_detected_client_and_warns(monkeypatch, tmp_path) -> None
         ),
     )
 
-    result = runner.invoke(app, ["mcp", "install", "cursor"], env={"HAI_API_KEY": "hk-test"})
+    result = runner.invoke(app, ["mcp", "install", "cursor", "--remote"], env={"HAI_API_KEY": "hk-test"})
 
     assert result.exit_code == 0, result.output
     assert "plaintext" in result.output
@@ -126,21 +126,21 @@ def test_install_requires_api_key(monkeypatch, tmp_path) -> None:
     monkeypatch.delenv("HAI_API_KEY", raising=False)
     monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", tmp_path / "global.env")
 
-    result = runner.invoke(app, ["mcp", "install", "cursor"], env={})
+    result = runner.invoke(app, ["mcp", "install", "cursor", "--remote"], env={})
 
     assert result.exit_code != 0
     text = "\n".join(part for part in (result.output, result.stderr, str(result.exception)) if part)
     assert "No API key found" in text
 
 
-def test_desktop_install_wires_this_holo_and_writes_no_key(monkeypatch, tmp_path) -> None:
+def test_install_wires_this_holo_and_writes_no_key(monkeypatch, tmp_path) -> None:
     path = tmp_path / "mcp.json"
     monkeypatch.setitem(
-        mcp_hosts.DESKTOP_CLIENTS, "cursor", replace(mcp_hosts.DESKTOP_CLIENTS["cursor"], config_path=str(path))
+        mcp_hosts.STDIO_CLIENTS, "cursor", replace(mcp_hosts.STDIO_CLIENTS["cursor"], config_path=str(path))
     )
     monkeypatch.setattr(mcp_hosts, "holo_command", lambda: "/opt/holo/bin/holo")
 
-    result = runner.invoke(app, ["mcp", "install", "cursor", "--desktop"], env={"HAI_API_KEY": "hk-test"})
+    result = runner.invoke(app, ["mcp", "install", "cursor"], env={"HAI_API_KEY": "hk-test"})
 
     assert result.exit_code == 0, result.output
     assert json.loads(path.read_text())["mcpServers"]["holo"] == {
@@ -151,7 +151,7 @@ def test_desktop_install_wires_this_holo_and_writes_no_key(monkeypatch, tmp_path
     assert "hk-test" not in path.read_text() and "plaintext" not in result.output
 
 
-async def test_the_desktop_tool_runs_one_session_and_always_ends_it(monkeypatch) -> None:
+async def test_a_local_run_streams_progress_and_always_ends_its_session(monkeypatch) -> None:
     from mcp.shared.memory import create_connected_server_and_client_session
 
     from hai_agents_cli import mcp_server
@@ -186,7 +186,7 @@ async def test_the_desktop_tool_runs_one_session_and_always_ends_it(monkeypatch)
         progress.append(params.data)
 
     async with create_connected_server_and_client_session(mcp_server.server, logging_callback=on_log) as session:
-        result = await session.call_tool("holo_desktop", {"task": "open Calculator"})
+        result = await session.call_tool("run_agent", {"task": "open Calculator", "local": True})
 
     assert result.content[0].text == "Calculator is open" and not result.isError
     assert progress == ["Wait"] and Handle.cancelled

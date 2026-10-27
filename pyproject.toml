@@ -33,6 +33,7 @@ dependencies = [
 
 [project.optional-dependencies]
 cli = [
+  "mcp>=1.10,<2",
   "prompt_toolkit>=3.0.43,<4",
   "python-dotenv>=1.2.3,<2",
   "pyyaml>=6.0,<7",
@@ -41,7 +42,6 @@ cli = [
 ]
 desktop = [
   "hai-drivers[desktop]>=0.1.3",
-  "mcp>=1.10,<2",
 ]
 browser = [
   "hai-drivers[web]>=0.1.3",

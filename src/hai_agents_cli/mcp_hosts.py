@@ -1,4 +1,4 @@
-"""MCP host registries for the remote `hai-agents` server and the local `holo` desktop server, plus the install engine."""
+"""MCP host registries for the local `holo` stdio server and the remote `hai-agents` server, plus the install engine."""
 
 from __future__ import annotations
 
@@ -127,73 +127,91 @@ CLIENTS: dict[str, Client] = {
 }
 
 
-DESKTOP_SERVER_NAME = "holo"
+STDIO_SERVER_NAME = "holo"
 HOLO = "__HOLO__"
 _STDIO = {"command": HOLO, "args": ["mcp", "serve"]}
-_STDIO_CMD = (DESKTOP_SERVER_NAME, "--", HOLO, "mcp", "serve")
+_STDIO_CMD = (STDIO_SERVER_NAME, "--", HOLO, "mcp", "serve")
 
-DESKTOP_CLIENTS: dict[str, Client] = {
+STDIO_CLIENTS: dict[str, Client] = {
     "antigravity": Client(
         name="Antigravity",
         config_path="~/.gemini/config/mcp_config.json",
-        key_path=("mcpServers", DESKTOP_SERVER_NAME),
+        key_path=("mcpServers", STDIO_SERVER_NAME),
         leaf=_STDIO,
     ),
     "claude-code": Client(
         name="Claude Code",
         cli_cmd=("claude", "mcp", "add", "--scope", "user", "--transport", "stdio", *_STDIO_CMD),
         cli_remove_cmds=(
-            ("claude", "mcp", "remove", "--scope", "local", DESKTOP_SERVER_NAME),
-            ("claude", "mcp", "remove", "--scope", "user", DESKTOP_SERVER_NAME),
+            ("claude", "mcp", "remove", "--scope", "local", STDIO_SERVER_NAME),
+            ("claude", "mcp", "remove", "--scope", "user", STDIO_SERVER_NAME),
         ),
     ),
     "claude-desktop": Client(
         name="Claude Desktop",
         config_path=user_config_path("Claude", "claude_desktop_config.json"),
-        key_path=("mcpServers", DESKTOP_SERVER_NAME),
+        key_path=("mcpServers", STDIO_SERVER_NAME),
         leaf=_STDIO,
     ),
     "codex": Client(
         name="Codex",
         cli_cmd=("codex", "mcp", "add", *_STDIO_CMD),
-        cli_remove_cmds=(("codex", "mcp", "remove", DESKTOP_SERVER_NAME),),
+        cli_remove_cmds=(("codex", "mcp", "remove", STDIO_SERVER_NAME),),
     ),
     "copilot": Client(
         name="GitHub Copilot CLI",
         config_path="~/.copilot/mcp-config.json",
-        key_path=("mcpServers", DESKTOP_SERVER_NAME),
+        key_path=("mcpServers", STDIO_SERVER_NAME),
         leaf={"type": "local", **_STDIO, "tools": ["*"]},
     ),
     "cursor": Client(
         name="Cursor",
         config_path="~/.cursor/mcp.json",
-        key_path=("mcpServers", DESKTOP_SERVER_NAME),
+        key_path=("mcpServers", STDIO_SERVER_NAME),
         leaf={"type": "stdio", **_STDIO},
     ),
     "grok-build": Client(
         name="Grok Build",
         cli_cmd=("grok", "mcp", "add", *_STDIO_CMD),
-        cli_remove_cmds=(("grok", "mcp", "remove", "--scope", "user", DESKTOP_SERVER_NAME),),
+        cli_remove_cmds=(("grok", "mcp", "remove", "--scope", "user", STDIO_SERVER_NAME),),
     ),
     "hermes": Client(
         name="Hermes",
         config_path="~/.hermes/config.yaml",
-        key_path=("mcp_servers", DESKTOP_SERVER_NAME),
+        key_path=("mcp_servers", STDIO_SERVER_NAME),
         leaf=_STDIO,
     ),
     "openclaw": Client(
         name="OpenClaw",
         config_path="~/.openclaw/openclaw.json",
-        key_path=("mcp", "servers", DESKTOP_SERVER_NAME),
+        key_path=("mcp", "servers", STDIO_SERVER_NAME),
         leaf=_STDIO,
         home_marker=".openclaw",
     ),
     "opencode": Client(
         name="OpenCode",
         config_path="~/.config/opencode/opencode.json",
-        key_path=("mcp", DESKTOP_SERVER_NAME),
+        key_path=("mcp", STDIO_SERVER_NAME),
         leaf={"type": "local", "command": [HOLO, "mcp", "serve"], "enabled": True},
         home_marker=".config/opencode",
+    ),
+    "vscode": Client(
+        name="VS Code",
+        config_path=user_config_path("Code", "User", "mcp.json"),
+        key_path=("servers", STDIO_SERVER_NAME),
+        leaf={"type": "stdio", **_STDIO},
+    ),
+    "vscode-insiders": Client(
+        name="VS Code Insiders",
+        config_path=user_config_path("Code - Insiders", "User", "mcp.json"),
+        key_path=("servers", STDIO_SERVER_NAME),
+        leaf={"type": "stdio", **_STDIO},
+    ),
+    "windsurf": Client(
+        name="Windsurf",
+        config_path="~/.codeium/windsurf/mcp_config.json",
+        key_path=("mcpServers", STDIO_SERVER_NAME),
+        leaf=_STDIO,
     ),
 }
 

@@ -6,7 +6,6 @@ import asyncio
 import concurrent.futures
 import contextlib
 import difflib
-import importlib.util
 import json
 import os
 import shutil
@@ -1308,11 +1307,9 @@ def get_skill_command(ctx: typer.Context, name: str = typer.Argument(...)) -> No
 
 @mcp_app.command("serve")
 def mcp_serve() -> None:
-    """Serve this desktop's agent over stdio, for `holo mcp install --desktop` configs to start."""
-    try:
-        from . import mcp_server
-    except ImportError as exc:
-        _raise_cli_error(RuntimeError(f"{exc}; install the desktop extra: pip install 'hai-agents[cli,desktop]'"))
+    """Serve `holo run` as MCP tools over stdio; `holo mcp install` wires clients to start it."""
+    from . import mcp_server
+
     mcp_server.serve()
 
 
@@ -1323,14 +1320,14 @@ def mcp_install(
         None, help="Client id (cursor, vscode, ...), 'list' to enumerate, or omit to wire every detected client."
     ),
     url: str = typer.Option(None, "--url", help="MCP endpoint. Defaults to your --base-url region or the EU host."),
-    desktop: bool = typer.Option(
-        False, "--desktop", help="Wire this desktop's agent (`holo mcp serve`) instead of the cloud server."
+    remote: bool = typer.Option(
+        False, "--remote", help="Wire the cloud server over HTTP, writing your API key into each config in plaintext."
     ),
 ) -> None:
-    """Wire the cloud MCP server into local clients (writes your API key into each config in plaintext)."""
+    """Wire `holo mcp serve` into local MCP clients, so their agents can run holo's agents."""
     state = _state(ctx)
-    registry = mcp_hosts.DESKTOP_CLIENTS if desktop else mcp_hosts.CLIENTS
-    flag = " --desktop" if desktop else ""
+    registry = mcp_hosts.CLIENTS if remote else mcp_hosts.STDIO_CLIENTS
+    flag = " --remote" if remote else ""
     if client == "list":
         _mcp_list(registry, flag, state.json_output)
         return
@@ -1346,10 +1343,10 @@ def mcp_install(
             RuntimeError(f"Unknown client {client!r}. Run `holo mcp install list{flag}` to see supported ids.")
         )
 
-    if desktop:
-        _install_desktop(targets, state.json_output)
-        return
     _sign_in_if_needed(state)
+    if not remote:
+        _install_stdio(targets, state.json_output)
+        return
     try:
         resolved = credentials.resolve_api_key(state.api_key)
         key = resolved() if callable(resolved) else resolved
@@ -1366,11 +1363,7 @@ def mcp_install(
     _exit_if_any_failed(results)
 
 
-def _install_desktop(targets: list[tuple[str, mcp_hosts.Client]], json_output: bool) -> None:
-    if importlib.util.find_spec("mcp") is None:
-        _raise_cli_error(
-            RuntimeError("serving this desktop needs the desktop extra: pip install 'hai-agents[desktop]'")
-        )
+def _install_stdio(targets: list[tuple[str, mcp_hosts.Client]], json_output: bool) -> None:
     try:
         holo = mcp_hosts.holo_command()
     except RuntimeError as exc:
