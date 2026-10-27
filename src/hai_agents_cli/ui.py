@@ -28,16 +28,15 @@ from rich.theme import Theme
 from . import tools
 
 IRIS = "#9a5bec"
-SKY = "#5b9cec"
 
 LOGO = (
-    "   ▄▄█████▄▄           ",
-    " ▄███████████▄         ",
-    "▄█████████████▄   ██ ██",
-    "███████████████   █████",
-    "▀█████████████▀   ██ ██",
-    " ▀███████████▀         ",
-    "   ▀▀█████▀▀           ",
+    "   ########           ",
+    " ############         ",
+    "##############   ## ##",
+    "##############   #####",
+    "##############   ## ##",
+    " ############         ",
+    "   ########           ",
 )
 
 DOT = "●"
@@ -61,6 +60,7 @@ _ACTIVITY_GLYPH = {
 
 RULE = "#4e4e4e"
 _USER = Style(bgcolor="#303030")
+_INK = Style(reverse=True)
 _SPINNER = "·✢✳✶✻✽" if sys.platform == "darwin" else "·✢*✶✻✽"
 _FRAMES = _SPINNER + _SPINNER[-2:0:-1]
 
@@ -107,71 +107,29 @@ class Activity:
     url: str | None = None
 
 
-def welcome(
-    out: Console, version: str, about: list[str], tips: list[Text], recent: list[Activity] | None = None
-) -> None:
-    """Logo and identity on the left, tips and recent activity on the right; stacks when the terminal is narrow."""
-    wide = out.width >= 80
-    rows = [*_logo(), Text(" ")] if wide else []
-    rows += [_clip(Text(line, style="meta")) for line in about]
-    left = Group(*(Align.center(row) for row in rows))
-    right: list[RenderableType] = [Text("Tips", style=f"bold {IRIS}"), *(_clip(tip) for tip in tips)]
-    if recent is not None:
-        right += [
-            Rule(style=f"dim {IRIS}"),
-            Text("Recent activity", style=f"bold {IRIS}"),
-            *([_activity(a) for a in recent] or [Text("No recent activity", style="meta")]),
-        ]
-    if wide:
-        body: RenderableType = Table(
-            Column(ratio=2),
-            Column(ratio=3),
-            box=box.MINIMAL,
-            show_header=False,
-            show_edge=False,
-            expand=True,
-            border_style=f"dim {IRIS}",
-            padding=(0, 1),
-        )
-        body.add_row(left, Group(*right))
-    else:
-        body = Group(left, Rule(style=f"dim {IRIS}"), *right)
-    title = Text.assemble(("holo", f"bold {IRIS}"), (f" v{version}", "meta"))
-    out.print(Panel(body, title=title, title_align="left", box=box.ROUNDED, border_style="accent", padding=(0, 1)))
+def welcome(out: Console, version: str, about: list[Text], tips: list[Text]) -> None:
+    """The logo beside what answers, then how to steer it; the logo drops on narrow terminals."""
+    lines = [Text.assemble(("holo", f"bold {IRIS}"), (f" v{version}", "meta")), *(_clip(line) for line in about)]
+    body: RenderableType = Group(*lines)
+    if out.width >= 60:
+        body = Table.grid(Column(no_wrap=True), Column(vertical="middle"), padding=(0, 3, 0, 0))
+        body.add_row(Group(*_logo()), Group(*lines))
+    out.print()
+    out.print(body)
+    out.print()
+    for tip in tips:
+        out.print(_clip(tip))
     out.print()
 
 
 def _logo() -> list[Text]:
-    width = len(LOGO[0])
-    gradient = [_blend(IRIS, SKY, i / (width - 1)) for i in range(width)]
-    lines = []
-    for row in LOGO:
-        line = Text()
-        for char, color in zip(row, gradient, strict=True):
-            line.append(char, style=color)
-        lines.append(line)
-    return lines
+    """Whole cells in the text color: block glyphs leave gaps between rows and columns in many fonts."""
+    return [Text.assemble(*((" ", _INK if pixel == "#" else "") for pixel in row)) for row in LOGO]
 
 
 def _clip(text: Text) -> Text:
     text.no_wrap, text.overflow = True, "ellipsis"
     return text
-
-
-def _activity(item: Activity) -> Table:
-    glyph, style = _ACTIVITY_GLYPH.get(item.status, (DOT, "accent"))
-    row = Table.grid(expand=True, padding=(0, 1, 0, 0))
-    row.add_column(no_wrap=True)
-    row.add_column(ratio=1, no_wrap=True, overflow="ellipsis")
-    row.add_column(no_wrap=True, justify="right")
-    task_style = f"link {item.url}" if item.url else ""
-    row.add_row(Text(glyph, style=style), Text(item.task, style=task_style), Text(item.age, style="meta"))
-    return row
-
-
-def _blend(start: str, end: str, t: float) -> str:
-    a, b = (tuple(int(c[i : i + 2], 16) for i in (1, 3, 5)) for c in (start, end))
-    return "#" + "".join(f"{round(x + (y - x) * t):02x}" for x, y in zip(a, b, strict=True))
 
 
 def header(out: Console, name: str, parts: list[str | None], link: str | None = None) -> None:

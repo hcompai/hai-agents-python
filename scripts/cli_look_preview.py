@@ -56,16 +56,13 @@ def main() -> None:
     ui.welcome(
         err,
         "1.3.0",
-        ["h/web-surfer", "runs tasks in a cloud browser", "1.2M of 5M tokens left · resets Nov 1"],
         [
-            ui.Text("esc pauses the agent so you can steer it"),
-            ui.Text("follow up in plain words; /new starts a fresh task"),
-            ui.Text("holo 1.3.2 is available · pip install -U hai-agents", style="warn"),
+            ui.Text.assemble("h/web-surfer", (" · runs in the cloud", "meta")),
+            ui.Text("1.2M of 5M tokens left · resets Nov 1", style="meta"),
         ],
         [
-            ui.Activity("completed", "Find the cheapest flight from Paris to Lisbon next Friday", "2h ago"),
-            ui.Activity("failed", "Compare pricing pages of HubSpot, Salesforce and Pipedrive", "1d ago"),
-            ui.Activity("running", "Summarize the top 5 stories on Hacker News", "just now"),
+            ui.Text("type while it works to steer · esc pauses · / lists commands", style="meta"),
+            ui.Text("holo 1.3.2 is available · pip install -U hai-agents", style="warn"),
         ],
     )
     ui.user(err, "Export the Q3 report from SAP GUI to ~/Reports as PDF")

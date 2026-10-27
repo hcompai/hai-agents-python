@@ -28,7 +28,6 @@ _REQUEST_OPTIONS = {"timeout_in_seconds": 2, "max_retries": 0}
 @dataclass
 class Facts:
     quota: Any = None
-    recent: list[Any] | None = None
     latest: str | None = None
 
 
@@ -43,7 +42,6 @@ def gather(client: Any, *, cloud: bool) -> Facts:
     jobs: dict[str, Callable[[], Any]] = {"latest": latest_version}
     if cloud:
         jobs["quota"] = lambda: client.quota.get_token_quota(request_options=_REQUEST_OPTIONS)
-        jobs["recent"] = lambda: client.sessions.list_sessions(page=1, size=3, request_options=_REQUEST_OPTIONS).items
     found: dict[str, Any] = {}
 
     def run(name: str, job: Callable[[], Any]) -> None:

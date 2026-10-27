@@ -253,20 +253,18 @@ def test_welcome_drops_failing_and_slow_sources(monkeypatch) -> None:
 
     from hai_agents_cli import welcome
 
-    def broken(**_):
+    def broken():
         raise RuntimeError("503")
 
     def slow(**_):
         time.sleep(1)
 
     monkeypatch.setattr(welcome, "FETCH_TIMEOUT_S", 0.1)
-    monkeypatch.setattr(welcome, "latest_version", lambda: "9.0.0")
-    client = SimpleNamespace(
-        quota=SimpleNamespace(get_token_quota=broken), sessions=SimpleNamespace(list_sessions=slow)
-    )
+    monkeypatch.setattr(welcome, "latest_version", broken)
+    client = SimpleNamespace(quota=SimpleNamespace(get_token_quota=slow))
 
     started = time.monotonic()
     facts = welcome.gather(client, cloud=True)
 
     assert time.monotonic() - started < 0.5
-    assert (facts.quota, facts.recent, facts.latest) == (None, None, "9.0.0")
+    assert (facts.quota, facts.latest) == (None, None)

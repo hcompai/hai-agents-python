@@ -478,18 +478,22 @@ class _Conversation:
         facts = welcome.gather(self.client, cloud=not self.local)
         current = welcome.current_version()
         if self.controls_machine:
-            stop = "esc esc stops the agent, from any app" if self._listener else "ctrl+c stops the agent"
+            stop = "esc esc stops it from any app" if self._listener else "ctrl+c stops it"
         else:
-            stop = "type while it works to add context; esc pauses it" if keys.supported() else "ctrl+c stops the agent"
-        tips = [Text(stop), Text("follow up in plain words; / lists commands")]
+            stop = f"type while it works to steer {ui.SEP} esc pauses" if keys.supported() else "ctrl+c stops it"
+        tips = [Text(f"{stop} {ui.SEP} / lists commands", style="meta")]
         if welcome.is_newer(facts.latest, current):
             upgrade = f"holo {facts.latest} is available {ui.SEP} pip install -U 'hai-agents[cli]'"
             tips.append(Text(upgrade, style="warn"))
         if self.drives_desktop and (missing := welcome.missing_grants()):
             tips.append(Text(f"missing macOS grants: {', '.join(missing)} {ui.SEP} run holo doctor", style="warn"))
-        about = [self.label, self.does, welcome.quota_line(facts.quota), _custom_endpoint_host(self.state)]
-        recent = None if self.local or facts.recent is None else [welcome.activity(s) for s in facts.recent]
-        ui.welcome(err_console, current, [line for line in about if line], tips, recent)
+        about = [Text.assemble(self.label, (f" {ui.SEP} {self.does}", "meta"))]
+        about += [
+            Text(line, style="meta")
+            for line in (welcome.quota_line(facts.quota), _custom_endpoint_host(self.state))
+            if line
+        ]
+        ui.welcome(err_console, current, about, tips)
 
     @property
     def label(self) -> str:
