@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
 
 from prompt_toolkit import PromptSession
-from prompt_toolkit.application import Application
+from prompt_toolkit.application import Application, get_app
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.data_structures import Point
 from prompt_toolkit.filters import Condition, is_searching, to_filter
@@ -29,6 +29,7 @@ Rows = Callable[[], list[tuple[str, str]]]
 _STYLE = Style.from_dict(
     {
         "prompt": ui.IRIS,
+        "rule": f"noreverse {ui.RULE}",
         "placeholder": "#6c6c6c",
         "bottom-toolbar": "noreverse #8a8a8a",
         "bottom-toolbar.warn": "noreverse #d7af00",
@@ -41,6 +42,10 @@ _STYLE = Style.from_dict(
 )
 
 PICKER_HEIGHT = 12
+
+
+def _rule() -> str:
+    return "─" * get_app().output.get_size().columns
 
 
 def choose(rows: Sequence[tuple[str, str]], headers: Mapping[int, str] | None = None, current: int = 0) -> int | None:
@@ -151,28 +156,36 @@ class Prompt:
             style=_STYLE,
             multiline=True,
             prompt_continuation="  ",
+            erase_when_done=True,
         )
         # The input grows with its text only, so the toolbar and menu sit right under it.
         self._session.layout.current_window.dont_extend_height = to_filter(True)
 
-    def read(self, *, toolbar: Callable[[], str], placeholder: str, example: str | None = None) -> str | None:
-        """``example`` is the task a placeholder suggests; tab types it."""
+    def read(
+        self, *, toolbar: Callable[[], str], placeholder: str, example: str | None = None, default: str = ""
+    ) -> str | None:
+        """``example`` is the task a placeholder suggests; tab types it. ``default`` prefills the input."""
         self._example = example
 
+        def message() -> FormattedText:
+            return FormattedText([("class:rule", _rule() + "\n"), ("class:prompt", f"{ui.PROMPT} ")])
+
         def bottom() -> FormattedText:
+            rule = [("class:rule", _rule() + "\n")]
             if self._exit_pending():
-                return FormattedText([("class:bottom-toolbar.warn", "  press ctrl+c again to exit")])
+                return FormattedText([*rule, ("class:bottom-toolbar.warn", "  press ctrl+c again to exit")])
             text = self._menu_text()
             if self._menu.matches(text):
-                return self._menu.render(text)
-            return FormattedText([("", toolbar())])
+                return FormattedText([*rule, *self._menu.render(text)])
+            return FormattedText([*rule, ("", toolbar())])
 
         try:
             return self._session.prompt(
-                FormattedText([("class:prompt", f"{ui.PROMPT} ")]),
+                message,
                 bottom_toolbar=bottom,
                 placeholder=FormattedText([("class:placeholder", placeholder)]),
                 refresh_interval=0.5,
+                default=default,
             )
         except (EOFError, KeyboardInterrupt):
             return None

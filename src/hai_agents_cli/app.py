@@ -41,7 +41,7 @@ from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
 from hai_agents_local import desktop as desktop_defaults
 
-from . import _CLI_HINT, auth, keys, mcp_hosts, ui, welcome
+from . import _CLI_HINT, auth, keys, mcp_hosts, steer, ui, welcome
 
 if TYPE_CHECKING:
     from hai_agents_local import LocalBridge
@@ -388,9 +388,9 @@ class _Conversation:
     _listener: Any = None
     _header_shown: bool = False
     _prompt: Any = None
-    _feed: ui.StepFeed | None = None
-    _turn_done: bool = False
     _pending: str | None = None
+    _pending_shown: bool = False
+    _draft: str = ""
     _kinds: list[str] | None = None
     _answer: Any = None
     _task: str | None = None
@@ -516,8 +516,8 @@ class _Conversation:
         elif keys.supported():
             stop = [
                 ("type", "message the agent while it works"),
-                ("esc", "pause the agent and tell it what to do instead"),
-                ("esc, then /answer", "answer now"),
+                ("esc", "pause the agent; esc again resumes"),
+                ("/answer", "while it works: answer now"),
             ]
         else:
             stop = []
@@ -550,6 +550,8 @@ class _Conversation:
     def turn(self, message: str, *, echo: bool = False) -> None:
         started_at = time.time()
         self.show_header()
+        if echo and self.human:
+            ui.user(err_console, message)
         if self.session is None:
             try:
                 with self._starting():
@@ -575,25 +577,23 @@ class _Conversation:
                     _raise_cli_error(exc)
                 self._end_session()
                 ui.hint(err_console, "that session had ended; starting a new one")
-                self.turn(message, echo=echo)
+                self.turn(message)
                 return
-        if echo and self.human:
-            ui.user(err_console, message)
         feed = None
+        steering = None
         if self.human:
-            if self.controls_machine:
-                stop_hint = "esc esc to stop" if self._listener else "ctrl+c to stop"
-            else:
-                steerable = _interactive() and keys.supported()
-                stop_hint = f"esc to steer {ui.SEP} ctrl+c to stop" if steerable else "ctrl+c to stop"
+            stop_hint = "esc esc to stop" if self.controls_machine and self._listener else "ctrl+c to stop"
             feed = ui.StepFeed(
                 err_console, max_steps=self.max_steps, steps=self.steps, cost=self.cost, stop_hint=stop_hint
             )
-        self._feed, self._turn_done = feed, False
+            if not self.controls_machine and _interactive() and keys.supported():
+                steering = steer.Steering(
+                    self.client, str(self.session.id), feed, err_console, local_command=self._command_mid_turn
+                )
         timeout = self.max_time_s + _TURN_GRACE_S if self.max_time_s else None
         try:
             if feed is not None:
-                with self._esc_watcher():
+                with steering.watch() if steering else contextlib.nullcontext():
                     _follow(
                         self.client,
                         self.session.id,
@@ -602,7 +602,12 @@ class _Conversation:
                         from_index=self.next_index,
                         stop_at_tool_wait=True,
                     )
-                    self._turn_done = True
+                    if steering is not None:
+                        steering.finish()
+                if steering is not None:
+                    self._draft = steering.box.text
+                    if steering.pending:
+                        self._pending, self._pending_shown = steering.pending, steering.pending_shown
             result = wait_for_session(self.client, self.session.id, from_index=self.next_index, timeout_seconds=timeout)
         except KeyboardInterrupt:
             self._cancel_turn(feed)
@@ -683,14 +688,17 @@ class _Conversation:
 
     def loop(self) -> None:
         while True:
+            shown = self._pending is not None and self._pending_shown
             text = self._pending if self._pending is not None else _read_message(self)
-            self._pending = None
+            self._pending, self._pending_shown = None, False
             if text is None:
                 self._leave()
                 return
             text = text.strip()
             if not text:
                 continue
+            if not shown:
+                ui.user(err_console, text)
             if text == "?":
                 self._show_help()
                 continue
@@ -751,7 +759,7 @@ class _Conversation:
                 ui.error(err_console, "nothing to retry yet", fix="send a task first")
             else:
                 self._end_session()
-                self._send(self._task)
+                self._send(self._task, echo=True)
         elif name == "resume" and not self.local:
             try:
                 self._resume_session(arg)
@@ -762,7 +770,7 @@ class _Conversation:
         elif name == "copy":
             self._copy()
         elif name == "answer":
-            ui.error(err_console, "/answer works mid-run", fix="press esc while the agent works, then type /answer")
+            ui.error(err_console, "/answer works while the agent runs", fix="type /answer while it works")
         else:
             ui.error(err_console, f"unknown command /{name}", fix="/help lists the commands")
         return True
@@ -864,116 +872,19 @@ class _Conversation:
             return
         ui.ok(err_console, "share link", url=absolute_share_url(self.client, share.share_url))
 
-    def _esc_watcher(self) -> Any:
-        if self.controls_machine or not _interactive():
-            return contextlib.nullcontext()
-        return keys.EscWatcher(self._steer, self._send_typed)
-
-    def _steer(self, watcher: keys.EscWatcher) -> None:
-        """Pause the agent, ask what to do instead, then send that once the pause lands and resume."""
-        feed, session_id = self._feed, self.session.id
-        try:
-            self.client.sessions.pause_session(session_id)
-        except Exception as exc:
-            ui.error(err_console, f"could not pause: {exc}")
-            return
-        if feed is not None:
-            feed.hold()
-        ui.paused(err_console)
-        line = watcher.edit_line(*_prompt_ansi())
-        if watcher.stopped:
-            return
-        err_console.print()
-        if feed is not None:
-            err_console.print()
-            feed.release()
-        self._deliver(session_id, (line or "").strip(), watcher)
-
-    def _send_typed(self, watcher: keys.EscWatcher, typed: str) -> None:
-        """Typing mid-run messages the agent; it is shown after the step in flight, where the agent reads it."""
-        feed, session_id = self._feed, self.session.id
-        if feed is not None:
-            feed.hold()
-        line, newline, _ = typed.replace("\r", "\n").partition("\n")
-        line = "".join(char for char in line if char.isprintable())
-        edited = line if newline else watcher.edit_line(*_prompt_ansi(), line, erase=True)
-        if watcher.stopped:
-            return
-        text = (edited or "").strip()
-        if text and not self._turn_done:
-            try:
-                self.client.sessions.pause_session(session_id)
-            except Exception as exc:
-                ui.error(err_console, f"message not sent: {exc}")
-                text = ""
-        if feed is not None:
-            if text:
-                feed.note(text)
-            feed.release()
-        if text and self._turn_done:
-            self._pending = text
-        elif text:
-            self._deliver(session_id, text, watcher)
-
-    def _deliver(self, session_id: str, text: str, watcher: keys.EscWatcher) -> None:
-        """Send once the pause lands and resume; a pause drops a model call in flight, so its answer can't skip the message."""
-        try:
-            status = self._await_pause(session_id, watcher)
-        except Exception as exc:
-            ui.error(err_console, str(exc))
-            status = None
-        if watcher.stopped:
-            return
-        if status == "paused" and not self._turn_done:
-            if text == "/answer":
-                self._force_answer(session_id)
-            else:
-                self._correct_and_resume(session_id, text)
+    def _command_mid_turn(self, text: str) -> bool:
+        """Commands typed while the agent works run here; /answer and plain text go to the agent."""
+        if text == "?":
+            self._show_help()
+            return True
+        if text == steer.ANSWER or not _is_command(text):
+            return False
+        name = text[1:].split(maxsplit=1)[0]
+        if name in ("help", "live", "share", "status", "copy"):
+            self.command(text)
         else:
-            if status is None or not is_terminal_session_status(status):
-                self._resume(session_id)
-            self._pending = None if text == "/answer" else text or None
-
-    def _correct_and_resume(self, session_id: str, text: str) -> None:
-        """Resume even if the correction fails: a paused session never settles, so the turn would wait forever."""
-        if text:
-            try:
-                request = SendSessionMessagesRequestBody_UserMessage(message=text)
-                self.client.sessions.send_session_messages(session_id, request=request)
-            except Exception as exc:
-                ui.error(err_console, f"correction not sent: {exc}")
-        self._resume(session_id)
-
-    def _force_answer(self, session_id: str) -> None:
-        """Asking for the answer also unpauses the session."""
-        try:
-            self.client.sessions.force_session_answer(session_id)
-        except Exception as exc:
-            ui.error(err_console, f"could not ask for the answer: {exc}")
-            self._resume(session_id)
-
-    def _resume(self, session_id: str) -> None:
-        try:
-            self.client.sessions.resume_session(session_id)
-        except Exception as exc:
-            ui.error(err_console, f"could not resume: {exc}", fix="ctrl+c cancels the turn")
-
-    def _await_pause(self, session_id: str, watcher: keys.EscWatcher) -> str | None:
-        """A pause lands at the end of the current step; a message sent before then is overtaken by it."""
-        while not watcher.stopped:
-            status = str(self.client.sessions.get_session_status(session_id).status)
-            if status in ("paused", "awaiting_tool_results") or is_settled_session_status(status):
-                return status
-            time.sleep(0.5)
-        return None
-
-
-def _prompt_ansi() -> tuple[str, int]:
-    """The `> ` prompt as terminal codes, and its width."""
-    prompt = ui.prompt_text()
-    with err_console.capture() as captured:
-        err_console.print(prompt, end="")
-    return captured.get(), prompt.cell_len
+            ui.hint(err_console, f"/{name} works between turns {ui.SEP} esc pauses, ctrl+c cancels the turn")
+        return True
 
 
 def _read_message(convo: _Conversation) -> str | None:
@@ -988,7 +899,10 @@ def _read_message(convo: _Conversation) -> str | None:
             raise typer.Exit(1) from None
 
         convo._prompt = Prompt(credentials.private_config_dir() / "history", convo.commands)
-    return convo._prompt.read(toolbar=convo.toolbar, placeholder=convo.placeholder(), example=convo.example())
+    draft, convo._draft = convo._draft, ""
+    return convo._prompt.read(
+        toolbar=convo.toolbar, placeholder=convo.placeholder(), example=convo.example(), default=draft
+    )
 
 
 def _is_command(text: str) -> bool:

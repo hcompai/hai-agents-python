@@ -22,7 +22,7 @@ def test_esc_watcher_exits_promptly_and_restores_the_terminal(monkeypatch, inter
     saved = termios.tcgetattr(follower)[3] & modes
 
     def leave() -> None:
-        with keys.EscWatcher(lambda watcher: None):
+        with keys.EscWatcher(lambda: None):
             if interrupted:
                 raise KeyboardInterrupt
 
@@ -36,21 +36,23 @@ def test_esc_watcher_exits_promptly_and_restores_the_terminal(monkeypatch, inter
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="no pty")
-def test_typing_mid_turn_can_erase_the_key_that_opened_the_prompt(monkeypatch) -> None:
+def test_typed_keys_edit_one_line_across_reads_and_a_lone_esc_pauses(monkeypatch) -> None:
     leader, follower = pty.openpty()
     monkeypatch.setattr(sys, "stdin", os.fdopen(follower, "r"))
-    lines: list[str | None] = []
+    box = {"text": "", "sent": [], "escs": 0}
 
-    def on_text(watcher: keys.EscWatcher, typed: str) -> None:
-        lines.append(watcher.edit_line("> ", 2, typed, erase=True))
+    def on_keys(typed: str) -> None:
+        box["text"], sent = keys.edit(box["text"], typed)
+        if sent:
+            box["sent"].append(box["text"])
 
-    with keys.EscWatcher(lambda watcher: None, on_text):
-        os.write(leader, b"o")
-        time.sleep(0.3)
-        os.write(leader, b"\x7fhi there\x17you\r")
-        deadline = time.monotonic() + 2
-        while not lines and time.monotonic() < deadline:
-            time.sleep(0.05)
+    def on_esc() -> None:
+        box["escs"] += 1
+
+    with keys.EscWatcher(on_esc, on_keys):
+        for chunk in (b"o", b"\x7fhi there\x17you\r", b"\x1b"):
+            os.write(leader, chunk)
+            time.sleep(0.3)
     os.close(leader)
 
-    assert lines == ["hi you"]
+    assert (box["sent"], box["escs"]) == (["hi you"], 1)

@@ -13,11 +13,12 @@ from typing import Any, Literal
 
 from rich import box
 from rich.align import Align
-from rich.console import Console, Group, RenderableType
+from rich.console import Console, ConsoleOptions, Group, RenderableType, RenderResult
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.rule import Rule
+from rich.segment import Segment
 from rich.style import Style
 from rich.table import Column, Table
 from rich.text import Text
@@ -41,7 +42,7 @@ LOGO = (
 DOT = "●"
 RESULT = "⎿"
 SPARK = "✻"
-PROMPT = ">"
+PROMPT = "❯"
 POINTER = "❯"
 DONE = "✓"
 FAILED = "✗"
@@ -57,6 +58,8 @@ _ACTIVITY_GLYPH = {
     "interrupted": (FAILED, "meta"),
 }
 
+RULE = "#4e4e4e"
+_USER = Style(bgcolor="#303030")
 _SPINNER = "·✢✳✶✻✽" if sys.platform == "darwin" else "·✢*✶✻✽"
 _FRAMES = _SPINNER + _SPINNER[-2:0:-1]
 
@@ -186,15 +189,45 @@ def user(out: Console, text: str) -> None:
 
 
 def user_message(text: str) -> Table:
-    grid = Table.grid()
-    grid.add_column(width=2, no_wrap=True)
+    grid = Table.grid(padding=(0, 1, 0, 0))
+    grid.add_column(width=1, no_wrap=True)
     grid.add_column()
-    grid.add_row(Text(PROMPT, style="meta"), Text(text, style="meta"))
+    grid.add_row(Text(PROMPT, style="meta"), Text(text), style=_USER)
     return grid
 
 
-def prompt_text() -> Text:
-    return Text(f"{PROMPT} ", style="accent")
+@dataclass
+class InputBox:
+    """The message line pinned under a running turn, between two rules, with a hint line below."""
+
+    text: str = ""
+    placeholder: str = ""
+    hint: str = ""
+    hint_style: str = "meta"
+
+    def lines(self) -> list[RenderableType]:
+        line = Text.assemble((f"{PROMPT} ", "accent"), self.text, (" ", "reverse"))
+        if not self.text:
+            line.append(self.placeholder, style="meta")
+        hint = Text(f"  {self.hint}", style=self.hint_style, no_wrap=True, overflow="ellipsis")
+        return [Text(""), Rule(style=RULE), line, Rule(style=RULE), hint]
+
+
+class _Lines:
+    def __init__(self, lines: list[list[Segment]]) -> None:
+        self.lines = lines
+
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        for line in self.lines:
+            yield from line
+            yield Segment.line()
+
+
+def _pinned(out: Console, body: list[RenderableType], bottom: list[RenderableType]) -> RenderableType:
+    """Keep ``bottom`` on screen by dropping the top of ``body`` once both outgrow the terminal."""
+    rendered = out.render_lines(Group(*body), out.options, pad=False)
+    room = out.size.height - sum(len(out.render_lines(item, out.options, pad=False)) for item in bottom)
+    return Group(_Lines(rendered[max(0, len(rendered) - room) :]), *bottom)
 
 
 def ok(out: Console, message: str, *, url: str | None = None) -> None:
@@ -212,15 +245,6 @@ def url(out: Console, address: str) -> None:
 def _link(url: str | None) -> tuple[tuple[str, str], ...]:
     """An OSC 8 hyperlink that still shows the URL; printed soft-wrapped, so a terminal's own URL detection sees it whole."""
     return ((" ", ""), (url, Style(dim=True, underline=True, link=url))) if url else ()
-
-
-def paused(out: Console) -> None:
-    out.print()
-    out.print(
-        Text.assemble(
-            (f"{DOT} ", "warn"), "Paused", (" · say what to do instead, /answer to wrap up, or enter to resume", "meta")
-        )
-    )
 
 
 def commands(out: Console, rows: list[tuple[str, str]]) -> None:
@@ -341,9 +365,8 @@ class StepFeed:
     _first_ts: float | None = None
     _latest_ts: float | None = None
     _started: float = field(default_factory=time.monotonic)
+    box: InputBox | None = None
     _live: Live | None = None
-    _held: list[Any] | None = None
-    _closed: bool = False
     _lock: threading.RLock = field(default_factory=threading.RLock)
     _agents: dict[str, _Agent] = field(default_factory=dict)
     _tail: list[_Done | RenderableType] = field(default_factory=list)
@@ -367,26 +390,7 @@ class StepFeed:
 
     def handle(self, event: Any) -> None:
         with self._lock:
-            if self._held is not None:
-                self._held.append(event)
-            else:
-                self._handle(event)
-
-    def hold(self) -> None:
-        """Queue events and clear the live area, so a prompt can take the terminal."""
-        with self._lock:
-            self._held = []
-            self._stop_live()
-
-    def release(self) -> None:
-        with self._lock:
-            if self._closed:
-                return
-            held, self._held = self._held or [], None
-            self._start_live()
-            for event in held:
-                self._handle(event)
-            self._settle()
+            self._handle(event)
 
     def note(self, text: str) -> None:
         """Show a message typed mid-run after the step in flight, which is where the agent reads it."""
@@ -434,8 +438,6 @@ class StepFeed:
         self._settle()
 
     def _settle(self, *, force: bool = False) -> None:
-        if self._held is not None and not force:
-            return
         while self._tail and (force or len(self._tail) > _MAX_TAIL or not self._runs_agents(self._tail[0])):
             for line in self._render(self._tail.pop(0)):
                 self.out.print(line)
@@ -506,10 +508,6 @@ class StepFeed:
 
     def close(self) -> None:
         with self._lock:
-            self._closed = True
-            for event in self._held or []:
-                self._handle(event)
-            self._held = None
             if self._current is not None:
                 self._finish(None, None)
             self._flush()
@@ -633,14 +631,14 @@ class StepFeed:
             _clock(self.elapsed),
             f"step {n - self._turn_from_steps}" + (f"/{self.max_steps}" if self.max_steps else ""),
             money(self.turn_cost),
-            self.stop_hint,
+            None if self.box else self.stop_hint,
         ]
         meta = f" {SEP} ".join(p for p in parts if p)
         frame = _FRAMES[int(now * 8) % len(_FRAMES)]
         lines.append(
             Text.assemble((f"{frame} {verb}…", "accent"), (f" ({meta})", "meta"), no_wrap=True, overflow="ellipsis")
         )
-        return Group(*lines)
+        return Group(*lines) if self.box is None else _pinned(self.out, lines, self.box.lines())
 
 
 def _blink() -> str:

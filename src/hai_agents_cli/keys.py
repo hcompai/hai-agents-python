@@ -1,4 +1,4 @@
-"""Watch the terminal for a lone Esc while a turn streams, without blocking the main thread."""
+"""Read the keyboard while a turn streams, without blocking the main thread."""
 
 from __future__ import annotations
 
@@ -10,28 +10,42 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
-from rich.cells import cell_len
-
 ESC = b"\x1b"
 _POLL_S = 0.1
-_UP_CLEARING = "\x1b[1A\x1b[2K"
 
 
 def supported() -> bool:
     return sys.platform != "win32" and sys.stdin.isatty()
 
 
+def edit(text: str, typed: str) -> tuple[str, bool]:
+    """Apply typed keys to a one-line input; True once enter is pressed. Escape sequences (arrows) are ignored."""
+    for char in typed:
+        if char in "\r\n":
+            return text, True
+        if char == "\x1b":
+            break
+        if char in "\x7f\b":
+            text = text[:-1]
+        elif char == "\x15":
+            text = ""
+        elif char == "\x17":
+            text = text.rstrip()
+            text = text[: len(text) - len(text.split(" ")[-1])]
+        elif char.isprintable():
+            text += char
+    return text, False
+
+
 class EscWatcher:
-    """On its own thread, calls ``on_esc(watcher)`` on Esc and ``on_text(watcher, typed)`` once typing starts.
+    """On its own thread, calls ``on_esc()`` on a lone Esc and ``on_keys(typed)`` for any other keys.
 
     A no-op off a TTY or on Windows.
     """
 
-    def __init__(
-        self, on_esc: Callable[[EscWatcher], None], on_text: Callable[[EscWatcher, str], None] | None = None
-    ) -> None:
+    def __init__(self, on_esc: Callable[[], None], on_keys: Callable[[str], None] | None = None) -> None:
         self._on_esc = on_esc
-        self._on_text = on_text
+        self._on_keys = on_keys
         self._stop = threading.Event()
         self._abandoned = threading.Event()
         self._thread: threading.Thread | None = None
@@ -53,7 +67,7 @@ class EscWatcher:
         return self
 
     def __exit__(self, exc_type: object, *_: object) -> None:
-        # On a clean exit, wait out a prompt the user is still typing; on ctrl+c, abandon it and leave the daemon behind.
+        # On ctrl+c, leave the daemon behind rather than wait on a callback still talking to the API.
         self._stop.set()
         try:
             if self._thread is not None and exc_type is None:
@@ -65,66 +79,21 @@ class EscWatcher:
 
     @property
     def stopped(self) -> bool:
-        """The turn ended under an open prompt, so whatever was typed belongs to no one."""
+        """The turn ended; work started from a key press belongs to no one."""
         return self._abandoned.is_set()
-
-    def edit_line(self, prompt: str, prompt_cells: int, text: str = "", *, erase: bool = False) -> str | None:
-        """The line typed after ``prompt`` from ``text``; None on esc, ctrl+d, or once abandoned (the turn ended)."""
-        assert self._fd is not None
-        decode = codecs.getincrementaldecoder("utf-8")(errors="ignore").decode
-        rows = self._draw(prompt, prompt_cells, text, 1)
-        result: str | None = None
-        while not self._abandoned.is_set():
-            ready, _, _ = select.select([self._fd], [], [], _POLL_S)
-            if not ready:
-                continue
-            chunk = decode(os.read(self._fd, 1024))
-            if chunk == "\x1b" or (chunk == "\x04" and not text):
-                break
-            done = False
-            for char in chunk:
-                if char in "\r\n":
-                    done = True
-                    break
-                if char == "\x1b":
-                    break
-                if char in "\x7f\b":
-                    text = text[:-1]
-                elif char == "\x15":
-                    text = ""
-                elif char == "\x17":
-                    text = text.rstrip()
-                    text = text[: len(text) - len(text.split(" ")[-1])]
-                elif char.isprintable():
-                    text += char
-            rows = self._draw(prompt, prompt_cells, text, rows)
-            if done:
-                result = text
-                break
-        if erase:
-            sys.stderr.write(_UP_CLEARING * (rows - 1) + "\r\x1b[J")
-            sys.stderr.flush()
-        return None if self._abandoned.is_set() else result
-
-    def _draw(self, prompt: str, prompt_cells: int, text: str, rows: int) -> int:
-        """Redraw the line from its first row; it may wrap, and backspace can't cross a wrap."""
-        sys.stderr.write(_UP_CLEARING * (rows - 1) + "\r\x1b[J" + prompt + text)
-        sys.stderr.flush()
-        width = max(1, os.get_terminal_size(self._fd).columns) if self._fd is not None else 80
-        return max(1, -(-(prompt_cells + cell_len(text)) // width))
 
     def _run(self) -> None:
         assert self._fd is not None
+        decode = codecs.getincrementaldecoder("utf-8")(errors="ignore").decode
         while not self._stop.is_set():
             ready, _, _ = select.select([self._fd], [], [], _POLL_S)
             if not ready:
                 continue
             chunk = os.read(self._fd, 1024)
-            typed = chunk.decode(errors="ignore")
             if chunk == ESC:
-                self._on_esc(self)
-            elif self._on_text is not None and typed and typed[0].isprintable():
-                self._on_text(self, typed)
+                self._on_esc()
+            elif self._on_keys is not None and (typed := decode(chunk)):
+                self._on_keys(typed)
 
     def _restore(self) -> None:
         if self._fd is not None and self._saved is not None:

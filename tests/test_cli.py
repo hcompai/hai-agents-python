@@ -2,16 +2,19 @@ from __future__ import annotations
 
 import concurrent.futures
 import contextlib
+import io
 import json
 import os
 import types
 from datetime import datetime, timezone
 
 import pytest
+from rich.console import Console
 from typer.testing import CliRunner
 
 import hai_agents_cli.app as app_module
 from hai_agents.polling import MAX_REQUEST_BYTES, SessionRunResult
+from hai_agents_cli import steer, ui
 from hai_agents_cli.app import app
 from hai_agents_common import credentials
 
@@ -355,94 +358,73 @@ def test_follow_up_continues_the_same_session_from_the_last_event(monkeypatch) -
     assert waits == [0, 7]
 
 
-def test_esc_waits_for_the_pause_then_sends_the_correction_and_resumes(monkeypatch) -> None:
-    monkeypatch.setattr(app_module.time, "sleep", lambda s: None)
-    send_and_resume = [("send", "only the top 2"), ("resume",)]
-    cases = (
-        ("only the top 2", False, False, False, send_and_resume, None),
-        ("", False, False, False, [("resume",)], None),
-        ("/answer", False, False, False, [("answer",)], None),
-        ("only the top 2", True, False, False, [("resume",)], None),
-        ("only the top 2", False, True, False, [], None),
-        ("only the top 2", False, False, True, [("resume",)], "only the top 2"),
-    )
-    for typed, send_fails, interrupted, stream_stopped, expected, pending in cases:
-        client = _RunClient()
-        client.sessions.send_fails = send_fails
-        convo = app_module._Conversation(
-            app_module.AppState(api_key=None, base_url=None, json_output=False),
-            "h/test-agent",
-            local=False,
-            max_steps=5,
-            max_time_s=60,
-            overrides={},
-            client=client,
-            session=type("Session", (), {"id": "sess_1"})(),
-        )
-        convo._turn_done = stream_stopped
-        convo._steer(_Watcher(typed, stopped=interrupted))
-
-        assert client.sessions.calls == [("pause",), *expected]
-        assert convo._pending == pending
+def _steering(client) -> steer.Steering:
+    feed = ui.StepFeed(Console(file=io.StringIO()))
+    return steer.Steering(client, "sess_1", feed, feed.out, spawn=lambda work: work())
 
 
 @pytest.mark.parametrize(
-    ("turn_done", "calls", "pending"),
-    [(False, [("pause",), ("send", "only the top 2"), ("resume",)], None), (True, [], "only the top 2")],
-    ids=["while it works", "after the turn"],
-)
-def test_typing_mid_run_pauses_so_the_agent_cannot_answer_past_the_message(
-    monkeypatch, turn_done, calls, pending
-) -> None:
-    monkeypatch.setattr(app_module.time, "sleep", lambda s: None)
-    client = _RunClient()
-    convo = app_module._Conversation(
-        app_module.AppState(api_key=None, base_url=None, json_output=False),
-        "h/test-agent",
-        local=False,
-        max_steps=5,
-        max_time_s=60,
-        overrides={},
-        client=client,
-        session=type("Session", (), {"id": "sess_1"})(),
-    )
-    convo._turn_done = turn_done
-    convo._send_typed(_Watcher("nly the top 2"), "o")
-
-    assert (client.sessions.calls, convo._pending) == (calls, pending)
-
-
-@pytest.mark.parametrize(
-    ("status", "expected"),
+    ("keys", "send_fails", "calls"),
     [
-        (RuntimeError("network down"), [("pause",), ("resume",)]),
-        ("idle", [("pause",), ("resume",)]),
-        ("completed", [("pause",)]),
+        (["only the top 2\r"], False, [("pause",), ("send", "only the top 2"), ("resume",)]),
+        ([None, "only the top 2\r"], False, [("pause",), ("send", "only the top 2"), ("resume",)]),
+        ([None, None], False, [("pause",), ("resume",)]),
+        (["/answer\r"], False, [("pause",), ("answer",)]),
+        (["only the top 2\r"], True, [("pause",), ("resume",)]),
     ],
-    ids=["status unknown", "idle, so the queued pause would freeze its next run", "ended"],
+    ids=["typed while it works", "esc, then a message", "esc twice", "/answer", "send fails"],
 )
-def test_esc_settles_when_the_pause_cannot_land(status, expected) -> None:
+def test_a_message_waits_for_the_pause_so_the_agent_cannot_answer_past_it(monkeypatch, keys, send_fails, calls):
+    monkeypatch.setattr(steer.time, "sleep", lambda s: None)
+    client = _RunClient()
+    client.sessions.send_fails = send_fails
+    steering = _steering(client)
+    for typed in keys:
+        steering.on_esc() if typed is None else steering.on_keys(typed)
+
+    assert (client.sessions.calls, steering.pending) == (calls, None)
+
+
+def test_a_message_after_the_stream_ends_is_the_next_turn() -> None:
+    client = _RunClient()
+    steering = _steering(client)
+    steering.finish()
+    steering.on_keys("only the top 2\r")
+
+    assert (client.sessions.calls, steering.pending, steering.pending_shown) == ([], "only the top 2", False)
+
+
+@pytest.mark.parametrize(
+    ("statuses", "expected", "pending"),
+    [
+        (["pending", "running", "paused"], [("pause",), ("send", "only the top 2"), ("resume",)], None),
+        ([RuntimeError("network down")], [("send", "only the top 2")], None),
+        (["running", "idle"], [("pause",), ("resume",)], "only the top 2"),
+        (["running", "completed"], [("pause",)], "only the top 2"),
+    ],
+    ids=[
+        "booting, so the pause waits for the run",
+        "status unknown",
+        "idle, so a queued pause would freeze its next run",
+        "ended",
+    ],
+)
+def test_a_message_lands_even_when_the_pause_cannot(monkeypatch, statuses, expected, pending) -> None:
+    monkeypatch.setattr(steer.time, "sleep", lambda s: None)
+    replies = iter(statuses)
+
     def get_session_status(id):
+        status = next(replies, statuses[-1])
         if isinstance(status, Exception):
             raise status
         return type("Status", (), {"status": status})()
 
     client = _RunClient()
     client.sessions.get_session_status = get_session_status
-    convo = app_module._Conversation(
-        app_module.AppState(api_key=None, base_url=None, json_output=False),
-        "h/test-agent",
-        local=False,
-        max_steps=5,
-        max_time_s=60,
-        overrides={},
-        client=client,
-        session=type("Session", (), {"id": "sess_1"})(),
-    )
-    convo._steer(_Watcher("only the top 2"))
+    steering = _steering(client)
+    steering.on_keys("only the top 2\r")
 
-    assert client.sessions.calls == expected
-    assert convo._pending == "only the top 2"
+    assert (client.sessions.calls, steering.pending) == (expected, pending)
 
 
 def test_agent_numbers_follow_the_listed_order_h_agents_first(monkeypatch) -> None:
@@ -608,6 +590,7 @@ class _RunSessions:
         self.sent: list[tuple[str, str]] = []
         self.calls: list[tuple] = []
         self.send_fails = False
+        self._polls_until_paused = 1_000
 
     def create_session(self, **kwargs):
         self.created += 1
@@ -641,14 +624,6 @@ class _RunSessions:
 
     def cancel_session(self, id):
         self.calls.append(("cancel",))
-
-
-class _Watcher:
-    def __init__(self, typed: str, *, stopped: bool = False) -> None:
-        self.typed, self.stopped = typed, stopped
-
-    def edit_line(self, prompt: str, prompt_cells: int, text: str = "", *, erase: bool = False) -> str:
-        return text + self.typed
 
 
 class _RunClient:
