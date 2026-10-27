@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from hai_agents_local import LocalBridge
 
 _AGENT_POLL_S = 3.0
+_TURN_GRACE_S = 120.0  # past max_time, sagent spends up to 60s forcing an answer, plus the pod's startup
 CLEAN_STATUSES = ("completed", "idle")
 IDLE_TIMEOUT_S = 600
 LOCAL_MAX_STEPS = 150
@@ -587,7 +588,7 @@ class _Conversation:
                 err_console, max_steps=self.max_steps, steps=self.steps, cost=self.cost, stop_hint=stop_hint
             )
         self._feed, self._turn_done = feed, False
-        timeout = self.max_time_s + 30.0 if self.max_time_s else None
+        timeout = self.max_time_s + _TURN_GRACE_S if self.max_time_s else None
         try:
             if feed is not None:
                 with self._esc_watcher():
@@ -884,10 +885,10 @@ class _Conversation:
             return
         if line is None:
             err_console.print()
-        self._deliver(session_id, (line or "").strip(), watcher)
         if feed is not None:
             err_console.print()
             feed.release()
+        self._deliver(session_id, (line or "").strip(), watcher)
 
     def _send_typed(self, watcher: keys.EscWatcher, typed: str) -> None:
         """Typing mid-run messages the agent; it is shown after the step in flight, where the agent reads it."""
@@ -934,7 +935,7 @@ class _Conversation:
             else:
                 self._correct_and_resume(session_id, text)
         else:
-            if status is None or status == "paused":
+            if status is None or not is_terminal_session_status(status):
                 self._resume(session_id)
             self._pending = None if text == "/answer" else text or None
 

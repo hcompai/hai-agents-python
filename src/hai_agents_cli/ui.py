@@ -631,7 +631,7 @@ class StepFeed:
         n = current.n if current else self.steps + 1
         parts = [
             _clock(self.elapsed),
-            f"step {n}/{self.max_steps}" if self.max_steps else f"step {n - self._turn_from_steps}",
+            f"step {n - self._turn_from_steps}" + (f"/{self.max_steps}" if self.max_steps else ""),
             money(self.turn_cost),
             self.stop_hint,
         ]

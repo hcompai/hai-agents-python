@@ -414,7 +414,12 @@ def test_typing_mid_run_pauses_so_the_agent_cannot_answer_past_the_message(
 
 @pytest.mark.parametrize(
     ("status", "expected"),
-    [(RuntimeError("network down"), [("pause",), ("resume",)]), ("awaiting_tool_results", [("pause",)])],
+    [
+        (RuntimeError("network down"), [("pause",), ("resume",)]),
+        ("idle", [("pause",), ("resume",)]),
+        ("completed", [("pause",)]),
+    ],
+    ids=["status unknown", "idle, so the queued pause would freeze its next run", "ended"],
 )
 def test_esc_settles_when_the_pause_cannot_land(status, expected) -> None:
     def get_session_status(id):
