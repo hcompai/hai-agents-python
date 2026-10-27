@@ -231,7 +231,7 @@ def error(out: Console, message: str, *, fix: str | None = None) -> None:
 
 
 def check(out: Console, state: CheckState, name: str, detail: str, *, fix: str | None = None) -> None:
-    out.print(Text.assemble((_CHECK_GLYPH[state], state), f" {name:<10} {detail}"))
+    out.print(Text.assemble((_CHECK_GLYPH[state], state), f" {name:<11} {detail}"))
     if fix:
         out.print(_result(Text.assemble(("fix: ", "meta"), fix), wrap=True))
 
