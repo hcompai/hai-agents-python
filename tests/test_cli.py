@@ -172,9 +172,16 @@ def test_a_lost_stream_keeps_the_session_for_the_next_message(monkeypatch, earli
         return result
 
     replies = iter([*(["next task"] * len(earlier)), "try again", None])
+    streamed_from = []
+
+    def follow(client_, session_id, feed, *, from_index, **_):
+        streamed_from.append(from_index)
+        for _ in range(2):
+            feed.handle({"type": "AgentEvent", "data": {"kind": "message_event", "caller_id": "agent", "content": []}})
+
     monkeypatch.setattr(app_module, "_client", lambda state: client)
     monkeypatch.setattr(app_module, "wait_for_session", wait)
-    monkeypatch.setattr(app_module, "_follow", _no_events)
+    monkeypatch.setattr(app_module, "_follow", follow)
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
 
@@ -184,6 +191,7 @@ def test_a_lost_stream_keeps_the_session_for_the_next_message(monkeypatch, earli
     assert "lost the session's stream" in result.output
     assert client.sessions.created == 1 + len(earlier)
     assert client.sessions.calls == [("send", "try again")]
+    assert streamed_from[-2:] == [0, 2]
 
 
 def test_retry_runs_the_first_task_again_in_a_new_session(monkeypatch) -> None:

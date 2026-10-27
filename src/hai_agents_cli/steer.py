@@ -54,9 +54,11 @@ class Steering:
     def watch(self) -> keys.EscWatcher:
         return keys.EscWatcher(self.on_esc, self.on_keys)
 
-    def finish(self) -> None:
+    def finish(self, *, settle: bool = True) -> None:
         """The stream ended, maybe on an error; settle any pause so it cannot freeze the next turn."""
         self._done.set()
+        if not settle:
+            return
         if self._lander is not None and hasattr(self._lander, "join"):
             self._lander.join()
         with self._lock:

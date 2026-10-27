@@ -334,6 +334,8 @@ class StepFeed:
     max_steps: int | None = None
     steps: int = 0
     cost: float | None = None
+    run_steps: int = 0
+    handled: int = 0
     answer: Any = None
     starting: bool = False
     paused: bool = False
@@ -361,7 +363,7 @@ class StepFeed:
 
     def __post_init__(self) -> None:
         self._turn_from_steps, self._turn_from_cost = self.steps, self.cost or 0.0
-        self._tally = _Tally(base=self.steps, cost=self.cost)
+        self._tally = _Tally(base=self.steps - self.run_steps, run=self.run_steps, cost=self.cost)
         self._start_live()
 
     @property
@@ -374,6 +376,7 @@ class StepFeed:
 
     def handle(self, event: Any) -> None:
         with self._lock:
+            self.handled += 1
             self._handle(event)
 
     def note(self, text: str) -> None:
@@ -472,6 +475,7 @@ class StepFeed:
         if kind == "metrics":
             self._tally.add(data)
             self.steps, self.cost = max(self.steps, self._tally.steps), self._tally.cost
+            self.run_steps = self._tally.run
         elif kind == "observation_event":
             meta = data.get("metadata") or {}
             self._flush(_observed(data, self._seen))

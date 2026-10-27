@@ -232,6 +232,17 @@ def test_a_redraw_never_waits_on_an_event_being_handled() -> None:
     assert feed._render_live() is not shown
 
 
+def test_a_run_carried_into_the_next_turn_counts_its_steps_once() -> None:
+    def metrics(steps: int) -> dict:
+        return {"type": "MetricsUpdateEvent", "data": {"metrics": {"steps": steps}}}
+
+    feed = ui.StepFeed(Console(file=io.StringIO()), steps=5, run_steps=3)
+    feed.handle(metrics(4))
+    assert feed.steps == 6
+    feed.handle(metrics(1))
+    assert feed.steps == 7
+
+
 def test_feed_surfaces_environment_and_tool_failures() -> None:
     buffer = io.StringIO()
     feed = ui.StepFeed(Console(file=buffer, width=200, color_system=None))

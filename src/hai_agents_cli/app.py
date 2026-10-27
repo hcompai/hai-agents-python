@@ -385,6 +385,7 @@ class _Conversation:
     next_index: int = 0
     steps: int = 0
     cost: float | None = None
+    run_steps: int = 0
     _listener: Any = None
     _header_shown: bool = False
     _prompt: Any = None
@@ -566,7 +567,7 @@ class _Conversation:
                 return
             except Exception as exc:
                 _raise_cli_error(exc)
-            self.next_index = 0
+            self.next_index, self.run_steps = 0, 0
             if self.human and self.view_url:
                 ui.url(err_console, self.view_url)
                 err_console.print()
@@ -593,6 +594,7 @@ class _Conversation:
                 max_steps=self.max_steps,
                 steps=self.steps,
                 cost=self.cost,
+                run_steps=self.run_steps,
                 stop_hint=stop_hint,
                 starting=self.next_index == 0,
             )
@@ -604,6 +606,7 @@ class _Conversation:
         try:
             if feed is not None:
                 with steering.watch() if steering else contextlib.nullcontext():
+                    interrupted = False
                     try:
                         _follow(
                             self.client,
@@ -613,9 +616,12 @@ class _Conversation:
                             from_index=self.next_index,
                             stop_at_tool_wait=True,
                         )
+                    except KeyboardInterrupt:
+                        interrupted = True
+                        raise
                     finally:
                         if steering is not None:
-                            steering.finish()
+                            steering.finish(settle=not interrupted)
                             self._draft = steering.box.text
                             if steering.pending:
                                 self._pending, self._pending_shown = steering.pending, steering.pending_shown
@@ -626,6 +632,8 @@ class _Conversation:
         except Exception as exc:
             if feed is not None:
                 feed.close()
+                self.next_index += feed.handled
+                self.steps, self.cost, self.run_steps = feed.steps, feed.cost, feed.run_steps
             if not self.followups:
                 _raise_cli_error(exc)
             if isinstance(exc, TimeoutError):
@@ -639,7 +647,7 @@ class _Conversation:
             if feed.answer is None:
                 feed.answer = result.answer
             self.steps, self.cost = feed.steps, feed.cost
-        self.result, self.next_index = result, result.next_from_index
+        self.result, self.next_index, self.run_steps = result, result.next_from_index, 0
         answer = feed.answer if feed is not None else result.answer
         if answer is not None:
             self._answer = answer
@@ -690,7 +698,7 @@ class _Conversation:
         """Release the session's browser or desktop; the next message starts a new one."""
         if self.session is not None and not is_terminal_session_status(str(getattr(self.result, "status", ""))):
             _cancel_quietly(self.client, self.session.id)
-        self.session, self.steps, self.cost = None, 0, None
+        self.session, self.steps, self.cost, self.run_steps = None, 0, None, 0
 
     def _session_ended(self) -> bool:
         try:
