@@ -41,7 +41,7 @@ from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
 from hai_agents_local import desktop as desktop_defaults
 
-from . import _CLI_HINT, auth, keys, mcp_hosts, steer, ui, welcome
+from . import _CLI_HINT, auth, desktop_agent, keys, mcp_hosts, steer, ui, welcome
 
 if TYPE_CHECKING:
     from hai_agents_local import LocalBridge
@@ -269,22 +269,32 @@ def _parse_overrides(items: list[str]) -> dict[str, Any]:
     return overrides
 
 
-LOCAL_DESKTOP_AGENT = {
-    "name": "holo",
-    "description": "Desktop agent that drives the user's machine.",
-    "environments": [{"id": "desktop", "kind": "desktop", "host": "user_device"}],
-}
-
-
-def _resolve_agent(agent: str | None, local: bool) -> Any:
+def _resolve_agent(
+    agent: str | None, local: bool, model: str | None, model_url: str | None, fast: bool
+) -> tuple[Any, Any]:
+    """The agent to run and, for --local, where its runtime infers."""
     if not local:
-        return agent or credentials.default_agent()
+        if model or model_url or fast:
+            _raise_cli_error(RuntimeError("--model, --model-url and --fast tune the desktop agent; add --local"))
+        return agent or credentials.default_agent(), None
     if agent:
         _raise_cli_error(RuntimeError("--local drives this desktop with its own agent; drop --agent"))
-    return LOCAL_DESKTOP_AGENT
+    try:
+        inference = desktop_agent.inference(model, model_url)
+    except ValueError as exc:
+        _raise_cli_error(exc)
+    return desktop_agent.agent(model=model, fast=fast), inference
 
 
 AGENT_HELP = f"Agent name. Default: {credentials.DEFAULT_AGENT}, or the one set with `holo agents use`."
+LOCAL_OPTION = typer.Option(False, "--local", help="Drive this machine's desktop through the local runtime.")
+MODEL_OPTION = typer.Option(None, "--model", help="Model for --local. Default: $HAI_AGENT_RUNTIME_MODEL, else H's.")
+MODEL_URL_OPTION = typer.Option(
+    None,
+    "--model-url",
+    help="OpenAI-compatible server --local infers on. Default: $HAI_AGENT_RUNTIME_BASE_URL, else H's cloud.",
+)
+FAST_OPTION = typer.Option(False, "--fast", help="--local acts without reasoning first: quicker, less careful.")
 COMMAND_NAMES = frozenset({"new", "clear", "agent", "live", "share", "help", "exit", "quit"})
 EXAMPLE_TASKS = {
     False: "Find the top 3 stories on Hacker News and their URLs",
@@ -297,7 +307,10 @@ def run(
     ctx: typer.Context,
     task: str = typer.Argument(..., help="Task to run."),
     agent: str | None = typer.Option(None, "--agent", "-a", help=AGENT_HELP),
-    local: bool = typer.Option(False, "--local", help="Drive this machine's desktop through the local runtime."),
+    local: bool = LOCAL_OPTION,
+    model: str | None = MODEL_OPTION,
+    model_url: str | None = MODEL_URL_OPTION,
+    fast: bool = FAST_OPTION,
     max_steps: int | None = typer.Option(
         None, "--max-steps", min=1, max=200, help="Maximum reasoning steps. Uncapped, or 150 with --local."
     ),
@@ -316,10 +329,12 @@ def run(
     ),
 ) -> None:
     """Run a task, stream its steps, and print the answer; in a terminal, follow up on the same session."""
+    spec, inference = _resolve_agent(agent, local, model, model_url, fast)
     convo = _Conversation(
         _state(ctx),
-        _resolve_agent(agent, local),
+        spec,
         local=local,
+        inference=inference,
         max_steps=max_steps or (LOCAL_MAX_STEPS if local else None),
         max_time_s=max_time_s or (LOCAL_MAX_TIME_S if local else None),
         overrides=_parse_overrides(override or []),
@@ -346,16 +361,21 @@ def run(
 def chat(
     ctx: typer.Context,
     agent: str | None = typer.Option(None, "--agent", "-a", help=AGENT_HELP),
-    local: bool = typer.Option(False, "--local", help="Drive this machine's desktop through the local runtime."),
+    local: bool = LOCAL_OPTION,
+    model: str | None = MODEL_OPTION,
+    model_url: str | None = MODEL_URL_OPTION,
+    fast: bool = FAST_OPTION,
 ) -> None:
     """Start an interactive session; plain `holo` in a terminal opens this."""
     state = _state(ctx)
     if not _interactive() or state.json_output:
         _raise_cli_error(RuntimeError('chat needs an interactive terminal; run one task with `holo "<task>"`'))
+    spec, inference = _resolve_agent(agent, local, model, model_url, fast)
     convo = _Conversation(
         state,
-        _resolve_agent(agent, local),
+        spec,
         local=local,
+        inference=inference,
         max_steps=LOCAL_MAX_STEPS if local else None,
         max_time_s=LOCAL_MAX_TIME_S if local else None,
         overrides={},
@@ -379,6 +399,7 @@ class _Conversation:
     max_time_s: float | None
     overrides: dict[str, Any]
     quiet: bool = False
+    inference: Any = None
     client: Any = None
     session: Any = None
     result: Any = None
@@ -447,7 +468,7 @@ class _Conversation:
         return "drives this machine's browser" if self.controls_machine else "runs in the cloud"
 
     def open(self) -> None:
-        self.client = _local_client(self.state) if self.local else _client(self.state)
+        self.client = _local_client(self.state, self.inference) if self.local else _client(self.state)
         self._arm_listener()
 
     def _arm_listener(self) -> None:
@@ -990,7 +1011,7 @@ def _custom_endpoint_host(state: AppState) -> str | None:
     return urlparse(base).netloc or base
 
 
-def _local_client(state: AppState) -> Any:
+def _local_client(state: AppState, inference: Any = None) -> Any:
     from hai_agents import Client
 
     _sign_in_if_needed(state)
@@ -999,7 +1020,7 @@ def _local_client(state: AppState) -> Any:
         if value:
             os.environ[var] = value
     try:
-        return Client.local()
+        return Client.local(inference=inference)
     except (RuntimeError, ValueError, PermissionError) as exc:
         _raise_cli_error(exc)
 
@@ -1553,8 +1574,8 @@ app.add_typer(local_app, name="local")
 _GLOBAL_FLAGS = ("--json",)
 _GLOBAL_OPTIONS = ("--api-key", "--base-url")
 _HELP_FLAGS = ("--help", "--install-completion", "--show-completion")
-_CHAT_FLAGS = ("--local",)
-_CHAT_OPTIONS = ("--agent", "-a")
+_CHAT_FLAGS = ("--local", "--fast")
+_CHAT_OPTIONS = ("--agent", "-a", "--model", "--model-url")
 
 
 def _only_chat_options(args: list[str]) -> bool:

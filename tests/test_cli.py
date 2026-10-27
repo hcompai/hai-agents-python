@@ -122,7 +122,7 @@ def test_kill_switch_stops_that_turn_and_the_next_message_starts_a_new_session(m
     )
     follows = iter([killswitch.request_stop, lambda: None])
     replies = iter(["open it again", None])
-    monkeypatch.setattr(app_module, "_local_client", lambda state: client)
+    monkeypatch.setattr(app_module, "_local_client", lambda state, inference: client)
     monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
     monkeypatch.setattr(app_module, "_follow", lambda *a, **k: next(follows)())
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
@@ -340,6 +340,38 @@ def test_run_without_options_uses_the_default_agent_uncapped(monkeypatch, tmp_pa
     credentials.save_default_agent("h/web-surfer-pro")
     runner.invoke(app, ["run", "hello"], env={"HAI_API_KEY": "hk-test"})
     assert captured["agent"] == "h/web-surfer-pro"
+
+
+def test_a_local_run_carries_the_holo_dir_and_its_skills_override_bundled_ones(monkeypatch, tmp_path) -> None:
+    from hai_agents_cli import desktop_agent
+    from hai_agents_local.runtime.inference import Inference
+
+    monkeypatch.setattr(desktop_agent, "HOLO_DIR", tmp_path)
+    monkeypatch.setattr(desktop_agent.platform, "system", lambda: "Darwin")
+    (tmp_path / "agents.md").write_text("Call me Alex.")
+    (tmp_path / "rules.md").write_text("Never send email.")
+    for slug, description in (("slack", "My Slack habits."), ("broken", "")):
+        (tmp_path / "skills" / slug).mkdir(parents=True)
+        (tmp_path / "skills" / slug / "SKILL.md").write_text(f"---\ndescription: {description}\n---\nbody")
+    captured: dict = {}
+    inferences: list = []
+    monkeypatch.setattr(
+        app_module, "_local_client", lambda state, inference: inferences.append(inference) or _RunClient(captured)
+    )
+    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
+    tuning = ["--model", "holo3-fast", "--model-url", "http://localhost:8000/v1", "--fast"]
+
+    result = runner.invoke(app, ["run", "hi", "--local", *tuning], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 0, result.output
+    agent = captured["agent"]
+    skills = {skill["name"]: skill["description"] for skill in agent["skills"]}
+    assert agent["instructions"] == "Call me Alex.\n\nNever send email."
+    assert skills["slack"] == "My Slack habits." and "apple-notes" in skills and "broken" not in skills
+    assert agent["model"] == "holo3-fast" and agent["reasoning_effort"] == "disabled"
+    assert inferences == [Inference(base_url="http://localhost:8000/v1", model="holo3-fast")]
+    assert "add --local" in _error_text(runner.invoke(app, ["run", "hi", *tuning], env={"HAI_API_KEY": "hk-test"}))
 
 
 def test_follow_up_continues_the_same_session_from_the_last_event(monkeypatch) -> None:
