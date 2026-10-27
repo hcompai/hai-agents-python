@@ -176,6 +176,7 @@ class Steering:
             ui.error(self.out, f"could not resume: {exc}", fix="ctrl+c cancels the turn")
 
     def _show(self) -> None:
+        self.feed.paused = self._pause == "paused"
         box = self.box
         if self._pause == "paused":
             box.placeholder = "What should it do instead?"

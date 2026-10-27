@@ -373,6 +373,7 @@ class StepFeed:
     cost: float | None = None
     answer: Any = None
     starting: bool = False
+    paused: bool = False
     stop_hint: str = "ctrl+c to stop"
     _current: _Step | None = None
     _done: _Done | None = None
@@ -706,7 +707,10 @@ class StepFeed:
                 lines.append(_result(Text(current.thought, style="thought")))
             lines.append(Text(""))
         lines += self._notes
-        verb = current.busy if current else "Starting" if self.starting else "Thinking"
+        if self.paused:
+            verb = "Paused"
+        else:
+            verb = current.busy if current else "Starting" if self.starting else "Thinking"
         n = current.n if current else self.steps + 1
         cost = self.turn_cost
         parts = [
