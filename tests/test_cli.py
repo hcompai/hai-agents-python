@@ -342,6 +342,31 @@ def test_run_without_options_uses_the_default_agent_uncapped(monkeypatch, tmp_pa
     assert captured["agent"] == "h/web-surfer-pro"
 
 
+def test_a_local_run_carries_the_users_holo_dir(monkeypatch, tmp_path) -> None:
+    from hai_agents_cli import desktop_agent
+
+    monkeypatch.setattr(desktop_agent, "HOLO_DIR", tmp_path)
+    (tmp_path / "AGENTS.md").write_text("Call me Alex.")
+    skill = tmp_path / "skills" / "expenses"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\nname: Expenses\ndescription: File my receipts.\n---\nOpen the portal.")
+    captured: dict = {}
+    monkeypatch.setattr(app_module, "_local_client", lambda state: _RunClient(captured))
+    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
+
+    result = runner.invoke(app, ["run", "hi", "--local"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 0, result.output
+    assert captured["agent"]["instructions"] == "Call me Alex."
+    assert captured["agent"]["skills"] == [
+        {"name": "expenses", "description": "File my receipts.", "body": "Open the portal."}
+    ]
+    (skill / "SKILL.md").write_text("no frontmatter")
+    broken = runner.invoke(app, ["run", "hi", "--local"], env={"HAI_API_KEY": "hk-test"})
+    assert "needs YAML frontmatter with a description" in " ".join(_error_text(broken).split())
+
+
 def test_follow_up_continues_the_same_session_from_the_last_event(monkeypatch) -> None:
     captured: dict = {}
     client = _RunClient(capture=captured)

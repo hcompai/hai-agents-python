@@ -41,7 +41,7 @@ from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
 from hai_agents_local import desktop as desktop_defaults
 
-from . import _CLI_HINT, auth, keys, mcp_hosts, steer, ui, welcome
+from . import _CLI_HINT, auth, desktop_agent, keys, mcp_hosts, steer, ui, welcome
 
 if TYPE_CHECKING:
     from hai_agents_local import LocalBridge
@@ -269,19 +269,15 @@ def _parse_overrides(items: list[str]) -> dict[str, Any]:
     return overrides
 
 
-LOCAL_DESKTOP_AGENT = {
-    "name": "holo",
-    "description": "Desktop agent that drives the user's machine.",
-    "environments": [{"id": "desktop", "kind": "desktop", "host": "user_device"}],
-}
-
-
 def _resolve_agent(agent: str | None, local: bool) -> Any:
     if not local:
         return agent or credentials.default_agent()
     if agent:
         _raise_cli_error(RuntimeError("--local drives this desktop with its own agent; drop --agent"))
-    return LOCAL_DESKTOP_AGENT
+    try:
+        return desktop_agent.agent()
+    except (OSError, ValueError) as exc:
+        _raise_cli_error(exc)
 
 
 AGENT_HELP = f"Agent name. Default: {credentials.DEFAULT_AGENT}, or the one set with `holo agents use`."
