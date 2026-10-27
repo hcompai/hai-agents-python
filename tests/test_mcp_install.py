@@ -6,6 +6,7 @@ import subprocess
 from dataclasses import replace
 from types import SimpleNamespace
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
@@ -157,7 +158,13 @@ def test_install_wires_this_holo_and_keeps_only_the_endpoint(monkeypatch, tmp_pa
     assert credentials._stored("HAI_API_BASE_URL") == "https://us.example.test"
 
 
-async def test_a_desktop_run_streams_progress_under_the_kill_switch_and_always_ends(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("status", "stopped", "answer"),
+    [("idle", False, "Calculator is open"), ("interrupted", True, "The user stopped this run")],
+)
+async def test_a_desktop_run_streams_progress_under_the_kill_switch_and_always_ends(
+    monkeypatch, status, stopped, answer
+) -> None:
     from mcp.shared.memory import create_connected_server_and_client_session
 
     from hai_agents_cli import mcp_server
@@ -169,6 +176,7 @@ async def test_a_desktop_run_streams_progress_under_the_kill_switch_and_always_e
             switch.append("disarmed")
 
     monkeypatch.setattr(mcp_server, "arm_esc_listener", lambda: switch.append("armed") or Listener())
+    monkeypatch.setattr(mcp_server, "StopSentinel", lambda _: SimpleNamespace(stop_requested=lambda: stopped))
 
     class Handle:
         id = "sess_1"
@@ -179,7 +187,7 @@ async def test_a_desktop_run_streams_progress_under_the_kill_switch_and_always_e
             yield {"type": "AgentEvent", "data": {"kind": "policy_event", "tool_reqs": [{"tool_name": "wait"}]}}
 
         async def wait_for_completion(self):
-            return SimpleNamespace(status="idle", answer="Calculator is open", error=None)
+            return SimpleNamespace(status=status, answer="Calculator is open", error=None)
 
         async def cancel(self):
             Handle.cancelled = True
@@ -203,14 +211,12 @@ async def test_a_desktop_run_streams_progress_under_the_kill_switch_and_always_e
     async with create_connected_server_and_client_session(mcp_server.server, logging_callback=on_log) as session:
         result = await session.call_tool("run_agent", {"task": "open Calculator", "agent": "h/holo-desktop"})
 
-    assert result.content[0].text == "Calculator is open" and not result.isError
+    assert result.content[0].text.startswith(answer) and not result.isError
     assert progress == ["Wait"] and Handle.cancelled and switch == ["armed", "disarmed"]
 
 
 async def test_a_run_cancelled_while_its_session_is_created_cancels_that_session() -> None:
     import asyncio
-
-    import pytest
 
     from hai_agents_cli import mcp_server
 

@@ -7,6 +7,7 @@ import contextlib
 import json
 import os
 import signal
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -15,7 +16,7 @@ from mcp.server.fastmcp import Context, FastMCP
 
 from hai_agents import AsyncClient
 from hai_agents_common import credentials
-from hai_agents_local.killswitch import KILL_SWITCH_UNAVAILABLE_HINT, arm_esc_listener
+from hai_agents_local.killswitch import KILL_SWITCH_UNAVAILABLE_HINT, StopSentinel, arm_esc_listener
 from hai_agents_local.routing import split_revision
 
 from . import holo_dir, tools, ui
@@ -105,7 +106,7 @@ async def run_agent(
     if overrides:
         params["overrides"] = overrides
     async with _one_run:
-        client = await _client(ctx, local)
+        client, started_at = await _client(ctx, local), time.time()
         handle = await _start(client, params)
         try:
             async with _kill_switch(ctx, client.sessions.bridged_kinds(handle.id)):
@@ -118,6 +119,8 @@ async def run_agent(
             with anyio.CancelScope(shield=True), contextlib.suppress(Exception):
                 await handle.cancel()
     if result.status not in ("completed", "idle"):
+        if StopSentinel(started_at).stop_requested():
+            return "The user stopped this run. Do not run it again unless they ask."
         raise RuntimeError(f"agent {result.status}: {result.error or 'no answer'}")
     if result.answer is None or isinstance(result.answer, str):
         return result.answer or ""
