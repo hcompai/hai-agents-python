@@ -154,7 +154,16 @@ async def _resolve_references_async(
 def local_environment_kinds(client: typing.Any, agent: typing.Any) -> typing.List[str]:
     """Kinds of the user_device environments a run of ``agent`` would serve from this machine; fetches named specs."""
     wrapper = client.sessions._client_wrapper
-    resolved = _resolve_references(wrapper, agent)
+    return _kinds(wrapper, agent, _resolve_references(wrapper, agent))
+
+
+async def local_environment_kinds_async(client: typing.Any, agent: typing.Any) -> typing.List[str]:
+    """``local_environment_kinds`` for an ``AsyncClient``."""
+    wrapper = client._client_wrapper
+    return _kinds(wrapper, agent, await _resolve_references_async(wrapper, agent))
+
+
+def _kinds(wrapper: typing.Any, agent: typing.Any, resolved: typing.Mapping[Reference, typing.Any]) -> typing.List[str]:
     localized = localize_agent(
         agent, api_key=_token_source(wrapper), base_url=wrapper.get_base_url(), resolved=resolved
     )

@@ -133,7 +133,7 @@ def test_install_requires_api_key(monkeypatch, tmp_path) -> None:
     assert "No API key found" in text
 
 
-def test_install_wires_this_holo_and_writes_no_key(monkeypatch, tmp_path) -> None:
+def test_install_wires_this_holo_and_keeps_only_the_endpoint(monkeypatch, tmp_path) -> None:
     path = tmp_path / "mcp.json"
     monkeypatch.setitem(
         mcp_hosts.STDIO_CLIENTS, "cursor", replace(mcp_hosts.STDIO_CLIENTS["cursor"], config_path=str(path))
@@ -142,8 +142,9 @@ def test_install_wires_this_holo_and_writes_no_key(monkeypatch, tmp_path) -> Non
     from hai_agents_common import credentials
 
     monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", tmp_path / "global.env")
+    env = {"HAI_API_KEY": "hk-test", "HAI_API_BASE_URL": "https://us.example.test"}
 
-    result = runner.invoke(app, ["mcp", "install", "cursor"], env={"HAI_API_KEY": "hk-test"})
+    result = runner.invoke(app, ["mcp", "install", "cursor"], env=env)
 
     assert result.exit_code == 0, result.output
     assert json.loads(path.read_text())["mcpServers"]["holo"] == {
@@ -153,12 +154,25 @@ def test_install_wires_this_holo_and_writes_no_key(monkeypatch, tmp_path) -> Non
     }
     assert "hk-test" not in path.read_text() and "plaintext" not in result.output
     assert "holo login" in result.output
+    assert credentials._stored("HAI_API_BASE_URL") == "https://us.example.test"
 
 
-async def test_a_local_run_streams_progress_and_always_ends_its_session(monkeypatch) -> None:
+async def test_a_desktop_run_streams_progress_under_the_kill_switch_and_always_ends(monkeypatch) -> None:
     from mcp.shared.memory import create_connected_server_and_client_session
 
     from hai_agents_cli import mcp_server
+
+    switch: list[str] = []
+
+    class Listener:
+        def stop(self):
+            switch.append("disarmed")
+
+    async def kinds(client, agent):
+        return ["desktop"]
+
+    monkeypatch.setattr(mcp_server, "local_environment_kinds_async", kinds)
+    monkeypatch.setattr(mcp_server, "arm_esc_listener", lambda: switch.append("armed") or Listener())
 
     class Handle:
         cancelled = False
@@ -172,28 +186,25 @@ async def test_a_local_run_streams_progress_and_always_ends_its_session(monkeypa
         async def cancel(self):
             Handle.cancelled = True
 
-    class Local:
+    class Client:
         async def start_session(self, **params):
-            assert params["agent"]["name"] == "holo" and params["messages"] == "open Calculator"
+            assert params == {"agent": "h/holo-desktop", "messages": "open Calculator"} and switch == ["armed"]
             return Handle()
 
         async def aclose(self):
             pass
 
-    async def local(**_):
-        return Local()
-
-    monkeypatch.setattr(mcp_server.AsyncClient, "local", local)
+    monkeypatch.setattr(mcp_server.credentials, "make_async_client", Client)
     progress: list[str] = []
 
     async def on_log(params):
         progress.append(params.data)
 
     async with create_connected_server_and_client_session(mcp_server.server, logging_callback=on_log) as session:
-        result = await session.call_tool("run_agent", {"task": "open Calculator", "local": True})
+        result = await session.call_tool("run_agent", {"task": "open Calculator", "agent": "h/holo-desktop"})
 
     assert result.content[0].text == "Calculator is open" and not result.isError
-    assert progress == ["Wait"] and Handle.cancelled
+    assert progress == ["Wait"] and Handle.cancelled and switch == ["armed", "disarmed"]
 
 
 def test_install_list_enumerates_clients() -> None:
