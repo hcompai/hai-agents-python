@@ -299,6 +299,8 @@ class _Step:
     started_ts: float | None
     call_ids: list[Any] = field(default_factory=list)
     agents: dict[int, str] = field(default_factory=dict)
+    waiting: list[Any] = field(default_factory=list)
+    error: str | None = None
 
 
 @dataclass
@@ -345,9 +347,11 @@ class StepFeed:
     _notes: list[RenderableType] = field(default_factory=list)
     _turn_from_steps: int = 0
     _turn_from_cost: float = 0.0
+    _tally: _Tally = field(init=False)
 
     def __post_init__(self) -> None:
         self._turn_from_steps, self._turn_from_cost = self.steps, self.cost or 0.0
+        self._tally = _Tally(base=self.steps, cost=self.cost)
         self._start_live()
 
     @property
@@ -457,7 +461,8 @@ class StepFeed:
             if self._last_end_ts is None and kind in ("observation_event", "message_event"):
                 self._last_end_ts = ts
         if kind == "metrics":
-            self.steps, self.cost = _metrics(data, self.steps, self.cost)
+            self._tally.add(data)
+            self.steps, self.cost = max(self.steps, self._tally.steps), self._tally.cost
         elif kind == "observation_event":
             meta = data.get("metadata") or {}
             title = meta.get("title") or tools.short_url(meta.get("url"))
@@ -474,16 +479,19 @@ class StepFeed:
             if req.get("tool_name") == "sleep" and isinstance(result, dict):
                 self._end_agents(result.get("completed"))
             if self._current is not None and req.get("tool_name") != "answer":
-                self._finish(ts, _tool_error(result))
+                self._call_done(req, ts, _tool_error(result))
         elif kind == "message_event":
             self._end_agents([data.get("caller_id")])
         elif kind == "error_event":
             message = _first_line(data.get("error")) or "error"
             origin = data.get("origin")
-            if origin in _MODEL_NUDGES:
+            req = data.get("tool_req") or {}
+            if origin == "tool_skipped" and self._current is not None and req:
+                self._call_done(req, ts, None)
+            elif origin in _MODEL_NUDGES:
                 pass
             elif origin in ("tool", "tool_validation") and self._current is not None:
-                self._finish(ts, message)
+                self._call_done(req, ts, message)
             else:
                 self._flush()
                 self._emit(_bullet(Text(message, style="warn"), "warn"))
@@ -529,7 +537,22 @@ class StepFeed:
         set_title(self.out, f"holo {SEP} step {self.steps + 1 - self._turn_from_steps}")
         busy = tools.busy(reqs[0])
         ids = [req.get("id") for req in reqs]
-        self._current = _Step(self.steps + 1, calls, busy, thought, self._last_end, self._last_end_ts, ids)
+        self._current = _Step(
+            self.steps + 1, calls, busy, thought, self._last_end, self._last_end_ts, ids, waiting=list(ids)
+        )
+
+    def _call_done(self, req: dict[str, Any], ts: float | None, error: str | None) -> None:
+        """Calls in a step run one after another; the step ends with its last result."""
+        step = self._current
+        assert step is not None
+        step.error = step.error or error
+        call_id = req.get("id")
+        if call_id in step.waiting:
+            step.waiting.remove(call_id)
+        elif call_id is None and step.waiting:
+            step.waiting.pop(0)
+        if not step.waiting:
+            self._finish(ts, None)
 
     def _finish(self, end_ts: float | None, error: str | None) -> None:
         step = self._current
@@ -538,7 +561,7 @@ class StepFeed:
             seconds = max(0.0, end_ts - step.started_ts)
         else:
             seconds = time.monotonic() - step.started
-        self._done = _Done(step, seconds, error)
+        self._done = _Done(step, seconds, error or step.error)
         self._last_end = time.monotonic()
         self._last_end_ts = end_ts
         self.steps = max(self.steps, step.n)
@@ -689,18 +712,35 @@ def summary(
 
 
 def usage(events: list[Any]) -> tuple[int, float | None]:
-    """Steps and cost as of the latest metrics event."""
-    steps, cost = 0, None
+    """Session steps and cost from its metrics events."""
+    tally = _Tally()
     for event in events:
         kind, data, _ = _unwrap(event)
         if kind == "metrics":
-            steps, cost = _metrics(data, steps, cost)
-    return steps, cost
+            tally.add(data)
+    return tally.steps, tally.cost
 
 
-def _metrics(data: dict[str, Any], steps: int, cost: float | None) -> tuple[int, float | None]:
-    metrics = data.get("metrics") or {}
-    return int(metrics.get("steps") or steps), metrics.get("total_cost", cost)
+@dataclass
+class _Tally:
+    """Metrics restart their step count on every run (each follow-up), while cost spans the session."""
+
+    base: int = 0
+    run: int = 0
+    cost: float | None = None
+
+    @property
+    def steps(self) -> int:
+        return self.base + self.run
+
+    def add(self, data: dict[str, Any]) -> None:
+        metrics = data.get("metrics") or {}
+        steps = metrics.get("steps")
+        if isinstance(steps, int):
+            if steps < self.run:
+                self.base += self.run
+            self.run = steps
+        self.cost = metrics.get("total_cost", self.cost)
 
 
 def _unwrap(event: Any) -> tuple[str, dict[str, Any], float | None]:

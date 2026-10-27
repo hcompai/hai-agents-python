@@ -129,6 +129,21 @@ def test_spawn_lines_show_each_subagent_state_and_hold_back_later_output(monkeyp
     assert "1 agent still running" in buffer.getvalue()
 
 
+def test_follow_up_step_waits_for_its_last_call_and_counts_from_the_turn() -> None:
+    buffer = io.StringIO()
+    feed = ui.StepFeed(Console(file=buffer, width=100, color_system=None), steps=5, cost=0.01)
+    searches = [{"tool_name": "web_search", "args": {"query": q}, "id": q} for q in ("a", "b")]
+    feed.handle(_agent("2026-10-26T12:00:00Z", kind="message_event", caller_id="user", content=["more"]))
+    feed.handle(_agent("2026-10-26T12:00:01Z", kind="policy_event", tool_reqs=searches))
+    for second, req in ((4, searches[0]), (19, searches[1])):
+        feed.handle(_agent(f"2026-10-26T12:00:{second:02}Z", kind="tool_result", tool_req=req, result="ok"))
+    feed.handle({"type": "MetricsUpdateEvent", "data": {"metrics": {"steps": 1, "total_cost": 0.012}}})
+    feed.close()
+
+    assert f"{ui.RESULT}  19.0s" in buffer.getvalue()
+    assert (feed.turn_steps, feed.steps) == (1, 6)
+
+
 def test_feed_surfaces_environment_and_tool_failures() -> None:
     buffer = io.StringIO()
     feed = ui.StepFeed(Console(file=buffer, width=200, color_system=None))
