@@ -616,10 +616,9 @@ class _Conversation:
                     finally:
                         if steering is not None:
                             steering.finish()
-                if steering is not None:
-                    self._draft = steering.box.text
-                    if steering.pending:
-                        self._pending, self._pending_shown = steering.pending, steering.pending_shown
+                            self._draft = steering.box.text
+                            if steering.pending:
+                                self._pending, self._pending_shown = steering.pending, steering.pending_shown
             result = wait_for_session(self.client, self.session.id, from_index=self.next_index, timeout_seconds=timeout)
         except KeyboardInterrupt:
             self._cancel_turn(feed)
