@@ -79,6 +79,7 @@ THEME = Theme(
 CheckState = Literal["ok", "warn", "fail"]
 _CHECK_GLYPH: dict[CheckState, str] = {"ok": DONE, "warn": ATTENTION, "fail": FAILED}
 
+_BLIND = "couldn't capture the screen"
 MAX_CALLS = 4
 _MAX_TAIL = 12
 _MODEL_NUDGES = frozenset({"no_tool_called", "tool_skipped", "answer_validation", "prompt_too_large_recovery"})
@@ -335,7 +336,7 @@ class _Done:
     step: _Step
     seconds: float
     error: str | None
-    title: str | None = None
+    title: str | Text | None = None
 
 
 @dataclass
@@ -356,10 +357,11 @@ class StepFeed:
     steps: int = 0
     cost: float | None = None
     answer: Any = None
-    page: str | None = None
     stop_hint: str = "ctrl+c to stop"
     _current: _Step | None = None
     _done: _Done | None = None
+    _seen: dict[str, Any] = field(default_factory=dict)
+    _blind: bool = False
     _last_end: float = field(default_factory=time.monotonic)
     _last_end_ts: float | None = None
     _first_ts: float | None = None
@@ -470,9 +472,10 @@ class StepFeed:
             self.steps, self.cost = max(self.steps, self._tally.steps), self._tally.cost
         elif kind == "observation_event":
             meta = data.get("metadata") or {}
-            title = meta.get("title") or tools.short_url(meta.get("url"))
-            self._flush(title if title != self.page else None)
-            self.page = title or self.page
+            self._flush(_observed(data, self._seen))
+            self._blind = False
+            if meta:
+                self._seen = meta
         elif kind == "policy_event":
             self._flush()
             self._start_step(data, ts)
@@ -497,6 +500,13 @@ class StepFeed:
                 pass
             elif origin in ("tool", "tool_validation") and self._current is not None:
                 self._call_done(req, ts, message)
+            elif origin == "failed_observation":
+                self._restart_clock(ts)
+                if not self._blind:
+                    self._blind = True
+                    if self._done is None:
+                        self._emit(_bullet(Text(_BLIND, style="meta"), "meta"))
+                    self._flush(Text(_BLIND, style="meta"))
             else:
                 self._flush()
                 self._emit(_bullet(Text(message, style="warn"), "warn"))
@@ -568,7 +578,16 @@ class StepFeed:
         self.steps = max(self.steps, step.n)
         self._current = None
 
-    def _flush(self, title: str | None = None) -> None:
+    def resumed(self) -> None:
+        """Time spent paused is not the next step's."""
+        with self._lock:
+            self._restart_clock(None)
+
+    def _restart_clock(self, ts: float | None) -> None:
+        if self._current is None:
+            self._last_end, self._last_end_ts = time.monotonic(), ts
+
+    def _flush(self, title: str | Text | None = None) -> None:
         done, self._done = self._done, None
         if done is not None:
             done.title = title
@@ -579,7 +598,10 @@ class StepFeed:
 
     def _block(self, done: _Done, *, live: bool = False) -> list[RenderableType]:
         style = "fail" if done.error else "ok"
-        outcome = Text(done.error, style="fail") if done.error else Text(done.title or "")
+        if done.error:
+            outcome = Text(done.error, style="fail")
+        else:
+            outcome = done.title.copy() if isinstance(done.title, Text) else Text(done.title or "")
         if outcome.plain:
             outcome.append(f" {SEP} ", style="meta")
         outcome.append(duration(done.seconds), style="meta")
@@ -639,6 +661,36 @@ class StepFeed:
             Text.assemble((f"{frame} {verb}…", "accent"), (f" ({meta})", "meta"), no_wrap=True, overflow="ellipsis")
         )
         return Group(*lines) if self.box is None else _pinned(self.out, lines, self.box.lines())
+
+
+def _observed(data: dict[str, Any], seen: dict[str, Any]) -> str | None:
+    """What a step left on screen: a new page's title, else the one thing that moved."""
+    meta = data.get("metadata") or {}
+    if not meta:
+        return "page unchanged" if "[page unchanged" in str(data.get("text") or "") else None
+    title = meta.get("title") or tools.short_url(meta.get("url"))
+    if not title:
+        return None
+    if title != (seen.get("title") or tools.short_url(seen.get("url"))) or meta.get("url") != seen.get("url"):
+        return title
+    tabs, tab = meta.get("tabs") or [], meta.get("current_tab")
+    if len(tabs) > 1 and tab != seen.get("current_tab") and tab in tabs:
+        return f"tab {tabs.index(tab) + 1} of {len(tabs)}"
+    part, parts = meta.get("chunk_number"), meta.get("total_chunks")
+    if isinstance(part, int) and isinstance(parts, int) and parts > 1 and part != seen.get("chunk_number"):
+        return f"part {part} of {parts}"
+    scrolled = _scrolled(meta)
+    if scrolled is not None and meta.get("scroll_position") != seen.get("scroll_position"):
+        return f"scrolled to {scrolled}%"
+    return None
+
+
+def _scrolled(meta: dict[str, Any]) -> int | None:
+    try:
+        top, page, view = meta["scroll_position"][1], meta["page_size"][1], meta["viewport_size"][1]
+    except (KeyError, IndexError, TypeError):
+        return None
+    return max(0, min(100, round(100 * top / (page - view)))) if page > view else None
 
 
 def _blink() -> str:

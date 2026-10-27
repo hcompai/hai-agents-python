@@ -72,6 +72,42 @@ def test_feed_renders_one_block_per_action_with_server_timings() -> None:
     assert (feed.steps, feed.cost) == (3, 0.004)
 
 
+def test_each_step_says_what_changed_on_screen_and_a_blind_spell_once() -> None:
+    page = {"url": "https://a.test/", "title": "A", "tabs": ["0"], "current_tab": "0"}
+    page |= {"page_size": [1000, 3000], "viewport_size": [1000, 1000], "scroll_position": [0, 0]}
+    screens = [
+        page | {"scroll_position": [0, 1000]},
+        page | {"scroll_position": [0, 1000], "tabs": ["0", "1"], "current_tab": "1"},
+        page | {"scroll_position": [0, 1000], "tabs": ["0", "1"], "current_tab": "1"},
+        {"url": "https://b.test/", "title": "B", "chunk_number": 1, "total_chunks": 3},
+        {"url": "https://b.test/", "title": "B", "chunk_number": 2, "total_chunks": 3},
+        None,
+        None,
+    ]
+    buffer = io.StringIO()
+    feed = ui.StepFeed(Console(file=buffer, width=100, color_system=None))
+    feed.handle(_agent("2026-10-26T12:00:00Z", kind="observation_event", metadata=page))
+    for n, screen in enumerate(screens, start=1):
+        feed.handle(_agent(f"2026-10-26T12:00:{n:02}Z", kind="policy_event", tool_reqs=[{"tool_name": "scroll"}]))
+        feed.handle(_agent(f"2026-10-26T12:00:{n:02}.5Z", kind="tool_result", tool_req={"tool_name": "scroll"}))
+        if screen is None:
+            feed.handle(_agent(f"2026-10-26T12:00:{n:02}.9Z", kind="error_event", origin="failed_observation"))
+        else:
+            feed.handle(_agent(f"2026-10-26T12:00:{n:02}.9Z", kind="observation_event", metadata=screen))
+    feed.close()
+
+    outcomes = [line.strip() for line in buffer.getvalue().splitlines() if ui.RESULT in line]
+    assert outcomes == [
+        f"{ui.RESULT}  scrolled to 50% · 1.5s",
+        f"{ui.RESULT}  tab 2 of 2 · 1.0s",
+        f"{ui.RESULT}  1.0s",
+        f"{ui.RESULT}  B · 1.0s",
+        f"{ui.RESULT}  part 2 of 3 · 1.0s",
+        f"{ui.RESULT}  couldn't capture the screen · 1.0s",
+        f"{ui.RESULT}  0.6s",
+    ]
+
+
 def test_feed_names_every_parallel_call_and_unknown_tools() -> None:
     buffer = io.StringIO()
     feed = ui.StepFeed(Console(file=buffer, width=100, color_system=None))
@@ -160,7 +196,7 @@ def test_feed_surfaces_environment_and_tool_failures() -> None:
     feed.close()
 
     output = buffer.getvalue()
-    assert f"{ui.DOT} Screenshot timed out" in output
+    assert f"{ui.DOT} couldn't capture the screen" in output
     assert f"{ui.RESULT}  run_command timed out" in output
     assert "Call a tool" not in output
 

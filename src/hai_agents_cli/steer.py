@@ -161,6 +161,7 @@ class Steering:
 
     def _force_answer(self) -> None:
         """Asking for the answer also unpauses the session."""
+        self.feed.resumed()
         try:
             self.client.sessions.force_session_answer(self.session_id)
         except Exception as exc:
@@ -168,6 +169,7 @@ class Steering:
             self._resume()
 
     def _resume(self) -> None:
+        self.feed.resumed()
         try:
             self.client.sessions.resume_session(self.session_id)
         except Exception as exc:
