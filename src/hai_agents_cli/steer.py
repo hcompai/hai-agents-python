@@ -45,6 +45,7 @@ class Steering:
     _queued: list[str] = field(default_factory=list)
     _done: threading.Event = field(default_factory=threading.Event)
     _lander: Any = None
+    _stopped: bool = False
     _lock: threading.RLock = field(default_factory=threading.RLock)
 
     def __post_init__(self) -> None:
@@ -54,10 +55,15 @@ class Steering:
     def watch(self) -> keys.EscWatcher:
         return keys.EscWatcher(self.on_esc, self.on_keys)
 
-    def finish(self, *, settle: bool = True) -> None:
+    def stop(self) -> None:
+        """The turn is being cancelled: leave the session alone, without waiting on a pause in flight."""
+        self._stopped = True
+        self._done.set()
+
+    def finish(self) -> None:
         """The stream ended, maybe on an error; settle any pause so it cannot freeze the next turn."""
         self._done.set()
-        if not settle:
+        if self._stopped:
             return
         if self._lander is not None and hasattr(self._lander, "join"):
             self._lander.join()
@@ -106,16 +112,20 @@ class Steering:
             self._await_start()
             self.client.sessions.pause_session(self.session_id)
         except Exception as exc:
-            ui.error(self.out, f"could not pause: {exc}")
             with self._lock:
-                self._release(resume=False)
+                if not self._stopped:
+                    ui.error(self.out, f"could not pause: {exc}")
+                    self._release(resume=False)
             return
         try:
             status = self._await_pause()
         except Exception as exc:
-            ui.error(self.out, str(exc))
             status = None
+            if not self._stopped:
+                ui.error(self.out, str(exc))
         with self._lock:
+            if self._stopped:
+                return
             if status == "paused" and not self._done.is_set():
                 if self._queued:
                     self._release()

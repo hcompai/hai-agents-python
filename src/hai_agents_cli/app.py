@@ -606,7 +606,6 @@ class _Conversation:
         try:
             if feed is not None:
                 with steering.watch() if steering else contextlib.nullcontext():
-                    interrupted = False
                     try:
                         _follow(
                             self.client,
@@ -617,11 +616,12 @@ class _Conversation:
                             stop_at_tool_wait=True,
                         )
                     except KeyboardInterrupt:
-                        interrupted = True
+                        if steering is not None:
+                            steering.stop()
                         raise
                     finally:
                         if steering is not None:
-                            steering.finish(settle=not interrupted)
+                            steering.finish()
                             self._draft = steering.box.text
                             if steering.pending:
                                 self._pending, self._pending_shown = steering.pending, steering.pending_shown

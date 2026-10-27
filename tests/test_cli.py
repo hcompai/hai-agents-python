@@ -400,6 +400,20 @@ def test_a_message_waits_for_the_pause_so_the_agent_cannot_answer_past_it(monkey
     assert (client.sessions.calls, steering.pending) == (calls, None)
 
 
+def test_a_cancel_leaves_the_session_alone_while_a_pause_is_in_flight(monkeypatch) -> None:
+    monkeypatch.setattr(steer.time, "sleep", lambda s: None)
+    client = _RunClient()
+    feed = ui.StepFeed(Console(file=io.StringIO()))
+    in_flight: list = []
+    steering = steer.Steering(client, "sess_1", feed, feed.out, spawn=in_flight.append)
+    steering.on_keys("only the top 2\r")
+    steering.stop()
+    steering.finish()
+    in_flight[0]()
+
+    assert client.sessions.calls == [("pause",)]
+
+
 def test_a_message_after_the_stream_ends_is_the_next_turn() -> None:
     client = _RunClient()
     steering = _steering(client)
