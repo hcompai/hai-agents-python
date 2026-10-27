@@ -46,7 +46,7 @@ TERMINAL_SESSION_STATUSES = frozenset({"completed", "failed", "timed_out", "inte
 # user message, which a one-shot wait will never send.
 SETTLED_SESSION_STATUSES = TERMINAL_SESSION_STATUSES | {"idle"}
 
-# The API gateway rejects request bodies above this size; enforced client-side for a clear early error.
+# Largest request body the SDK sends, enforced client-side for a clear early error.
 MAX_REQUEST_BYTES = 10_000_000
 
 
