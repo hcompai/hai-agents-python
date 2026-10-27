@@ -18,6 +18,7 @@ from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.rule import Rule
+from rich.style import Style
 from rich.table import Column, Table
 from rich.text import Text
 from rich.theme import Theme
@@ -67,6 +68,8 @@ THEME = Theme(
         "warn": "yellow",
         "meta": "dim",
         "key": "bold",
+        "thought": "dim italic",
+        "attention": "bold yellow",
     }
 )
 
@@ -208,7 +211,7 @@ def url(out: Console, address: str) -> None:
 
 def _link(url: str | None) -> tuple[tuple[str, str], ...]:
     """An OSC 8 hyperlink that still shows the URL; printed soft-wrapped, so a terminal's own URL detection sees it whole."""
-    return ((" ", ""), (url, f"meta underline link {url}")) if url else ()
+    return ((" ", ""), (url, Style(dim=True, underline=True, link=url))) if url else ()
 
 
 def paused(out: Console) -> None:
@@ -243,7 +246,7 @@ def check(out: Console, state: CheckState, name: str, detail: str, *, fix: str |
 
 def needs_you(out: Console, action: str, lines: list[str], options: list[str], *, selected: int = 0) -> None:
     body: list[RenderableType] = [
-        Text("Needs you", style="bold warn"),
+        Text("Needs you", style="attention"),
         Text(""),
         Text.from_markup(f"  {action}"),
         *(Text.from_markup(f"  {line}") for line in lines),
@@ -621,7 +624,7 @@ class StepFeed:
             lines += self._block(done, live=True)
         if current is not None:
             lines += self._calls(current, _blink(), live=True)
-            lines.append(_result(Text(current.thought or "Running…", style="meta italic")))
+            lines.append(_result(Text(current.thought or "Running…", style="thought")))
             lines.append(Text(""))
         lines += self._notes
         verb = current.busy if current else "Thinking"
