@@ -167,11 +167,17 @@ def test_self_hosted_inference_does_not_receive_hosted_key(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("inference", "forwarded"),
-    [(None, "hk-stored"), (Inference.self_hosted("http://127.0.0.1:8000/v1", model="my-model"), None)],
+    ("inference", "server_env", "forwarded"),
+    [
+        (None, None, "hk-stored"),
+        (Inference.self_hosted("http://127.0.0.1:8000/v1", model="my-model"), None, None),
+        (None, "http://127.0.0.1:8000/v1", None),
+    ],
 )
-def test_spawned_runtime_infers_with_the_key_hai_login_stored(tmp_path, monkeypatch, inference, forwarded):
+def test_spawned_runtime_infers_with_the_key_hai_login_stored(tmp_path, monkeypatch, inference, server_env, forwarded):
     monkeypatch.delenv("HAI_API_KEY", raising=False)
+    if server_env:
+        monkeypatch.setenv("HAI_AGENT_RUNTIME_BASE_URL", server_env)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     (tmp_path / "hai").mkdir()
     (tmp_path / "hai" / ".env").write_text("HAI_API_KEY=hk-stored\n")

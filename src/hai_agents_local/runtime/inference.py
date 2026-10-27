@@ -28,6 +28,12 @@ class Inference:
             raise ValueError("self-hosted inference requires an HTTP(S) endpoint and model")
         return cls(base_url=base_url, model=model)
 
+    @classmethod
+    def from_env(cls, env: Mapping[str, str]) -> Optional["Inference"]:
+        """The server ``HAI_AGENT_RUNTIME_BASE_URL`` selects in ``env``, else None."""
+        url = env.get(URL_ENV, "").strip()
+        return cls(base_url=url, model=env.get(MODEL_ENV, "").strip() or None) if url else None
+
     def runtime_env(self, overrides: Optional[Dict[str, str]] = None) -> Dict[str, str]:
         env = {**os.environ, **(overrides or {})}
         if self.base_url is not None:
