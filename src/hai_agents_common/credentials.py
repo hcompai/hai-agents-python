@@ -131,6 +131,10 @@ def source(explicit: ApiKey | None = None) -> str | None:
     return None
 
 
+def stored_api_key() -> str | None:
+    return _stored(API_KEY_VAR)
+
+
 def _client_kwargs(api_key: ApiKey | None, base_url: str | None) -> dict[str, ApiKey | str]:
     kwargs: dict[str, ApiKey | str] = {"api_key": resolve_api_key(api_key)}
     resolved_base_url = resolve_base_url(base_url)

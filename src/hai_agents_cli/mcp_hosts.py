@@ -129,8 +129,8 @@ CLIENTS: dict[str, Client] = {
 
 STDIO_SERVER_NAME = "holo"
 HOLO = "__HOLO__"
-_STDIO = {"command": HOLO, "args": ["mcp", "serve"]}
-_STDIO_CMD = (STDIO_SERVER_NAME, "--", HOLO, "mcp", "serve")
+_STDIO = {"command": HOLO, "args": ["mcp"]}
+_STDIO_CMD = (STDIO_SERVER_NAME, "--", HOLO, "mcp")
 
 STDIO_CLIENTS: dict[str, Client] = {
     "antigravity": Client(
@@ -192,7 +192,7 @@ STDIO_CLIENTS: dict[str, Client] = {
         name="OpenCode",
         config_path="~/.config/opencode/opencode.json",
         key_path=("mcp", STDIO_SERVER_NAME),
-        leaf={"type": "local", "command": [HOLO, "mcp", "serve"], "enabled": True},
+        leaf={"type": "local", "command": [HOLO, "mcp"], "enabled": True},
         home_marker=".config/opencode",
     ),
     "vscode": Client(

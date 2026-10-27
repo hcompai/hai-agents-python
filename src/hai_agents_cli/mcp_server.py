@@ -1,4 +1,4 @@
-"""`holo mcp serve`: `holo run` as MCP tools that coding agents call over stdio."""
+"""`holo mcp`: `holo run` as MCP tools that coding agents call over stdio."""
 
 from __future__ import annotations
 

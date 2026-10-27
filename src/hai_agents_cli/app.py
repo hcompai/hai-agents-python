@@ -71,7 +71,7 @@ app = typer.Typer(
 sessions_app = typer.Typer(no_args_is_help=True, help="Inspect and steer sessions.")
 agents_app = typer.Typer(no_args_is_help=True, help="Browse available agents.")
 skills_app = typer.Typer(no_args_is_help=True, help="Browse available skills.")
-mcp_app = typer.Typer(no_args_is_help=True, help="Give coding agents holo's tools over MCP.")
+mcp_app = typer.Typer()
 local_app = typer.Typer(
     no_args_is_help=True,
     help="Manually run the local browser, desktop or workstation bridge. Only needed when the session is started "
@@ -1305,9 +1305,14 @@ def get_skill_command(ctx: typer.Context, name: str = typer.Argument(...)) -> No
     _print_json(result)
 
 
-@mcp_app.command("serve")
-def mcp_serve() -> None:
+@mcp_app.callback(invoke_without_command=True)
+def mcp_serve(ctx: typer.Context) -> None:
     """Serve `holo run` as MCP tools over stdio; `holo mcp install` wires clients to start it."""
+    if ctx.invoked_subcommand is not None:
+        return
+    if sys.stdin.isatty():
+        console.print(ctx.get_help())
+        return
     from . import mcp_server
 
     mcp_server.serve()
@@ -1324,8 +1329,9 @@ def mcp_install(
         False, "--remote", help="Wire the cloud server over HTTP, writing your API key into each config in plaintext."
     ),
 ) -> None:
-    """Wire `holo mcp serve` into local MCP clients, so their agents can run holo's agents."""
+    """Wire `holo mcp` into local MCP clients, so their agents can run holo's agents."""
     state = _state(ctx)
+    remote = remote or url is not None
     registry = mcp_hosts.CLIENTS if remote else mcp_hosts.STDIO_CLIENTS
     flag = " --remote" if remote else ""
     if client == "list":
@@ -1346,6 +1352,11 @@ def mcp_install(
     _sign_in_if_needed(state)
     if not remote:
         _install_stdio(targets, state.json_output)
+        if not credentials.stored_api_key() and not state.json_output:
+            console.print(
+                f"  [warn]{ui.ATTENTION}[/warn] no stored API key, and clients start the server outside this shell; "
+                "run `holo login` so it can sign in"
+            )
         return
     try:
         resolved = credentials.resolve_api_key(state.api_key)
@@ -1372,7 +1383,7 @@ def _install_stdio(targets: list[tuple[str, mcp_hosts.Client]], json_output: boo
     for cid, c in targets:
         status, detail = mcp_hosts.wire_mcp(c, {mcp_hosts.HOLO: holo})
         results.append({"client": cid, "status": status, "detail": detail, "skill": None})
-    _print_mcp_results(results, f"{holo} mcp serve", json_output)
+    _print_mcp_results(results, f"{holo} mcp", json_output)
     _exit_if_any_failed(results)
 
 

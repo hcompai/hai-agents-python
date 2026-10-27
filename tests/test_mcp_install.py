@@ -139,6 +139,9 @@ def test_install_wires_this_holo_and_writes_no_key(monkeypatch, tmp_path) -> Non
         mcp_hosts.STDIO_CLIENTS, "cursor", replace(mcp_hosts.STDIO_CLIENTS["cursor"], config_path=str(path))
     )
     monkeypatch.setattr(mcp_hosts, "holo_command", lambda: "/opt/holo/bin/holo")
+    from hai_agents_common import credentials
+
+    monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", tmp_path / "global.env")
 
     result = runner.invoke(app, ["mcp", "install", "cursor"], env={"HAI_API_KEY": "hk-test"})
 
@@ -146,9 +149,10 @@ def test_install_wires_this_holo_and_writes_no_key(monkeypatch, tmp_path) -> Non
     assert json.loads(path.read_text())["mcpServers"]["holo"] == {
         "type": "stdio",
         "command": "/opt/holo/bin/holo",
-        "args": ["mcp", "serve"],
+        "args": ["mcp"],
     }
     assert "hk-test" not in path.read_text() and "plaintext" not in result.output
+    assert "holo login" in result.output
 
 
 async def test_a_local_run_streams_progress_and_always_ends_its_session(monkeypatch) -> None:
