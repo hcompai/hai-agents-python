@@ -372,8 +372,9 @@ def _steering(client) -> steer.Steering:
         ([None, None], False, [("pause",), ("resume",)]),
         (["/answer\r"], False, [("pause",), ("answer",)]),
         (["only the top 2\r"], True, [("pause",), ("resume",)]),
+        ([None, "end"], False, [("pause",), ("resume",)]),
     ],
-    ids=["typed while it works", "esc, then a message", "esc twice", "/answer", "send fails"],
+    ids=["typed while it works", "esc, then a message", "esc twice", "/answer", "send fails", "stream ends paused"],
 )
 def test_a_message_waits_for_the_pause_so_the_agent_cannot_answer_past_it(monkeypatch, keys, send_fails, calls):
     monkeypatch.setattr(steer.time, "sleep", lambda s: None)
@@ -381,7 +382,12 @@ def test_a_message_waits_for_the_pause_so_the_agent_cannot_answer_past_it(monkey
     client.sessions.send_fails = send_fails
     steering = _steering(client)
     for typed in keys:
-        steering.on_esc() if typed is None else steering.on_keys(typed)
+        if typed is None:
+            steering.on_esc()
+        elif typed == "end":
+            steering.finish()
+        else:
+            steering.on_keys(typed)
 
     assert (client.sessions.calls, steering.pending) == (calls, None)
 

@@ -600,16 +600,18 @@ class _Conversation:
         try:
             if feed is not None:
                 with steering.watch() if steering else contextlib.nullcontext():
-                    _follow(
-                        self.client,
-                        self.session.id,
-                        feed,
-                        timeout_s=timeout,
-                        from_index=self.next_index,
-                        stop_at_tool_wait=True,
-                    )
-                    if steering is not None:
-                        steering.finish()
+                    try:
+                        _follow(
+                            self.client,
+                            self.session.id,
+                            feed,
+                            timeout_s=timeout,
+                            from_index=self.next_index,
+                            stop_at_tool_wait=True,
+                        )
+                    finally:
+                        if steering is not None:
+                            steering.finish()
                 if steering is not None:
                     self._draft = steering.box.text
                     if steering.pending:

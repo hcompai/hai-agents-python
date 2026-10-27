@@ -55,10 +55,15 @@ class Steering:
         return keys.EscWatcher(self.on_esc, self.on_keys)
 
     def finish(self) -> None:
-        """The stream ended; wait for a pause in flight to settle so it cannot freeze the next turn."""
+        """The stream ended, maybe on an error; settle any pause so it cannot freeze the next turn."""
         self._done.set()
         if self._lander is not None and hasattr(self._lander, "join"):
             self._lander.join()
+        with self._lock:
+            if self._pause == "paused":
+                self._resume()
+                self._pause = None
+                self._show()
 
     def on_keys(self, typed: str) -> None:
         text, sent = keys.edit(self.box.text, typed)
