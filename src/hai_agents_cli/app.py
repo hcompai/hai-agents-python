@@ -1637,8 +1637,8 @@ def route(argv: list[str], commands: set[str], interactive: bool) -> list[str]:
     first = rest[0]
     if first in commands or first in _HELP_FLAGS:
         return head + rest
-    looks_like_typo = not first.startswith("-") and " " not in first
-    if looks_like_typo and difflib.get_close_matches(first, commands, n=1, cutoff=0.75):
+    a_word = not first.startswith("-") and " " not in first
+    if a_word and (len(rest) == 1 or difflib.get_close_matches(first, commands, n=1, cutoff=0.75)):
         return head + rest
     return head + ["run", *rest]
 

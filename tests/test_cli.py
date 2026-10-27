@@ -44,6 +44,8 @@ def test_route_runs_bare_tasks_and_hoists_global_options() -> None:
     assert route("--local", interactive=False) == ["run", "--local"]
     assert route(interactive=False) == []
     assert route("sesions") == ["sesions"]
+    assert route("guard") == ["guard"]
+    assert route("open", "calculator") == ["run", "open", "calculator"]
     assert route("--help") == ["--help"]
 
 
