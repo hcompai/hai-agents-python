@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import threading
 
 from rich.console import Console
 from rich.text import Text
@@ -197,6 +198,27 @@ def test_follow_up_step_waits_for_its_last_call_and_counts_from_the_turn() -> No
 
     assert f"{ui.RESULT}  19.0s" in buffer.getvalue()
     assert (feed.turn_steps, feed.steps) == (1, 6)
+
+
+def test_a_redraw_never_waits_on_an_event_being_handled() -> None:
+    feed = ui.StepFeed(Console(file=io.StringIO(), width=100, color_system=None))
+    shown = feed._render_live()
+    holding, release = threading.Event(), threading.Event()
+
+    def handle() -> None:
+        with feed._lock:
+            holding.set()
+            release.wait()
+
+    worker = threading.Thread(target=handle, daemon=True)
+    worker.start()
+    holding.wait()
+    try:
+        assert feed._render_live() is shown
+    finally:
+        release.set()
+        worker.join()
+    assert feed._render_live() is not shown
 
 
 def test_feed_surfaces_environment_and_tool_failures() -> None:

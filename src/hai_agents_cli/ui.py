@@ -387,6 +387,7 @@ class StepFeed:
     box: InputBox | None = None
     _live: Live | None = None
     _lock: threading.RLock = field(default_factory=threading.RLock)
+    _frame: RenderableType = field(default_factory=Group)
     _agents: dict[str, _Agent] = field(default_factory=dict)
     _tail: list[_Done | RenderableType] = field(default_factory=list)
     _notes: list[RenderableType] = field(default_factory=list)
@@ -694,6 +695,16 @@ class StepFeed:
         return call
 
     def _render_live(self) -> RenderableType:
+        """Live's refresh thread holds its own lock here, and a print holding ours waits on it: never block."""
+        if not self._lock.acquire(blocking=False):
+            return self._frame
+        try:
+            self._frame = self._draw_live()
+        finally:
+            self._lock.release()
+        return self._frame
+
+    def _draw_live(self) -> RenderableType:
         now = time.monotonic()
         current, done = self._current, self._done
         lines: list[RenderableType] = []
