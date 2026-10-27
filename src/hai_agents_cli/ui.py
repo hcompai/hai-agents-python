@@ -306,6 +306,15 @@ def money(usd: float | None) -> str | None:
     return f"${usd:.3f}" if usd < 1 else f"${usd:.2f}"
 
 
+def _bytes(size: int) -> str:
+    value = float(size)
+    for unit in ("B", "KB", "MB"):
+        if value < 1024:
+            return f"{value:.0f} {unit}"
+        value /= 1024
+    return f"{value:.1f} GB"
+
+
 def _clock(seconds: float) -> str:
     minutes, secs = divmod(int(seconds), 60)
     return f"{minutes}m {secs}s" if minutes else f"{secs}s"
@@ -363,6 +372,7 @@ class StepFeed:
     steps: int = 0
     cost: float | None = None
     answer: Any = None
+    starting: bool = False
     stop_hint: str = "ctrl+c to stop"
     _current: _Step | None = None
     _done: _Done | None = None
@@ -491,6 +501,8 @@ class StepFeed:
             self._latest_ts = ts
             if self._last_end_ts is None and kind in ("observation_event", "message_event"):
                 self._last_end_ts = ts
+        if kind in ("observation_event", "policy_event", "error_event"):
+            self.starting = False
         if kind == "metrics":
             self._tally.add(data)
             self.steps, self.cost = max(self.steps, self._tally.steps), self._tally.cost
@@ -535,6 +547,14 @@ class StepFeed:
                 self._flush()
                 self._emit(_bullet(Text(message, style="warn"), "warn"))
                 self._emit(Text(""))
+        elif kind == "AttachmentEvent" and data.get("origin") == "agent":
+            self._flush()
+            size = data.get("size_bytes")
+            line = Text.assemble(("Shared ", "bold"), str(data.get("name") or "a file"))
+            if isinstance(size, int):
+                line.append(f" {SEP} {_bytes(size)}", style="meta")
+            self._emit(_bullet(line, "accent"))
+            self._emit(Text(""))
         elif kind == "answer_event":
             self.answer = data.get("answer")
         if self._live is not None:
@@ -686,7 +706,7 @@ class StepFeed:
                 lines.append(_result(Text(current.thought, style="thought")))
             lines.append(Text(""))
         lines += self._notes
-        verb = current.busy if current else "Thinking"
+        verb = current.busy if current else "Starting" if self.starting else "Thinking"
         n = current.n if current else self.steps + 1
         cost = self.turn_cost
         parts = [

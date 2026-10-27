@@ -161,6 +161,8 @@ def test_spawn_lines_follow_each_subagent_to_its_report_and_hold_back_later_outp
     assert "Spawn" not in buffer.getvalue()
 
     feed.agent_status("sess_Wiki", "running", steps=4)
+    attachment = {"origin": "agent", "name": "report.csv", "size_bytes": 2048, "url": "https://x.test/r"}
+    feed.handle({"type": "AttachmentEvent", "timestamp": "2026-10-26T12:00:11Z", "data": attachment})
     feed.handle(_agent("2026-10-26T12:00:11Z", kind="message_event", caller_id="Blog", content=["Read it. Details."]))
     feed.handle(_agent("2026-10-26T12:00:11Z", kind="message_event", caller_id="squad_failure:News", content=["Boom"]))
     feed.close()
@@ -175,7 +177,8 @@ def test_spawn_lines_follow_each_subagent_to_its_report_and_hold_back_later_outp
         f"{ui.DOT} Spawn Wiki",
         f"  {ui.RESULT}  step 4",
     ]
-    assert lines[6].startswith(f"{ui.DOT} Search") and not any("Wait" in line for line in lines)
+    assert lines[6] == f"{ui.DOT} Shared report.csv · 2 KB"
+    assert lines[7].startswith(f"{ui.DOT} Search") and not any("Wait" in line for line in lines)
     dots = [line for line in output.splitlines() if ui.DOT in line][:3]
     assert [line.startswith(f"\x1b[{code}m{ui.DOT}") for line, code in zip(dots, (32, 31, 2))] == [True] * 3
     assert "1 agent still running" in output

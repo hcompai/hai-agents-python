@@ -585,7 +585,12 @@ class _Conversation:
         if self.human:
             stop_hint = "esc esc to stop" if self.controls_machine and self._listener else "ctrl+c to stop"
             feed = ui.StepFeed(
-                err_console, max_steps=self.max_steps, steps=self.steps, cost=self.cost, stop_hint=stop_hint
+                err_console,
+                max_steps=self.max_steps,
+                steps=self.steps,
+                cost=self.cost,
+                stop_hint=stop_hint,
+                starting=self.next_index == 0,
             )
             if not self.controls_machine and _interactive() and keys.supported():
                 steering = steer.Steering(
