@@ -1,4 +1,4 @@
-"""MCP host registry for the remote `hai-agents` server, plus the install engine other CLIs reuse with their own registry."""
+"""MCP host registries for the local `holo` stdio server and the remote `hai-agents` server, plus the install engine."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 import tempfile
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -124,6 +125,103 @@ CLIENTS: dict[str, Client] = {
         leaf={"serverUrl": URL, "headers": _BEARER_HEADERS},
     ),
 }
+
+
+STDIO_SERVER_NAME = "holo"
+HOLO = "__HOLO__"
+_STDIO = {"command": HOLO, "args": ["mcp"]}
+_STDIO_CMD = (STDIO_SERVER_NAME, "--", HOLO, "mcp")
+
+STDIO_CLIENTS: dict[str, Client] = {
+    "antigravity": Client(
+        name="Antigravity",
+        config_path="~/.gemini/config/mcp_config.json",
+        key_path=("mcpServers", STDIO_SERVER_NAME),
+        leaf=_STDIO,
+    ),
+    "claude-code": Client(
+        name="Claude Code",
+        cli_cmd=("claude", "mcp", "add", "--scope", "user", "--transport", "stdio", *_STDIO_CMD),
+        cli_remove_cmds=(
+            ("claude", "mcp", "remove", "--scope", "local", STDIO_SERVER_NAME),
+            ("claude", "mcp", "remove", "--scope", "user", STDIO_SERVER_NAME),
+        ),
+    ),
+    "claude-desktop": Client(
+        name="Claude Desktop",
+        config_path=user_config_path("Claude", "claude_desktop_config.json"),
+        key_path=("mcpServers", STDIO_SERVER_NAME),
+        leaf=_STDIO,
+    ),
+    "codex": Client(
+        name="Codex",
+        cli_cmd=("codex", "mcp", "add", *_STDIO_CMD),
+        cli_remove_cmds=(("codex", "mcp", "remove", STDIO_SERVER_NAME),),
+    ),
+    "copilot": Client(
+        name="GitHub Copilot CLI",
+        config_path="~/.copilot/mcp-config.json",
+        key_path=("mcpServers", STDIO_SERVER_NAME),
+        leaf={"type": "local", **_STDIO, "tools": ["*"]},
+    ),
+    "cursor": Client(
+        name="Cursor",
+        config_path="~/.cursor/mcp.json",
+        key_path=("mcpServers", STDIO_SERVER_NAME),
+        leaf={"type": "stdio", **_STDIO},
+    ),
+    "grok-build": Client(
+        name="Grok Build",
+        cli_cmd=("grok", "mcp", "add", *_STDIO_CMD),
+        cli_remove_cmds=(("grok", "mcp", "remove", "--scope", "user", STDIO_SERVER_NAME),),
+    ),
+    "hermes": Client(
+        name="Hermes",
+        config_path="~/.hermes/config.yaml",
+        key_path=("mcp_servers", STDIO_SERVER_NAME),
+        leaf=_STDIO,
+    ),
+    "openclaw": Client(
+        name="OpenClaw",
+        config_path="~/.openclaw/openclaw.json",
+        key_path=("mcp", "servers", STDIO_SERVER_NAME),
+        leaf=_STDIO,
+        home_marker=".openclaw",
+    ),
+    "opencode": Client(
+        name="OpenCode",
+        config_path="~/.config/opencode/opencode.json",
+        key_path=("mcp", STDIO_SERVER_NAME),
+        leaf={"type": "local", "command": [HOLO, "mcp"], "enabled": True},
+        home_marker=".config/opencode",
+    ),
+    "vscode": Client(
+        name="VS Code",
+        config_path=user_config_path("Code", "User", "mcp.json"),
+        key_path=("servers", STDIO_SERVER_NAME),
+        leaf={"type": "stdio", **_STDIO},
+    ),
+    "vscode-insiders": Client(
+        name="VS Code Insiders",
+        config_path=user_config_path("Code - Insiders", "User", "mcp.json"),
+        key_path=("servers", STDIO_SERVER_NAME),
+        leaf={"type": "stdio", **_STDIO},
+    ),
+    "windsurf": Client(
+        name="Windsurf",
+        config_path="~/.codeium/windsurf/mcp_config.json",
+        key_path=("mcpServers", STDIO_SERVER_NAME),
+        leaf=_STDIO,
+    ),
+}
+
+
+def holo_command() -> str:
+    """Absolute `holo`, so hosts launched from the dock, with a bare PATH, still find it."""
+    found = shutil.which("holo", path=str(Path(sys.executable).parent)) or shutil.which("holo")
+    if found is None:
+        raise RuntimeError("cannot find the `holo` command; put it on PATH, then re-run")
+    return str(Path(found).absolute())
 
 
 def resolve_mcp_url(base_url: str | None, override: str | None) -> str:

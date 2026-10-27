@@ -286,7 +286,7 @@ def test_welcome_drops_failing_and_slow_sources(monkeypatch) -> None:
     client = SimpleNamespace(quota=SimpleNamespace(get_token_quota=slow))
 
     started = time.monotonic()
-    facts = welcome.gather(client, cloud=True)
+    facts = welcome.gather(client)
 
     assert time.monotonic() - started < 0.5
     assert (facts.quota, facts.latest) == (None, None)

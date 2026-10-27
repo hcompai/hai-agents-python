@@ -231,7 +231,7 @@ def error(out: Console, message: str, *, fix: str | None = None) -> None:
 
 
 def check(out: Console, state: CheckState, name: str, detail: str, *, fix: str | None = None) -> None:
-    out.print(Text.assemble((_CHECK_GLYPH[state], state), f" {name:<10} {detail}"))
+    out.print(Text.assemble((_CHECK_GLYPH[state], state), f" {name:<11} {detail}"))
     if fix:
         out.print(_result(Text.assemble(("fix: ", "meta"), fix), wrap=True))
 
@@ -464,7 +464,7 @@ class StepFeed:
             self._live = None
 
     def _handle(self, event: Any) -> None:
-        kind, data, ts = _unwrap(event)
+        kind, data, ts = unwrap(event)
         if ts is not None:
             self._first_ts = self._first_ts or ts
             self._latest_ts = ts
@@ -822,7 +822,7 @@ def usage(events: list[Any]) -> tuple[int, float | None]:
     """Session steps and cost from its metrics events."""
     tally = _Tally()
     for event in events:
-        kind, data, _ = _unwrap(event)
+        kind, data, _ = unwrap(event)
         if kind == "metrics":
             tally.add(data)
     return tally.steps, tally.cost
@@ -850,7 +850,7 @@ class _Tally:
         self.cost = metrics.get("total_cost", self.cost)
 
 
-def _unwrap(event: Any) -> tuple[str, dict[str, Any], float | None]:
+def unwrap(event: Any) -> tuple[str, dict[str, Any], float | None]:
     if not isinstance(event, dict):
         from hai_agents_common.jsonable import to_jsonable
 

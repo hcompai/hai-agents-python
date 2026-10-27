@@ -41,7 +41,7 @@ from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
 from hai_agents_local import desktop as desktop_defaults
 
-from . import _CLI_HINT, auth, keys, mcp_hosts, steer, ui, welcome
+from . import _CLI_HINT, auth, holo_dir, keys, mcp_hosts, steer, ui, welcome
 
 if TYPE_CHECKING:
     from hai_agents_local import LocalBridge
@@ -50,8 +50,6 @@ _AGENT_POLL_S = 3.0
 _TURN_GRACE_S = 120.0  # past max_time, sagent spends up to 60s forcing an answer, plus the pod's startup
 CLEAN_STATUSES = ("completed", "idle")
 IDLE_TIMEOUT_S = 600
-LOCAL_MAX_STEPS = 150
-LOCAL_MAX_TIME_S = 1800.0
 NOTIFY_AFTER_S = 30.0
 
 console = ui.console()
@@ -61,7 +59,7 @@ app = typer.Typer(
     name="holo",
     help="Run H Company agents from your terminal.",
     epilog='\b\nExamples:\n  holo "What is the top story on Hacker News?"\n'
-    '  holo --local "Open Calculator and compute 2+2"\n'
+    '  holo -a h/holo-desktop "Open Calculator and compute 2+2"\n'
     "  holo                                  (interactive session)\n"
     "  holo agents use h/web-surfer-pro      (change the default agent)\n"
     "  holo sessions watch <session-id>",
@@ -71,7 +69,7 @@ app = typer.Typer(
 sessions_app = typer.Typer(no_args_is_help=True, help="Inspect and steer sessions.")
 agents_app = typer.Typer(no_args_is_help=True, help="Browse available agents.")
 skills_app = typer.Typer(no_args_is_help=True, help="Browse available skills.")
-mcp_app = typer.Typer(no_args_is_help=True, help="Manage the hai-agents MCP server.")
+mcp_app = typer.Typer()
 local_app = typer.Typer(
     no_args_is_help=True,
     help="Manually run the local browser, desktop or workstation bridge. Only needed when the session is started "
@@ -111,7 +109,13 @@ def login(
     """Sign in through the browser or with a pasted key, and store the key in ~/.config/hai/.env."""
     state = _state(ctx)
     if credentials.current_api_key() and not force:
-        console.print("Already signed in. Pass --force to rotate the key.")
+        if credentials.stored_api_key():
+            console.print("Already signed in. Pass --force to rotate the key.")
+        else:
+            console.print(
+                f"Signed in with {credentials.API_KEY_VAR} from this shell only. "
+                "Pass --force to save a key that MCP hosts and new shells can use."
+            )
         return
     if key:
         _store_pasted_key(state.base_url)
@@ -203,7 +207,7 @@ def doctor(ctx: typer.Context) -> None:
     else:
         for r in results:
             ui.check(console, "ok" if r.ok else "fail", r.name, r.detail, fix=r.fix)
-        if _interactive() and any(r.name == "desktop" and not r.ok for r in results):
+        if _interactive() and any(r.name in ("desktop", "workstation") and not r.ok for r in results):
             _offer_privacy_settings()
     if not all(r.ok for r in results):
         raise typer.Exit(1)
@@ -269,22 +273,8 @@ def _parse_overrides(items: list[str]) -> dict[str, Any]:
     return overrides
 
 
-LOCAL_DESKTOP_AGENT = {
-    "name": "holo",
-    "description": "Desktop agent that drives the user's machine.",
-    "environments": [{"id": "desktop", "kind": "desktop", "host": "user_device"}],
-}
-
-
-def _resolve_agent(agent: str | None, local: bool) -> Any:
-    if not local:
-        return agent or credentials.default_agent()
-    if agent:
-        _raise_cli_error(RuntimeError("--local drives this desktop with its own agent; drop --agent"))
-    return LOCAL_DESKTOP_AGENT
-
-
 AGENT_HELP = f"Agent name. Default: {credentials.DEFAULT_AGENT}, or the one set with `holo agents use`."
+LOCAL_HELP = "Run the agent loop on this machine, through a local agent runtime."
 COMMAND_NAMES = frozenset({"new", "clear", "agent", "live", "share", "help", "exit", "quit"})
 EXAMPLE_TASKS = {
     False: "Find the top 3 stories on Hacker News and their URLs",
@@ -297,12 +287,20 @@ def run(
     ctx: typer.Context,
     task: str = typer.Argument(..., help="Task to run."),
     agent: str | None = typer.Option(None, "--agent", "-a", help=AGENT_HELP),
-    local: bool = typer.Option(False, "--local", help="Drive this machine's desktop through the local runtime."),
+    local: bool = typer.Option(False, "--local", help=LOCAL_HELP),
     max_steps: int | None = typer.Option(
-        None, "--max-steps", min=1, max=200, help="Maximum reasoning steps. Uncapped, or 150 with --local."
+        None,
+        "--max-steps",
+        min=1,
+        max=200,
+        help="Maximum reasoning steps. Uncapped, or 150 when it drives this machine.",
     ),
     max_time_s: float | None = typer.Option(
-        None, "--max-time", min=1.0, max=1800.0, help="Maximum run seconds. Uncapped, or 1800 with --local."
+        None,
+        "--max-time",
+        min=1.0,
+        max=1800.0,
+        help="Maximum run seconds. Uncapped, or 1800 when it drives this machine.",
     ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Print only the answer."),
     override: list[str] = typer.Option(
@@ -318,12 +316,12 @@ def run(
     """Run a task, stream its steps, and print the answer; in a terminal, follow up on the same session."""
     convo = _Conversation(
         _state(ctx),
-        _resolve_agent(agent, local),
-        local=local,
-        max_steps=max_steps or (LOCAL_MAX_STEPS if local else None),
-        max_time_s=max_time_s or (LOCAL_MAX_TIME_S if local else None),
+        agent or credentials.default_agent(),
+        max_steps=max_steps,
+        max_time_s=max_time_s,
         overrides=_parse_overrides(override or []),
         quiet=quiet,
+        local=local,
     )
     try:
         assert_request_under_limit(convo.params(task))
@@ -346,19 +344,14 @@ def run(
 def chat(
     ctx: typer.Context,
     agent: str | None = typer.Option(None, "--agent", "-a", help=AGENT_HELP),
-    local: bool = typer.Option(False, "--local", help="Drive this machine's desktop through the local runtime."),
+    local: bool = typer.Option(False, "--local", help=LOCAL_HELP),
 ) -> None:
     """Start an interactive session; plain `holo` in a terminal opens this."""
     state = _state(ctx)
     if not _interactive() or state.json_output:
         _raise_cli_error(RuntimeError('chat needs an interactive terminal; run one task with `holo "<task>"`'))
     convo = _Conversation(
-        state,
-        _resolve_agent(agent, local),
-        local=local,
-        max_steps=LOCAL_MAX_STEPS if local else None,
-        max_time_s=LOCAL_MAX_TIME_S if local else None,
-        overrides={},
+        state, agent or credentials.default_agent(), max_steps=None, max_time_s=None, overrides={}, local=local
     )
     convo.open()
     try:
@@ -374,12 +367,13 @@ class _Conversation:
 
     state: AppState
     agent: Any
-    local: bool
     max_steps: int | None
     max_time_s: float | None
     overrides: dict[str, Any]
     quiet: bool = False
+    local: bool = False
     client: Any = None
+    cloud: Any = None
     session: Any = None
     result: Any = None
     next_index: int = 0
@@ -426,10 +420,8 @@ class _Conversation:
     @property
     def kinds(self) -> list[str]:
         """The environments this agent drives on this machine; empty for an agent that runs in the cloud."""
-        if self.local:
-            return ["desktop"]
         if self._kinds is None:
-            self._kinds = _local_kinds(self.client, self.agent)
+            self._kinds = _local_kinds(self.cloud, self.agent)
         return self._kinds
 
     @property
@@ -447,7 +439,9 @@ class _Conversation:
         return "drives this machine's browser" if self.controls_machine else "runs in the cloud"
 
     def open(self) -> None:
-        self.client = _local_client(self.state) if self.local else _client(self.state)
+        """`client` runs sessions; `cloud` looks up agents and quota, which a local runtime does not serve."""
+        self.cloud = _client(self.state)
+        self.client = _local_client(self.state) if self.local else self.cloud
         self._arm_listener()
 
     def _arm_listener(self) -> None:
@@ -462,8 +456,8 @@ class _Conversation:
         if self._listener is not None:
             self._listener.stop()
             self._listener = None
-        if self.client is not None:
-            self.client.close()
+        for client in {id(c): c for c in (self.client, self.cloud) if c is not None}.values():
+            client.close()
 
     def show_header(self) -> None:
         if self._header_shown or not self.human:
@@ -476,7 +470,7 @@ class _Conversation:
         ui.header(err_console, "holo", [self.label, self.does + stop, _custom_endpoint_host(self.state)])
 
     def _show_welcome(self) -> None:
-        facts = welcome.gather(self.client, cloud=not self.local)
+        facts = welcome.gather(self.cloud)
         current = welcome.current_version()
         if self.controls_machine:
             stop = "esc esc stops it from any app" if self._listener else "ctrl+c stops it"
@@ -498,17 +492,17 @@ class _Conversation:
 
     @property
     def label(self) -> str:
-        return "local desktop" if self.local else str(self.agent)
+        return f"{self.agent} {ui.SEP} local runtime" if self.local else str(self.agent)
 
     def commands(self) -> list[tuple[str, str]]:
         rows = [
             ("/new [task]", "end this session; start fresh, optionally with a task"),
             ("/retry", "run the session's first task again, fresh"),
+            ("/agent [name]", "switch agent and save it as the default"),
         ]
         if not self.local:
             rows += [
                 ("/resume [n]", "continue one of your recent sessions"),
-                ("/agent [name]", "switch agent and save it as the default"),
                 ("/live", "open the live view in your browser"),
                 ("/share", "create a public share link"),
             ]
@@ -568,6 +562,9 @@ class _Conversation:
             except Exception as exc:
                 _raise_cli_error(exc)
             self.next_index, self.run_steps = 0, 0
+            if bridged := self.client.sessions.bridged_kinds(self.session.id):
+                self._kinds = bridged
+                self._arm_listener()
             if self.human and self.view_url:
                 ui.url(err_console, self.view_url)
                 err_console.print()
@@ -671,6 +668,16 @@ class _Conversation:
     def _create_session(self, message: str) -> Any:
         """On ctrl+c, the session is cancelled once the create call returns, even if ctrl+c is pressed again."""
         params = self.params(message)
+        if self.local or holo_dir.customized():
+            from hai_agents_local.routing import split_revision
+
+            name, revision = split_revision(self.agent)
+            agent = self.cloud.agents.get_agent(name, revision=revision, resolve=self.local)
+            spec = agent.model_dump(mode="json", exclude_none=True)
+            if self.local:
+                params["agent"] = spec
+            if holo_dir.customized():
+                params["overrides"] = {**holo_dir.overrides(spec), **self.overrides}
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             created = pool.submit(self.client.sessions.create_session, **params)
             try:
@@ -740,7 +747,7 @@ class _Conversation:
         err_console.print()
 
     def _leave(self) -> None:
-        if self.session is not None and not self.controls_machine:
+        if self.session is not None and not (self.controls_machine or self.local):
             minutes = IDLE_TIMEOUT_S // 60
             ui.hint(err_console, f"session {self.session.id} stays open {minutes} min, then closes")
 
@@ -769,6 +776,8 @@ class _Conversation:
                 self._switch_agent(arg)
             except KeyboardInterrupt:
                 err_console.print()
+        elif name in ("live", "share") and self.local:
+            ui.error(err_console, f"/{name} needs a cloud session", fix="run without --local")
         elif name == "live":
             if self.view_url:
                 webbrowser.open(self.view_url)
@@ -852,10 +861,9 @@ class _Conversation:
             ]
             ui.ok(err_console, f" {ui.SEP} ".join(p for p in parts if p), url=self.view_url)
             ui.hint(err_console, f"{self.label} {ui.SEP} {self.does}")
-        if not self.local:
-            with contextlib.suppress(Exception):
-                if line := welcome.quota_line(self.client.quota.get_token_quota()):
-                    ui.hint(err_console, line)
+        with contextlib.suppress(Exception):
+            if line := welcome.quota_line(self.cloud.quota.get_token_quota()):
+                ui.hint(err_console, line)
 
     def _copy(self) -> None:
         if self._answer is None:
@@ -868,14 +876,9 @@ class _Conversation:
             ui.error(err_console, "could not copy", fix="needs a working pbcopy, wl-copy, xclip or xsel")
 
     def _switch_agent(self, name: str) -> None:
-        if self.local:
-            ui.error(
-                err_console, "the local desktop agent cannot be switched", fix="leave and run `holo` without --local"
-            )
-            return
         try:
-            name = name or _pick_agent(self.client, current=self.agent)
-            _save_default_agent(self.client, name)
+            name = name or _pick_agent(self.cloud, current=self.agent)
+            _save_default_agent(self.cloud, name)
         except typer.Exit:
             return
         self._end_session()
@@ -995,7 +998,8 @@ def _local_client(state: AppState) -> Any:
 
     _sign_in_if_needed(state)
     # The spawned runtime and the in-process bridges both read these from the environment.
-    for var, value in ((credentials.API_KEY_VAR, state.api_key), (credentials.BASE_URL_VAR, state.base_url)):
+    base_url = credentials.resolve_base_url(state.base_url)
+    for var, value in ((credentials.API_KEY_VAR, state.api_key), (credentials.BASE_URL_VAR, base_url)):
         if value:
             os.environ[var] = value
     try:
@@ -1309,6 +1313,21 @@ def get_skill_command(ctx: typer.Context, name: str = typer.Argument(...)) -> No
     _print_json(result)
 
 
+@mcp_app.callback(invoke_without_command=True)
+def mcp_serve(ctx: typer.Context) -> None:
+    """Serve `holo run` as MCP tools over stdio; `holo mcp install` wires clients to start it."""
+    if ctx.invoked_subcommand is not None:
+        return
+    if sys.stdin.isatty():
+        console.print(ctx.get_help())
+        return
+    try:
+        from . import mcp_server
+    except ModuleNotFoundError as exc:
+        _raise_cli_error(RuntimeError(f"{exc}. Install it with: pip install 'hai-agents[cli]'"))
+    mcp_server.serve()
+
+
 @mcp_app.command("install")
 def mcp_install(
     ctx: typer.Context,
@@ -1316,23 +1335,41 @@ def mcp_install(
         None, help="Client id (cursor, vscode, ...), 'list' to enumerate, or omit to wire every detected client."
     ),
     url: str = typer.Option(None, "--url", help="MCP endpoint. Defaults to your --base-url region or the EU host."),
+    remote: bool = typer.Option(
+        False, "--remote", help="Wire the cloud server over HTTP, writing your API key into each config in plaintext."
+    ),
 ) -> None:
-    """Wire the hai-agents MCP server into local clients (writes your API key into each config in plaintext)."""
+    """Wire `holo mcp` into local MCP clients, so their agents can run holo's agents."""
     state = _state(ctx)
+    remote = remote or url is not None
+    registry = mcp_hosts.CLIENTS if remote else mcp_hosts.STDIO_CLIENTS
+    flag = " --remote" if remote else ""
     if client == "list":
-        _mcp_list(state.json_output)
+        _mcp_list(registry, flag, state.json_output)
         return
 
     if client is None:
-        targets = [(cid, c) for cid, c in mcp_hosts.CLIENTS.items() if mcp_hosts.host_present(c)]
+        targets = [(cid, c) for cid, c in registry.items() if mcp_hosts.host_present(c)]
         if not targets:
-            _raise_cli_error(RuntimeError("No supported MCP clients detected. Run `holo mcp install list`."))
-    elif client in mcp_hosts.CLIENTS:
-        targets = [(client, mcp_hosts.CLIENTS[client])]
+            _raise_cli_error(RuntimeError(f"No supported MCP clients detected. Run `holo mcp install list{flag}`."))
+    elif client in registry:
+        targets = [(client, registry[client])]
     else:
-        _raise_cli_error(RuntimeError(f"Unknown client {client!r}. Run `holo mcp install list` to see supported ids."))
+        _raise_cli_error(
+            RuntimeError(f"Unknown client {client!r}. Run `holo mcp install list{flag}` to see supported ids.")
+        )
 
     _sign_in_if_needed(state)
+    if not remote:
+        if base_url := credentials.resolve_base_url(state.base_url):
+            credentials.save_base_url(base_url)
+        _install_stdio(targets, state.json_output)
+        if not credentials.stored_api_key() and not state.json_output:
+            console.print(
+                f"  [warn]{ui.ATTENTION}[/warn] no stored API key, and clients start the server outside this shell; "
+                "run `holo login` so it can sign in"
+            )
+        return
     try:
         resolved = credentials.resolve_api_key(state.api_key)
         key = resolved() if callable(resolved) else resolved
@@ -1342,6 +1379,27 @@ def mcp_install(
 
     results = [_install_one(cid, c, server_url, key) for cid, c in targets]
     _print_mcp_results(results, server_url, state.json_output)
+    if not state.json_output:
+        console.print(
+            f"  [warn]{ui.ATTENTION}[/warn] your API key was written into these configs in plaintext; keep them private"
+        )
+    _exit_if_any_failed(results)
+
+
+def _install_stdio(targets: list[tuple[str, mcp_hosts.Client]], json_output: bool) -> None:
+    try:
+        holo = mcp_hosts.holo_command()
+    except RuntimeError as exc:
+        _raise_cli_error(exc)
+    results = []
+    for cid, c in targets:
+        status, detail = mcp_hosts.wire_mcp(c, {mcp_hosts.HOLO: holo})
+        results.append({"client": cid, "status": status, "detail": detail, "skill": None})
+    _print_mcp_results(results, f"{holo} mcp", json_output)
+    _exit_if_any_failed(results)
+
+
+def _exit_if_any_failed(results: list[dict]) -> None:
     if any(r["status"].fatal or (r["skill"] and r["skill"][0].fatal) for r in results):
         raise typer.Exit(1)
 
@@ -1352,8 +1410,8 @@ def _install_one(cid: str, c: mcp_hosts.Client, url: str, key: str) -> dict:
     return {"client": cid, "status": status, "detail": detail, "skill": skill}
 
 
-def _mcp_list(json_output: bool) -> None:
-    rows = [(cid, mcp_hosts.host_present(c), mcp_hosts.host_target(c)) for cid, c in mcp_hosts.CLIENTS.items()]
+def _mcp_list(registry: dict[str, mcp_hosts.Client], flag: str, json_output: bool) -> None:
+    rows = [(cid, mcp_hosts.host_present(c), mcp_hosts.host_target(c)) for cid, c in registry.items()]
     if json_output:
         _print_json({cid: {"detected": detected, "target": tgt} for cid, detected, tgt in rows})
         return
@@ -1362,7 +1420,8 @@ def _mcp_list(json_output: bool) -> None:
         table.add_row(cid, "[green]yes[/green]" if detected else "[dim]no[/dim]", tgt)
     console.print(table)
     console.print(
-        "[dim]Wire one with[/dim] [cyan]holo mcp install <id>[/cyan][dim], or all detected with[/dim] [cyan]holo mcp install[/cyan]."
+        f"[dim]Wire one with[/dim] [cyan]holo mcp install <id>{flag}[/cyan][dim], "
+        f"or all detected with[/dim] [cyan]holo mcp install{flag}[/cyan]."
     )
 
 
@@ -1374,11 +1433,11 @@ _MCP_GLYPH: dict[mcp_hosts.Status, str] = {
 }
 
 
-def _print_mcp_results(results: list[dict], server_url: str, json_output: bool) -> None:
+def _print_mcp_results(results: list[dict], server: str, json_output: bool) -> None:
     if json_output:
         _print_json(
             {
-                "url": server_url,
+                "server": server,
                 "results": [
                     {
                         "client": r["client"],
@@ -1398,10 +1457,7 @@ def _print_mcp_results(results: list[dict], server_url: str, json_output: bool) 
         elif r["skill"]:
             line += f"  {_MCP_GLYPH[r['skill'][0]]} [meta]skill: {escape(r['skill'][1])}[/meta]"
         console.print(line)
-    console.print(f"\n  [meta]server[/meta] {server_url}")
-    console.print(
-        f"  [warn]{ui.ATTENTION}[/warn] your API key was written into these configs in plaintext; keep them private"
-    )
+    console.print(f"\n  [meta]server[/meta] {escape(server)}")
 
 
 @local_app.command("browser")
@@ -1593,8 +1649,8 @@ def route(argv: list[str], commands: set[str], interactive: bool) -> list[str]:
     first = rest[0]
     if first in commands or first in _HELP_FLAGS:
         return head + rest
-    looks_like_typo = not first.startswith("-") and " " not in first
-    if looks_like_typo and difflib.get_close_matches(first, commands, n=1, cutoff=0.75):
+    a_word = not first.startswith("-") and " " not in first
+    if a_word and (len(rest) == 1 or difflib.get_close_matches(first, commands, n=1, cutoff=0.75)):
         return head + rest
     return head + ["run", *rest]
 

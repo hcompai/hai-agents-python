@@ -44,6 +44,8 @@ def test_route_runs_bare_tasks_and_hoists_global_options() -> None:
     assert route("--local", interactive=False) == ["run", "--local"]
     assert route(interactive=False) == []
     assert route("sesions") == ["sesions"]
+    assert route("guard") == ["guard"]
+    assert route("open", "calculator") == ["run", "open", "calculator"]
     assert route("--help") == ["--help"]
 
 
@@ -122,13 +124,14 @@ def test_kill_switch_stops_that_turn_and_the_next_message_starts_a_new_session(m
     )
     follows = iter([killswitch.request_stop, lambda: None])
     replies = iter(["open it again", None])
-    monkeypatch.setattr(app_module, "_local_client", lambda state: client)
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module, "_local_kinds", lambda client_, agent: ["desktop"])
     monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
     monkeypatch.setattr(app_module, "_follow", lambda *a, **k: next(follows)())
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
 
-    result = runner.invoke(app, ["run", "open calculator", "--local"], env={"HAI_API_KEY": "hk-test"})
+    result = runner.invoke(app, ["run", "open calculator", "-a", "h/holo-desktop"], env={"HAI_API_KEY": "hk-test"})
 
     assert result.output.count("stopped by the kill switch") == 1
     assert client.sessions.created == 2
@@ -262,26 +265,6 @@ def test_a_turn_stops_following_at_a_client_tool_wait_but_watch_does_not(monkeyp
         assert handled == expected
 
 
-def test_local_run_hands_the_key_and_endpoint_flags_to_the_runtime(monkeypatch) -> None:
-    import hai_agents
-
-    seen: dict = {}
-
-    def local(cls, **_):
-        seen.update(key=os.environ.get("HAI_API_KEY"), url=os.environ.get("HAI_API_BASE_URL"))
-        return _RunClient()
-
-    for var in ("HAI_API_KEY", "HAI_API_BASE_URL"):
-        monkeypatch.setenv(var, "unset")
-    monkeypatch.setattr(hai_agents.Client, "local", classmethod(local))
-    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
-    monkeypatch.setattr(app_module, "_follow", _no_events)
-
-    runner.invoke(app, ["--api-key", "hk-flag", "--base-url", "https://agp.example.test", "run", "x", "--local"])
-
-    assert seen == {"key": "hk-flag", "url": "https://agp.example.test"}
-
-
 def test_a_follow_up_after_a_failed_turn_starts_a_new_session(monkeypatch) -> None:
     client = _RunClient()
     failed = SessionRunResult(id="sess_1", status="failed", events=[], next_from_index=1)
@@ -298,11 +281,23 @@ def test_a_follow_up_after_a_failed_turn_starts_a_new_session(monkeypatch) -> No
     assert client.sessions.sent == []
 
 
-def test_local_rejects_a_named_agent() -> None:
-    result = runner.invoke(app, ["run", "x", "--local", "--agent", "h/web-surfer-pro"], env={"HAI_API_KEY": "hk-t"})
+def test_local_runs_any_agent_inline_on_the_local_runtime(monkeypatch) -> None:
+    captured: dict = {}
+    cloud, runtime = _RunClient(), _RunClient(captured)
+    fetched: list = []
+    spec = types.SimpleNamespace(model_dump=lambda **_: {"name": "h/web-surfer-pro", "instructions": "Browse."})
+    cloud.agents = types.SimpleNamespace(get_agent=lambda *a, **kw: fetched.append((a, kw)) or spec)
+    monkeypatch.setattr(app_module, "_client", lambda state: cloud)
+    monkeypatch.setattr(app_module, "_local_client", lambda state: runtime)
+    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
 
-    assert result.exit_code != 0
-    assert "drop --agent" in _error_text(result)
+    result = runner.invoke(app, ["run", "x", "--local", "-a", "h/web-surfer-pro"], env={"HAI_API_KEY": "hk-t"})
+
+    assert result.exit_code == 0, result.output
+    assert fetched == [(("h/web-surfer-pro",), {"revision": None, "resolve": True})]
+    assert captured["agent"] == {"name": "h/web-surfer-pro", "instructions": "Browse."}
+    assert cloud.sessions.created == 0
 
 
 def test_new_releases_the_idle_session_before_starting_another(monkeypatch) -> None:
@@ -340,6 +335,35 @@ def test_run_without_options_uses_the_default_agent_uncapped(monkeypatch, tmp_pa
     credentials.save_default_agent("h/web-surfer-pro")
     runner.invoke(app, ["run", "hello"], env={"HAI_API_KEY": "hk-test"})
     assert captured["agent"] == "h/web-surfer-pro"
+
+
+def test_every_run_adds_the_users_holo_dir_to_its_agent(monkeypatch, holo_home) -> None:
+    skill = holo_home / "skills" / "expenses"
+    skill.mkdir(parents=True)
+    (holo_home / "agents.md").write_text("Call me Alex.")
+    (skill / "SKILL.md").write_text("---\nname: Expenses\ndescription: File my receipts.\n---\nOpen the portal.")
+    captured: dict = {}
+    client = _RunClient(captured)
+    fetched: list = []
+    spec = types.SimpleNamespace(model_dump=lambda **_: {"instructions": "Be brief.", "skills": ["h/web"]})
+    client.agents = types.SimpleNamespace(
+        get_agent=lambda name, revision, resolve: fetched.append((name, revision)) or spec
+    )
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
+    monkeypatch.setattr(app_module, "_follow", _no_events)
+
+    result = runner.invoke(app, ["run", "hi", "-a", "me/helper:3"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 0, result.output
+    assert fetched == [("me/helper", 3)]
+    assert captured["overrides"] == {
+        "agent.instructions": "Be brief.\n\nCall me Alex.",
+        "agent.skills": ["h/web", {"name": "expenses", "description": "File my receipts.", "body": "Open the portal."}],
+    }
+    (skill / "SKILL.md").write_text("no frontmatter")
+    broken = runner.invoke(app, ["run", "hi"], env={"HAI_API_KEY": "hk-test"})
+    assert "needs YAML frontmatter with a description" in " ".join(_error_text(broken).split())
 
 
 def test_follow_up_continues_the_same_session_from_the_last_event(monkeypatch) -> None:
@@ -492,7 +516,6 @@ def test_resume_switches_sessions_but_keeps_the_current_one_when_picked_again() 
     convo = app_module._Conversation(
         app_module.AppState(api_key=None, base_url=None, json_output=False),
         "h/test-agent",
-        local=False,
         max_steps=5,
         max_time_s=60,
         overrides={},
@@ -620,6 +643,9 @@ class _RunSessions:
         self.calls: list[tuple] = []
         self.send_fails = False
         self._polls_until_paused = 1_000
+
+    def bridged_kinds(self, session_id):
+        return []
 
     def create_session(self, **kwargs):
         self.created += 1

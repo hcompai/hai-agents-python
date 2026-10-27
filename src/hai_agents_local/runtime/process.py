@@ -59,6 +59,7 @@ def spawn(cmd: typing.List[str], *, env: typing.Dict[str, str], log_path: pathli
     with log_path.open("wb") as log_file:  # child inherits the fd; the parent handle can close right away
         return subprocess.Popen(
             cmd,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=log_file,
             env=env,

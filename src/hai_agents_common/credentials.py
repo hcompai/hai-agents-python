@@ -92,6 +92,10 @@ def save_default_agent(name: str) -> Path:
     return _save(AGENT_VAR, name)
 
 
+def save_base_url(url: str) -> Path:
+    return _save(BASE_URL_VAR, url)
+
+
 def private_config_dir() -> Path:
     """The CLI's config directory, owner-only: it holds the API key and prompt history."""
     path = GLOBAL_ENV_PATH.parent
@@ -129,6 +133,10 @@ def source(explicit: ApiKey | None = None) -> str | None:
     if _stored(API_KEY_VAR):
         return str(GLOBAL_ENV_PATH)
     return None
+
+
+def stored_api_key() -> str | None:
+    return _stored(API_KEY_VAR)
 
 
 def _client_kwargs(api_key: ApiKey | None, base_url: str | None) -> dict[str, ApiKey | str]:

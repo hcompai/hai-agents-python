@@ -38,10 +38,11 @@ def current_version() -> str:
         return "dev"
 
 
-def gather(client: Any, *, cloud: bool) -> Facts:
-    jobs: dict[str, Callable[[], Any]] = {"latest": latest_version}
-    if cloud:
-        jobs["quota"] = lambda: client.quota.get_token_quota(request_options=_REQUEST_OPTIONS)
+def gather(client: Any) -> Facts:
+    jobs: dict[str, Callable[[], Any]] = {
+        "latest": latest_version,
+        "quota": lambda: client.quota.get_token_quota(request_options=_REQUEST_OPTIONS),
+    }
     found: dict[str, Any] = {}
 
     def run(name: str, job: Callable[[], Any]) -> None:

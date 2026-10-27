@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import importlib.util
+import os
+import shutil
 import socket
 import sys
+import sysconfig
 from dataclasses import dataclass
 
 from hai_agents.environment import HaiAgentsEnvironment
@@ -69,24 +72,34 @@ def check_browser() -> CheckResult:
 
 
 def check_desktop() -> CheckResult:
-    if importlib.util.find_spec("hai_drivers") is None or importlib.util.find_spec("hai_drivers.desktop") is None:
+    installed = importlib.util.find_spec("hai_drivers") is not None
+    return _check_machine("desktop", installed and importlib.util.find_spec("hai_drivers.desktop") is not None)
+
+
+def check_workstation() -> CheckResult:
+    path = os.pathsep.join([sysconfig.get_path("scripts"), os.environ.get("PATH", os.defpath)])
+    return _check_machine("workstation", shutil.which("desk", path=path) is not None)
+
+
+def _check_machine(kind: str, installed: bool) -> CheckResult:
+    if not installed:
         return CheckResult(
-            "desktop", True, "local desktop control not installed; add it with: pip install 'hai-agents[desktop]'"
+            kind, True, f"local {kind} control not installed; add it with: pip install 'hai-agents[{kind}]'"
         )
     if sys.platform != "darwin":
-        return CheckResult("desktop", True, "deps installed")
+        return CheckResult(kind, True, "deps installed")
     missing = missing_macos_grants()
     if missing:
         from hai_agents_local.desktop import ACCESSIBILITY_SETTINGS_URL, SCREEN_RECORDING_SETTINGS_URL
 
         return CheckResult(
-            "desktop",
+            kind,
             False,
             f"deps installed, but this terminal is missing macOS grants: {', '.join(missing)}",
             fix="grant them in System Settings -> Privacy & Security, then restart this terminal: "
             f"{ACCESSIBILITY_SETTINGS_URL} and {SCREEN_RECORDING_SETTINGS_URL}",
         )
-    return CheckResult("desktop", True, "deps installed; Accessibility and Screen Recording granted")
+    return CheckResult(kind, True, "deps installed; Accessibility and Screen Recording granted")
 
 
 def settings_urls() -> dict[str, str]:
@@ -119,5 +132,5 @@ def run_checks(api_key: str | None, base_url: str | None) -> list[CheckResult]:
     checks = [login]
     if login.ok:
         checks.append(check_platform(api_key, base_url))
-    checks.extend([check_runtime(), check_browser(), check_desktop()])
+    checks.extend([check_runtime(), check_browser(), check_desktop(), check_workstation()])
     return checks

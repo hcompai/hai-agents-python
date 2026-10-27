@@ -363,6 +363,11 @@ class _LocalSessionsState:
         # Sessions this client created on a local runtime; they never keep that runtime alive past close().
         self.own_session_ids: typing.Set[str] = set()
 
+    def bridged_kinds(self, session_id: str) -> typing.List[str]:
+        """Kinds of the environments this client serves from this machine for ``session_id``."""
+        bridges = self._served.get(str(session_id)) or self._stopped.get(str(session_id)) or []
+        return [bridge.environment_kind for bridge in bridges]
+
     @contextlib.contextmanager
     def _reviving(self, session_id: str) -> typing.Iterator[typing.List[LocalBridge]]:
         """Bridges a stopped session needs again; kept for the retry if the follow-up fails."""
