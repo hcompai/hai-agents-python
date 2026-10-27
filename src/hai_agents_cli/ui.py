@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -80,6 +81,7 @@ CheckState = Literal["ok", "warn", "fail"]
 _CHECK_GLYPH: dict[CheckState, str] = {"ok": DONE, "warn": ATTENTION, "fail": FAILED}
 
 _BLIND = "couldn't capture the screen"
+_ERROR_CODE = re.compile(r"^[A-Z][A-Z0-9_]{2,}:\s+")
 MAX_CALLS = 4
 _MAX_TAIL = 12
 _MODEL_NUDGES = frozenset({"no_tool_called", "tool_skipped", "answer_validation", "prompt_too_large_recovery"})
@@ -539,9 +541,9 @@ class StepFeed:
         if self._current is not None:
             self._finish(ts, None)
             self._flush()
-        content = " ".join(str(data.get("content") or "").split())
+        content = str(data.get("content") or "").strip()
         if content:
-            self._emit(_bullet(Text(content)))
+            self._emit(_bullet(Markdown(content)))
             self._emit(Text(""))
         calls = [tools.label(req) for req in reqs]
         thought = None if content else _first_sentence(data.get("reasoning_content"))
@@ -644,15 +646,17 @@ class StepFeed:
             lines += self._block(done, live=True)
         if current is not None:
             lines += self._calls(current, _blink(), live=True)
-            lines.append(_result(Text(current.thought or "Running…", style="thought")))
+            if current.thought:
+                lines.append(_result(Text(current.thought, style="thought")))
             lines.append(Text(""))
         lines += self._notes
         verb = current.busy if current else "Thinking"
         n = current.n if current else self.steps + 1
+        cost = self.turn_cost
         parts = [
             _clock(self.elapsed),
-            f"step {n - self._turn_from_steps}" + (f"/{self.max_steps}" if self.max_steps else ""),
-            money(self.turn_cost),
+            f"step {n - self._turn_from_steps}/{self.max_steps}" if self.max_steps else None,
+            money(cost) if cost and cost >= 0.001 else None,
             None if self.box else self.stop_hint,
         ]
         meta = f" {SEP} ".join(p for p in parts if p)
@@ -703,7 +707,6 @@ def print_answer(out: Console, answer: Any) -> None:
     if not isinstance(answer, str):
         out.print(json.dumps(answer, indent=2, default=str), markup=False, highlight=False, soft_wrap=True)
     elif interactive(out):
-        out.print()
         out.print(_bullet(Markdown(answer), "accent"))
     else:
         out.print(answer, markup=False, highlight=False, soft_wrap=True)
@@ -841,5 +844,8 @@ def _tool_error(result: Any) -> str | None:
 
 
 def _first_line(text: Any) -> str | None:
+    """The first line, without a leading `ERROR_CODE: ` the tool adds for the model."""
     lines = str(text).strip().splitlines() if text else []
-    return lines[0] if lines else None
+    if not lines:
+        return None
+    return _ERROR_CODE.sub("", lines[0]) or lines[0]

@@ -565,6 +565,7 @@ class _Conversation:
             self.next_index = 0
             if self.human and self.view_url:
                 ui.url(err_console, self.view_url)
+                err_console.print()
         else:
             request = SendSessionMessagesRequestBody_UserMessage(message=message)
             try:

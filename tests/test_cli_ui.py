@@ -191,7 +191,12 @@ def test_feed_surfaces_environment_and_tool_failures() -> None:
     feed.handle(_agent("2026-10-26T12:05:17Z", kind="error_event", origin="no_tool_called", error="Call a tool"))
     feed.handle(_agent("2026-10-26T12:07:28Z", kind="policy_event", tool_reqs=[run]))
     feed.handle(
-        _agent("2026-10-26T12:08:29Z", kind="tool_result", tool_req=run, result="error:\nrun_command timed out")
+        _agent(
+            "2026-10-26T12:08:29Z",
+            kind="tool_result",
+            tool_req=run,
+            result="error:\nCOMMAND_TIMEOUT: run_command timed out",
+        )
     )
     feed.close()
 
