@@ -200,6 +200,17 @@ def test_follow_up_step_waits_for_its_last_call_and_counts_from_the_turn() -> No
     assert (feed.turn_steps, feed.steps) == (1, 6)
 
 
+def test_the_input_box_never_rides_back_up_during_a_run() -> None:
+    out = Console(file=io.StringIO(), width=100, height=40, color_system=None)
+    feed = ui.StepFeed(out, box=ui.InputBox())
+    heights = []
+    for event in EVENTS[:6]:
+        feed.handle(event)
+        heights.append(len(out.render_lines(feed._render_live(), out.options, pad=False)))
+
+    assert heights == sorted(heights)
+
+
 def test_a_redraw_never_waits_on_an_event_being_handled() -> None:
     feed = ui.StepFeed(Console(file=io.StringIO(), width=100, color_system=None))
     shown = feed._render_live()

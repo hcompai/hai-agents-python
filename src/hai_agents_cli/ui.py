@@ -186,11 +186,16 @@ class _Lines:
             yield Segment.line()
 
 
-def _pinned(out: Console, body: list[RenderableType], bottom: list[RenderableType]) -> RenderableType:
-    """Keep ``bottom`` on screen by dropping the top of ``body`` once both outgrow the terminal."""
+def _pinned(
+    out: Console, body: list[RenderableType], bottom: list[RenderableType], floor: int
+) -> tuple[RenderableType, int]:
+    """Keep ``bottom`` on screen, and never let it ride back up from the tallest frame so far."""
     rendered = out.render_lines(Group(*body), out.options, pad=False)
-    room = out.size.height - sum(len(out.render_lines(item, out.options, pad=False)) for item in bottom)
-    return Group(_Lines(rendered[max(0, len(rendered) - room) :]), *bottom)
+    under = sum(len(out.render_lines(item, out.options, pad=False)) for item in bottom)
+    rendered = rendered[max(0, len(rendered) - (out.size.height - under)) :]
+    height = min(max(floor, len(rendered) + under), out.size.height)
+    blanks: list[list[Segment]] = [[] for _ in range(height - len(rendered) - under)]
+    return Group(_Lines(rendered + blanks), *bottom), height
 
 
 def ok(out: Console, message: str, *, url: str | None = None) -> None:
@@ -346,6 +351,7 @@ class StepFeed:
     _live: Live | None = None
     _lock: threading.RLock = field(default_factory=threading.RLock)
     _frame: RenderableType = field(default_factory=Group)
+    _floor: int = 0
     _agents: dict[str, _Agent] = field(default_factory=dict)
     _tail: list[_Done | RenderableType] = field(default_factory=list)
     _notes: list[RenderableType] = field(default_factory=list)
@@ -693,7 +699,10 @@ class StepFeed:
         lines.append(
             Text.assemble((f"{frame} {verb}…", "accent"), (f" ({meta})", "meta"), no_wrap=True, overflow="ellipsis")
         )
-        return Group(*lines) if self.box is None else _pinned(self.out, lines, self.box.lines())
+        if self.box is None:
+            return Group(*lines)
+        live, self._floor = _pinned(self.out, lines, self.box.lines(), self._floor)
+        return live
 
 
 def _observed(data: dict[str, Any], seen: dict[str, Any]) -> str | None:
