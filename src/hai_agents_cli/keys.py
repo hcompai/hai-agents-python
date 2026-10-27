@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-import contextlib
+import codecs
 import os
 import select
 import sys
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from typing import Any
+
+from rich.cells import cell_len
 
 ESC = b"\x1b"
 _POLL_S = 0.1
+_UP_CLEARING = "\x1b[1A\x1b[2K"
 
 
 def supported() -> bool:
@@ -65,36 +68,50 @@ class EscWatcher:
         """The turn ended under an open prompt, so whatever was typed belongs to no one."""
         return self._abandoned.is_set()
 
-    @contextlib.contextmanager
-    def cooked(self) -> Iterator[None]:
-        """Normal line editing for a prompt typed mid-turn."""
-        with self._tty_lock:
-            if not self._abandoned.is_set():
-                self._restore()
-        try:
-            yield
-        finally:
-            with self._tty_lock:
-                if self._fd is not None and not self._abandoned.is_set():
-                    import tty
-
-                    tty.setcbreak(self._fd)
-
-    def read_line(self) -> str | None:
-        """A line typed in cooked mode; None on EOF or once abandoned, so it never eats the next prompt's input."""
+    def edit_line(self, prompt: str, prompt_cells: int, text: str = "", *, erase: bool = False) -> str | None:
+        """The line typed after ``prompt`` from ``text``; None on esc, ctrl+d, or once abandoned (the turn ended)."""
         assert self._fd is not None
-        typed = b""
+        decode = codecs.getincrementaldecoder("utf-8")(errors="ignore").decode
+        rows = self._draw(prompt, prompt_cells, text, 1)
+        result: str | None = None
         while not self._abandoned.is_set():
             ready, _, _ = select.select([self._fd], [], [], _POLL_S)
             if not ready:
                 continue
-            chunk = os.read(self._fd, 1024)
-            if not chunk:
-                return None
-            typed += chunk
-            if typed.endswith(b"\n"):
-                return typed.decode(errors="replace").rstrip("\n")
-        return None
+            chunk = decode(os.read(self._fd, 1024))
+            if chunk == "\x1b" or (chunk == "\x04" and not text):
+                break
+            done = False
+            for char in chunk:
+                if char in "\r\n":
+                    done = True
+                    break
+                if char == "\x1b":
+                    break
+                if char in "\x7f\b":
+                    text = text[:-1]
+                elif char == "\x15":
+                    text = ""
+                elif char == "\x17":
+                    text = text.rstrip()
+                    text = text[: len(text) - len(text.split(" ")[-1])]
+                elif char.isprintable():
+                    text += char
+            rows = self._draw(prompt, prompt_cells, text, rows)
+            if done:
+                result = text
+                break
+        if erase:
+            sys.stderr.write(_UP_CLEARING * (rows - 1) + "\r\x1b[J")
+            sys.stderr.flush()
+        return None if self._abandoned.is_set() else result
+
+    def _draw(self, prompt: str, prompt_cells: int, text: str, rows: int) -> int:
+        """Redraw the line from its first row; it may wrap, and backspace can't cross a wrap."""
+        sys.stderr.write(_UP_CLEARING * (rows - 1) + "\r\x1b[J" + prompt + text)
+        sys.stderr.flush()
+        width = max(1, os.get_terminal_size(self._fd).columns) if self._fd is not None else 80
+        return max(1, -(-(prompt_cells + cell_len(text)) // width))
 
     def _run(self) -> None:
         assert self._fd is not None

@@ -44,6 +44,16 @@ def test_history_is_reachable_past_a_recalled_command(monkeypatch, tmp_path, key
         assert prompt.read(toolbar=lambda: "", placeholder="") == "find flights"
 
 
+@pytest.mark.parametrize(("keys", "expected"), [(f"fi{TAB}{ENTER}", "find flights"), (f"{TAB}{ENTER}", "Book a table")])
+def test_tab_accepts_the_grey_suggestion(monkeypatch, tmp_path, keys, expected) -> None:
+    monkeypatch.setenv("TERM", "xterm-256color")
+    FileHistory(str(tmp_path / "history")).store_string("find flights")
+    with create_pipe_input() as pipe, create_app_session(input=pipe, output=DummyOutput()):
+        pipe.send_text(keys)
+        prompt = Prompt(tmp_path / "history", lambda: [("/exit", "leave")])
+        assert prompt.read(toolbar=lambda: "", placeholder='Try "Book a table"', example="Book a table") == expected
+
+
 @pytest.mark.parametrize(
     ("keys", "expected"), [(ENTER, 1), (f"{DOWN}{DOWN}{ENTER}", 0), (f"{UP}{ENTER}", 0), (CTRL_C, None)]
 )

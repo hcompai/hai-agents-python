@@ -143,6 +143,7 @@ class Prompt:
     def __init__(self, history_path: Path, commands: Rows) -> None:
         self._menu = _SlashMenu(commands)
         self._exit_armed_at = 0.0
+        self._example: str | None = None
         self._session: PromptSession[str] = PromptSession(
             history=FileHistory(str(history_path)),
             auto_suggest=AutoSuggestFromHistory(),
@@ -154,7 +155,10 @@ class Prompt:
         # The input grows with its text only, so the toolbar and menu sit right under it.
         self._session.layout.current_window.dont_extend_height = to_filter(True)
 
-    def read(self, *, toolbar: Callable[[], str], placeholder: str) -> str | None:
+    def read(self, *, toolbar: Callable[[], str], placeholder: str, example: str | None = None) -> str | None:
+        """``example`` is the task a placeholder suggests; tab types it."""
+        self._example = example
+
         def bottom() -> FormattedText:
             if self._exit_pending():
                 return FormattedText([("class:bottom-toolbar.warn", "  press ctrl+c again to exit")])
@@ -215,6 +219,15 @@ class Prompt:
             name, _, args = usage.partition(" ")
             event.current_buffer.text = f"{name} " if args else name
             event.current_buffer.cursor_position = len(event.current_buffer.text)
+
+        @kb.add("tab", filter=~menu_open)
+        def _accept_suggestion(event: KeyPressEvent) -> None:
+            buf = event.current_buffer
+            suggestion = buf.suggestion or (buf.auto_suggest and buf.auto_suggest.get_suggestion(buf, buf.document))
+            if suggestion and buf.document.is_cursor_at_the_end:
+                buf.insert_text(suggestion.text)
+            elif not buf.text and self._example:
+                buf.insert_text(self._example)
 
         @kb.add("escape", "enter")
         @kb.add("c-j")

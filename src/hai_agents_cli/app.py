@@ -528,7 +528,7 @@ class _Conversation:
             ("ctrl+d", "exit"),
             ("up / down", "history"),
             ("ctrl+r", "search history"),
-            ("→", "accept the grey suggestion"),
+            ("tab or →", "accept the grey suggestion"),
             ("\\ enter", "new line"),
         ]
 
@@ -540,10 +540,12 @@ class _Conversation:
             state = f" {ui.SEP} ".join(p for p in parts if p) + f" {ui.SEP} /new for a fresh task"
         return f"  {self.label} {ui.SEP} {state} {ui.SEP} ? for shortcuts"
 
+    def example(self) -> str | None:
+        return None if self.session is not None else EXAMPLE_TASKS[self.drives_desktop]
+
     def placeholder(self) -> str:
-        if self.session is not None:
-            return "Follow up, or /new for a fresh task"
-        return f'Try "{EXAMPLE_TASKS[self.drives_desktop]}"'
+        example = self.example()
+        return f'Try "{example}"' if example else "Follow up, or /new for a fresh task"
 
     def turn(self, message: str, *, echo: bool = False) -> None:
         started_at = time.time()
@@ -878,13 +880,10 @@ class _Conversation:
         if feed is not None:
             feed.hold()
         ui.paused(err_console)
-        with watcher.cooked():
-            err_console.print(ui.prompt_text(), end="")
-            line = watcher.read_line()
+        line = watcher.edit_line(*_prompt_ansi())
         if watcher.stopped:
             return
-        if line is None:
-            err_console.print()
+        err_console.print()
         if feed is not None:
             err_console.print()
             feed.release()
@@ -896,15 +895,11 @@ class _Conversation:
         if feed is not None:
             feed.hold()
         line, newline, _ = typed.replace("\r", "\n").partition("\n")
-        rest: str | None = ""
-        if not newline:
-            with watcher.cooked():
-                err_console.print(Text.assemble(ui.prompt_text(), line), end="")
-                rest = watcher.read_line()
-            if watcher.stopped:
-                return
-            _erase_typed(Text.assemble(ui.prompt_text(), line, rest or ""), entered=rest is not None)
-        text = "" if rest is None else (line + rest).strip()
+        line = "".join(char for char in line if char.isprintable())
+        edited = line if newline else watcher.edit_line(*_prompt_ansi(), line, erase=True)
+        if watcher.stopped:
+            return
+        text = (edited or "").strip()
         if text and not self._turn_done:
             try:
                 self.client.sessions.pause_session(session_id)
@@ -973,11 +968,12 @@ class _Conversation:
         return None
 
 
-def _erase_typed(typed: Text, *, entered: bool) -> None:
-    rows = max(1, -(-typed.cell_len // max(1, err_console.width)))
-    up = "\x1b[1A\x1b[2K"
-    err_console.file.write(f"\r{up * rows}" if entered else f"\r\x1b[2K{up * (rows - 1)}")
-    err_console.file.flush()
+def _prompt_ansi() -> tuple[str, int]:
+    """The `> ` prompt as terminal codes, and its width."""
+    prompt = ui.prompt_text()
+    with err_console.capture() as captured:
+        err_console.print(prompt, end="")
+    return captured.get(), prompt.cell_len
 
 
 def _read_message(convo: _Conversation) -> str | None:
@@ -992,7 +988,7 @@ def _read_message(convo: _Conversation) -> str | None:
             raise typer.Exit(1) from None
 
         convo._prompt = Prompt(credentials.private_config_dir() / "history", convo.commands)
-    return convo._prompt.read(toolbar=convo.toolbar, placeholder=convo.placeholder())
+    return convo._prompt.read(toolbar=convo.toolbar, placeholder=convo.placeholder(), example=convo.example())
 
 
 def _is_command(text: str) -> bool:

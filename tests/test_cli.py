@@ -647,12 +647,8 @@ class _Watcher:
     def __init__(self, typed: str, *, stopped: bool = False) -> None:
         self.typed, self.stopped = typed, stopped
 
-    @contextlib.contextmanager
-    def cooked(self):
-        yield
-
-    def read_line(self) -> str:
-        return self.typed
+    def edit_line(self, prompt: str, prompt_cells: int, text: str = "", *, erase: bool = False) -> str:
+        return text + self.typed
 
 
 class _RunClient:
