@@ -126,7 +126,7 @@ An agent that drives this desktop, like `h/holo-desktop`, uses your mouse and ke
 | `holo sessions` | `list`, `status`, `watch`, `events`, `send`, `cancel`, `share` sessions |
 | `holo agents` | `list` agents, `get` one, `use` one as the default |
 | `holo skills` | browse available skills |
-| `holo mcp install` | add the hai-agents MCP server to Cursor, VS Code, Claude Code, and other MCP clients |
+| `holo mcp install` | let Cursor, Claude Code, Codex, and other MCP clients run agents through `holo mcp`; `--remote` adds the hosted server instead |
 | `holo local` | serve a browser, desktop, or workstation on this machine for a session started elsewhere |
 | `holo login`, `logout`, `whoami`, `doctor` | manage and check your credentials and setup |
 

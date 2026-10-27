@@ -116,13 +116,15 @@ def test_login_requires_a_browser():
     assert "interactive terminal" in _error_text(result)
 
 
-def test_login_short_circuits_when_signed_in(monkeypatch):
+@pytest.mark.parametrize(("stored", "says"), [("hk-existing", "Already signed in"), (None, "this shell only")])
+def test_login_short_circuits_when_signed_in(monkeypatch, stored, says):
     monkeypatch.setattr(app_module.credentials, "current_api_key", lambda *_: "hk-existing")
+    monkeypatch.setattr(app_module.credentials, "stored_api_key", lambda: stored)
 
     result = runner.invoke(app, ["login"])
 
     assert result.exit_code == 0
-    assert "Already signed in" in result.output
+    assert says in result.output
 
 
 def test_login_portal_follows_the_platform_region(monkeypatch):
@@ -211,6 +213,7 @@ def _error_text(result) -> str:
 def test_login_key_is_a_no_op_when_a_key_is_already_stored(monkeypatch):
     """Pasted snippets start with `hai login --key`; a second paste must not ask again."""
     monkeypatch.setattr(app_module.credentials, "current_api_key", lambda *_: "hk-existing")
+    monkeypatch.setattr(app_module.credentials, "stored_api_key", lambda: "hk-existing")
     monkeypatch.setattr(app_module, "make_client", lambda **_: pytest.fail("must not validate or store anything"))
 
     result = runner.invoke(app, ["login", "--key"], input="hk-pasted\n")

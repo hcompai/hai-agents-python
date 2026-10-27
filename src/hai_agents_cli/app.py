@@ -109,7 +109,13 @@ def login(
     """Sign in through the browser or with a pasted key, and store the key in ~/.config/hai/.env."""
     state = _state(ctx)
     if credentials.current_api_key() and not force:
-        console.print("Already signed in. Pass --force to rotate the key.")
+        if credentials.stored_api_key():
+            console.print("Already signed in. Pass --force to rotate the key.")
+        else:
+            console.print(
+                f"Signed in with {credentials.API_KEY_VAR} from this shell only. "
+                "Pass --force to save a key that MCP hosts and new shells can use."
+            )
         return
     if key:
         _store_pasted_key(state.base_url)
@@ -201,7 +207,7 @@ def doctor(ctx: typer.Context) -> None:
     else:
         for r in results:
             ui.check(console, "ok" if r.ok else "fail", r.name, r.detail, fix=r.fix)
-        if _interactive() and any(r.name == "desktop" and not r.ok for r in results):
+        if _interactive() and any(r.name in ("desktop", "workstation") and not r.ok for r in results):
             _offer_privacy_settings()
     if not all(r.ok for r in results):
         raise typer.Exit(1)
@@ -283,10 +289,18 @@ def run(
     agent: str | None = typer.Option(None, "--agent", "-a", help=AGENT_HELP),
     local: bool = typer.Option(False, "--local", help=LOCAL_HELP),
     max_steps: int | None = typer.Option(
-        None, "--max-steps", min=1, max=200, help="Maximum reasoning steps. Uncapped, or 150 on this machine."
+        None,
+        "--max-steps",
+        min=1,
+        max=200,
+        help="Maximum reasoning steps. Uncapped, or 150 when it drives this machine.",
     ),
     max_time_s: float | None = typer.Option(
-        None, "--max-time", min=1.0, max=1800.0, help="Maximum run seconds. Uncapped, or 1800 on this machine."
+        None,
+        "--max-time",
+        min=1.0,
+        max=1800.0,
+        help="Maximum run seconds. Uncapped, or 1800 when it drives this machine.",
     ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Print only the answer."),
     override: list[str] = typer.Option(
@@ -733,7 +747,7 @@ class _Conversation:
         err_console.print()
 
     def _leave(self) -> None:
-        if self.session is not None and not self.controls_machine:
+        if self.session is not None and not (self.controls_machine or self.local):
             minutes = IDLE_TIMEOUT_S // 60
             ui.hint(err_console, f"session {self.session.id} stays open {minutes} min, then closes")
 
@@ -762,6 +776,8 @@ class _Conversation:
                 self._switch_agent(arg)
             except KeyboardInterrupt:
                 err_console.print()
+        elif name in ("live", "share") and self.local:
+            ui.error(err_console, f"/{name} needs a cloud session", fix="run without --local")
         elif name == "live":
             if self.view_url:
                 webbrowser.open(self.view_url)
@@ -982,7 +998,8 @@ def _local_client(state: AppState) -> Any:
 
     _sign_in_if_needed(state)
     # The spawned runtime and the in-process bridges both read these from the environment.
-    for var, value in ((credentials.API_KEY_VAR, state.api_key), (credentials.BASE_URL_VAR, state.base_url)):
+    base_url = credentials.resolve_base_url(state.base_url)
+    for var, value in ((credentials.API_KEY_VAR, state.api_key), (credentials.BASE_URL_VAR, base_url)):
         if value:
             os.environ[var] = value
     try:
@@ -1304,8 +1321,10 @@ def mcp_serve(ctx: typer.Context) -> None:
     if sys.stdin.isatty():
         console.print(ctx.get_help())
         return
-    from . import mcp_server
-
+    try:
+        from . import mcp_server
+    except ModuleNotFoundError as exc:
+        _raise_cli_error(RuntimeError(f"{exc}. Install it with: pip install 'hai-agents[cli]'"))
     mcp_server.serve()
 
 

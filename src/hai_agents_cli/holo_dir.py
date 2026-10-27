@@ -20,7 +20,7 @@ def overrides(spec: dict[str, Any]) -> dict[str, Any]:
     """Session overrides that add ~/.holo to the agent `spec`, whose own instructions and skills come first."""
     added: dict[str, Any] = {}
     notes = HOLO_DIR / "agents.md"
-    if notes.is_file() and (text := notes.read_text(encoding="utf-8").strip()):
+    if notes.is_file() and (text := notes.read_text(encoding="utf-8-sig").strip()):
         added["agent.instructions"] = "\n\n".join(filter(None, [spec.get("instructions"), text]))
     if mine := [_skill(path) for path in sorted(HOLO_DIR.glob("skills/*/SKILL.md"))]:
         names = {skill["name"] for skill in mine}
@@ -31,7 +31,7 @@ def overrides(spec: dict[str, Any]) -> dict[str, Any]:
 
 def _skill(path: Path) -> dict[str, str]:
     # ponytail: SKILL.md only; a desktop environment cannot provision a skill's other files.
-    match = _FRONTMATTER.match(path.read_text(encoding="utf-8"))
+    match = _FRONTMATTER.match(path.read_text(encoding="utf-8-sig"))
     try:
         meta = yaml.safe_load(match[1]) if match else None
     except yaml.YAMLError:

@@ -207,6 +207,33 @@ async def test_a_desktop_run_streams_progress_under_the_kill_switch_and_always_e
     assert progress == ["Wait"] and Handle.cancelled and switch == ["armed", "disarmed"]
 
 
+async def test_a_run_cancelled_while_its_session_is_created_cancels_that_session() -> None:
+    import asyncio
+
+    import pytest
+
+    from hai_agents_cli import mcp_server
+
+    creating, cancelled = asyncio.Event(), []
+
+    class Handle:
+        async def cancel(self):
+            cancelled.append(True)
+
+    class Client:
+        async def start_session(self, **_):
+            creating.set()
+            await asyncio.sleep(0.05)
+            return Handle()
+
+    call = asyncio.ensure_future(mcp_server._start(Client(), {}))
+    await creating.wait()
+    call.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await call
+    assert cancelled == [True]
+
+
 def test_install_list_enumerates_clients() -> None:
     result = runner.invoke(app, ["mcp", "install", "list"])
 
