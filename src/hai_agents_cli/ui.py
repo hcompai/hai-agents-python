@@ -81,6 +81,7 @@ CheckState = Literal["ok", "warn", "fail"]
 _CHECK_GLYPH: dict[CheckState, str] = {"ok": DONE, "warn": ATTENTION, "fail": FAILED}
 
 _BLIND = "couldn't capture the screen"
+_REPORT_PREFIXES = (("squad_failure:", "failed"), ("squad_no_answer:", "interrupted"))
 _VERDICTS = {"partial": "partly done", "infeasible": "not possible", "blocked": "blocked"}
 _ERROR_CODE = re.compile(r"^[A-Z][A-Z0-9_]{2,}:\s+")
 MAX_CALLS = 4
@@ -346,6 +347,8 @@ class _Done:
 class _Agent:
     name: str
     status: str = "running"
+    steps: int | None = None
+    report: str | None = None
 
 
 @dataclass
@@ -409,10 +412,13 @@ class StepFeed:
         with self._lock:
             return [session_id for session_id, agent in self._agents.items() if agent.status == "running"]
 
-    def agent_status(self, session_id: str, status: str) -> None:
+    def agent_status(self, session_id: str, status: str, steps: int | None = None) -> None:
         with self._lock:
             agent = self._agents.get(session_id)
-            if agent is not None and agent.status == "running" and status in _ACTIVITY_GLYPH:
+            if agent is None or agent.status != "running":
+                return
+            agent.steps = steps if isinstance(steps, int) else agent.steps
+            if status in _ACTIVITY_GLYPH:
                 agent.status = status
                 self._settle()
 
@@ -420,6 +426,20 @@ class StepFeed:
         for agent in self._agents.values():
             if agent.status == "running" and agent.name in (names or ()):
                 agent.status = "completed"
+        self._settle()
+
+    def _reported(self, caller: str, content: Any) -> None:
+        """A subagent's answer reaches the parent as a message from it; failures carry a prefix."""
+        status = "completed"
+        for prefix, ended in _REPORT_PREFIXES:
+            if caller.startswith(prefix):
+                caller, status = caller.removeprefix(prefix), ended
+        text = next((part for part in content or [] if isinstance(part, str)), None)
+        for agent in self._agents.values():
+            if agent.name == caller:
+                agent.report = _first_sentence(text) or ""
+                if agent.status == "running" or status != "completed":
+                    agent.status = status
         self._settle()
 
     def _track_spawn(self, req: dict[str, Any], result: dict[str, Any]) -> None:
@@ -448,7 +468,8 @@ class StepFeed:
                 self.out.print(line)
 
     def _runs_agents(self, item: _Done | RenderableType) -> bool:
-        return isinstance(item, _Done) and any(self._agents[s].status == "running" for s in item.step.agents.values())
+        """Its subagents have not all reported back; a report can trail the wait that saw them finish."""
+        return isinstance(item, _Done) and any(self._agents[s].report is None for s in item.step.agents.values())
 
     def _render(self, item: _Done | RenderableType, *, live: bool = False) -> list[RenderableType]:
         return self._block(item, live=live) if isinstance(item, _Done) else [item]
@@ -492,7 +513,7 @@ class StepFeed:
             if self._current is not None and req.get("tool_name") != "answer":
                 self._call_done(req, ts, _tool_error(result))
         elif kind == "message_event":
-            self._end_agents([data.get("caller_id")])
+            self._reported(str(data.get("caller_id") or ""), data.get("content"))
         elif kind == "error_event":
             message = _first_line(data.get("error")) or "error"
             origin = data.get("origin")
@@ -608,18 +629,32 @@ class StepFeed:
         if outcome.plain:
             outcome.append(f" {SEP} ", style="meta")
         outcome.append(duration(done.seconds), style="meta")
-        return [*self._calls(done.step, style, live=live), _result(outcome), Text("")]
+        verbs = {verb for verb, _ in done.step.calls}
+        if verbs == {"wait"} and not done.error:
+            return []
+        calls = self._calls(done.step, style, live=live)
+        if len(done.step.agents) == len(done.step.calls) and not done.error and not done.title:
+            return [*calls, Text("")]
+        return [*calls, _result(outcome), Text("")]
 
-    def _calls(self, step: _Step, dot: str, *, live: bool = False) -> list[Text]:
-        """One dotted line per call; a spawn's dot blinks while its subagent runs, then shows how it ended."""
+    def _calls(self, step: _Step, dot: str, *, live: bool = False) -> list[RenderableType]:
+        """One dotted line per call; a spawn's dot blinks while its subagent runs, with its progress, then its report."""
         shown = step.calls if len(step.calls) <= MAX_CALLS else step.calls[: MAX_CALLS - 1]
-        lines = [
-            Text.assemble((f"{DOT} ", self._dot(step, i, dot, live)), self._call(verb, target))
-            for i, (verb, target) in enumerate(shown)
-        ]
+        lines: list[RenderableType] = []
+        for i, (verb, target) in enumerate(shown):
+            lines.append(Text.assemble((f"{DOT} ", self._dot(step, i, dot, live)), self._call(verb, target)))
+            if i in step.agents and (progress := self._progress(self._agents[step.agents[i]])):
+                lines.append(_result(progress))
         if hidden := len(step.calls) - len(shown):
             lines.append(Text(f"  +{hidden} more", style="meta"))
         return lines
+
+    def _progress(self, agent: _Agent) -> Text | None:
+        if agent.report:
+            return Text(agent.report, style="fail" if agent.status == "failed" else "")
+        if agent.status == "running":
+            return Text(f"step {agent.steps}" if agent.steps else "starting…", style="meta")
+        return None
 
     def _dot(self, step: _Step, index: int, default: str, live: bool) -> str:
         if index not in step.agents:

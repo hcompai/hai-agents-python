@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 
 from rich.console import Console
+from rich.text import Text
 
 from hai_agents_cli import ui
 
@@ -143,7 +144,7 @@ def test_feed_names_every_parallel_call_and_unknown_tools() -> None:
     ]
 
 
-def test_spawn_lines_show_each_subagent_state_and_hold_back_later_output(monkeypatch) -> None:
+def test_spawn_lines_follow_each_subagent_to_its_report_and_hold_back_later_output(monkeypatch) -> None:
     monkeypatch.delenv("NO_COLOR", raising=False)
     buffer = io.StringIO()
     feed = ui.StepFeed(Console(file=buffer, width=100, color_system="standard", theme=ui.THEME))
@@ -154,25 +155,30 @@ def test_spawn_lines_show_each_subagent_state_and_hold_back_later_output(monkeyp
         result = {"agent_id": req["args"]["agent_id"], "trajectory_id": f"sess_{req['args']['agent_id']}"}
         feed.handle(_agent("2026-10-26T12:00:01Z", kind="tool_result", tool_req=req, result=result))
     feed.handle(_agent("2026-10-26T12:00:02Z", kind="policy_event", tool_reqs=[{"tool_name": "sleep"}]))
-    feed.handle(_agent("2026-10-26T12:00:09Z", kind="tool_result", tool_req={"tool_name": "sleep"}, result={}))
+    sleep = {"completed": ["Blog", "News"]}
+    feed.handle(_agent("2026-10-26T12:00:09Z", kind="tool_result", tool_req={"tool_name": "sleep"}, result=sleep))
     feed.handle(_agent("2026-10-26T12:00:10Z", kind="policy_event", tool_reqs=[{"tool_name": "web_search"}]))
     assert "Spawn" not in buffer.getvalue()
 
-    feed.agent_status("sess_News", "failed")
-    feed.handle(_agent("2026-10-26T12:01:41Z", kind="message_event", caller_id="Blog", content=["report"]))
+    feed.agent_status("sess_Wiki", "running", steps=4)
+    feed.handle(_agent("2026-10-26T12:00:11Z", kind="message_event", caller_id="Blog", content=["Read it. Details."]))
+    feed.handle(_agent("2026-10-26T12:00:11Z", kind="message_event", caller_id="squad_failure:News", content=["Boom"]))
     feed.close()
 
-    lines = [line for line in buffer.getvalue().splitlines() if ui.DOT in line]
-    colors = {f"\x1b[{code}m{ui.DOT}": name for code, name in ((32, "green"), (31, "red"), (2, "dim"))}
-    assert [next(c for p, c in colors.items() if line.startswith(p)) for line in lines] == [
-        "green",
-        "red",
-        "dim",
-        "green",
-        "green",
+    output = buffer.getvalue()
+    lines = [line.rstrip() for line in Text.from_ansi(output).plain.splitlines() if line.strip()]
+    assert lines[:6] == [
+        f"{ui.DOT} Spawn Blog",
+        f"  {ui.RESULT}  Read it.",
+        f"{ui.DOT} Spawn News",
+        f"  {ui.RESULT}  Boom",
+        f"{ui.DOT} Spawn Wiki",
+        f"  {ui.RESULT}  step 4",
     ]
-    assert ["Blog" in lines[0], "News" in lines[1], "Wiki" in lines[2], "Wait" in lines[3]] == [True] * 4
-    assert "1 agent still running" in buffer.getvalue()
+    assert lines[6].startswith(f"{ui.DOT} Search") and not any("Wait" in line for line in lines)
+    dots = [line for line in output.splitlines() if ui.DOT in line][:3]
+    assert [line.startswith(f"\x1b[{code}m{ui.DOT}") for line, code in zip(dots, (32, 31, 2))] == [True] * 3
+    assert "1 agent still running" in output
 
 
 def test_follow_up_step_waits_for_its_last_call_and_counts_from_the_turn() -> None:
