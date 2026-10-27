@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import stat
 import subprocess
+from dataclasses import replace
+from types import SimpleNamespace
 
 import yaml
 from typer.testing import CliRunner
@@ -129,6 +131,65 @@ def test_install_requires_api_key(monkeypatch, tmp_path) -> None:
     assert result.exit_code != 0
     text = "\n".join(part for part in (result.output, result.stderr, str(result.exception)) if part)
     assert "No API key found" in text
+
+
+def test_desktop_install_wires_this_holo_and_writes_no_key(monkeypatch, tmp_path) -> None:
+    path = tmp_path / "mcp.json"
+    monkeypatch.setitem(
+        mcp_hosts.DESKTOP_CLIENTS, "cursor", replace(mcp_hosts.DESKTOP_CLIENTS["cursor"], config_path=str(path))
+    )
+    monkeypatch.setattr(mcp_hosts, "holo_command", lambda: "/opt/holo/bin/holo")
+
+    result = runner.invoke(app, ["mcp", "install", "cursor", "--desktop"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(path.read_text())["mcpServers"]["holo"] == {
+        "type": "stdio",
+        "command": "/opt/holo/bin/holo",
+        "args": ["mcp", "serve"],
+    }
+    assert "hk-test" not in path.read_text() and "plaintext" not in result.output
+
+
+async def test_the_desktop_tool_runs_one_session_and_always_ends_it(monkeypatch) -> None:
+    from mcp.shared.memory import create_connected_server_and_client_session
+
+    from hai_agents_cli import mcp_server
+
+    class Handle:
+        cancelled = False
+
+        async def stream(self):
+            yield {"type": "AgentEvent", "data": {"kind": "policy_event", "tool_reqs": [{"tool_name": "wait"}]}}
+
+        async def wait_for_completion(self):
+            return SimpleNamespace(status="idle", answer="Calculator is open", error=None)
+
+        async def cancel(self):
+            Handle.cancelled = True
+
+    class Local:
+        async def start_session(self, **params):
+            assert params["agent"]["name"] == "holo" and params["messages"] == "open Calculator"
+            return Handle()
+
+        async def aclose(self):
+            pass
+
+    async def local(**_):
+        return Local()
+
+    monkeypatch.setattr(mcp_server.AsyncClient, "local", local)
+    progress: list[str] = []
+
+    async def on_log(params):
+        progress.append(params.data)
+
+    async with create_connected_server_and_client_session(mcp_server.server, logging_callback=on_log) as session:
+        result = await session.call_tool("holo_desktop", {"task": "open Calculator"})
+
+    assert result.content[0].text == "Calculator is open" and not result.isError
+    assert progress == ["Wait"] and Handle.cancelled
 
 
 def test_install_list_enumerates_clients() -> None:

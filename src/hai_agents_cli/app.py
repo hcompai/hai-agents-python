@@ -6,6 +6,7 @@ import asyncio
 import concurrent.futures
 import contextlib
 import difflib
+import importlib.util
 import json
 import os
 import shutil
@@ -71,7 +72,7 @@ app = typer.Typer(
 sessions_app = typer.Typer(no_args_is_help=True, help="Inspect and steer sessions.")
 agents_app = typer.Typer(no_args_is_help=True, help="Browse available agents.")
 skills_app = typer.Typer(no_args_is_help=True, help="Browse available skills.")
-mcp_app = typer.Typer(no_args_is_help=True, help="Manage the hai-agents MCP server.")
+mcp_app = typer.Typer(no_args_is_help=True, help="Give coding agents holo's tools over MCP.")
 local_app = typer.Typer(
     no_args_is_help=True,
     help="Manually run the local browser, desktop or workstation bridge. Only needed when the session is started "
@@ -1305,6 +1306,16 @@ def get_skill_command(ctx: typer.Context, name: str = typer.Argument(...)) -> No
     _print_json(result)
 
 
+@mcp_app.command("serve")
+def mcp_serve() -> None:
+    """Serve this desktop's agent over stdio, for `holo mcp install --desktop` configs to start."""
+    try:
+        from . import mcp_server
+    except ImportError as exc:
+        _raise_cli_error(RuntimeError(f"{exc}; install the desktop extra: pip install 'hai-agents[cli,desktop]'"))
+    mcp_server.serve()
+
+
 @mcp_app.command("install")
 def mcp_install(
     ctx: typer.Context,
@@ -1312,22 +1323,32 @@ def mcp_install(
         None, help="Client id (cursor, vscode, ...), 'list' to enumerate, or omit to wire every detected client."
     ),
     url: str = typer.Option(None, "--url", help="MCP endpoint. Defaults to your --base-url region or the EU host."),
+    desktop: bool = typer.Option(
+        False, "--desktop", help="Wire this desktop's agent (`holo mcp serve`) instead of the cloud server."
+    ),
 ) -> None:
-    """Wire the hai-agents MCP server into local clients (writes your API key into each config in plaintext)."""
+    """Wire the cloud MCP server into local clients (writes your API key into each config in plaintext)."""
     state = _state(ctx)
+    registry = mcp_hosts.DESKTOP_CLIENTS if desktop else mcp_hosts.CLIENTS
+    flag = " --desktop" if desktop else ""
     if client == "list":
-        _mcp_list(state.json_output)
+        _mcp_list(registry, flag, state.json_output)
         return
 
     if client is None:
-        targets = [(cid, c) for cid, c in mcp_hosts.CLIENTS.items() if mcp_hosts.host_present(c)]
+        targets = [(cid, c) for cid, c in registry.items() if mcp_hosts.host_present(c)]
         if not targets:
-            _raise_cli_error(RuntimeError("No supported MCP clients detected. Run `holo mcp install list`."))
-    elif client in mcp_hosts.CLIENTS:
-        targets = [(client, mcp_hosts.CLIENTS[client])]
+            _raise_cli_error(RuntimeError(f"No supported MCP clients detected. Run `holo mcp install list{flag}`."))
+    elif client in registry:
+        targets = [(client, registry[client])]
     else:
-        _raise_cli_error(RuntimeError(f"Unknown client {client!r}. Run `holo mcp install list` to see supported ids."))
+        _raise_cli_error(
+            RuntimeError(f"Unknown client {client!r}. Run `holo mcp install list{flag}` to see supported ids.")
+        )
 
+    if desktop:
+        _install_desktop(targets, state.json_output)
+        return
     _sign_in_if_needed(state)
     try:
         resolved = credentials.resolve_api_key(state.api_key)
@@ -1338,6 +1359,31 @@ def mcp_install(
 
     results = [_install_one(cid, c, server_url, key) for cid, c in targets]
     _print_mcp_results(results, server_url, state.json_output)
+    if not state.json_output:
+        console.print(
+            f"  [warn]{ui.ATTENTION}[/warn] your API key was written into these configs in plaintext; keep them private"
+        )
+    _exit_if_any_failed(results)
+
+
+def _install_desktop(targets: list[tuple[str, mcp_hosts.Client]], json_output: bool) -> None:
+    if importlib.util.find_spec("mcp") is None:
+        _raise_cli_error(
+            RuntimeError("serving this desktop needs the desktop extra: pip install 'hai-agents[desktop]'")
+        )
+    try:
+        holo = mcp_hosts.holo_command()
+    except RuntimeError as exc:
+        _raise_cli_error(exc)
+    results = []
+    for cid, c in targets:
+        status, detail = mcp_hosts.wire_mcp(c, {mcp_hosts.HOLO: holo})
+        results.append({"client": cid, "status": status, "detail": detail, "skill": None})
+    _print_mcp_results(results, f"{holo} mcp serve", json_output)
+    _exit_if_any_failed(results)
+
+
+def _exit_if_any_failed(results: list[dict]) -> None:
     if any(r["status"].fatal or (r["skill"] and r["skill"][0].fatal) for r in results):
         raise typer.Exit(1)
 
@@ -1348,8 +1394,8 @@ def _install_one(cid: str, c: mcp_hosts.Client, url: str, key: str) -> dict:
     return {"client": cid, "status": status, "detail": detail, "skill": skill}
 
 
-def _mcp_list(json_output: bool) -> None:
-    rows = [(cid, mcp_hosts.host_present(c), mcp_hosts.host_target(c)) for cid, c in mcp_hosts.CLIENTS.items()]
+def _mcp_list(registry: dict[str, mcp_hosts.Client], flag: str, json_output: bool) -> None:
+    rows = [(cid, mcp_hosts.host_present(c), mcp_hosts.host_target(c)) for cid, c in registry.items()]
     if json_output:
         _print_json({cid: {"detected": detected, "target": tgt} for cid, detected, tgt in rows})
         return
@@ -1358,7 +1404,8 @@ def _mcp_list(json_output: bool) -> None:
         table.add_row(cid, "[green]yes[/green]" if detected else "[dim]no[/dim]", tgt)
     console.print(table)
     console.print(
-        "[dim]Wire one with[/dim] [cyan]holo mcp install <id>[/cyan][dim], or all detected with[/dim] [cyan]holo mcp install[/cyan]."
+        f"[dim]Wire one with[/dim] [cyan]holo mcp install <id>{flag}[/cyan][dim], "
+        f"or all detected with[/dim] [cyan]holo mcp install{flag}[/cyan]."
     )
 
 
@@ -1370,11 +1417,11 @@ _MCP_GLYPH: dict[mcp_hosts.Status, str] = {
 }
 
 
-def _print_mcp_results(results: list[dict], server_url: str, json_output: bool) -> None:
+def _print_mcp_results(results: list[dict], server: str, json_output: bool) -> None:
     if json_output:
         _print_json(
             {
-                "url": server_url,
+                "server": server,
                 "results": [
                     {
                         "client": r["client"],
@@ -1394,10 +1441,7 @@ def _print_mcp_results(results: list[dict], server_url: str, json_output: bool) 
         elif r["skill"]:
             line += f"  {_MCP_GLYPH[r['skill'][0]]} [meta]skill: {escape(r['skill'][1])}[/meta]"
         console.print(line)
-    console.print(f"\n  [meta]server[/meta] {server_url}")
-    console.print(
-        f"  [warn]{ui.ATTENTION}[/warn] your API key was written into these configs in plaintext; keep them private"
-    )
+    console.print(f"\n  [meta]server[/meta] {escape(server)}")
 
 
 @local_app.command("browser")
