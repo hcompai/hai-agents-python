@@ -81,6 +81,7 @@ CheckState = Literal["ok", "warn", "fail"]
 _CHECK_GLYPH: dict[CheckState, str] = {"ok": DONE, "warn": ATTENTION, "fail": FAILED}
 
 _BLIND = "couldn't capture the screen"
+_VERDICTS = {"partial": "partly done", "infeasible": "not possible", "blocked": "blocked"}
 _ERROR_CODE = re.compile(r"^[A-Z][A-Z0-9_]{2,}:\s+")
 MAX_CALLS = 4
 _MAX_TAIL = 12
@@ -725,8 +726,11 @@ def set_title(out: Console, text: str) -> None:
         out.set_window_title(text)
 
 
-def outcome(status: str) -> str:
-    return "done" if status in ("completed", "idle") else status
+def outcome(status: str, answered: str | None = None) -> str:
+    """``answered`` is the agent's own verdict on a finished task: success, partial, infeasible or blocked."""
+    if status not in ("completed", "idle"):
+        return status
+    return _VERDICTS.get(answered or "", "done")
 
 
 def notify(out: Console, message: str) -> None:
@@ -747,6 +751,7 @@ def summary(
     *,
     error_text: str | None = None,
     session_id: str | None = None,
+    answered: str | None = None,
 ) -> None:
     parts: list[str | None] = []
     if feed is not None:
@@ -755,9 +760,14 @@ def summary(
         parts.append(f"session {session_id}")
     meta = "".join(f" {SEP} {p}" for p in parts if p)
     took = duration(feed.elapsed) if feed is not None else None
-    set_title(out, f"holo {SEP} {f'{DONE} done' if outcome(status) == 'done' else f'{FAILED} {status}'}")
-    if status in ("completed", "idle"):
+    verdict = outcome(status, answered)
+    set_title(out, f"holo {SEP} {f'{DONE} done' if verdict == 'done' else f'{FAILED} {verdict}'}")
+    if verdict == "done":
         line = Text.assemble((f"{SPARK} ", "accent"), f"Done in {took}" if took else "Done", (meta, "meta"))
+    elif status in ("completed", "idle"):
+        line = Text.assemble(
+            (f"{DOT} ", "warn"), verdict.capitalize(), (f" {SEP} {took}" if took else "", "meta"), (meta, "meta")
+        )
     elif status == "failed":
         line = Text.assemble((f"{DOT} ", "fail"), f"Failed after {took}" if took else "Failed", (meta, "meta"))
     else:

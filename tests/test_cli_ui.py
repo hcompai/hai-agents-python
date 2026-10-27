@@ -108,6 +108,16 @@ def test_each_step_says_what_changed_on_screen_and_a_blind_spell_once() -> None:
     ]
 
 
+def test_the_last_line_says_when_the_agent_could_not_finish() -> None:
+    lines = []
+    for answered in ("success", "blocked"):
+        buffer = io.StringIO()
+        ui.summary(Console(file=buffer, width=100, color_system=None), "idle", None, answered=answered)
+        lines.append(buffer.getvalue().strip())
+
+    assert lines == [f"{ui.SPARK} Done", f"{ui.DOT} Blocked"]
+
+
 def test_feed_names_every_parallel_call_and_unknown_tools() -> None:
     buffer = io.StringIO()
     feed = ui.StepFeed(Console(file=buffer, width=100, color_system=None))

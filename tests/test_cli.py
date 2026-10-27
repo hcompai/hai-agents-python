@@ -159,7 +159,7 @@ def test_a_client_tool_wait_ends_the_session_and_the_next_message_starts_a_new_o
 
 
 @pytest.mark.parametrize("earlier", [[], ["completed"]], ids=["first turn", "after a finished session"])
-def test_a_lost_stream_cancels_the_session_and_the_chat_continues(monkeypatch, earlier) -> None:
+def test_a_lost_stream_keeps_the_session_for_the_next_message(monkeypatch, earlier) -> None:
     client = _RunClient()
     finished = [SessionRunResult(id="sess_1", status=status, events=[], next_from_index=1) for status in earlier]
     idle = SessionRunResult(id="sess_1", status="idle", events=[], next_from_index=1)
@@ -181,8 +181,9 @@ def test_a_lost_stream_cancels_the_session_and_the_chat_continues(monkeypatch, e
     result = runner.invoke(app, ["run", "find flights", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
 
     assert result.exit_code == 0, result.output
-    assert client.sessions.created == 2 + len(earlier)
-    assert client.sessions.calls == [("cancel",)]
+    assert "lost the session's stream" in result.output
+    assert client.sessions.created == 1 + len(earlier)
+    assert client.sessions.calls == [("send", "try again")]
 
 
 def test_retry_runs_the_first_task_again_in_a_new_session(monkeypatch) -> None:

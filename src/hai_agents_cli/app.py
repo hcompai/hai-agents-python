@@ -616,9 +616,14 @@ class _Conversation:
         except Exception as exc:
             if feed is not None:
                 feed.close()
-            if self.followups:
-                self._end_session()
-            _raise_cli_error(exc)
+            if not self.followups:
+                _raise_cli_error(exc)
+            if isinstance(exc, TimeoutError):
+                ui.error(err_console, f"no answer after {ui.duration(timeout or 0)}; the agent may still be working")
+            else:
+                ui.error(err_console, f"lost the session's stream: {exc}")
+            ui.hint(err_console, "follow up to pick it back up, /live to watch, or /new to start over")
+            return
         if feed is not None:
             feed.close()
             if feed.answer is None:
@@ -638,7 +643,8 @@ class _Conversation:
             show_session_id=not self.followups,
         )
         if feed is not None and feed.elapsed >= NOTIFY_AFTER_S:
-            ui.notify(err_console, f"holo: {ui.outcome(_status_text(result.status))} in {ui.duration(feed.elapsed)}")
+            verdict = ui.outcome(_status_text(result.status), result.outcome)
+            ui.notify(err_console, f"holo: {verdict} in {ui.duration(feed.elapsed)}")
         if stopped or is_terminal_session_status(str(result.status)) or _awaits_tools(result):
             self._end_session()
             if self.followups:
@@ -1201,7 +1207,8 @@ def _watch_human(client: Any, session_id: str, timeout: float) -> None:
     if answer is not None:
         ui.print_answer(console, answer)
         err_console.print()
-    ui.summary(err_console, status, feed, error_text=_error_line(current.error, current.error_code))
+    error_text = _error_line(current.error, current.error_code)
+    ui.summary(err_console, status, feed, error_text=error_text, answered=getattr(current, "outcome", None))
     _exit_unless_clean(current.status)
 
 
@@ -1721,7 +1728,8 @@ def _print_run_result(
     if feed is not None:
         if answer is not None:
             err_console.print()
-        ui.summary(err_console, status, feed, error_text=error_text, session_id=result.id if show_session_id else None)
+        session_id = result.id if show_session_id else None
+        ui.summary(err_console, status, feed, error_text=error_text, session_id=session_id, answered=result.outcome)
     elif error_text or status not in CLEAN_STATUSES:
         ui.error(err_console, error_text or f"session {status}")
 
