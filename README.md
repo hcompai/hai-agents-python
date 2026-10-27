@@ -335,7 +335,7 @@ The `cli` extra installs the `holo` command (also available as `hai`) for drivin
 
 ```bash
 holo "What's the top story on Hacker News?"   # run one task
-holo                                         # interactive session: follow-ups, /help, Esc to steer
+holo                                         # interactive session: follow-ups, /help, type or Esc while it works
 holo --local "Open Calculator and compute 2+2"
 holo agents use h/web-surfer-pro             # change the default agent
 holo sessions watch <session-id>
