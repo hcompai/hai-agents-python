@@ -154,16 +154,7 @@ async def _resolve_references_async(
 def local_environment_kinds(client: typing.Any, agent: typing.Any) -> typing.List[str]:
     """Kinds of the user_device environments a run of ``agent`` would serve from this machine; fetches named specs."""
     wrapper = client.sessions._client_wrapper
-    return _kinds(wrapper, agent, _resolve_references(wrapper, agent))
-
-
-async def local_environment_kinds_async(client: typing.Any, agent: typing.Any) -> typing.List[str]:
-    """``local_environment_kinds`` for an ``AsyncClient``."""
-    wrapper = client._client_wrapper
-    return _kinds(wrapper, agent, await _resolve_references_async(wrapper, agent))
-
-
-def _kinds(wrapper: typing.Any, agent: typing.Any, resolved: typing.Mapping[Reference, typing.Any]) -> typing.List[str]:
+    resolved = _resolve_references(wrapper, agent)
     localized = localize_agent(
         agent, api_key=_token_source(wrapper), base_url=wrapper.get_base_url(), resolved=resolved
     )
@@ -371,6 +362,11 @@ class _LocalSessionsState:
         self._stopped: typing.Dict[str, typing.List[LocalBridge]] = {}
         # Sessions this client created on a local runtime; they never keep that runtime alive past close().
         self.own_session_ids: typing.Set[str] = set()
+
+    def bridged_kinds(self, session_id: str) -> typing.List[str]:
+        """Kinds of the environments this client serves from this machine for ``session_id``."""
+        bridges = self._served.get(str(session_id)) or self._stopped.get(str(session_id)) or []
+        return [bridge.environment_kind for bridge in bridges]
 
     @contextlib.contextmanager
     def _reviving(self, session_id: str) -> typing.Iterator[typing.List[LocalBridge]]:

@@ -644,6 +644,9 @@ class _RunSessions:
         self.send_fails = False
         self._polls_until_paused = 1_000
 
+    def bridged_kinds(self, session_id):
+        return []
+
     def create_session(self, **kwargs):
         self.created += 1
         if self._capture is not None:

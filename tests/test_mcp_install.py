@@ -168,16 +168,14 @@ async def test_a_desktop_run_streams_progress_under_the_kill_switch_and_always_e
         def stop(self):
             switch.append("disarmed")
 
-    async def kinds(client, agent):
-        return ["desktop"]
-
-    monkeypatch.setattr(mcp_server, "local_environment_kinds_async", kinds)
     monkeypatch.setattr(mcp_server, "arm_esc_listener", lambda: switch.append("armed") or Listener())
 
     class Handle:
+        id = "sess_1"
         cancelled = False
 
         async def stream(self):
+            assert switch == ["armed"]
             yield {"type": "AgentEvent", "data": {"kind": "policy_event", "tool_reqs": [{"tool_name": "wait"}]}}
 
         async def wait_for_completion(self):
@@ -187,8 +185,10 @@ async def test_a_desktop_run_streams_progress_under_the_kill_switch_and_always_e
             Handle.cancelled = True
 
     class Client:
+        sessions = SimpleNamespace(bridged_kinds=lambda session_id: ["desktop"] if session_id == "sess_1" else [])
+
         async def start_session(self, **params):
-            assert params == {"agent": "h/holo-desktop", "messages": "open Calculator"} and switch == ["armed"]
+            assert params == {"agent": "h/holo-desktop", "messages": "open Calculator"}
             return Handle()
 
         async def aclose(self):

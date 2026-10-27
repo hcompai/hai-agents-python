@@ -16,7 +16,6 @@ from hai_agents import AsyncClient
 from hai_agents_common import credentials
 from hai_agents_local.killswitch import KILL_SWITCH_UNAVAILABLE_HINT, arm_esc_listener
 from hai_agents_local.routing import split_revision
-from hai_agents_local.sessions import local_environment_kinds_async
 
 from . import holo_dir, tools, ui
 
@@ -26,8 +25,9 @@ INSTRUCTIONS = (
     "The agent sees none of this conversation: write a self-contained task that keeps the user's own words. "
     "Confirm with the user before an agent sends, deletes, pays or changes settings."
 )
-# Bridges in one process share this machine's mouse and keyboard.
-_this_machine = asyncio.Lock()
+# Bridges in one process share this machine's mouse and keyboard, and which runs start bridges is only known once
+# they have. ponytail: one run at a time.
+_one_run = asyncio.Lock()
 
 
 @contextlib.asynccontextmanager
@@ -87,14 +87,14 @@ async def run_agent(task: str, ctx: Context, agent: str | None = None, local: bo
             params["agent"] = spec
         if holo_dir.customized():
             params["overrides"] = holo_dir.overrides(spec)
-    kinds = await local_environment_kinds_async(cloud, agent)
     client = await _client(ctx, local)
-    async with _this_machine if kinds else contextlib.nullcontext(), _kill_switch(ctx, kinds):
+    async with _one_run:
         handle = await client.start_session(**params)
         try:
-            async for event in handle.stream():
-                await _report(ctx, event)
-            result = await handle.wait_for_completion()
+            async with _kill_switch(ctx, client.sessions.bridged_kinds(handle.id)):
+                async for event in handle.stream():
+                    await _report(ctx, event)
+                result = await handle.wait_for_completion()
         finally:
             # A settled session keeps its machine claimed; only a shield lets the cancel outlive the call's own.
             with anyio.CancelScope(shield=True), contextlib.suppress(Exception):

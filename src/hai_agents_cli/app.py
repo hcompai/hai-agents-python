@@ -548,6 +548,9 @@ class _Conversation:
             except Exception as exc:
                 _raise_cli_error(exc)
             self.next_index, self.run_steps = 0, 0
+            if bridged := self.client.sessions.bridged_kinds(self.session.id):
+                self._kinds = bridged
+                self._arm_listener()
             if self.human and self.view_url:
                 ui.url(err_console, self.view_url)
                 err_console.print()
