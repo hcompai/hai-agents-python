@@ -137,7 +137,7 @@ def _page(*, title: str, status: str, pill: str, headline: str, subtitle: str, i
         '<html lang="en" data-theme="dark">'
         f'<head><meta charset="utf-8">'
         f'<meta name="viewport" content="width=device-width,initial-scale=1">'
-        f"<title>hai - {title}</title>"
+        f"<title>holo - {title}</title>"
         f"<style>{_CSS}</style></head>"
         f'<body><main data-status="{status}">{_MARK_SVG}'
         f'<div class="copy">'
@@ -161,6 +161,6 @@ ERROR_HTML = _page(
     status="error",
     pill="Sign-in failed",
     headline="Something went wrong",
-    subtitle="Return to your terminal for details, then run hai login again.",
+    subtitle="Return to your terminal for details, then run holo login again.",
     icon=_ICON_X,
 )

@@ -1,4 +1,4 @@
-"""`hai doctor`: read-only diagnostics for login, platform access, the local runtime, and local control."""
+"""`holo doctor`: read-only diagnostics for login, platform access, the local runtime, and local control."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def check_login(api_key: str | None) -> CheckResult:
         "login",
         False,
         "no API key configured",
-        fix=f"run `hai login`, set {credentials.API_KEY_VAR}, or pass --api-key",
+        fix=f"run `holo login`, set {credentials.API_KEY_VAR}, or pass --api-key",
     )
 
 
@@ -42,7 +42,7 @@ def check_platform(api_key: str | None, base_url: str | None) -> CheckResult:
             "platform",
             False,
             f"cannot query {endpoint}: {exc}",
-            fix="check the key and network; `hai whoami` shows the resolved endpoint",
+            fix="check the key and network; `holo whoami` shows the resolved endpoint",
         )
     return CheckResult("platform", True, f"authenticated against {endpoint}")
 
@@ -75,7 +75,7 @@ def check_desktop() -> CheckResult:
         )
     if sys.platform != "darwin":
         return CheckResult("desktop", True, "deps installed")
-    missing = _missing_macos_grants()
+    missing = missing_macos_grants()
     if missing:
         from hai_agents_local.desktop import ACCESSIBILITY_SETTINGS_URL, SCREEN_RECORDING_SETTINGS_URL
 
@@ -89,7 +89,13 @@ def check_desktop() -> CheckResult:
     return CheckResult("desktop", True, "deps installed; Accessibility and Screen Recording granted")
 
 
-def _missing_macos_grants() -> list[str]:
+def settings_urls() -> dict[str, str]:
+    from hai_agents_local.desktop import ACCESSIBILITY_SETTINGS_URL, SCREEN_RECORDING_SETTINGS_URL
+
+    return {"Accessibility": ACCESSIBILITY_SETTINGS_URL, "Screen Recording": SCREEN_RECORDING_SETTINGS_URL}
+
+
+def missing_macos_grants() -> list[str]:
     # Non-prompting variants keep the doctor read-only; the bridge preflight does the prompting.
     from ApplicationServices import AXIsProcessTrusted
     from Quartz import CGPreflightScreenCaptureAccess

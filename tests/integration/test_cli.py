@@ -18,7 +18,7 @@ def test_cli_help_entrypoint() -> None:
     )
 
     assert result.returncode == 0
-    assert "hai" in result.stdout
+    assert "holo" in result.stdout
 
 
 @pytest.mark.integration

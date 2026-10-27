@@ -2,7 +2,7 @@
 
 Ctrl-C is not a reliable panic button while an agent drives the mouse and keyboard: the terminal
 may not have focus, and focus itself is what the agent is fighting you for. The stop file works
-from any terminal (`hai local stop`); the Esc listener works from anywhere at all.
+from any terminal (`holo local stop`); the Esc listener works from anywhere at all.
 """
 
 from __future__ import annotations
@@ -31,7 +31,9 @@ _UNAVAILABLE_REASON = {
     "darwin": "grant Input Monitoring to this terminal in System Settings -> Privacy & Security",
     "win32": "the global keyboard hook did not start",
 }.get(sys.platform, "needs `pip install pynput` and an X11 session; Wayland has no global key listener")
-KILL_SWITCH_UNAVAILABLE_HINT = f"double-Esc kill switch unavailable ({_UNAVAILABLE_REASON}); stop with `hai local stop`"
+KILL_SWITCH_UNAVAILABLE_HINT = (
+    f"double-Esc kill switch unavailable ({_UNAVAILABLE_REASON}); stop with `holo local stop`"
+)
 
 
 class EscListener(Protocol):

@@ -33,6 +33,7 @@ dependencies = [
 
 [project.optional-dependencies]
 cli = [
+  "prompt_toolkit>=3.0.43,<4",
   "python-dotenv>=1.2.3,<2",
   "pyyaml>=6.0,<7",
   "rich>=15.0.0,<16",
@@ -54,6 +55,7 @@ all = [
 ]
 
 [project.scripts]
+holo = "hai_agents_cli:main"
 hai = "hai_agents_cli:main"
 
 [project.urls]

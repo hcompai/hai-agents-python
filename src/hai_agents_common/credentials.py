@@ -18,6 +18,8 @@ ApiKey = str | Callable[[], str]
 
 BASE_URL_VAR = "HAI_API_BASE_URL"
 PORTAL_URL_VAR = "HAI_PORTAL_URL"
+AGENT_VAR = "HAI_AGENT"
+DEFAULT_AGENT = "h/web-surfer-flash"
 
 PORTALS = {
     HaiAgentsEnvironment.EU.value: "https://portal.api.eu.hcompany.ai",
@@ -29,7 +31,7 @@ GLOBAL_ENV_PATH = credentials_path()
 
 
 def portal_base(base_url: str | None = None) -> str:
-    """Portal origin used by `hai login`: `HAI_PORTAL_URL`, else the portal of the platform's region."""
+    """Portal origin used by `holo login`: `HAI_PORTAL_URL`, else the portal of the platform's region."""
     if os.environ.get(PORTAL_URL_VAR):
         return os.environ[PORTAL_URL_VAR]
     platform = (resolve_base_url(base_url) or HaiAgentsEnvironment.EU.value).rstrip("/")
@@ -49,7 +51,7 @@ def resolve_api_key(explicit: ApiKey | None = None) -> ApiKey:
     """Resolved API key, or raise with guidance if none is configured."""
     key = current_api_key(explicit)
     if not key:
-        raise RuntimeError(f"No API key found. Run `hai login`, set {API_KEY_VAR}, or pass --api-key.")
+        raise RuntimeError(f"No API key found. Run `holo login`, set {API_KEY_VAR}, or pass --api-key.")
     return key
 
 
@@ -78,13 +80,33 @@ def absolute_share_url(client: Client | AsyncClient, share_path: str) -> str:
 
 def save_api_key(key: str) -> Path:
     """Persist the API key to the global `.env` (file 600, directory 700) and the process env."""
-    GLOBAL_ENV_PATH.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    GLOBAL_ENV_PATH.parent.chmod(0o700)  # mkdir leaves an existing directory's mode untouched, so we set it explicitly
+    return _save(API_KEY_VAR, key)
+
+
+def default_agent() -> str:
+    """Agent `holo run` uses without `--agent`: `HAI_AGENT`, else the fast web surfer."""
+    return _lookup(AGENT_VAR) or DEFAULT_AGENT
+
+
+def save_default_agent(name: str) -> Path:
+    return _save(AGENT_VAR, name)
+
+
+def private_config_dir() -> Path:
+    """The CLI's config directory, owner-only: it holds the API key and prompt history."""
+    path = GLOBAL_ENV_PATH.parent
+    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    path.chmod(0o700)  # mkdir leaves an existing directory's mode untouched, so we set it explicitly
+    return path
+
+
+def _save(name: str, value: str) -> Path:
+    private_config_dir()
     # Create owner-only from the start
     os.close(os.open(GLOBAL_ENV_PATH, os.O_WRONLY | os.O_CREAT, 0o600))
     GLOBAL_ENV_PATH.chmod(0o600)  # tighten a file that already existed
-    set_key(str(GLOBAL_ENV_PATH), API_KEY_VAR, key)
-    os.environ[API_KEY_VAR] = key
+    set_key(str(GLOBAL_ENV_PATH), name, value)
+    os.environ[name] = value
     return GLOBAL_ENV_PATH
 
 
@@ -99,7 +121,7 @@ def clear_api_key() -> Path | None:
 
 
 def source(explicit: ApiKey | None = None) -> str | None:
-    """Where the resolved credential comes from (`argument`, `environment`, or a file path), for `hai whoami`."""
+    """Where the resolved credential comes from (`argument`, `environment`, or a file path), for `holo whoami`."""
     if explicit:
         return "argument"
     if os.environ.get(API_KEY_VAR):

@@ -27,27 +27,41 @@
   <a href="https://hcompany.ai">H Company</a>
 </p>
 
+## Contents
+
+- [Installation](#installation)
+- [Quickstart: command line](#quickstart-command-line)
+- [Quickstart: Python](#quickstart-python)
+- [Command line](#command-line)
+- [Python SDK guides](#python-sdk-guides)
+- [Documentation](#documentation)
+
 ## Installation
 
 ```bash
-pip install hai-agents
+pip install "hai-agents[cli]"   # SDK and the holo command
+pip install hai-agents          # SDK only
 ```
 
-Add the optional command-line tools with the `cli` extra:
+Python 3.10 or newer is required.
+
+## Quickstart: command line
 
 ```bash
 pip install "hai-agents[cli]"
+holo login
+holo "What's the top story on Hacker News?"
 ```
 
-Python 3.10 or newer is required. Get an API key at [platform.hcompany.ai/settings/api-keys](https://platform.hcompany.ai/settings/api-keys) and export it:
+`holo login` signs you in with Google in the browser, or takes a key you paste with `holo login --key`, and stores it in `~/.config/hai/.env`. Any command does the same on first use in a terminal, so this step is optional. The task then runs on a hosted agent with its own browser: its steps stream to your terminal, and its answer prints at the end. In a terminal you can follow up on the same session, or run `holo` alone to start an interactive session.
+
+## Quickstart: Python
+
+Get an API key at [platform.hcompany.ai/settings/api-keys](https://platform.hcompany.ai/settings/api-keys) and export it, or run `holo login` once:
 
 ```bash
 export HAI_API_KEY=hk-...
 ```
-
-With the `cli` extra, `hai login` stores a key once instead, and `Client()` picks it up.
-
-## Quickstart
 
 Launch the built-in `h/web-surfer-pro` agent, which ships with its own browser, and describe the task in plain language. `run_session` polls until the agent finishes and returns the final answer.
 
@@ -65,45 +79,70 @@ print(result.status)
 print(result.answer)
 ```
 
-`Client()` reads `HAI_API_KEY` from the environment, else the key `hai login` stored in `~/.config/hai/.env`.
+`Client()` reads `HAI_API_KEY` from the environment, else the key `holo login` stored in `~/.config/hai/.env`.
 
 `result` is a `SessionRunResult`: `id`, `status`, `answer`, the accumulated `events`, and `final_changes`.
 
-## Local agents
+## Command line
 
-`Client.local()` and `await AsyncClient.local()` run the agent on this machine through a local agent runtime,
-started on demand or passed in with `runtime=...`. Each environment picks `host="user_device"` or `host="cloud"`.
-`Client()` keeps using the hosted Agents API. Closing the client stops a runtime it started, unless other clients still
-have active sessions there.
+The `cli` extra installs the `holo` command, also available as `hai`.
 
-```python
-from hai_agents import Client
-
-with Client.local(local_options={"binary_path": "/path/to/hai-agent-runtime"}) as client:
-    session = client.sessions.create_session(
-        agent={
-            "name": "local-example",
-            "description": "Local workstation example",
-            "instructions": "Answer the user's task using the workstation tools.",
-            "environments": [
-                {"id": "workstation", "kind": "workstation", "host": "user_device"}
-            ],
-        },
-        messages=[{"type": "user_message", "message": "Print hello using the shell."}],
-        max_steps=8,
-        max_time_s=120,
-    )
-    # Poll or steer the session here, before leaving the client context.
+```bash
+holo "What's the top story on Hacker News?"      # run one task
+holo                                            # interactive session
+holo -a h/web-surfer-pro "Compare 3 laptops"    # pick an agent for one run
+holo agents use h/web-surfer-pro                # change the default agent
+holo --local "Open Calculator and compute 2+2"  # drive this machine's desktop
+holo sessions watch <session-id>                # follow a running session
+holo mcp install                                # add the MCP server to your editor
 ```
 
-Inference stays hosted (`HAI_API_KEY`) unless you pass `inference=Inference.self_hosted(url, model=...)`
-(`from hai_agents_local.runtime import Inference`).
+Tasks run on `h/web-surfer-flash` unless you pass `--agent` or set a default with `holo agents use`. Run `holo --help`, or `holo <command> --help`, for every option.
 
-One agent drives this machine's desktop at a time: a second process asking for a `desktop` or `workstation` bridge
-fails fast instead of sharing the mouse. `hai local stop` stops every local turn on the machine; so does a double Esc
-once `hai_agents_local.killswitch.arm_esc_listener()` is armed (macOS, Windows, and X11 Linux).
+### Interactive sessions
 
-## How a session works
+`holo` in a terminal opens a session you talk to in plain words. Each message continues the same session, with its browser and context, until you start fresh with `/new`.
+
+| Key | Action |
+| --- | --- |
+| type, then enter | message the agent while it works |
+| esc | pause the agent; esc again resumes |
+| `/answer` | ask the agent to answer now |
+| `/` | list commands: `/new`, `/retry`, `/resume`, `/agent`, `/live`, `/share`, `/status`, `/copy` |
+| `?` | all shortcuts |
+| ctrl+c | cancel the turn; twice to exit |
+
+With `--local`, the agent drives your mouse and keyboard, so typing goes to your apps instead: press esc twice, from any app, to stop it.
+
+### Commands
+
+| Command | What it does |
+| --- | --- |
+| `holo run <task>` | run one task; same as `holo <task>` |
+| `holo chat` | start an interactive session |
+| `holo sessions` | `list`, `status`, `watch`, `events`, `send`, `cancel`, `share` sessions |
+| `holo agents` | `list` agents, `get` one, `use` one as the default |
+| `holo skills` | browse available skills |
+| `holo mcp install` | add the hai-agents MCP server to Cursor, VS Code, Claude Code, and other MCP clients |
+| `holo local` | serve a browser, desktop, or workstation on this machine for a session started elsewhere |
+| `holo login`, `logout`, `whoami`, `doctor` | manage and check your credentials and setup |
+
+### Scripts and CI
+
+Scripts never prompt. Set `HAI_API_KEY`, or pipe a key into `holo login --key`, then use `--json` for machine-readable output or `-q` for the answer alone:
+
+```bash
+holo --json run "What's the top story on Hacker News?" | jq -r .answer
+holo run -q "What's the top story on Hacker News?" > answer.txt
+```
+
+`--json` prints `session_id`, `status`, `answer`, `outcome`, `error`, `error_code`, and `agent_view_url`. The exit code is `0` when the session completes and `1` otherwise.
+
+Credentials resolve from `--api-key`, then `HAI_API_KEY`, then `~/.config/hai/.env`.
+
+## Python SDK guides
+
+### How a session works
 
 A session is one run of an agent against a task. It moves through a small set of states: `pending`, `running`, and then a settled state such as `completed`, `idle`, `failed`, `timed_out`, or `interrupted`.
 
@@ -120,7 +159,7 @@ result = session.wait_for_completion()
 print(result.status, result.answer)
 ```
 
-## Watch and steer a running session
+### Watch and steer a running session
 
 A handle bound to the session `id` exposes the full lifecycle. Read the agent's progress at three levels of detail:
 
@@ -144,7 +183,7 @@ session.cancel()
 
 `send_message` redirects the agent on its next step and wakes an `idle` session. `pause` halts with state preserved until `resume`. `force_answer` makes the agent stop exploring and answer from what it has. `cancel` ends the session as `interrupted`.
 
-## Multi-turn sessions
+### Multi-turn sessions
 
 By default a session ends as soon as the agent answers. Set `idle_timeout_s` to keep it open: after each answer the session goes `idle` and waits that long for your next message, carrying its full context and browser state across turns.
 
@@ -160,7 +199,7 @@ session.send_message({"type": "user_message", "message": "Now summarize its comm
 second = session.wait_for_completion()
 ```
 
-## Structured output
+### Structured output
 
 Pass a pydantic model as `answer_schema` and the agent's final answer comes back as a validated instance. The model's JSON schema is sent as the agent's answer format; the raw wire value stays at `result.final_changes.answer`.
 
@@ -188,7 +227,7 @@ for job in result.answer.jobs:
 
 A completed answer that does not match the schema raises `AnswerValidationError`, with the raw payload on `.raw`. Sessions that end without completing return their raw answer untouched.
 
-## Custom tools
+### Custom tools
 
 Expose your own Python functions to the agent. Pass them to `run_session` and the polling loop runs each one when the agent calls it, then posts the result back so the session continues. Any function with typed parameters and a docstring works; the input schema is derived from the signature.
 
@@ -220,7 +259,7 @@ def lookup(order_id: str) -> dict:
 
 A tool that raises is reported to the agent as a tool error rather than crashing the run. With `AsyncClient`, tools may be `async def`.
 
-### Prebuilt: one-time passwords (2FA)
+#### Prebuilt: one-time passwords (2FA)
 
 `hai_agents_tools` ships ready-made tools. `otp_tool` lets the agent ask for a one-time password, verification code, or confirmation link when a login or signup step needs one. Without a handler it prompts on stdin; `imap_otp_handler` reads the code straight from a mailbox over IMAP (for Gmail, use an app password).
 
@@ -246,7 +285,7 @@ result = client.run_session(
 
 Like every custom tool, the handler runs entirely in your process: the IMAP credentials never leave your machine, and the agent only receives the single extracted code or link -- never mailbox contents.
 
-## Browser profiles and vaults
+### Browser profiles and vaults
 
 Start a session on a browser that already knows the user. A [browser profile](https://hub.hcompany.ai/agents-api/browser/profiles) restores saved cookies and storage from an earlier session, and a [vault](https://hub.hcompany.ai/agents-api/vaults/overview) lets the agent sign in to sites with secrets that never enter its context. Bind both through per-run overrides:
 
@@ -261,7 +300,7 @@ result = client.run_session(
 )
 ```
 
-## Async
+### Async
 
 `AsyncClient` mirrors `Client` for asyncio. Every session method is a coroutine.
 
@@ -280,7 +319,41 @@ async def main():
 asyncio.run(main())
 ```
 
-## Inspect and share sessions
+### Local agents
+
+`Client.local()` and `await AsyncClient.local()` run the agent on this machine through a local agent runtime,
+started on demand or passed in with `runtime=...`. Each environment picks `host="user_device"` or `host="cloud"`.
+`Client()` keeps using the hosted Agents API. Closing the client stops a runtime it started, unless other clients still
+have active sessions there.
+
+```python
+from hai_agents import Client
+
+with Client.local(local_options={"binary_path": "/path/to/hai-agent-runtime"}) as client:
+    session = client.sessions.create_session(
+        agent={
+            "name": "local-example",
+            "description": "Local workstation example",
+            "instructions": "Answer the user's task using the workstation tools.",
+            "environments": [
+                {"id": "workstation", "kind": "workstation", "host": "user_device"}
+            ],
+        },
+        messages=[{"type": "user_message", "message": "Print hello using the shell."}],
+        max_steps=8,
+        max_time_s=120,
+    )
+    # Poll or steer the session here, before leaving the client context.
+```
+
+Inference stays hosted (`HAI_API_KEY`) unless you pass `inference=Inference.self_hosted(url, model=...)`
+(`from hai_agents_local.runtime import Inference`).
+
+One agent drives this machine's desktop at a time: a second process asking for a `desktop` or `workstation` bridge
+fails fast instead of sharing the mouse. `holo local stop` stops every local turn on the machine; so does a double Esc
+once `hai_agents_local.killswitch.arm_esc_listener()` is armed (macOS, Windows, and X11 Linux).
+
+### Inspect and share sessions
 
 List past sessions and create a public replay link:
 
@@ -293,7 +366,7 @@ link = client.sessions.share_session("<session-id>")
 print(link.share_url)
 ```
 
-## Regions and configuration
+### Regions and configuration
 
 The client targets the EU region by default; pass `environment` to use the US region instead:
 
@@ -309,7 +382,7 @@ client = Client(environment=HaiAgentsEnvironment.US)
 client = Client(base_url="https://agp.hcompany.ai", api_key="hk-...")
 ```
 
-## Errors
+### Errors
 
 ```python
 from hai_agents import AnswerValidationError, UnprocessableEntityError
@@ -318,7 +391,7 @@ from hai_agents.core import ApiError
 
 `ApiError` is the base for HTTP failures and carries `.status_code` and `.body`. `UnprocessableEntityError` is the 422 raised when a request fails validation. `AnswerValidationError` is raised when a completed answer does not match `answer_schema`, with the unparsed value on `.raw`.
 
-## Webhooks
+### Webhooks
 
 Verify the signature on an incoming webhook before trusting it:
 
@@ -328,20 +401,6 @@ from hai_agents import verify_webhook, WebhookVerificationError
 event = verify_webhook(request_body, signature, timestamp, secret)
 print(event.type, event.data)
 ```
-
-## Command line
-
-The `cli` extra installs the `hai` command for driving agents from your terminal:
-
-```bash
-hai login
-hai run "What's the top story on Hacker News?"
-hai sessions list
-hai sessions watch <session-id>
-hai mcp install
-```
-
-`hai login` signs in with Google in the browser, or takes a key you paste from [platform.hcompany.ai/settings/api-keys](https://platform.hcompany.ai/settings/api-keys), and stores it in `~/.config/hai/.env`. Any other command does the same on first use in a terminal, so `hai login` is optional. Scripts and `--json` runs never prompt: pipe a key into `hai login --key` or set `HAI_API_KEY`. `hai mcp install` adds the hai-agents MCP server to Cursor, VS Code, Claude Code, and other MCP clients. Credentials resolve from `--api-key`, then `HAI_API_KEY`, then `~/.config/hai/.env`. Run `hai --help` for the full command set.
 
 ## Documentation
 

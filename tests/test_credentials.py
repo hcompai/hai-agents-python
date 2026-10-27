@@ -14,6 +14,7 @@ from hai_agents import AsyncClient, Client
 from hai_agents.core.api_error import ApiError
 from hai_agents_cli import auth
 from hai_agents_cli.app import app
+from hai_agents_cli.welcome import latest_version
 from hai_agents_common import credentials
 
 runner = CliRunner()
@@ -84,6 +85,18 @@ def test_saved_key_is_owner_only(tmp_path, monkeypatch):
     assert stat.S_IMODE(credentials.GLOBAL_ENV_PATH.stat().st_mode) == 0o600
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permissions")
+def test_update_check_creates_the_config_dir_owner_only(tmp_path, monkeypatch):
+    directory = tmp_path / "hai"
+    monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", directory / ".env")
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: (_ for _ in ()).throw(httpx.ConnectError("offline")))
+
+    latest_version()
+
+    assert (directory / "latest-version.json").exists()
+    assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+
+
 def test_absolute_share_url_prepends_base():
     class _Wrapper:
         def get_base_url(self) -> str:
@@ -130,7 +143,7 @@ def test_portal_failure_shows_the_portal_reason():
         auth._ok(response)
 
 
-@pytest.mark.parametrize(("status", "saved"), [(None, True), (401, False)])
+@pytest.mark.parametrize(("status", "saved"), [(None, True), (401, False), (500, False)])
 def test_login_key_validates_then_stores(monkeypatch, status, saved):
     class _Sessions:
         def get_session_quota(self):
@@ -145,13 +158,13 @@ def test_login_key_validates_then_stores(monkeypatch, status, saved):
     stored = credentials.GLOBAL_ENV_PATH.read_text() if credentials.GLOBAL_ENV_PATH.exists() else ""
     assert (result.exit_code == 0) is saved
     assert ("hk-pasted" in stored) is saved
-    if not saved:
+    if status == 401:
         assert "rejected this key" in _error_text(result)
 
 
 @pytest.mark.parametrize("client_type", [Client, AsyncClient])
 def test_sdk_client_falls_back_to_the_key_hai_login_stored(monkeypatch, client_type):
-    with pytest.raises(ApiError, match="hai login"):
+    with pytest.raises(ApiError, match="holo login"):
         client_type()
 
     credentials.save_api_key("hk-stored")

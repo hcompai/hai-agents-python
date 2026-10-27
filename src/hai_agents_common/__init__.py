@@ -1,1 +1,1 @@
-"""Shared helpers for the `hai` CLI."""
+"""Shared helpers for the `holo` CLI."""
