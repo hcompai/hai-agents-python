@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import threading
 import typing
 
@@ -166,6 +167,9 @@ def _launch_options(
     api_key = default_api_key()
     if api_key is not None:
         options["spawn_env"].setdefault(API_KEY_VAR, api_key)
+    if inference is None:
+        inherited = os.environ if options.get("inherit_env", True) else {}
+        inference = Inference.from_env({**inherited, **options["spawn_env"]})
     if inference is not None:
         options["spawn_env"] = inference.runtime_env(options["spawn_env"])
         options["inherit_env"] = False
