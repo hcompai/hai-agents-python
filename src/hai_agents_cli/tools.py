@@ -187,6 +187,8 @@ def _fallback(name: str, args: dict[str, Any]) -> Label:
     return " ".join(re.sub(r"[_-]", " ", name).split()).lower(), " ".join(first.split())
 
 
+_share = _with("share", lambda args: _names([_basename(p) for p in args.get("paths") or []], 3))
+
 _RULES: dict[str, Rule] = {
     "answer": _with("answer"),
     "update_plan": _plan,
@@ -238,7 +240,8 @@ _RULES: dict[str, Rule] = {
     "write_file": _with("write", lambda args: _text(args, "path")),
     "search_replace": _with("edit", lambda args: _text(args, "file_path", "path")),
     "view_image": _with("view", lambda args: _url(args, "source")),
-    "share_files": _with("share", lambda args: _names([_basename(p) for p in args.get("paths") or []], 3)),
+    "share_files": _share,
+    "share_files_web": _share,
     "mobile_click": _with("tap", _point),
     "mobile_long_press": _with("long-press", _point),
     "mobile_write": _with("type", lambda args: _in(_quoted(args, "text"), args)),
