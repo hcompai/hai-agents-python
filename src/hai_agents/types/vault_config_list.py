@@ -9,7 +9,7 @@ from .vault_config_read import VaultConfigRead
 
 class VaultConfigList(UniversalBaseModel):
     """
-    Response model for listing vault configs.
+    A page of vault configs.
     """
 
     total: int

@@ -4,11 +4,15 @@ import typing
 
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
-from ..types.one_password_config import OnePasswordConfig
 from ..types.vault_config_list import VaultConfigList
 from ..types.vault_config_read import VaultConfigRead
 from ..types.vault_health import VaultHealth
+from ..types.vault_item_list import VaultItemList
+from ..types.vault_item_read import VaultItemRead
+from ..types.vault_item_values import VaultItemValues
 from .raw_client import AsyncRawVaultsClient, RawVaultsClient
+from .types.vault_create_request_provider_config import VaultCreateRequestProviderConfig
+from .types.vault_update_request_provider_config import VaultUpdateRequestProviderConfig
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -69,20 +73,21 @@ class VaultsClient:
         self,
         *,
         name: str,
-        provider_config: OnePasswordConfig,
-        token: str,
+        provider_config: VaultCreateRequestProviderConfig,
+        token: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> VaultConfigRead:
         """
-        Create a vault config. The provider token is validated by env-manager before storage.
+        Create a vault config. A third-party provider's token is validated by env-manager before storage.
 
         Parameters
         ----------
         name : str
 
-        provider_config : OnePasswordConfig
+        provider_config : VaultCreateRequestProviderConfig
 
-        token : str
+        token : typing.Optional[str]
+            Provider token. Required for third-party providers; internal vaults take none.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -94,17 +99,15 @@ class VaultsClient:
 
         Examples
         --------
-        from hai_agents import Client, OnePasswordConfig
+        from hai_agents import Client
+        from hai_agents.vaults import VaultCreateRequestProviderConfig_Internal
 
         client = Client(
             api_key="YOUR_API_KEY",
         )
         client.vaults.create_vault(
             name="name",
-            provider_config=OnePasswordConfig(
-                op_vault_id="op_vault_id",
-            ),
-            token="token",
+            provider_config=VaultCreateRequestProviderConfig_Internal(),
         )
         """
         _response = self._raw_client.create_vault(
@@ -144,7 +147,7 @@ class VaultsClient:
 
     def delete_vault(self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         """
-        Delete a vault config.
+        Delete a vault config. An internal vault's items are deleted with it.
 
         Parameters
         ----------
@@ -176,7 +179,7 @@ class VaultsClient:
         vault_id: str,
         *,
         name: typing.Optional[str] = OMIT,
-        provider_config: typing.Optional[OnePasswordConfig] = OMIT,
+        provider_config: typing.Optional[VaultUpdateRequestProviderConfig] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> VaultConfigRead:
         """
@@ -188,7 +191,7 @@ class VaultsClient:
 
         name : typing.Optional[str]
 
-        provider_config : typing.Optional[OnePasswordConfig]
+        provider_config : typing.Optional[VaultUpdateRequestProviderConfig]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -278,6 +281,256 @@ class VaultsClient:
         _response = self._raw_client.vault_health(vault_id, request_options=request_options)
         return _response.data
 
+    def list_vault_items(
+        self,
+        vault_id: str,
+        *,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> VaultItemList:
+        """
+        List an internal vault's items, newest first.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        limit : typing.Optional[int]
+
+        offset : typing.Optional[int]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        VaultItemList
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.vaults.list_vault_items(
+            vault_id="vault_id",
+        )
+        """
+        _response = self._raw_client.list_vault_items(
+            vault_id, limit=limit, offset=offset, request_options=request_options
+        )
+        return _response.data
+
+    def create_vault_item(
+        self,
+        vault_id: str,
+        *,
+        name: str,
+        urls: typing.Sequence[str],
+        values: typing.Dict[str, str],
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> VaultItemRead:
+        """
+        Add an item to an internal vault. The response lists which fields are set, never their values.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        name : str
+
+        urls : typing.Sequence[str]
+            http(s) URLs of the sites this item signs in to; secrets resolve by host.
+
+        values : typing.Dict[str, str]
+            Secret values by field. `totp` takes the seed or an `otpauth://` URI and is never returned.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        VaultItemRead
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.vaults.create_vault_item(
+            vault_id="vault_id",
+            name="name",
+            urls=["urls"],
+            values={"key": "value"},
+        )
+        """
+        _response = self._raw_client.create_vault_item(
+            vault_id, name=name, urls=urls, values=values, request_options=request_options
+        )
+        return _response.data
+
+    def get_vault_item(
+        self, vault_id: str, item_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> VaultItemRead:
+        """
+        Fetch an internal vault item's metadata.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        VaultItemRead
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.vaults.get_vault_item(
+            vault_id="vault_id",
+            item_id="item_id",
+        )
+        """
+        _response = self._raw_client.get_vault_item(vault_id, item_id, request_options=request_options)
+        return _response.data
+
+    def delete_vault_item(
+        self, vault_id: str, item_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> None:
+        """
+        Delete an internal vault item and its stored values.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.vaults.delete_vault_item(
+            vault_id="vault_id",
+            item_id="item_id",
+        )
+        """
+        _response = self._raw_client.delete_vault_item(vault_id, item_id, request_options=request_options)
+        return _response.data
+
+    def update_vault_item(
+        self,
+        vault_id: str,
+        item_id: str,
+        *,
+        name: typing.Optional[str] = OMIT,
+        urls: typing.Optional[typing.Sequence[str]] = OMIT,
+        values: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> VaultItemRead:
+        """
+        Partial update of an internal vault item.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        name : typing.Optional[str]
+
+        urls : typing.Optional[typing.Sequence[str]]
+            Replaces the item's URLs.
+
+        values : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+            Values to set. Omitted fields are unchanged; a field set to null is removed.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        VaultItemRead
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.vaults.update_vault_item(
+            vault_id="vault_id",
+            item_id="item_id",
+        )
+        """
+        _response = self._raw_client.update_vault_item(
+            vault_id, item_id, name=name, urls=urls, values=values, request_options=request_options
+        )
+        return _response.data
+
+    def reveal_vault_item(
+        self, vault_id: str, item_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> VaultItemValues:
+        """
+        Return an internal vault item's values, with the current TOTP code in place of its seed. Audit-logged.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        VaultItemValues
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.vaults.reveal_vault_item(
+            vault_id="vault_id",
+            item_id="item_id",
+        )
+        """
+        _response = self._raw_client.reveal_vault_item(vault_id, item_id, request_options=request_options)
+        return _response.data
+
 
 class AsyncVaultsClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
@@ -342,20 +595,21 @@ class AsyncVaultsClient:
         self,
         *,
         name: str,
-        provider_config: OnePasswordConfig,
-        token: str,
+        provider_config: VaultCreateRequestProviderConfig,
+        token: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> VaultConfigRead:
         """
-        Create a vault config. The provider token is validated by env-manager before storage.
+        Create a vault config. A third-party provider's token is validated by env-manager before storage.
 
         Parameters
         ----------
         name : str
 
-        provider_config : OnePasswordConfig
+        provider_config : VaultCreateRequestProviderConfig
 
-        token : str
+        token : typing.Optional[str]
+            Provider token. Required for third-party providers; internal vaults take none.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -369,7 +623,8 @@ class AsyncVaultsClient:
         --------
         import asyncio
 
-        from hai_agents import AsyncClient, OnePasswordConfig
+        from hai_agents import AsyncClient
+        from hai_agents.vaults import VaultCreateRequestProviderConfig_Internal
 
         client = AsyncClient(
             api_key="YOUR_API_KEY",
@@ -379,10 +634,7 @@ class AsyncVaultsClient:
         async def main() -> None:
             await client.vaults.create_vault(
                 name="name",
-                provider_config=OnePasswordConfig(
-                    op_vault_id="op_vault_id",
-                ),
-                token="token",
+                provider_config=VaultCreateRequestProviderConfig_Internal(),
             )
 
 
@@ -435,7 +687,7 @@ class AsyncVaultsClient:
 
     async def delete_vault(self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         """
-        Delete a vault config.
+        Delete a vault config. An internal vault's items are deleted with it.
 
         Parameters
         ----------
@@ -475,7 +727,7 @@ class AsyncVaultsClient:
         vault_id: str,
         *,
         name: typing.Optional[str] = OMIT,
-        provider_config: typing.Optional[OnePasswordConfig] = OMIT,
+        provider_config: typing.Optional[VaultUpdateRequestProviderConfig] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> VaultConfigRead:
         """
@@ -487,7 +739,7 @@ class AsyncVaultsClient:
 
         name : typing.Optional[str]
 
-        provider_config : typing.Optional[OnePasswordConfig]
+        provider_config : typing.Optional[VaultUpdateRequestProviderConfig]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -601,4 +853,302 @@ class AsyncVaultsClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.vault_health(vault_id, request_options=request_options)
+        return _response.data
+
+    async def list_vault_items(
+        self,
+        vault_id: str,
+        *,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> VaultItemList:
+        """
+        List an internal vault's items, newest first.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        limit : typing.Optional[int]
+
+        offset : typing.Optional[int]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        VaultItemList
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.vaults.list_vault_items(
+                vault_id="vault_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.list_vault_items(
+            vault_id, limit=limit, offset=offset, request_options=request_options
+        )
+        return _response.data
+
+    async def create_vault_item(
+        self,
+        vault_id: str,
+        *,
+        name: str,
+        urls: typing.Sequence[str],
+        values: typing.Dict[str, str],
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> VaultItemRead:
+        """
+        Add an item to an internal vault. The response lists which fields are set, never their values.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        name : str
+
+        urls : typing.Sequence[str]
+            http(s) URLs of the sites this item signs in to; secrets resolve by host.
+
+        values : typing.Dict[str, str]
+            Secret values by field. `totp` takes the seed or an `otpauth://` URI and is never returned.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        VaultItemRead
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.vaults.create_vault_item(
+                vault_id="vault_id",
+                name="name",
+                urls=["urls"],
+                values={"key": "value"},
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.create_vault_item(
+            vault_id, name=name, urls=urls, values=values, request_options=request_options
+        )
+        return _response.data
+
+    async def get_vault_item(
+        self, vault_id: str, item_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> VaultItemRead:
+        """
+        Fetch an internal vault item's metadata.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        VaultItemRead
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.vaults.get_vault_item(
+                vault_id="vault_id",
+                item_id="item_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.get_vault_item(vault_id, item_id, request_options=request_options)
+        return _response.data
+
+    async def delete_vault_item(
+        self, vault_id: str, item_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> None:
+        """
+        Delete an internal vault item and its stored values.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.vaults.delete_vault_item(
+                vault_id="vault_id",
+                item_id="item_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.delete_vault_item(vault_id, item_id, request_options=request_options)
+        return _response.data
+
+    async def update_vault_item(
+        self,
+        vault_id: str,
+        item_id: str,
+        *,
+        name: typing.Optional[str] = OMIT,
+        urls: typing.Optional[typing.Sequence[str]] = OMIT,
+        values: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> VaultItemRead:
+        """
+        Partial update of an internal vault item.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        name : typing.Optional[str]
+
+        urls : typing.Optional[typing.Sequence[str]]
+            Replaces the item's URLs.
+
+        values : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+            Values to set. Omitted fields are unchanged; a field set to null is removed.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        VaultItemRead
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.vaults.update_vault_item(
+                vault_id="vault_id",
+                item_id="item_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.update_vault_item(
+            vault_id, item_id, name=name, urls=urls, values=values, request_options=request_options
+        )
+        return _response.data
+
+    async def reveal_vault_item(
+        self, vault_id: str, item_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> VaultItemValues:
+        """
+        Return an internal vault item's values, with the current TOTP code in place of its seed. Audit-logged.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        VaultItemValues
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.vaults.reveal_vault_item(
+                vault_id="vault_id",
+                item_id="item_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.reveal_vault_item(vault_id, item_id, request_options=request_options)
         return _response.data

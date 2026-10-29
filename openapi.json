@@ -1297,6 +1297,49 @@
         }
       }
     },
+    "/api/v2/files/{file_id}": {
+      "get": {
+        "tags": [
+          "Session Files"
+        ],
+        "summary": "Download File",
+        "description": "Download a file shared in a session, by the ``file_id`` its ``AttachmentEvent`` carries.",
+        "operationId": "download_file_api_v2_files__file_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to a presigned URL for the file."
+          },
+          "200": {
+            "description": "File bytes. SDK clients follow the redirect and receive the raw file.",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "404": {
+            "description": "File not found."
+          },
+          "4XX": {
+            "description": "Client error."
+          }
+        }
+      }
+    },
     "/api/v2/skills": {
       "post": {
         "tags": [
@@ -4319,7 +4362,7 @@
           "Vaults"
         ],
         "summary": "Create Vault",
-        "description": "Create a vault config. The provider token is validated by env-manager before storage.",
+        "description": "Create a vault config. A third-party provider's token is validated by env-manager before storage.",
         "operationId": "create_vault_api_v2_vaults_post",
         "security": [
           {
@@ -4530,7 +4573,7 @@
           "Vaults"
         ],
         "summary": "Delete Vault",
-        "description": "Delete a vault config.",
+        "description": "Delete a vault config. An internal vault's items are deleted with it.",
         "operationId": "delete_vault_api_v2_vaults__vault_id__delete",
         "security": [
           {
@@ -4650,6 +4693,370 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VaultHealth"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/vaults/{vault_id}/items": {
+      "post": {
+        "tags": [
+          "Vaults"
+        ],
+        "summary": "Create Vault Item",
+        "description": "Add an item to an internal vault. The response lists which fields are set, never their values.",
+        "operationId": "create_vault_item_api_v2_vaults__vault_id__items_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vault_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vault Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VaultItemCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultItemRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Vaults"
+        ],
+        "summary": "List Vault Items",
+        "description": "List an internal vault's items, newest first.",
+        "operationId": "list_vault_items_api_v2_vaults__vault_id__items_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vault_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vault Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultItemList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/vaults/{vault_id}/items/{item_id}": {
+      "get": {
+        "tags": [
+          "Vaults"
+        ],
+        "summary": "Get Vault Item",
+        "description": "Fetch an internal vault item's metadata.",
+        "operationId": "get_vault_item_api_v2_vaults__vault_id__items__item_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vault_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vault Id"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultItemRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Vaults"
+        ],
+        "summary": "Update Vault Item",
+        "description": "Partial update of an internal vault item.",
+        "operationId": "update_vault_item_api_v2_vaults__vault_id__items__item_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vault_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vault Id"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VaultItemUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultItemRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Vaults"
+        ],
+        "summary": "Delete Vault Item",
+        "description": "Delete an internal vault item and its stored values.",
+        "operationId": "delete_vault_item_api_v2_vaults__vault_id__items__item_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vault_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vault Id"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/vaults/{vault_id}/items/{item_id}/reveal": {
+      "post": {
+        "tags": [
+          "Vaults"
+        ],
+        "summary": "Reveal Vault Item",
+        "description": "Return an internal vault item's values, with the current TOTP code in place of its seed. Audit-logged.",
+        "operationId": "reveal_vault_item_api_v2_vaults__vault_id__items__item_id__reveal_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vault_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vault Id"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultItemValues"
                 }
               }
             }
@@ -6556,13 +6963,33 @@
         "title": "InitiateUploadResponse",
         "description": "Response model for initiating a browser profile upload."
       },
+      "InternalConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "internal",
+            "title": "Provider",
+            "default": "internal"
+          }
+        },
+        "type": "object",
+        "title": "InternalConfig",
+        "description": "H-hosted vault: its items are stored by the session manager, and it takes no token."
+      },
       "JsonValue": {},
       "ListFilesRequest": {
         "properties": {
           "path": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Path",
-            "default": "~/Downloads"
+            "description": "Directory to list; by default the environment's own, such as `~/Downloads` on a browser."
           },
           "max_entries": {
             "type": "integer",
@@ -9271,7 +9698,7 @@
           "vaults"
         ],
         "title": "VaultConfigList",
-        "description": "Response model for listing vault configs."
+        "description": "A page of vault configs."
       },
       "VaultConfigRead": {
         "properties": {
@@ -9285,12 +9712,39 @@
             "format": "uuid",
             "title": "Org Id"
           },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
           "name": {
             "type": "string",
             "title": "Name"
           },
           "provider_config": {
-            "$ref": "#/components/schemas/OnePasswordConfig"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OnePasswordConfig"
+              },
+              {
+                "$ref": "#/components/schemas/InternalConfig"
+              }
+            ],
+            "title": "Provider Config",
+            "discriminator": {
+              "propertyName": "provider",
+              "mapping": {
+                "internal": "#/components/schemas/InternalConfig",
+                "onepassword": "#/components/schemas/OnePasswordConfig"
+              }
+            }
           },
           "created_at": {
             "type": "string",
@@ -9313,7 +9767,7 @@
           "updated_at"
         ],
         "title": "VaultConfigRead",
-        "description": "Response model for a vault config. Never includes the stored token."
+        "description": "A vault config. Never includes the stored token."
       },
       "VaultCreateRequest": {
         "properties": {
@@ -9322,20 +9776,42 @@
             "title": "Name"
           },
           "provider_config": {
-            "$ref": "#/components/schemas/OnePasswordConfig"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OnePasswordConfig"
+              },
+              {
+                "$ref": "#/components/schemas/InternalConfig"
+              }
+            ],
+            "title": "Provider Config",
+            "discriminator": {
+              "propertyName": "provider",
+              "mapping": {
+                "internal": "#/components/schemas/InternalConfig",
+                "onepassword": "#/components/schemas/OnePasswordConfig"
+              }
+            }
           },
           "token": {
-            "type": "string",
-            "format": "password",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Token",
-            "writeOnly": true
+            "description": "Provider token. Required for third-party providers; internal vaults take none."
           }
         },
         "type": "object",
         "required": [
           "name",
-          "provider_config",
-          "token"
+          "provider_config"
         ],
         "title": "VaultCreateRequest",
         "description": "Request body for creating a vault config."
@@ -9364,6 +9840,257 @@
         ],
         "title": "VaultHealth",
         "description": "Result of a provider health check. The API always returns 200; branch on ``ok``."
+      },
+      "VaultItemCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Urls",
+            "description": "http(s) URLs of the sites this item signs in to; secrets resolve by host."
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string",
+              "format": "password",
+              "writeOnly": true
+            },
+            "propertyNames": {
+              "enum": [
+                "username",
+                "password",
+                "email",
+                "totp",
+                "api_key"
+              ]
+            },
+            "type": "object",
+            "title": "Values",
+            "description": "Secret values by field. `totp` takes the seed or an `otpauth://` URI and is never returned."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "urls",
+          "values"
+        ],
+        "title": "VaultItemCreateRequest",
+        "description": "Request body for adding an item to an internal vault."
+      },
+      "VaultItemList": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VaultItemRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "limit",
+          "offset",
+          "items"
+        ],
+        "title": "VaultItemList",
+        "description": "Response model for listing an internal vault's items."
+      },
+      "VaultItemRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "vault_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vault Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Urls"
+          },
+          "fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "username",
+                "password",
+                "email",
+                "totp",
+                "api_key"
+              ]
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "vault_id",
+          "name",
+          "urls",
+          "fields",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "VaultItemRead",
+        "description": "An internal vault item's metadata: which fields are set, never their values."
+      },
+      "VaultItemUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "urls": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Urls",
+            "description": "Replaces the item's URLs."
+          },
+          "values": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "password",
+                      "writeOnly": true
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "propertyNames": {
+                  "enum": [
+                    "username",
+                    "password",
+                    "email",
+                    "totp",
+                    "api_key"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Values",
+            "description": "Values to set. Omitted fields are unchanged; a field set to null is removed."
+          }
+        },
+        "type": "object",
+        "title": "VaultItemUpdateRequest",
+        "description": "Partial item update; only provided fields are forwarded."
+      },
+      "VaultItemValues": {
+        "properties": {
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "enum": [
+                "username",
+                "password",
+                "email",
+                "totp",
+                "api_key"
+              ]
+            },
+            "type": "object",
+            "title": "Values"
+          },
+          "totp_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totp Code"
+          },
+          "totp_valid_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totp Valid Until"
+          }
+        },
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "title": "VaultItemValues",
+        "description": "An internal vault item's values. A TOTP seed is never revealed: ``totp_code`` is its current code."
       },
       "VaultTokenRotateRequest": {
         "properties": {
@@ -9397,12 +10124,27 @@
           "provider_config": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/OnePasswordConfig"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OnePasswordConfig"
+                  },
+                  {
+                    "$ref": "#/components/schemas/InternalConfig"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "provider",
+                  "mapping": {
+                    "internal": "#/components/schemas/InternalConfig",
+                    "onepassword": "#/components/schemas/OnePasswordConfig"
+                  }
+                }
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Provider Config"
           }
         },
         "type": "object",

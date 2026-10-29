@@ -13,10 +13,14 @@ from ..core.request_options import RequestOptions
 from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.error_response import ErrorResponse
-from ..types.one_password_config import OnePasswordConfig
 from ..types.vault_config_list import VaultConfigList
 from ..types.vault_config_read import VaultConfigRead
 from ..types.vault_health import VaultHealth
+from ..types.vault_item_list import VaultItemList
+from ..types.vault_item_read import VaultItemRead
+from ..types.vault_item_values import VaultItemValues
+from .types.vault_create_request_provider_config import VaultCreateRequestProviderConfig
+from .types.vault_update_request_provider_config import VaultUpdateRequestProviderConfig
 from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
@@ -94,20 +98,21 @@ class RawVaultsClient:
         self,
         *,
         name: str,
-        provider_config: OnePasswordConfig,
-        token: str,
+        provider_config: VaultCreateRequestProviderConfig,
+        token: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[VaultConfigRead]:
         """
-        Create a vault config. The provider token is validated by env-manager before storage.
+        Create a vault config. A third-party provider's token is validated by env-manager before storage.
 
         Parameters
         ----------
         name : str
 
-        provider_config : OnePasswordConfig
+        provider_config : VaultCreateRequestProviderConfig
 
-        token : str
+        token : typing.Optional[str]
+            Provider token. Required for third-party providers; internal vaults take none.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -123,7 +128,7 @@ class RawVaultsClient:
             json={
                 "name": name,
                 "provider_config": convert_and_respect_annotation_metadata(
-                    object_=provider_config, annotation=OnePasswordConfig, direction="write"
+                    object_=provider_config, annotation=VaultCreateRequestProviderConfig, direction="write"
                 ),
                 "token": token,
             },
@@ -220,7 +225,7 @@ class RawVaultsClient:
         self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> HttpResponse[None]:
         """
-        Delete a vault config.
+        Delete a vault config. An internal vault's items are deleted with it.
 
         Parameters
         ----------
@@ -266,7 +271,7 @@ class RawVaultsClient:
         vault_id: str,
         *,
         name: typing.Optional[str] = OMIT,
-        provider_config: typing.Optional[OnePasswordConfig] = OMIT,
+        provider_config: typing.Optional[VaultUpdateRequestProviderConfig] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[VaultConfigRead]:
         """
@@ -278,7 +283,7 @@ class RawVaultsClient:
 
         name : typing.Optional[str]
 
-        provider_config : typing.Optional[OnePasswordConfig]
+        provider_config : typing.Optional[VaultUpdateRequestProviderConfig]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -294,7 +299,9 @@ class RawVaultsClient:
             json={
                 "name": name,
                 "provider_config": convert_and_respect_annotation_metadata(
-                    object_=provider_config, annotation=typing.Optional[OnePasswordConfig], direction="write"
+                    object_=provider_config,
+                    annotation=typing.Optional[VaultUpdateRequestProviderConfig],
+                    direction="write",
                 ),
             },
             headers={
@@ -440,6 +447,384 @@ class RawVaultsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
+    def list_vault_items(
+        self,
+        vault_id: str,
+        *,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[VaultItemList]:
+        """
+        List an internal vault's items, newest first.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        limit : typing.Optional[int]
+
+        offset : typing.Optional[int]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[VaultItemList]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/items",
+            method="GET",
+            params={
+                "limit": limit,
+                "offset": offset,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultItemList,
+                    parse_obj_as(
+                        type_=VaultItemList,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def create_vault_item(
+        self,
+        vault_id: str,
+        *,
+        name: str,
+        urls: typing.Sequence[str],
+        values: typing.Dict[str, str],
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[VaultItemRead]:
+        """
+        Add an item to an internal vault. The response lists which fields are set, never their values.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        name : str
+
+        urls : typing.Sequence[str]
+            http(s) URLs of the sites this item signs in to; secrets resolve by host.
+
+        values : typing.Dict[str, str]
+            Secret values by field. `totp` takes the seed or an `otpauth://` URI and is never returned.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[VaultItemRead]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/items",
+            method="POST",
+            json={
+                "name": name,
+                "urls": urls,
+                "values": values,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultItemRead,
+                    parse_obj_as(
+                        type_=VaultItemRead,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def get_vault_item(
+        self, vault_id: str, item_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[VaultItemRead]:
+        """
+        Fetch an internal vault item's metadata.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[VaultItemRead]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/items/{encode_path_param(item_id)}",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultItemRead,
+                    parse_obj_as(
+                        type_=VaultItemRead,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def delete_vault_item(
+        self, vault_id: str, item_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[None]:
+        """
+        Delete an internal vault item and its stored values.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[None]
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/items/{encode_path_param(item_id)}",
+            method="DELETE",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return HttpResponse(response=_response, data=None)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def update_vault_item(
+        self,
+        vault_id: str,
+        item_id: str,
+        *,
+        name: typing.Optional[str] = OMIT,
+        urls: typing.Optional[typing.Sequence[str]] = OMIT,
+        values: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[VaultItemRead]:
+        """
+        Partial update of an internal vault item.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        name : typing.Optional[str]
+
+        urls : typing.Optional[typing.Sequence[str]]
+            Replaces the item's URLs.
+
+        values : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+            Values to set. Omitted fields are unchanged; a field set to null is removed.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[VaultItemRead]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/items/{encode_path_param(item_id)}",
+            method="PATCH",
+            json={
+                "name": name,
+                "urls": urls,
+                "values": values,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultItemRead,
+                    parse_obj_as(
+                        type_=VaultItemRead,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def reveal_vault_item(
+        self, vault_id: str, item_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[VaultItemValues]:
+        """
+        Return an internal vault item's values, with the current TOTP code in place of its seed. Audit-logged.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[VaultItemValues]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/items/{encode_path_param(item_id)}/reveal",
+            method="POST",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultItemValues,
+                    parse_obj_as(
+                        type_=VaultItemValues,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
 
 class AsyncRawVaultsClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
@@ -512,20 +897,21 @@ class AsyncRawVaultsClient:
         self,
         *,
         name: str,
-        provider_config: OnePasswordConfig,
-        token: str,
+        provider_config: VaultCreateRequestProviderConfig,
+        token: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[VaultConfigRead]:
         """
-        Create a vault config. The provider token is validated by env-manager before storage.
+        Create a vault config. A third-party provider's token is validated by env-manager before storage.
 
         Parameters
         ----------
         name : str
 
-        provider_config : OnePasswordConfig
+        provider_config : VaultCreateRequestProviderConfig
 
-        token : str
+        token : typing.Optional[str]
+            Provider token. Required for third-party providers; internal vaults take none.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -541,7 +927,7 @@ class AsyncRawVaultsClient:
             json={
                 "name": name,
                 "provider_config": convert_and_respect_annotation_metadata(
-                    object_=provider_config, annotation=OnePasswordConfig, direction="write"
+                    object_=provider_config, annotation=VaultCreateRequestProviderConfig, direction="write"
                 ),
                 "token": token,
             },
@@ -638,7 +1024,7 @@ class AsyncRawVaultsClient:
         self, vault_id: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> AsyncHttpResponse[None]:
         """
-        Delete a vault config.
+        Delete a vault config. An internal vault's items are deleted with it.
 
         Parameters
         ----------
@@ -684,7 +1070,7 @@ class AsyncRawVaultsClient:
         vault_id: str,
         *,
         name: typing.Optional[str] = OMIT,
-        provider_config: typing.Optional[OnePasswordConfig] = OMIT,
+        provider_config: typing.Optional[VaultUpdateRequestProviderConfig] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[VaultConfigRead]:
         """
@@ -696,7 +1082,7 @@ class AsyncRawVaultsClient:
 
         name : typing.Optional[str]
 
-        provider_config : typing.Optional[OnePasswordConfig]
+        provider_config : typing.Optional[VaultUpdateRequestProviderConfig]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -712,7 +1098,9 @@ class AsyncRawVaultsClient:
             json={
                 "name": name,
                 "provider_config": convert_and_respect_annotation_metadata(
-                    object_=provider_config, annotation=typing.Optional[OnePasswordConfig], direction="write"
+                    object_=provider_config,
+                    annotation=typing.Optional[VaultUpdateRequestProviderConfig],
+                    direction="write",
                 ),
             },
             headers={
@@ -834,6 +1222,384 @@ class AsyncRawVaultsClient:
                     VaultHealth,
                     parse_obj_as(
                         type_=VaultHealth,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def list_vault_items(
+        self,
+        vault_id: str,
+        *,
+        limit: typing.Optional[int] = None,
+        offset: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[VaultItemList]:
+        """
+        List an internal vault's items, newest first.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        limit : typing.Optional[int]
+
+        offset : typing.Optional[int]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[VaultItemList]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/items",
+            method="GET",
+            params={
+                "limit": limit,
+                "offset": offset,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultItemList,
+                    parse_obj_as(
+                        type_=VaultItemList,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def create_vault_item(
+        self,
+        vault_id: str,
+        *,
+        name: str,
+        urls: typing.Sequence[str],
+        values: typing.Dict[str, str],
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[VaultItemRead]:
+        """
+        Add an item to an internal vault. The response lists which fields are set, never their values.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        name : str
+
+        urls : typing.Sequence[str]
+            http(s) URLs of the sites this item signs in to; secrets resolve by host.
+
+        values : typing.Dict[str, str]
+            Secret values by field. `totp` takes the seed or an `otpauth://` URI and is never returned.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[VaultItemRead]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/items",
+            method="POST",
+            json={
+                "name": name,
+                "urls": urls,
+                "values": values,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultItemRead,
+                    parse_obj_as(
+                        type_=VaultItemRead,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def get_vault_item(
+        self, vault_id: str, item_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[VaultItemRead]:
+        """
+        Fetch an internal vault item's metadata.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[VaultItemRead]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/items/{encode_path_param(item_id)}",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultItemRead,
+                    parse_obj_as(
+                        type_=VaultItemRead,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def delete_vault_item(
+        self, vault_id: str, item_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[None]:
+        """
+        Delete an internal vault item and its stored values.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[None]
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/items/{encode_path_param(item_id)}",
+            method="DELETE",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def update_vault_item(
+        self,
+        vault_id: str,
+        item_id: str,
+        *,
+        name: typing.Optional[str] = OMIT,
+        urls: typing.Optional[typing.Sequence[str]] = OMIT,
+        values: typing.Optional[typing.Dict[str, typing.Optional[str]]] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[VaultItemRead]:
+        """
+        Partial update of an internal vault item.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        name : typing.Optional[str]
+
+        urls : typing.Optional[typing.Sequence[str]]
+            Replaces the item's URLs.
+
+        values : typing.Optional[typing.Dict[str, typing.Optional[str]]]
+            Values to set. Omitted fields are unchanged; a field set to null is removed.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[VaultItemRead]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/items/{encode_path_param(item_id)}",
+            method="PATCH",
+            json={
+                "name": name,
+                "urls": urls,
+                "values": values,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultItemRead,
+                    parse_obj_as(
+                        type_=VaultItemRead,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def reveal_vault_item(
+        self, vault_id: str, item_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[VaultItemValues]:
+        """
+        Return an internal vault item's values, with the current TOTP code in place of its seed. Audit-logged.
+
+        Parameters
+        ----------
+        vault_id : str
+
+        item_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[VaultItemValues]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/vaults/{encode_path_param(vault_id)}/items/{encode_path_param(item_id)}/reveal",
+            method="POST",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    VaultItemValues,
+                    parse_obj_as(
+                        type_=VaultItemValues,  # type: ignore
                         object_=_response.json(),
                     ),
                 )

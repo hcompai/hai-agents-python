@@ -105,6 +105,7 @@ class BaseClient:
             logging=logging,
         )
         self._sessions: typing.Optional[SessionsClient] = None
+        self._session_files: typing.Optional[SessionFilesClient] = None
         self._skills: typing.Optional[SkillsClient] = None
         self._environments: typing.Optional[EnvironmentsClient] = None
         self._agents: typing.Optional[AgentsClient] = None
@@ -112,7 +113,6 @@ class BaseClient:
         self._schedules: typing.Optional[SchedulesClient] = None
         self._browser_profiles: typing.Optional[BrowserProfilesClient] = None
         self._vaults: typing.Optional[VaultsClient] = None
-        self._session_files: typing.Optional[SessionFilesClient] = None
         self._quota: typing.Optional[QuotaClient] = None
 
     @property
@@ -122,6 +122,14 @@ class BaseClient:
 
             self._sessions = SessionsClient(client_wrapper=self._client_wrapper)
         return self._sessions
+
+    @property
+    def session_files(self):
+        if self._session_files is None:
+            from .session_files.client import SessionFilesClient  # noqa: E402
+
+            self._session_files = SessionFilesClient(client_wrapper=self._client_wrapper)
+        return self._session_files
 
     @property
     def skills(self):
@@ -178,14 +186,6 @@ class BaseClient:
 
             self._vaults = VaultsClient(client_wrapper=self._client_wrapper)
         return self._vaults
-
-    @property
-    def session_files(self):
-        if self._session_files is None:
-            from .session_files.client import SessionFilesClient  # noqa: E402
-
-            self._session_files = SessionFilesClient(client_wrapper=self._client_wrapper)
-        return self._session_files
 
     @property
     def quota(self):
@@ -298,6 +298,7 @@ class AsyncBaseClient:
             logging=logging,
         )
         self._sessions: typing.Optional[AsyncSessionsClient] = None
+        self._session_files: typing.Optional[AsyncSessionFilesClient] = None
         self._skills: typing.Optional[AsyncSkillsClient] = None
         self._environments: typing.Optional[AsyncEnvironmentsClient] = None
         self._agents: typing.Optional[AsyncAgentsClient] = None
@@ -305,7 +306,6 @@ class AsyncBaseClient:
         self._schedules: typing.Optional[AsyncSchedulesClient] = None
         self._browser_profiles: typing.Optional[AsyncBrowserProfilesClient] = None
         self._vaults: typing.Optional[AsyncVaultsClient] = None
-        self._session_files: typing.Optional[AsyncSessionFilesClient] = None
         self._quota: typing.Optional[AsyncQuotaClient] = None
 
     @property
@@ -315,6 +315,14 @@ class AsyncBaseClient:
 
             self._sessions = AsyncSessionsClient(client_wrapper=self._client_wrapper)
         return self._sessions
+
+    @property
+    def session_files(self):
+        if self._session_files is None:
+            from .session_files.client import AsyncSessionFilesClient  # noqa: E402
+
+            self._session_files = AsyncSessionFilesClient(client_wrapper=self._client_wrapper)
+        return self._session_files
 
     @property
     def skills(self):
@@ -371,14 +379,6 @@ class AsyncBaseClient:
 
             self._vaults = AsyncVaultsClient(client_wrapper=self._client_wrapper)
         return self._vaults
-
-    @property
-    def session_files(self):
-        if self._session_files is None:
-            from .session_files.client import AsyncSessionFilesClient  # noqa: E402
-
-            self._session_files = AsyncSessionFilesClient(client_wrapper=self._client_wrapper)
-        return self._session_files
 
     @property
     def quota(self):

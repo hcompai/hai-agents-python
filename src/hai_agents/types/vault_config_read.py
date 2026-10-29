@@ -5,18 +5,19 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .one_password_config import OnePasswordConfig
+from .vault_config_read_provider_config import VaultConfigReadProviderConfig
 
 
 class VaultConfigRead(UniversalBaseModel):
     """
-    Response model for a vault config. Never includes the stored token.
+    A vault config. Never includes the stored token.
     """
 
     id: str
     org_id: str
+    created_by: typing.Optional[str] = None
     name: str
-    provider_config: OnePasswordConfig
+    provider_config: VaultConfigReadProviderConfig
     created_at: dt.datetime
     updated_at: dt.datetime
 
