@@ -61,7 +61,7 @@ app = typer.Typer(
     name="holo",
     help="Run H Company agents from your terminal.",
     epilog='\b\nExamples:\n  holo "What is the top story on Hacker News?"\n'
-    "  holo agents list                      (browse agents)\n"
+    '  holo -a h/holo-desktop "Open Calculator and compute 2+2"\n'
     "  holo                                  (interactive session)\n"
     "  holo agents use h/web-surfer-pro      (change the default agent)\n"
     "  holo sessions watch <session-id>",
