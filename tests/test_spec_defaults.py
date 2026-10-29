@@ -24,6 +24,7 @@ import pytest
 import hai_agents.types as types_module
 from hai_agents.core.http_client import get_request_body
 from hai_agents.types import Environment_Android, Environment_Desktop, Environment_Web
+from hai_agents.vaults import VaultCreateRequestProviderConfig_Internal, VaultCreateRequestProviderConfig_Onepassword
 
 SPEC = json.loads((pathlib.Path(__file__).parent.parent / "openapi.json").read_text())
 
@@ -106,6 +107,8 @@ def test_generated_model_sends_spec_default(schema_name, prop_name, expected_def
         (Environment_Web(id="browser", start_url="https://x.test"), "kind", "web"),
         (Environment_Desktop(id="box", host="user_device"), "kind", "desktop"),
         (Environment_Android(id="phone"), "kind", "android"),
+        (VaultCreateRequestProviderConfig_Onepassword(op_vault_id="vault_1"), "provider", "onepassword"),
+        (VaultCreateRequestProviderConfig_Internal(), "provider", "internal"),
     ],
 )
 def test_union_variant_sends_its_tag(instance, field, expected):
