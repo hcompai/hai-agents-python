@@ -51,6 +51,8 @@ _TURN_GRACE_S = 120.0  # past max_time, sagent spends up to 60s forcing an answe
 CLEAN_STATUSES = ("completed", "idle")
 IDLE_TIMEOUT_S = 600
 NOTIFY_AFTER_S = 30.0
+_NOT_PUBLIC = "environment_not_public"
+_YOUR_DESKTOP_DOCS = "https://hub.hcompany.ai/agents-api/your-desktop"
 
 console = ui.console()
 err_console = ui.console(stderr=True)
@@ -59,7 +61,7 @@ app = typer.Typer(
     name="holo",
     help="Run H Company agents from your terminal.",
     epilog='\b\nExamples:\n  holo "What is the top story on Hacker News?"\n'
-    '  holo -a h/holo-desktop "Open Calculator and compute 2+2"\n'
+    "  holo agents list                      (browse agents)\n"
     "  holo                                  (interactive session)\n"
     "  holo agents use h/web-surfer-pro      (change the default agent)\n"
     "  holo sessions watch <session-id>",
@@ -1887,13 +1889,22 @@ def _format_api_body(body) -> str:
     return json.dumps(to_jsonable(body), sort_keys=True)
 
 
+def _error_types(body: Any) -> set[str]:
+    detail = body.get("detail") if isinstance(body, dict) else getattr(body, "detail", None)
+    if not isinstance(detail, list):
+        return set()
+    return {item.get("type") if isinstance(item, dict) else getattr(item, "type", None) for item in detail}
+
+
 def _raise_cli_error(exc: Exception) -> NoReturn:
     fix = None
     if isinstance(exc, ApiError):
         message = _format_api_body(exc.body)
         if exc.status_code is not None:
             message = f"API error {exc.status_code}: {message}"
-        if exc.status_code in (401, 403):
+        if _NOT_PUBLIC in _error_types(exc.body):
+            fix = f"to drive this machine, build your own desktop agent: {_YOUR_DESKTOP_DOCS}"
+        elif exc.status_code in (401, 403):
             fix = "holo login --force"
     else:
         message = str(exc)

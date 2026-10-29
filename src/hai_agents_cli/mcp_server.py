@@ -23,7 +23,7 @@ from . import holo_dir, tools, ui
 
 INSTRUCTIONS = (
     "`run_agent` hands a task to an H agent and returns its answer. Cloud agents browse the web; "
-    "`h/holo-desktop` drives this machine with the real cursor and keyboard. "
+    "an agent with a `user_device` desktop drives this machine with the real cursor and keyboard. "
     "The agent sees none of this conversation: write a self-contained task that keeps the user's own words. "
     "Confirm with the user before an agent sends, deletes, pays or changes settings."
 )
