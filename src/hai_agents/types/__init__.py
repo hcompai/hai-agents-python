@@ -79,6 +79,7 @@ if typing.TYPE_CHECKING:
     from .image_content import ImageContent
     from .image_content_type import ImageContentType
     from .initiate_upload_response import InitiateUploadResponse
+    from .internal_config import InternalConfig
     from .json_value import JsonValue
     from .list_files_response import ListFilesResponse
     from .live_view_url_data import LiveViewUrlData
@@ -93,7 +94,6 @@ if typing.TYPE_CHECKING:
     from .model_usage import ModelUsage
     from .observation_event import ObservationEvent
     from .one_password_config import OnePasswordConfig
-    from .one_password_config_provider import OnePasswordConfigProvider
     from .page_agent import PageAgent
     from .page_agent_revision_record import PageAgentRevisionRecord
     from .page_schedule_record import PageScheduleRecord
@@ -168,7 +168,16 @@ if typing.TYPE_CHECKING:
     from .user_message_event_type import UserMessageEventType
     from .vault_config_list import VaultConfigList
     from .vault_config_read import VaultConfigRead
+    from .vault_config_read_provider_config import (
+        VaultConfigReadProviderConfig,
+        VaultConfigReadProviderConfig_Internal,
+        VaultConfigReadProviderConfig_Onepassword,
+    )
     from .vault_health import VaultHealth
+    from .vault_item_list import VaultItemList
+    from .vault_item_read import VaultItemRead
+    from .vault_item_read_fields_item import VaultItemReadFieldsItem
+    from .vault_item_values import VaultItemValues
     from .webhook_event_type_definition import WebhookEventTypeDefinition
     from .webhook_ping_result import WebhookPingResult
     from .webhook_record import WebhookRecord
@@ -251,6 +260,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ImageContent": ".image_content",
     "ImageContentType": ".image_content_type",
     "InitiateUploadResponse": ".initiate_upload_response",
+    "InternalConfig": ".internal_config",
     "JsonValue": ".json_value",
     "ListFilesResponse": ".list_files_response",
     "LiveViewUrlData": ".live_view_url_data",
@@ -265,7 +275,6 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ModelUsage": ".model_usage",
     "ObservationEvent": ".observation_event",
     "OnePasswordConfig": ".one_password_config",
-    "OnePasswordConfigProvider": ".one_password_config_provider",
     "PageAgent": ".page_agent",
     "PageAgentRevisionRecord": ".page_agent_revision_record",
     "PageScheduleRecord": ".page_schedule_record",
@@ -336,7 +345,14 @@ _dynamic_imports: typing.Dict[str, str] = {
     "UserMessageEventType": ".user_message_event_type",
     "VaultConfigList": ".vault_config_list",
     "VaultConfigRead": ".vault_config_read",
+    "VaultConfigReadProviderConfig": ".vault_config_read_provider_config",
+    "VaultConfigReadProviderConfig_Internal": ".vault_config_read_provider_config",
+    "VaultConfigReadProviderConfig_Onepassword": ".vault_config_read_provider_config",
     "VaultHealth": ".vault_health",
+    "VaultItemList": ".vault_item_list",
+    "VaultItemRead": ".vault_item_read",
+    "VaultItemReadFieldsItem": ".vault_item_read_fields_item",
+    "VaultItemValues": ".vault_item_values",
     "WebhookEventTypeDefinition": ".webhook_event_type_definition",
     "WebhookPingResult": ".webhook_ping_result",
     "WebhookRecord": ".webhook_record",
@@ -443,6 +459,7 @@ __all__ = [
     "ImageContent",
     "ImageContentType",
     "InitiateUploadResponse",
+    "InternalConfig",
     "JsonValue",
     "ListFilesResponse",
     "LiveViewUrlData",
@@ -457,7 +474,6 @@ __all__ = [
     "ModelUsage",
     "ObservationEvent",
     "OnePasswordConfig",
-    "OnePasswordConfigProvider",
     "PageAgent",
     "PageAgentRevisionRecord",
     "PageScheduleRecord",
@@ -528,7 +544,14 @@ __all__ = [
     "UserMessageEventType",
     "VaultConfigList",
     "VaultConfigRead",
+    "VaultConfigReadProviderConfig",
+    "VaultConfigReadProviderConfig_Internal",
+    "VaultConfigReadProviderConfig_Onepassword",
     "VaultHealth",
+    "VaultItemList",
+    "VaultItemRead",
+    "VaultItemReadFieldsItem",
+    "VaultItemValues",
     "WebhookEventTypeDefinition",
     "WebhookPingResult",
     "WebhookRecord",

@@ -4,7 +4,6 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .one_password_config_provider import OnePasswordConfigProvider
 
 
 class OnePasswordConfig(UniversalBaseModel):
@@ -12,7 +11,6 @@ class OnePasswordConfig(UniversalBaseModel):
     1Password vault provider config.
     """
 
-    provider: typing.Optional[OnePasswordConfigProvider] = "onepassword"
     op_vault_id: str
 
     if IS_PYDANTIC_V2:

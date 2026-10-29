@@ -29,6 +29,39 @@ class SessionFilesClient:
         """
         return self._raw_client
 
+    def download_file(
+        self, file_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> typing.Iterator[bytes]:
+        """
+        Download a file shared in a session, by the ``file_id`` its ``AttachmentEvent`` carries.
+
+        Parameters
+        ----------
+        file_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration. You can pass in configuration such as `chunk_size`, and more to customize the request and response.
+
+        Returns
+        -------
+        typing.Iterator[bytes]
+            File bytes. SDK clients follow the redirect and receive the raw file.
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        for _chunk in client.session_files.download_file(
+            file_id="file_id",
+        ):
+            pass
+        """
+        with self._raw_client.download_file(file_id, request_options=request_options) as r:
+            yield from r.data
+
     def list_files(
         self,
         session_id: str,
@@ -47,6 +80,7 @@ class SessionFilesClient:
         session_id : str
 
         path : typing.Optional[str]
+            Directory to list; by default the environment's own, such as `~/Downloads` on a browser.
 
         max_entries : typing.Optional[int]
 
@@ -179,6 +213,48 @@ class AsyncSessionFilesClient:
         """
         return self._raw_client
 
+    async def download_file(
+        self, file_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> typing.AsyncIterator[bytes]:
+        """
+        Download a file shared in a session, by the ``file_id`` its ``AttachmentEvent`` carries.
+
+        Parameters
+        ----------
+        file_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration. You can pass in configuration such as `chunk_size`, and more to customize the request and response.
+
+        Returns
+        -------
+        typing.AsyncIterator[bytes]
+            File bytes. SDK clients follow the redirect and receive the raw file.
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            async for _chunk in client.session_files.download_file(
+                file_id="file_id",
+            ):
+                pass
+
+
+        asyncio.run(main())
+        """
+        async with self._raw_client.download_file(file_id, request_options=request_options) as r:
+            async for _chunk in r.data:
+                yield _chunk
+
     async def list_files(
         self,
         session_id: str,
@@ -197,6 +273,7 @@ class AsyncSessionFilesClient:
         session_id : str
 
         path : typing.Optional[str]
+            Directory to list; by default the environment's own, such as `~/Downloads` on a browser.
 
         max_entries : typing.Optional[int]
 
