@@ -346,7 +346,7 @@ class VaultsClient:
             http(s) URLs of the sites this item signs in to; secrets resolve by host.
 
         values : typing.Dict[str, str]
-            Secret values by field. `totp` takes the seed or an `otpauth://` URI and is never returned.
+            Secret values by field. `totp` takes the seed or an `otpauth://totp/` URI and is never returned.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -469,7 +469,7 @@ class VaultsClient:
             Replaces the item's URLs.
 
         values : typing.Optional[typing.Dict[str, typing.Optional[str]]]
-            Values to set. Omitted fields are unchanged; a field set to null is removed.
+            Values to set: omitted keys are unchanged and a key set to null is removed. An update that would leave the item with no value is rejected.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -928,7 +928,7 @@ class AsyncVaultsClient:
             http(s) URLs of the sites this item signs in to; secrets resolve by host.
 
         values : typing.Dict[str, str]
-            Secret values by field. `totp` takes the seed or an `otpauth://` URI and is never returned.
+            Secret values by field. `totp` takes the seed or an `otpauth://totp/` URI and is never returned.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -1075,7 +1075,7 @@ class AsyncVaultsClient:
             Replaces the item's URLs.
 
         values : typing.Optional[typing.Dict[str, typing.Optional[str]]]
-            Values to set. Omitted fields are unchanged; a field set to null is removed.
+            Values to set: omitted keys are unchanged and a key set to null is removed. An update that would leave the item with no value is rejected.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.

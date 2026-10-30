@@ -57,6 +57,11 @@ class Agent(UniversalBaseModel):
     Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
     """
 
+    registry_skills: typing.Optional[typing.List[str]] = pydantic.Field(default=None)
+    """
+    Exact first-party registry skill IDs, loaded on demand from the runtime-pinned release. Omitted, null, or empty disables registry skills. No wildcards or subagent inheritance. Only text-only packages are supported. Separate from user-authored skills.
+    """
+
     answer_format: typing.Optional[typing.Dict[str, typing.Any]] = pydantic.Field(default=None)
     """
     JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.

@@ -4850,7 +4850,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VaultItemCreateRequest"
+                "$ref": "#/components/schemas/VaultItemCreate"
               }
             }
           }
@@ -5116,7 +5116,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VaultItemUpdateRequest"
+                "$ref": "#/components/schemas/VaultItemUpdate"
               }
             }
           }
@@ -5725,6 +5725,21 @@
             ],
             "title": "Skills",
             "description": "Skills the agent can draw on. Each entry is a registered skill's name or an inline definition."
+          },
+          "registry_skills": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Skills",
+            "description": "Exact first-party registry skill IDs, loaded on demand from the runtime-pinned release. Omitted, null, or empty disables registry skills. No wildcards or subagent inheritance. Only text-only packages are supported. Separate from user-authored skills."
           },
           "answer_format": {
             "anyOf": [
@@ -8048,6 +8063,20 @@
             ],
             "title": "Skills"
           },
+          "registry_skills": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Skills"
+          },
           "answer_format": {
             "anyOf": [
               {
@@ -10115,23 +10144,31 @@
         "title": "VaultHealth",
         "description": "Result of a provider health check. The API always returns 200; branch on ``ok``."
       },
-      "VaultItemCreateRequest": {
+      "VaultItemCreate": {
         "properties": {
           "name": {
             "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
             "title": "Name"
           },
           "urls": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 2048,
+              "minLength": 1
             },
             "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
             "title": "Urls",
             "description": "http(s) URLs of the sites this item signs in to; secrets resolve by host."
           },
           "values": {
             "additionalProperties": {
               "type": "string",
+              "maxLength": 4096,
+              "minLength": 1,
               "format": "password",
               "writeOnly": true
             },
@@ -10145,8 +10182,9 @@
               ]
             },
             "type": "object",
+            "minProperties": 1,
             "title": "Values",
-            "description": "Secret values by field. `totp` takes the seed or an `otpauth://` URI and is never returned."
+            "description": "Secret values by field. `totp` takes the seed or an `otpauth://totp/` URI and is never returned."
           }
         },
         "type": "object",
@@ -10155,7 +10193,7 @@
           "urls",
           "values"
         ],
-        "title": "VaultItemCreateRequest",
+        "title": "VaultItemCreate",
         "description": "Request body for adding an item to an internal vault."
       },
       "VaultItemList": {
@@ -10251,12 +10289,14 @@
         "title": "VaultItemRead",
         "description": "An internal vault item's metadata: which fields are set, never their values."
       },
-      "VaultItemUpdateRequest": {
+      "VaultItemUpdate": {
         "properties": {
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
               },
               {
                 "type": "null"
@@ -10268,9 +10308,13 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 2048,
+                  "minLength": 1
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 20,
+                "minItems": 1
               },
               {
                 "type": "null"
@@ -10286,6 +10330,8 @@
                   "anyOf": [
                     {
                       "type": "string",
+                      "maxLength": 4096,
+                      "minLength": 1,
                       "format": "password",
                       "writeOnly": true
                     },
@@ -10303,19 +10349,20 @@
                     "api_key"
                   ]
                 },
-                "type": "object"
+                "type": "object",
+                "minProperties": 1
               },
               {
                 "type": "null"
               }
             ],
             "title": "Values",
-            "description": "Values to set. Omitted fields are unchanged; a field set to null is removed."
+            "description": "Values to set: omitted keys are unchanged and a key set to null is removed. An update that would leave the item with no value is rejected."
           }
         },
         "type": "object",
-        "title": "VaultItemUpdateRequest",
-        "description": "Partial item update; only provided fields are forwarded."
+        "title": "VaultItemUpdate",
+        "description": "Partial item update: omitted fields, and a null `name` or `urls`, are unchanged."
       },
       "VaultItemValues": {
         "properties": {
