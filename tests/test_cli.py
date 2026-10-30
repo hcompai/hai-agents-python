@@ -13,6 +13,7 @@ from rich.console import Console
 from typer.testing import CliRunner
 
 import hai_agents_cli.app as app_module
+from hai_agents.core.api_error import ApiError
 from hai_agents.polling import MAX_REQUEST_BYTES, SessionRunResult
 from hai_agents_cli import steer, ui
 from hai_agents_cli.app import app
@@ -26,6 +27,29 @@ def test_help_lists_examples() -> None:
 
     assert result.exit_code == 0
     assert 'holo "What is the top story on Hacker News?"' in result.output
+
+
+@pytest.mark.parametrize(
+    ("body", "fix"),
+    [
+        (
+            {"message": "not public", "detail": [{"type": "environment_not_public", "message": "not public"}]},
+            "agents-api/your-desktop",
+        ),
+        ({"detail": "Forbidden"}, "holo login --force"),
+    ],
+)
+def test_a_403_hints_at_its_cause(monkeypatch, body: dict, fix: str) -> None:
+    def get_agent(*_a, **_k):
+        raise ApiError(status_code=403, body=body)
+
+    client = types.SimpleNamespace(agents=types.SimpleNamespace(get_agent=get_agent))
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+
+    result = runner.invoke(app, ["agents", "get", "h/holo-desktop", "--resolve"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 1
+    assert fix in " ".join(result.output.split())
 
 
 def test_route_runs_bare_tasks_and_hoists_global_options() -> None:
