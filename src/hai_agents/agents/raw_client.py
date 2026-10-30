@@ -143,6 +143,7 @@ class RawAgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        registry_skills: typing.Optional[typing.Sequence[str]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -178,6 +179,9 @@ class RawAgentsClient:
 
         skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
             Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
+
+        registry_skills : typing.Optional[typing.Sequence[str]]
+            Exact first-party registry skill IDs, loaded on demand from the runtime-pinned release. Omitted, null, or empty disables registry skills. No wildcards or subagent inheritance. Only text-only packages are supported. Separate from user-authored skills.
 
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
@@ -216,6 +220,7 @@ class RawAgentsClient:
                 "skills": convert_and_respect_annotation_metadata(
                     object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
                 ),
+                "registry_skills": registry_skills,
                 "answer_format": answer_format,
                 "tools": convert_and_respect_annotation_metadata(
                     object_=tools, annotation=typing.Optional[typing.Sequence[ToolDefinition]], direction="write"
@@ -501,6 +506,7 @@ class RawAgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        registry_skills: typing.Optional[typing.Sequence[str]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -544,6 +550,9 @@ class RawAgentsClient:
         skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
             Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
 
+        registry_skills : typing.Optional[typing.Sequence[str]]
+            Exact first-party registry skill IDs, loaded on demand from the runtime-pinned release. Omitted, null, or empty disables registry skills. No wildcards or subagent inheritance. Only text-only packages are supported. Separate from user-authored skills.
+
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
@@ -581,6 +590,7 @@ class RawAgentsClient:
                 "skills": convert_and_respect_annotation_metadata(
                     object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
                 ),
+                "registry_skills": registry_skills,
                 "answer_format": answer_format,
                 "tools": convert_and_respect_annotation_metadata(
                     object_=tools, annotation=typing.Optional[typing.Sequence[ToolDefinition]], direction="write"
@@ -713,6 +723,7 @@ class RawAgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[PatchAgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[PatchAgentSkillsItem]] = OMIT,
+        registry_skills: typing.Optional[typing.Sequence[str]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -743,6 +754,8 @@ class RawAgentsClient:
         subagents : typing.Optional[typing.Sequence[PatchAgentSubagentsItem]]
 
         skills : typing.Optional[typing.Sequence[PatchAgentSkillsItem]]
+
+        registry_skills : typing.Optional[typing.Sequence[str]]
 
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
 
@@ -778,6 +791,7 @@ class RawAgentsClient:
                 "skills": convert_and_respect_annotation_metadata(
                     object_=skills, annotation=typing.Optional[typing.Sequence[PatchAgentSkillsItem]], direction="write"
                 ),
+                "registry_skills": registry_skills,
                 "answer_format": answer_format,
                 "tools": convert_and_respect_annotation_metadata(
                     object_=tools, annotation=typing.Optional[typing.Sequence[ToolDefinition]], direction="write"
@@ -940,6 +954,7 @@ class AsyncRawAgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        registry_skills: typing.Optional[typing.Sequence[str]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -975,6 +990,9 @@ class AsyncRawAgentsClient:
 
         skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
             Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
+
+        registry_skills : typing.Optional[typing.Sequence[str]]
+            Exact first-party registry skill IDs, loaded on demand from the runtime-pinned release. Omitted, null, or empty disables registry skills. No wildcards or subagent inheritance. Only text-only packages are supported. Separate from user-authored skills.
 
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
@@ -1013,6 +1031,7 @@ class AsyncRawAgentsClient:
                 "skills": convert_and_respect_annotation_metadata(
                     object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
                 ),
+                "registry_skills": registry_skills,
                 "answer_format": answer_format,
                 "tools": convert_and_respect_annotation_metadata(
                     object_=tools, annotation=typing.Optional[typing.Sequence[ToolDefinition]], direction="write"
@@ -1298,6 +1317,7 @@ class AsyncRawAgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[AgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
+        registry_skills: typing.Optional[typing.Sequence[str]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -1341,6 +1361,9 @@ class AsyncRawAgentsClient:
         skills : typing.Optional[typing.Sequence[AgentSkillsItem]]
             Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
 
+        registry_skills : typing.Optional[typing.Sequence[str]]
+            Exact first-party registry skill IDs, loaded on demand from the runtime-pinned release. Omitted, null, or empty disables registry skills. No wildcards or subagent inheritance. Only text-only packages are supported. Separate from user-authored skills.
+
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
             JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
@@ -1378,6 +1401,7 @@ class AsyncRawAgentsClient:
                 "skills": convert_and_respect_annotation_metadata(
                     object_=skills, annotation=typing.Optional[typing.Sequence[AgentSkillsItem]], direction="write"
                 ),
+                "registry_skills": registry_skills,
                 "answer_format": answer_format,
                 "tools": convert_and_respect_annotation_metadata(
                     object_=tools, annotation=typing.Optional[typing.Sequence[ToolDefinition]], direction="write"
@@ -1510,6 +1534,7 @@ class AsyncRawAgentsClient:
         instructions: typing.Optional[str] = OMIT,
         subagents: typing.Optional[typing.Sequence[PatchAgentSubagentsItem]] = OMIT,
         skills: typing.Optional[typing.Sequence[PatchAgentSkillsItem]] = OMIT,
+        registry_skills: typing.Optional[typing.Sequence[str]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -1540,6 +1565,8 @@ class AsyncRawAgentsClient:
         subagents : typing.Optional[typing.Sequence[PatchAgentSubagentsItem]]
 
         skills : typing.Optional[typing.Sequence[PatchAgentSkillsItem]]
+
+        registry_skills : typing.Optional[typing.Sequence[str]]
 
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
 
@@ -1575,6 +1602,7 @@ class AsyncRawAgentsClient:
                 "skills": convert_and_respect_annotation_metadata(
                     object_=skills, annotation=typing.Optional[typing.Sequence[PatchAgentSkillsItem]], direction="write"
                 ),
+                "registry_skills": registry_skills,
                 "answer_format": answer_format,
                 "tools": convert_and_respect_annotation_metadata(
                     object_=tools, annotation=typing.Optional[typing.Sequence[ToolDefinition]], direction="write"
