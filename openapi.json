@@ -4390,6 +4390,26 @@
               }
             }
           },
+          "400": {
+            "description": "The provider rejected the token or config.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The org already has a vault with this name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -4499,6 +4519,16 @@
               }
             }
           },
+          "404": {
+            "description": "No vault with this id in the caller's org.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -4556,6 +4586,36 @@
               }
             }
           },
+          "400": {
+            "description": "- `provider_config` names a different provider.\n- The provider rejected the token or config.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No vault with this id in the caller's org.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The org already has a vault with this name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -4595,6 +4655,26 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "404": {
+            "description": "No vault with this id in the caller's org.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An item was added during the delete; retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -4648,6 +4728,26 @@
           "204": {
             "description": "Successful Response"
           },
+          "400": {
+            "description": "- The vault has no token (an internal vault).\n- The provider rejected the token or config.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No vault with this id in the caller's org.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -4693,6 +4793,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VaultHealth"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No vault with this id in the caller's org.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
                 }
               }
             }
@@ -4752,6 +4862,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VaultItemRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "- The vault is not an internal vault.\n- `totp` is neither a base32 seed nor a valid `otpauth://totp/` URI.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The org is at its `max_items_per_org` cap.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No vault with this id in the caller's org.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
                 }
               }
             }
@@ -4826,6 +4966,26 @@
               }
             }
           },
+          "400": {
+            "description": "The vault is not an internal vault.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No vault with this id in the caller's org.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -4881,6 +5041,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VaultItemRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The vault is not an internal vault.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such vault in the caller's org, or no such item in it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
                 }
               }
             }
@@ -4952,6 +5132,36 @@
               }
             }
           },
+          "400": {
+            "description": "- The vault is not an internal vault.\n- `totp` is neither a base32 seed nor a valid `otpauth://totp/` URI.\n- The update would remove every value.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such vault in the caller's org, or no such item in it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The item's stored values could not be read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -5001,6 +5211,26 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "400": {
+            "description": "The vault is not an internal vault.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such vault in the caller's org, or no such item in it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -5057,6 +5287,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VaultItemValues"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The vault is not an internal vault.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such vault in the caller's org, or no such item in it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The item's stored values could not be read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
                 }
               }
             }
@@ -6591,6 +6851,20 @@
         ],
         "title": "Desktop",
         "description": "A desktop the agent controls via mouse, keyboard, and screenshots."
+      },
+      "DetailErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "DetailErrorResponse",
+        "description": "Error body with its message in `detail`."
       },
       "Environment": {
         "oneOf": [

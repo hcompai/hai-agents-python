@@ -56,6 +56,7 @@ if typing.TYPE_CHECKING:
     from .cron_timing_type import CronTimingType
     from .desktop import Desktop
     from .desktop_host import DesktopHost
+    from .detail_error_response import DetailErrorResponse
     from .environment import (
         Environment,
         Environment_Android,
@@ -239,6 +240,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "CronTimingType": ".cron_timing_type",
     "Desktop": ".desktop",
     "DesktopHost": ".desktop_host",
+    "DetailErrorResponse": ".detail_error_response",
     "Environment": ".environment",
     "EnvironmentKind": ".environment_kind",
     "EnvironmentPage": ".environment_page",
@@ -438,6 +440,7 @@ __all__ = [
     "CronTimingType",
     "Desktop",
     "DesktopHost",
+    "DetailErrorResponse",
     "Environment",
     "EnvironmentKind",
     "EnvironmentPage",
