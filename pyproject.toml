@@ -33,7 +33,7 @@ dependencies = [
 
 [project.optional-dependencies]
 cli = [
-  "mcp>=1.10,<2",
+  "mcp>=1.10,<3",
   "prompt_toolkit>=3.0.43,<4",
   "python-dotenv>=1.2.3,<2",
   "pyyaml>=6.0,<7",
@@ -75,7 +75,7 @@ dev = [
   # Used only by tests/integration/ — read HAI_API_KEY_TEST when running locally.
   "python-dotenv>=1.2.3,<2",
   "rich>=15.0.0,<16",
-  "ruff==0.17.1",
+  "ruff==0.17.2",
   "typer>=0.27.2,<1",
 ]
 
