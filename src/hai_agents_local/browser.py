@@ -41,6 +41,7 @@ class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
     """Serves web environments by attaching Selenium to a Chrome debugging port on this machine."""
 
     environment_kind = "web"
+    environment = {"kind": "web", "host": "user_device"}
     startup_hint = (
         "a stale Chrome or Chromium already holding the debug port (default 9222) is the usual cause; "
         "quit it, or serve on another port with `holo local browser --debug-port <port>`"

@@ -61,6 +61,8 @@ class LocalBridge(ABC, Generic[DriverT]):
     """Polls the command channel for session_id and dispatches each command to a local hai-drivers driver."""
 
     environment_kind: ClassVar[str]
+    environment: ClassVar[dict[str, Any]]
+    """The environment fields a session sets, beside ``session_id``, to be served by this bridge."""
     startup_hint: ClassVar[str | None] = None
     """Appended to the manager's not-ready timeout error; names the common cause of a hung startup."""
     verify_runtime: bool = False

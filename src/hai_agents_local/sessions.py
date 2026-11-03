@@ -31,7 +31,7 @@ from .bridge import LocalBridge, TokenSource
 from .config import auto_bridges_enabled
 from .killswitch import StopWatcher
 from .manager import ensure_bridges, serving_bridges, stop_bridges
-from .routing import Reference, localize_agent, references, split_revision
+from .routing import Reference, local_bridge_types, localize_agent, references, split_revision
 
 if typing.TYPE_CHECKING:
     from .runtime import LocalRuntime
@@ -152,13 +152,9 @@ async def _resolve_references_async(
 
 
 def local_environment_kinds(client: typing.Any, agent: typing.Any) -> typing.List[str]:
-    """Kinds of the user_device environments a run of ``agent`` would serve from this machine; fetches named specs."""
-    wrapper = client.sessions._client_wrapper
-    resolved = _resolve_references(wrapper, agent)
-    localized = localize_agent(
-        agent, api_key=_token_source(wrapper), base_url=wrapper.get_base_url(), resolved=resolved
-    )
-    return [bridge.environment_kind for bridge in localized.bridges]
+    """Bridge kinds a run of ``agent`` is served with from this machine; fetches named specs."""
+    resolved = _resolve_references(client.sessions._client_wrapper, agent) if references(agent) else {}
+    return [bridge_type.environment_kind for bridge_type in local_bridge_types(agent, resolved)]
 
 
 def _localize(

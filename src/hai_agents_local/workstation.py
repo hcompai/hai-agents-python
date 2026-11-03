@@ -1,4 +1,4 @@
-"""Local workstation bridge: the agent's shell runs on this machine and drives it through the desk, cua and web CLIs."""
+"""Shell desktop bridge: the agent's shell runs on this machine and drives it through the desk, cua and web CLIs."""
 
 from __future__ import annotations
 
@@ -21,13 +21,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-INSTALL_HINT = "Local workstation control requires extra deps. Install with: pip install 'hai-agents[workstation]'"
+INSTALL_HINT = "A desktop with a shell requires extra deps. Install with: pip install 'hai-agents[workstation]'"
 
 
 class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
-    """Serves workstation environments with a shell in ~/hai/<session_id>, running as the current user."""
+    """Serves desktops with ``shell: true`` with a shell in ~/hai/<session_id>, running as the current user."""
 
     environment_kind = "workstation"
+    environment = {"kind": "desktop", "shell": True}
     drives_desktop = True
 
     def __init__(
