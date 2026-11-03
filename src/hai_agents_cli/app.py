@@ -432,7 +432,9 @@ class _Conversation:
 
     @property
     def drives_desktop(self) -> bool:
-        return any(kind in ("desktop", "workstation") for kind in self.kinds)
+        from hai_agents_local.routing import BRIDGE_TYPES
+
+        return any(BRIDGE_TYPES[kind].drives_desktop for kind in self.kinds)
 
     @property
     def does(self) -> str:
@@ -835,7 +837,7 @@ class _Conversation:
         except Exception as exc:
             ui.error(err_console, str(exc))
             return
-        if _drives_a_machine(self.client, session.request.agent):
+        if _local_kinds(self.client, session.request.agent):
             ui.error(err_console, "a session that drove a machine cannot be resumed", fix="/new starts a fresh one")
             return
         self._end_session()
@@ -1563,7 +1565,7 @@ def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str
         _raise_cli_error(exc)
 
     console.print(
-        f"[bold]Local {bridge.environment_kind} bridge[/bold] serving session id "
+        f"[bold]Local {bridge.environment['kind']} bridge[/bold] serving session id "
         f"[cyan]{bridge.session_id}[/cyan]. Press Ctrl-C to stop, or run `holo local stop` from any terminal."
     )
     environment = json.dumps({**bridge.environment, "session_id": bridge.session_id})
@@ -1602,7 +1604,7 @@ async def _serve_bridge(bridge: Any) -> None:
 
 def _arm_kill_switch(bridge: Any) -> Any:
     """Arm the double-Esc listener for desktop serving; a desktop turn steals focus, so Ctrl-C may be out of reach."""
-    if bridge.environment_kind not in ("desktop", "workstation") or not (sys.stdin.isatty() and sys.stdout.isatty()):
+    if not bridge.drives_desktop or not (sys.stdin.isatty() and sys.stdout.isatty()):
         return None
     from hai_agents_local.killswitch import KILL_SWITCH_ARMED_HINT, KILL_SWITCH_UNAVAILABLE_HINT, arm_esc_listener
 
@@ -1745,18 +1747,6 @@ def _local_kinds(client: Any, agent: Any) -> list[str]:
         return local_environment_kinds(client, agent)
     except Exception:
         return []
-
-
-def _drives_a_machine(client: Any, agent: Any) -> bool:
-    """Read-back specs carry their bridges' session ids, which `_local_kinds` skips, so scan the specs too."""
-    return _has_local_environment(to_jsonable(agent)) or bool(_local_kinds(client, agent))
-
-
-def _has_local_environment(value: Any) -> bool:
-    if isinstance(value, dict):
-        local = value.get("host") == "user_device" or value.get("kind") == "desktop"
-        return local or any(map(_has_local_environment, value.values()))
-    return isinstance(value, list) and any(map(_has_local_environment, value))
 
 
 _CLIPBOARD_TOOLS = (

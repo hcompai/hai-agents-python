@@ -51,6 +51,23 @@ def split_revision(reference: str) -> tuple[str, int | None]:
     return (name, int(revision)) if sep and revision.isdigit() else (reference, None)
 
 
+def local_bridge_types(agent: AgentLike, resolved: Mapping[Reference, Any] | None = None) -> list[type[LocalBridge]]:
+    """The bridges this machine serves ``agent``'s environments with, whether or not a session already binds them."""
+    resolved = resolved or {}
+    if isinstance(agent, str):
+        spec = resolved.get(("agent", agent))
+        return [] if spec is None else local_bridge_types(spec, resolved)
+    found: list[type[LocalBridge]] = []
+    for env in _read(agent, "environments") or []:
+        spec = resolved.get(("environment", env)) if isinstance(env, str) else env
+        kind = None if spec is None else _local_kind(spec)
+        if kind is not None:
+            found.append(_bridge_type(spec, kind))
+    for sub in _read(agent, "subagents") or []:
+        found += local_bridge_types(sub, resolved)
+    return found
+
+
 def localize_agent(
     agent: AgentLike,
     *,
