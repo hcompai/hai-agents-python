@@ -1491,11 +1491,15 @@ def local_desktop(
     shell: bool = typer.Option(
         False,
         "--shell",
+        hidden=True,
         help="Serve a desktop with `shell: true`: a shell on this machine, running as you, that drives its "
         "screen and a Chrome.",
     ),
     workspace: str | None = typer.Option(
-        None, "--workspace", help="With --shell, the folder the shell starts in. Defaults to ~/hai/<session id>."
+        None,
+        "--workspace",
+        hidden=True,
+        help="With --shell, the folder the shell starts in. Defaults to ~/hai/<session id>.",
     ),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""

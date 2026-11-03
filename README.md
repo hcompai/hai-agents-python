@@ -127,7 +127,7 @@ An agent that drives this desktop, like `h/holo-desktop`, uses your mouse and ke
 | `holo agents` | `list` agents, `get` one, `use` one as the default |
 | `holo skills` | browse available skills |
 | `holo mcp install` | let Cursor, Claude Code, Codex, and other MCP clients run agents through `holo mcp`; `--remote` adds the hosted server instead |
-| `holo local` | serve a browser or desktop (`--shell` for a shell) on this machine for a session started elsewhere |
+| `holo local` | serve a browser or desktop on this machine for a session started elsewhere |
 | `holo login`, `logout`, `whoami`, `doctor` | manage and check your credentials and setup |
 
 ### Scripts and CI
@@ -338,10 +338,10 @@ with Client.local(local_options={"binary_path": "/path/to/hai-agent-runtime"}) a
         agent={
             "name": "local-example",
             "description": "Local desktop example",
-            "instructions": "Answer the user's task using the shell.",
-            "environments": [{"id": "my-laptop", "kind": "desktop", "shell": True}],
+            "instructions": "Answer the user's task on this desktop.",
+            "environments": [{"id": "my-laptop", "kind": "desktop"}],
         },
-        messages=[{"type": "user_message", "message": "Print hello using the shell."}],
+        messages=[{"type": "user_message", "message": "Open the Calculator app."}],
         max_steps=8,
         max_time_s=120,
     )
