@@ -14,6 +14,11 @@ if typing.TYPE_CHECKING:
         SendSessionMessagesRequestBody_Batch,
         SendSessionMessagesRequestBody_UserMessage,
     )
+    from .send_session_tool_approvals_request_body import (
+        SendSessionToolApprovalsRequestBody,
+        SendSessionToolApprovalsRequestBody_Batch,
+        SendSessionToolApprovalsRequestBody_ToolApprovalResponse,
+    )
     from .send_session_tool_results_request_body import SendSessionToolResultsRequestBody
 _dynamic_imports: typing.Dict[str, str] = {
     "ListSessionEventsRequestSortItem": ".list_session_events_request_sort_item",
@@ -22,6 +27,9 @@ _dynamic_imports: typing.Dict[str, str] = {
     "SendSessionMessagesRequestBody": ".send_session_messages_request_body",
     "SendSessionMessagesRequestBody_Batch": ".send_session_messages_request_body",
     "SendSessionMessagesRequestBody_UserMessage": ".send_session_messages_request_body",
+    "SendSessionToolApprovalsRequestBody": ".send_session_tool_approvals_request_body",
+    "SendSessionToolApprovalsRequestBody_Batch": ".send_session_tool_approvals_request_body",
+    "SendSessionToolApprovalsRequestBody_ToolApprovalResponse": ".send_session_tool_approvals_request_body",
     "SendSessionToolResultsRequestBody": ".send_session_tool_results_request_body",
 }
 
@@ -54,5 +62,8 @@ __all__ = [
     "SendSessionMessagesRequestBody",
     "SendSessionMessagesRequestBody_Batch",
     "SendSessionMessagesRequestBody_UserMessage",
+    "SendSessionToolApprovalsRequestBody",
+    "SendSessionToolApprovalsRequestBody_Batch",
+    "SendSessionToolApprovalsRequestBody_ToolApprovalResponse",
     "SendSessionToolResultsRequestBody",
 ]

@@ -10,12 +10,10 @@ from ...core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from ...types.browser_host import BrowserHost
 from ...types.browser_mode import BrowserMode
 from ...types.browser_network import BrowserNetwork
-from ...types.desktop_host import DesktopHost
-from ...types.workstation_host import WorkstationHost
 from ...types.workstation_storage import WorkstationStorage
 
 
-class CreateEnvironmentRequest_Web(UniversalBaseModel):
+class CreateEnvironmentRequestBody_Web(UniversalBaseModel):
     kind: typing.Literal["web"] = "web"
     id: str
     host: typing.Optional[BrowserHost] = None
@@ -41,13 +39,12 @@ class CreateEnvironmentRequest_Web(UniversalBaseModel):
             extra = pydantic.Extra.allow
 
 
-class CreateEnvironmentRequest_Desktop(UniversalBaseModel):
+class CreateEnvironmentRequestBody_Desktop(UniversalBaseModel):
     kind: typing.Literal["desktop"] = "desktop"
     id: str
-    host: DesktopHost
+    shell: typing.Optional[bool] = None
     session_id: typing.Optional[str] = None
     lazy: typing.Optional[bool] = None
-    settle_s: typing.Optional[float] = None
     screenshot_max_width: typing.Optional[int] = None
 
     if IS_PYDANTIC_V2:
@@ -60,7 +57,7 @@ class CreateEnvironmentRequest_Desktop(UniversalBaseModel):
             extra = pydantic.Extra.allow
 
 
-class CreateEnvironmentRequest_Android(UniversalBaseModel):
+class CreateEnvironmentRequestBody_Android(UniversalBaseModel):
     kind: typing.Literal["android"] = "android"
     id: str
     session_id: typing.Optional[str] = None
@@ -77,13 +74,13 @@ class CreateEnvironmentRequest_Android(UniversalBaseModel):
             extra = pydantic.Extra.allow
 
 
-class CreateEnvironmentRequest_Workstation(UniversalBaseModel):
+class CreateEnvironmentRequestBody_Workstation(UniversalBaseModel):
     kind: typing.Literal["workstation"] = "workstation"
     id: str
-    host: typing.Optional[WorkstationHost] = None
     session_id: typing.Optional[str] = None
     storage: typing.Optional[WorkstationStorage] = None
     lazy: typing.Optional[bool] = None
+    screenshot_max_width: typing.Optional[int] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
@@ -95,12 +92,12 @@ class CreateEnvironmentRequest_Workstation(UniversalBaseModel):
             extra = pydantic.Extra.allow
 
 
-CreateEnvironmentRequest = typing_extensions.Annotated[
+CreateEnvironmentRequestBody = typing_extensions.Annotated[
     typing.Union[
-        CreateEnvironmentRequest_Web,
-        CreateEnvironmentRequest_Desktop,
-        CreateEnvironmentRequest_Android,
-        CreateEnvironmentRequest_Workstation,
+        CreateEnvironmentRequestBody_Web,
+        CreateEnvironmentRequestBody_Desktop,
+        CreateEnvironmentRequestBody_Android,
+        CreateEnvironmentRequestBody_Workstation,
     ],
     pydantic.Field(discriminator="kind"),
 ]

@@ -13,7 +13,7 @@ import pathlib
 import threading
 import time
 import typing
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pydantic
 import typing_extensions
@@ -28,6 +28,7 @@ from .types.session_changes import SessionChanges
 from .types.session_changes_answer import SessionChangesAnswer
 from .types.file_content import FileContent
 from .types.session_event import SessionEvent
+from .types.tool_approval_request import ToolApprovalRequest
 from .types.tool_definition import ToolDefinition
 from .types.trajectory_status import TrajectoryStatus
 
@@ -90,6 +91,9 @@ class SessionRunResult(typing.Generic[AnswerT]):
     ``infeasible``/``blocked``), when reported. ``error`` and ``error_code`` describe the
     failure when the session failed or timed out; they come from the authoritative
     ``/status`` response, falling back to ``final_changes``.
+
+    ``pending_approvals`` lists the tool calls held for a decision when the wait stopped on
+    them: answer each with ``approve``/``deny`` on the session handle, then wait again.
     """
 
     id: str
@@ -101,6 +105,7 @@ class SessionRunResult(typing.Generic[AnswerT]):
     outcome: typing.Optional[str] = None
     error: typing.Optional[str] = None
     error_code: typing.Optional[str] = None
+    pending_approvals: typing.List[ToolApprovalRequest] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.answer is None and self.final_changes is not None:
@@ -342,8 +347,24 @@ def _tool_results_body(results: typing.List[typing.Dict[str, typing.Any]]) -> ty
     return results[0] if len(results) == 1 else {"type": "batch", "results": results}
 
 
+def _approval_body(call_id: str, action: str, message: typing.Optional[str]) -> typing.Dict[str, typing.Any]:
+    body: typing.Dict[str, typing.Any] = {"type": "tool_approval_response", "call_id": call_id, "action": action}
+    if message is not None:
+        body["message"] = message
+    return body
+
+
+def _holds_for_approval(status: typing.Any) -> bool:
+    """Only held calls block the session: nothing a tool loop runs will settle them."""
+    return (
+        status.status == "awaiting_tool_results"
+        and bool(getattr(status, "pending_approvals", None))
+        and not getattr(status, "pending_tool_calls", None)
+    )
+
+
 def _raise_unless_posted(response: typing.Any) -> None:
-    """409 means the session finished and resolved the calls itself; the status poll will exit the loop."""
+    """409 means the session finished and settled the calls itself; the status poll will exit the loop."""
     if 200 <= response.status_code < 300 or response.status_code == 409:
         return
     raise ApiError(status_code=response.status_code, headers=dict(response.headers), body=response.text)
@@ -375,12 +396,16 @@ def _is_transient(status_code: int) -> bool:
 
 
 def _post_tool_results(client: Client, id: str, results: typing.List[typing.Dict[str, typing.Any]]) -> None:
+    _post_settlement(client, id, "tool_results", _tool_results_body(results))
+
+
+def _post_settlement(client: Client, id: str, route: str, body: typing.Dict[str, typing.Any]) -> None:
     # The shared client would retry 409s; here a 409 is a final answer (session settled), so retry transient codes only.
     for attempt in range(3):
         response = client._client_wrapper.httpx_client.request(
-            f"api/v2/sessions/{id}/tool_results",
+            f"api/v2/sessions/{id}/{route}",
             method="POST",
-            json=_tool_results_body(results),
+            json=body,
             headers={"content-type": "application/json"},
             request_options=RequestOptions(max_retries=0),
         )
@@ -393,11 +418,15 @@ def _post_tool_results(client: Client, id: str, results: typing.List[typing.Dict
 async def _async_post_tool_results(
     client: AsyncClient, id: str, results: typing.List[typing.Dict[str, typing.Any]]
 ) -> None:
+    await _async_post_settlement(client, id, "tool_results", _tool_results_body(results))
+
+
+async def _async_post_settlement(client: AsyncClient, id: str, route: str, body: typing.Dict[str, typing.Any]) -> None:
     for attempt in range(3):
         response = await client._client_wrapper.httpx_client.request(
-            f"api/v2/sessions/{id}/tool_results",
+            f"api/v2/sessions/{id}/{route}",
             method="POST",
-            json=_tool_results_body(results),
+            json=body,
             headers={"content-type": "application/json"},
             request_options=RequestOptions(max_retries=0),
         )
@@ -444,12 +473,12 @@ def _answer_tool_calls(
     id: str,
     dispatch: _ToolDispatch,
     advertised: _Advertised,
-    status: TrajectoryStatus,
+    status: SessionStatus,
     caught_up: bool,
 ) -> None:
     """Run and post the calls the session awaits, each once per step."""
     # The live status describes the tip: a lagging cursor's advertised calls may already be answered.
-    if not caught_up or status != "awaiting_tool_results":
+    if not caught_up or status.status != "awaiting_tool_results" or _holds_for_approval(status):
         return
     if not advertised.anchored or not advertised.calls:
         advertised.adopt(_recover_pending_tool_calls(client, id))
@@ -467,11 +496,11 @@ async def _async_answer_tool_calls(
     id: str,
     dispatch: _ToolDispatch,
     advertised: _Advertised,
-    status: TrajectoryStatus,
+    status: SessionStatus,
     caught_up: bool,
 ) -> None:
     """Async version of ``_answer_tool_calls``."""
-    if not caught_up or status != "awaiting_tool_results":
+    if not caught_up or status.status != "awaiting_tool_results" or _holds_for_approval(status):
         return
     if not advertised.anchored or not advertised.calls:
         advertised.adopt(await _async_recover_pending_tool_calls(client, id))
@@ -537,6 +566,7 @@ def wait_for_session(
     """Poll a session until it settles (terminal, or idle awaiting the next message), running custom tools along the way.
 
     Without ``tools``, a session awaiting tool results also ends the wait, since nothing here will answer it.
+    Calls held for approval end it too, listed on ``result.pending_approvals``.
 
     Status is read from ``/status`` (authoritative); ``/changes`` only feeds
     events and the final answer, since it 204s whenever no new events exist past
@@ -576,7 +606,11 @@ def wait_for_session(
         caught_up = _caught_up(batch, limit)
 
         status = client.sessions.get_session_status(id)
-        if is_settled_session_status(status.status) or (status.status == "awaiting_tool_results" and dispatch is None):
+        if (
+            is_settled_session_status(status.status)
+            or (status.status == "awaiting_tool_results" and dispatch is None)
+            or _holds_for_approval(status)
+        ):
             if include_events:
                 while True:
                     if deadline is not None and time.monotonic() >= deadline:
@@ -603,10 +637,11 @@ def wait_for_session(
                 outcome=status.outcome,
                 error=status.error,
                 error_code=status.error_code,
+                pending_approvals=list(getattr(status, "pending_approvals", None) or []),
             )
 
         if dispatch is not None:
-            _answer_tool_calls(client, id, dispatch, advertised, status.status, caught_up)
+            _answer_tool_calls(client, id, dispatch, advertised, status, caught_up)
 
         # The long-poll above paces the loop when streaming events; otherwise sleep.
         if not include_events:
@@ -720,7 +755,11 @@ async def async_wait_for_session(
         caught_up = _caught_up(batch, limit)
 
         status = await client.sessions.get_session_status(id)
-        if is_settled_session_status(status.status) or (status.status == "awaiting_tool_results" and dispatch is None):
+        if (
+            is_settled_session_status(status.status)
+            or (status.status == "awaiting_tool_results" and dispatch is None)
+            or _holds_for_approval(status)
+        ):
             if include_events:
                 while True:
                     if deadline is not None and time.monotonic() >= deadline:
@@ -747,10 +786,11 @@ async def async_wait_for_session(
                 outcome=status.outcome,
                 error=status.error,
                 error_code=status.error_code,
+                pending_approvals=list(getattr(status, "pending_approvals", None) or []),
             )
 
         if dispatch is not None:
-            await _async_answer_tool_calls(client, id, dispatch, advertised, status.status, caught_up)
+            await _async_answer_tool_calls(client, id, dispatch, advertised, status, caught_up)
 
         if not include_events:
             await asyncio.sleep(poll_backoff_seconds or wait_for_seconds)
@@ -816,6 +856,8 @@ def stream_session(
     With ``tools``, each poll then runs the custom tool calls the session awaits and
     posts their results. Without them the stream is a read-only view that keeps
     polling through ``awaiting_tool_results``, for calls another process answers.
+    Calls held for approval keep either stream open: answer each with ``approve``/``deny``
+    on the session handle when its ``ToolApprovalRequestedEvent`` arrives.
 
     Args:
         client: Client bound to the session.
@@ -859,8 +901,8 @@ def stream_session(
             advertised.read(batch, next_from_index)
         caught_up = _caught_up(batch, limit)
 
-        status = client.sessions.get_session_status(id).status
-        if should_stop(status):
+        status = client.sessions.get_session_status(id)
+        if should_stop(status.status):
             # Drain to exhaustion: with ``limit``, one page may not cover the backlog past the
             # cursor. Keep honoring the wall-clock budget so a large tail cannot outlive
             # ``timeout_seconds``.
@@ -938,7 +980,7 @@ async def async_stream_session(
                 next_from_index = _cursor_after(next_from_index, tail)
 
         if dispatch is not None:
-            await _async_answer_tool_calls(client, id, dispatch, advertised, status.status, caught_up)
+            await _async_answer_tool_calls(client, id, dispatch, advertised, status, caught_up)
 
 
 class SessionHandle(typing.Generic[AnswerT]):
@@ -982,6 +1024,14 @@ class SessionHandle(typing.Generic[AnswerT]):
 
     def force_answer(self) -> None:
         self._client.sessions.force_session_answer(self.id)
+
+    def approve(self, call_id: str) -> None:
+        """Run a call listed in ``pending_approvals``."""
+        _post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "approve", None))
+
+    def deny(self, call_id: str, message: typing.Optional[str] = None) -> None:
+        """Refuse a call listed in ``pending_approvals``; the model reads ``message``."""
+        _post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "deny", message))
 
     def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
         """Block until the session settles (terminal or idle); returns the result and final answer."""
@@ -1053,6 +1103,14 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
 
     async def force_answer(self) -> None:
         await self._client.sessions.force_session_answer(self.id)
+
+    async def approve(self, call_id: str) -> None:
+        """Run a call listed in ``pending_approvals``."""
+        await _async_post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "approve", None))
+
+    async def deny(self, call_id: str, message: typing.Optional[str] = None) -> None:
+        """Refuse a call listed in ``pending_approvals``; the model reads ``message``."""
+        await _async_post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "deny", message))
 
     async def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
         """Block until the session settles (terminal or idle); returns the result and final answer."""

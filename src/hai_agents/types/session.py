@@ -7,6 +7,7 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel, update_forward_refs
+from .dependency_revisions import DependencyRevisions
 from .session_request import SessionRequest
 from .session_status import SessionStatus
 
@@ -19,13 +20,18 @@ class Session(UniversalBaseModel):
     id: str
     request: SessionRequest = pydantic.Field()
     """
-    The request the session runs. Secrets read back as ``***``, with keys and list lengths kept: MCP server ``headers``, ``env`` and ``args``, code sandbox ``env``, and browser ``proxy_url``.
+    The request the session runs. Secrets read back as ``***``, with keys and list lengths kept: a browser ``proxy_url``.
     """
 
     status: SessionStatus
     agent_revision: typing.Optional[int] = pydantic.Field(default=None)
     """
     Revision of the catalog agent the session runs; ``request.agent`` is that revision, resolved, with ``request.overrides`` applied. Null for inline agent specs and sessions created before agent revisions.
+    """
+
+    dependency_revisions: typing.Optional[DependencyRevisions] = pydantic.Field(default=None)
+    """
+    Revisions of the catalog skills and environments in ``request.agent``, through every subagent. Inline ones are not listed. Null for sessions created before skill and environment revisions.
     """
 
     agent_view_url: typing.Optional[str] = pydantic.Field(default=None)

@@ -8,9 +8,11 @@ from ..types.browser_network import BrowserNetwork
 from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
+from ..types.page_environment_revision_record import PageEnvironmentRevisionRecord
 from ..types.workstation_storage import WorkstationStorage
 from .raw_client import AsyncRawEnvironmentsClient, RawEnvironmentsClient
-from .types.create_environment_request import CreateEnvironmentRequest
+from .types.create_environment_request_body import CreateEnvironmentRequestBody
+from .types.list_environment_revisions_request_sort_item import ListEnvironmentRevisionsRequestSortItem
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
 from .types.patch_environment_host import PatchEnvironmentHost
 from .types.patch_environment_mode import PatchEnvironmentMode
@@ -94,14 +96,21 @@ class EnvironmentsClient:
         return _response.data
 
     def create_environment(
-        self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        request: CreateEnvironmentRequestBody,
+        message: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
-        Create an environment.
+        Create an environment at revision 1. Ids cannot contain ``:``, which pins a revision in references.
 
         Parameters
         ----------
-        request : CreateEnvironmentRequest
+        request : CreateEnvironmentRequestBody
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -114,27 +123,143 @@ class EnvironmentsClient:
         Examples
         --------
         from hai_agents import Client
-        from hai_agents.environments import CreateEnvironmentRequest_Web
+        from hai_agents.environments import CreateEnvironmentRequestBody_Web
 
         client = Client(
             api_key="YOUR_API_KEY",
         )
         client.environments.create_environment(
-            request=CreateEnvironmentRequest_Web(
+            request=CreateEnvironmentRequestBody_Web(
                 id="id",
             ),
         )
         """
-        _response = self._raw_client.create_environment(request=request, request_options=request_options)
+        _response = self._raw_client.create_environment(
+            request=request, message=message, request_options=request_options
+        )
         return _response.data
 
-    def get_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Environment:
+    def list_environment_revisions(
+        self,
+        id: str,
+        *,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[
+            typing.Union[
+                ListEnvironmentRevisionsRequestSortItem, typing.Sequence[ListEnvironmentRevisionsRequestSortItem]
+            ]
+        ] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> PageEnvironmentRevisionRecord:
         """
-        Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
+        List an environment's revisions without their specs, newest first. Read one with ``?revision=N``.
+
+        Unauthenticated callers can list reserved ``h/`` environments only.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Union[ListEnvironmentRevisionsRequestSortItem, typing.Sequence[ListEnvironmentRevisionsRequestSortItem]]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        PageEnvironmentRevisionRecord
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.environments.list_environment_revisions(
+            id="id",
+        )
+        """
+        _response = self._raw_client.list_environment_revisions(
+            id, page=page, size=size, sort=sort, request_options=request_options
+        )
+        return _response.data
+
+    def restore_environment_revision(
+        self,
+        id: str,
+        number: int,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Environment:
+        """
+        Make revision ``number``'s spec current again, as a new revision with the message ``Restored from vN``.
+
+        Validated and authorised like ``PUT``. The new revision's ``restored_from`` is ``number``.
+        Restoring a spec that is already current changes nothing and returns the current revision.
+
+        Parameters
+        ----------
+        id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        number : int
+            The revision whose spec becomes current again.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        Environment
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.environments.restore_environment_revision(
+            id="id",
+            number=1,
+        )
+        """
+        _response = self._raw_client.restore_environment_revision(
+            id, number, if_match=if_match, request_options=request_options
+        )
+        return _response.data
+
+    def get_environment(
+        self, id: str, *, revision: typing.Optional[int] = None, request_options: typing.Optional[RequestOptions] = None
+    ) -> Environment:
+        """
+        Fetch by id at its latest revision, or at ``revision``; 404 if not visible or no such revision.
+
+        ``:path`` so slash-containing ids round-trip.
+
+        Parameters
+        ----------
+        id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        revision : typing.Optional[int]
+            Read this revision instead of the latest. References to an environment elsewhere, such as an agent's ``environment``, pin a revision as ``id:N`` instead.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -155,20 +280,35 @@ class EnvironmentsClient:
             id="id",
         )
         """
-        _response = self._raw_client.get_environment(id, request_options=request_options)
+        _response = self._raw_client.get_environment(id, revision=revision, request_options=request_options)
         return _response.data
 
     def update_environment(
-        self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
+        self,
+        id: str,
+        *,
+        request: UpdateEnvironmentRequestBody,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
-        Replace the environment spec.
+        Replace the environment spec as a new revision. ``id`` must match the URL.
+
+        Sending the spec that is already current changes nothing and returns the current revision.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
 
         request : UpdateEnvironmentRequestBody
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -193,16 +333,24 @@ class EnvironmentsClient:
             ),
         )
         """
-        _response = self._raw_client.update_environment(id, request=request, request_options=request_options)
+        _response = self._raw_client.update_environment(
+            id, request=request, message=message, if_match=if_match, request_options=request_options
+        )
         return _response.data
 
-    def delete_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
+    def delete_environment(
+        self, id: str, *, if_match: typing.Optional[str] = None, request_options: typing.Optional[RequestOptions] = None
+    ) -> None:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete by id, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -222,13 +370,15 @@ class EnvironmentsClient:
             id="id",
         )
         """
-        _response = self._raw_client.delete_environment(id, request_options=request_options)
+        _response = self._raw_client.delete_environment(id, if_match=if_match, request_options=request_options)
         return _response.data
 
     def patch_environment(
         self,
         id: str,
         *,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         host: typing.Optional[PatchEnvironmentHost] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         headless: typing.Optional[bool] = OMIT,
@@ -241,17 +391,25 @@ class EnvironmentsClient:
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
+        shell: typing.Optional[bool] = OMIT,
         screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
         storage: typing.Optional[WorkstationStorage] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
-        Partially update an environment spec; only provided fields change.
+        Partially update an environment spec as a new revision; only provided fields change.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         host : typing.Optional[PatchEnvironmentHost]
 
@@ -276,6 +434,8 @@ class EnvironmentsClient:
         persist_browser_profile : typing.Optional[bool]
 
         network : typing.Optional[BrowserNetwork]
+
+        shell : typing.Optional[bool]
 
         screenshot_max_width : typing.Optional[int]
 
@@ -304,6 +464,8 @@ class EnvironmentsClient:
         """
         _response = self._raw_client.patch_environment(
             id,
+            message=message,
+            if_match=if_match,
             host=host,
             start_url=start_url,
             headless=headless,
@@ -316,6 +478,7 @@ class EnvironmentsClient:
             use_default_browser_profile=use_default_browser_profile,
             persist_browser_profile=persist_browser_profile,
             network=network,
+            shell=shell,
             screenshot_max_width=screenshot_max_width,
             image=image,
             storage=storage,
@@ -406,14 +569,21 @@ class AsyncEnvironmentsClient:
         return _response.data
 
     async def create_environment(
-        self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        request: CreateEnvironmentRequestBody,
+        message: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
-        Create an environment.
+        Create an environment at revision 1. Ids cannot contain ``:``, which pins a revision in references.
 
         Parameters
         ----------
-        request : CreateEnvironmentRequest
+        request : CreateEnvironmentRequestBody
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -428,7 +598,7 @@ class AsyncEnvironmentsClient:
         import asyncio
 
         from hai_agents import AsyncClient
-        from hai_agents.environments import CreateEnvironmentRequest_Web
+        from hai_agents.environments import CreateEnvironmentRequestBody_Web
 
         client = AsyncClient(
             api_key="YOUR_API_KEY",
@@ -437,7 +607,7 @@ class AsyncEnvironmentsClient:
 
         async def main() -> None:
             await client.environments.create_environment(
-                request=CreateEnvironmentRequest_Web(
+                request=CreateEnvironmentRequestBody_Web(
                     id="id",
                 ),
             )
@@ -445,16 +615,148 @@ class AsyncEnvironmentsClient:
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.create_environment(request=request, request_options=request_options)
+        _response = await self._raw_client.create_environment(
+            request=request, message=message, request_options=request_options
+        )
         return _response.data
 
-    async def get_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Environment:
+    async def list_environment_revisions(
+        self,
+        id: str,
+        *,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[
+            typing.Union[
+                ListEnvironmentRevisionsRequestSortItem, typing.Sequence[ListEnvironmentRevisionsRequestSortItem]
+            ]
+        ] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> PageEnvironmentRevisionRecord:
         """
-        Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
+        List an environment's revisions without their specs, newest first. Read one with ``?revision=N``.
+
+        Unauthenticated callers can list reserved ``h/`` environments only.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Union[ListEnvironmentRevisionsRequestSortItem, typing.Sequence[ListEnvironmentRevisionsRequestSortItem]]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        PageEnvironmentRevisionRecord
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.environments.list_environment_revisions(
+                id="id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.list_environment_revisions(
+            id, page=page, size=size, sort=sort, request_options=request_options
+        )
+        return _response.data
+
+    async def restore_environment_revision(
+        self,
+        id: str,
+        number: int,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Environment:
+        """
+        Make revision ``number``'s spec current again, as a new revision with the message ``Restored from vN``.
+
+        Validated and authorised like ``PUT``. The new revision's ``restored_from`` is ``number``.
+        Restoring a spec that is already current changes nothing and returns the current revision.
+
+        Parameters
+        ----------
+        id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        number : int
+            The revision whose spec becomes current again.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        Environment
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.environments.restore_environment_revision(
+                id="id",
+                number=1,
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.restore_environment_revision(
+            id, number, if_match=if_match, request_options=request_options
+        )
+        return _response.data
+
+    async def get_environment(
+        self, id: str, *, revision: typing.Optional[int] = None, request_options: typing.Optional[RequestOptions] = None
+    ) -> Environment:
+        """
+        Fetch by id at its latest revision, or at ``revision``; 404 if not visible or no such revision.
+
+        ``:path`` so slash-containing ids round-trip.
+
+        Parameters
+        ----------
+        id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        revision : typing.Optional[int]
+            Read this revision instead of the latest. References to an environment elsewhere, such as an agent's ``environment``, pin a revision as ``id:N`` instead.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -483,20 +785,35 @@ class AsyncEnvironmentsClient:
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.get_environment(id, request_options=request_options)
+        _response = await self._raw_client.get_environment(id, revision=revision, request_options=request_options)
         return _response.data
 
     async def update_environment(
-        self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
+        self,
+        id: str,
+        *,
+        request: UpdateEnvironmentRequestBody,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
-        Replace the environment spec.
+        Replace the environment spec as a new revision. ``id`` must match the URL.
+
+        Sending the spec that is already current changes nothing and returns the current revision.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
 
         request : UpdateEnvironmentRequestBody
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -529,16 +846,24 @@ class AsyncEnvironmentsClient:
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.update_environment(id, request=request, request_options=request_options)
+        _response = await self._raw_client.update_environment(
+            id, request=request, message=message, if_match=if_match, request_options=request_options
+        )
         return _response.data
 
-    async def delete_environment(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
+    async def delete_environment(
+        self, id: str, *, if_match: typing.Optional[str] = None, request_options: typing.Optional[RequestOptions] = None
+    ) -> None:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete by id, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -566,13 +891,15 @@ class AsyncEnvironmentsClient:
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.delete_environment(id, request_options=request_options)
+        _response = await self._raw_client.delete_environment(id, if_match=if_match, request_options=request_options)
         return _response.data
 
     async def patch_environment(
         self,
         id: str,
         *,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         host: typing.Optional[PatchEnvironmentHost] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         headless: typing.Optional[bool] = OMIT,
@@ -585,17 +912,25 @@ class AsyncEnvironmentsClient:
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
+        shell: typing.Optional[bool] = OMIT,
         screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
         storage: typing.Optional[WorkstationStorage] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Environment:
         """
-        Partially update an environment spec; only provided fields change.
+        Partially update an environment spec as a new revision; only provided fields change.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         host : typing.Optional[PatchEnvironmentHost]
 
@@ -620,6 +955,8 @@ class AsyncEnvironmentsClient:
         persist_browser_profile : typing.Optional[bool]
 
         network : typing.Optional[BrowserNetwork]
+
+        shell : typing.Optional[bool]
 
         screenshot_max_width : typing.Optional[int]
 
@@ -656,6 +993,8 @@ class AsyncEnvironmentsClient:
         """
         _response = await self._raw_client.patch_environment(
             id,
+            message=message,
+            if_match=if_match,
             host=host,
             start_url=start_url,
             headless=headless,
@@ -668,6 +1007,7 @@ class AsyncEnvironmentsClient:
             use_default_browser_profile=use_default_browser_profile,
             persist_browser_profile=persist_browser_profile,
             network=network,
+            shell=shell,
             screenshot_max_width=screenshot_max_width,
             image=image,
             storage=storage,

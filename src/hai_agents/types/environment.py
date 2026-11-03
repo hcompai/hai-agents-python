@@ -10,8 +10,6 @@ from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .browser_host import BrowserHost
 from .browser_mode import BrowserMode
 from .browser_network import BrowserNetwork
-from .desktop_host import DesktopHost
-from .workstation_host import WorkstationHost
 from .workstation_storage import WorkstationStorage
 
 
@@ -35,10 +33,9 @@ class Environment_Android(UniversalBaseModel):
 class Environment_Desktop(UniversalBaseModel):
     kind: typing.Literal["desktop"] = "desktop"
     id: str
-    host: DesktopHost
+    shell: typing.Optional[bool] = None
     session_id: typing.Optional[str] = None
     lazy: typing.Optional[bool] = None
-    settle_s: typing.Optional[float] = None
     screenshot_max_width: typing.Optional[int] = None
 
     if IS_PYDANTIC_V2:
@@ -80,10 +77,10 @@ class Environment_Web(UniversalBaseModel):
 class Environment_Workstation(UniversalBaseModel):
     kind: typing.Literal["workstation"] = "workstation"
     id: str
-    host: typing.Optional[WorkstationHost] = None
     session_id: typing.Optional[str] = None
     storage: typing.Optional[WorkstationStorage] = None
     lazy: typing.Optional[bool] = None
+    screenshot_max_width: typing.Optional[int] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

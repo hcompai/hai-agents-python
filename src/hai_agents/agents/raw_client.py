@@ -281,6 +281,7 @@ class RawAgentsClient:
         Parameters
         ----------
         agent_name : str
+            The agent's `name` from its spec, slashes allowed. Not a UUID.
 
         page : typing.Optional[int]
             Page number (1-based)
@@ -356,6 +357,7 @@ class RawAgentsClient:
         Parameters
         ----------
         agent_name : str
+            The agent's `name` from its spec, slashes allowed. Not a UUID.
 
         number : int
             The revision whose spec becomes current again.
@@ -438,6 +440,7 @@ class RawAgentsClient:
         Parameters
         ----------
         agent_name : str
+            The agent's `name` from its spec, slashes allowed. Not a UUID.
 
         revision : typing.Optional[int]
             Read this revision instead of the latest. References to an agent elsewhere, such as a session's ``agent``, pin a revision as ``name:N`` instead.
@@ -519,6 +522,7 @@ class RawAgentsClient:
         Parameters
         ----------
         agent_name : str
+            The agent's `name` from its spec, slashes allowed. Not a UUID.
 
         name : str
             Unique name for this agent in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
@@ -652,11 +656,12 @@ class RawAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[None]:
         """
-        Delete by identifier, with its revisions. Reserved rows: H employee only.
+        Delete by name, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         agent_name : str
+            The agent's `name` from its spec, slashes allowed. Not a UUID.
 
         if_match : typing.Optional[str]
             The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
@@ -734,6 +739,7 @@ class RawAgentsClient:
         Parameters
         ----------
         agent_name : str
+            The agent's `name` from its spec, slashes allowed. Not a UUID.
 
         message : typing.Optional[str]
             Optional note stored on the revision this write creates, such as why the change was made.
@@ -1092,6 +1098,7 @@ class AsyncRawAgentsClient:
         Parameters
         ----------
         agent_name : str
+            The agent's `name` from its spec, slashes allowed. Not a UUID.
 
         page : typing.Optional[int]
             Page number (1-based)
@@ -1167,6 +1174,7 @@ class AsyncRawAgentsClient:
         Parameters
         ----------
         agent_name : str
+            The agent's `name` from its spec, slashes allowed. Not a UUID.
 
         number : int
             The revision whose spec becomes current again.
@@ -1249,6 +1257,7 @@ class AsyncRawAgentsClient:
         Parameters
         ----------
         agent_name : str
+            The agent's `name` from its spec, slashes allowed. Not a UUID.
 
         revision : typing.Optional[int]
             Read this revision instead of the latest. References to an agent elsewhere, such as a session's ``agent``, pin a revision as ``name:N`` instead.
@@ -1330,6 +1339,7 @@ class AsyncRawAgentsClient:
         Parameters
         ----------
         agent_name : str
+            The agent's `name` from its spec, slashes allowed. Not a UUID.
 
         name : str
             Unique name for this agent in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
@@ -1463,11 +1473,12 @@ class AsyncRawAgentsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[None]:
         """
-        Delete by identifier, with its revisions. Reserved rows: H employee only.
+        Delete by name, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         agent_name : str
+            The agent's `name` from its spec, slashes allowed. Not a UUID.
 
         if_match : typing.Optional[str]
             The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
@@ -1545,6 +1556,7 @@ class AsyncRawAgentsClient:
         Parameters
         ----------
         agent_name : str
+            The agent's `name` from its spec, slashes allowed. Not a UUID.
 
         message : typing.Optional[str]
             Optional note stored on the revision this write creates, such as why the change was made.

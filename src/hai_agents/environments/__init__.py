@@ -7,11 +7,12 @@ from importlib import import_module
 
 if typing.TYPE_CHECKING:
     from .types import (
-        CreateEnvironmentRequest,
-        CreateEnvironmentRequest_Android,
-        CreateEnvironmentRequest_Desktop,
-        CreateEnvironmentRequest_Web,
-        CreateEnvironmentRequest_Workstation,
+        CreateEnvironmentRequestBody,
+        CreateEnvironmentRequestBody_Android,
+        CreateEnvironmentRequestBody_Desktop,
+        CreateEnvironmentRequestBody_Web,
+        CreateEnvironmentRequestBody_Workstation,
+        ListEnvironmentRevisionsRequestSortItem,
         ListEnvironmentsRequestSortItem,
         PatchEnvironmentHost,
         PatchEnvironmentMode,
@@ -24,11 +25,12 @@ if typing.TYPE_CHECKING:
         UpdateEnvironmentRequestBody_Workstation,
     )
 _dynamic_imports: typing.Dict[str, str] = {
-    "CreateEnvironmentRequest": ".types",
-    "CreateEnvironmentRequest_Android": ".types",
-    "CreateEnvironmentRequest_Desktop": ".types",
-    "CreateEnvironmentRequest_Web": ".types",
-    "CreateEnvironmentRequest_Workstation": ".types",
+    "CreateEnvironmentRequestBody": ".types",
+    "CreateEnvironmentRequestBody_Android": ".types",
+    "CreateEnvironmentRequestBody_Desktop": ".types",
+    "CreateEnvironmentRequestBody_Web": ".types",
+    "CreateEnvironmentRequestBody_Workstation": ".types",
+    "ListEnvironmentRevisionsRequestSortItem": ".types",
     "ListEnvironmentsRequestSortItem": ".types",
     "PatchEnvironmentHost": ".types",
     "PatchEnvironmentMode": ".types",
@@ -64,11 +66,12 @@ def __dir__():
 
 
 __all__ = [
-    "CreateEnvironmentRequest",
-    "CreateEnvironmentRequest_Android",
-    "CreateEnvironmentRequest_Desktop",
-    "CreateEnvironmentRequest_Web",
-    "CreateEnvironmentRequest_Workstation",
+    "CreateEnvironmentRequestBody",
+    "CreateEnvironmentRequestBody_Android",
+    "CreateEnvironmentRequestBody_Desktop",
+    "CreateEnvironmentRequestBody_Web",
+    "CreateEnvironmentRequestBody_Workstation",
+    "ListEnvironmentRevisionsRequestSortItem",
     "ListEnvironmentsRequestSortItem",
     "PatchEnvironmentHost",
     "PatchEnvironmentMode",

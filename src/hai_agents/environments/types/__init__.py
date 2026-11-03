@@ -6,13 +6,14 @@ import typing
 from importlib import import_module
 
 if typing.TYPE_CHECKING:
-    from .create_environment_request import (
-        CreateEnvironmentRequest,
-        CreateEnvironmentRequest_Android,
-        CreateEnvironmentRequest_Desktop,
-        CreateEnvironmentRequest_Web,
-        CreateEnvironmentRequest_Workstation,
+    from .create_environment_request_body import (
+        CreateEnvironmentRequestBody,
+        CreateEnvironmentRequestBody_Android,
+        CreateEnvironmentRequestBody_Desktop,
+        CreateEnvironmentRequestBody_Web,
+        CreateEnvironmentRequestBody_Workstation,
     )
+    from .list_environment_revisions_request_sort_item import ListEnvironmentRevisionsRequestSortItem
     from .list_environments_request_sort_item import ListEnvironmentsRequestSortItem
     from .patch_environment_host import PatchEnvironmentHost
     from .patch_environment_mode import PatchEnvironmentMode, PatchEnvironmentMode_Text, PatchEnvironmentMode_Visual
@@ -24,11 +25,12 @@ if typing.TYPE_CHECKING:
         UpdateEnvironmentRequestBody_Workstation,
     )
 _dynamic_imports: typing.Dict[str, str] = {
-    "CreateEnvironmentRequest": ".create_environment_request",
-    "CreateEnvironmentRequest_Android": ".create_environment_request",
-    "CreateEnvironmentRequest_Desktop": ".create_environment_request",
-    "CreateEnvironmentRequest_Web": ".create_environment_request",
-    "CreateEnvironmentRequest_Workstation": ".create_environment_request",
+    "CreateEnvironmentRequestBody": ".create_environment_request_body",
+    "CreateEnvironmentRequestBody_Android": ".create_environment_request_body",
+    "CreateEnvironmentRequestBody_Desktop": ".create_environment_request_body",
+    "CreateEnvironmentRequestBody_Web": ".create_environment_request_body",
+    "CreateEnvironmentRequestBody_Workstation": ".create_environment_request_body",
+    "ListEnvironmentRevisionsRequestSortItem": ".list_environment_revisions_request_sort_item",
     "ListEnvironmentsRequestSortItem": ".list_environments_request_sort_item",
     "PatchEnvironmentHost": ".patch_environment_host",
     "PatchEnvironmentMode": ".patch_environment_mode",
@@ -64,11 +66,12 @@ def __dir__():
 
 
 __all__ = [
-    "CreateEnvironmentRequest",
-    "CreateEnvironmentRequest_Android",
-    "CreateEnvironmentRequest_Desktop",
-    "CreateEnvironmentRequest_Web",
-    "CreateEnvironmentRequest_Workstation",
+    "CreateEnvironmentRequestBody",
+    "CreateEnvironmentRequestBody_Android",
+    "CreateEnvironmentRequestBody_Desktop",
+    "CreateEnvironmentRequestBody_Web",
+    "CreateEnvironmentRequestBody_Workstation",
+    "ListEnvironmentRevisionsRequestSortItem",
     "ListEnvironmentsRequestSortItem",
     "PatchEnvironmentHost",
     "PatchEnvironmentMode",
