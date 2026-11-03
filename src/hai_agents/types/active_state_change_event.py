@@ -10,7 +10,7 @@ from .active_state_change_data import ActiveStateChangeData
 
 class ActiveStateChangeEvent(UniversalBaseModel):
     """
-    The agent switched between running, idle and awaiting custom tool results.
+    The agent switched between running, idle and awaiting the client, for custom tool results or approvals.
     """
 
     timestamp: dt.datetime

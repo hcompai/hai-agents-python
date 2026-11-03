@@ -5,12 +5,14 @@ import typing
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .active_state_change_data_state import ActiveStateChangeDataState
+from .tool_approval_request import ToolApprovalRequest
 from .tool_request import ToolRequest
 
 
 class ActiveStateChangeData(UniversalBaseModel):
     state: ActiveStateChangeDataState
     pending_tool_calls: typing.Optional[typing.List[ToolRequest]] = None
+    pending_approvals: typing.Optional[typing.List[ToolApprovalRequest]] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

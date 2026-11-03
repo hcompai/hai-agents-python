@@ -11,10 +11,13 @@ from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
 from ..errors.content_too_large_error import ContentTooLargeError
+from ..errors.precondition_failed_error import PreconditionFailedError
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.error_response import ErrorResponse
 from ..types.page_skill import PageSkill
+from ..types.page_skill_revision_record import PageSkillRevisionRecord
 from ..types.skill import Skill
+from .types.list_skill_revisions_request_sort_item import ListSkillRevisionsRequestSortItem
 from .types.list_skills_request_sort_item import ListSkillsRequestSortItem
 from pydantic import ValidationError
 
@@ -125,6 +128,7 @@ class RawSkillsClient:
         name: str,
         description: str,
         body: str,
+        message: typing.Optional[str] = None,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
         compatibility: typing.Optional[str] = OMIT,
@@ -133,7 +137,7 @@ class RawSkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Skill]:
         """
-        Create a skill. The ``h/`` namespace is reserved for built-in skills.
+        Create a skill at revision 1. The ``h/`` namespace is reserved for built-in skills.
 
         Parameters
         ----------
@@ -145,6 +149,9 @@ class RawSkillsClient:
 
         body : str
             Markdown instructions the agent loads when it uses the skill.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
 
         source : typing.Optional[str]
             Optional URL the content was sourced from.
@@ -169,6 +176,9 @@ class RawSkillsClient:
         _response = self._client_wrapper.httpx_client.request(
             "api/v2/skills",
             method="POST",
+            params={
+                "message": message,
+            },
             json={
                 "name": name,
                 "description": description,
@@ -215,13 +225,185 @@ class RawSkillsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def get_skill(self, name: str, *, request_options: typing.Optional[RequestOptions] = None) -> HttpResponse[Skill]:
+    def list_skill_revisions(
+        self,
+        name: str,
+        *,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[
+            typing.Union[ListSkillRevisionsRequestSortItem, typing.Sequence[ListSkillRevisionsRequestSortItem]]
+        ] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[PageSkillRevisionRecord]:
         """
-        Fetch by name; 404 if not visible. ``:path`` so slash-containing names round-trip.
+        List a skill's revisions without their content, newest first. Read one with ``?revision=N``.
+
+        Unauthenticated callers can list reserved ``h/`` skills only.
 
         Parameters
         ----------
         name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Union[ListSkillRevisionsRequestSortItem, typing.Sequence[ListSkillRevisionsRequestSortItem]]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[PageSkillRevisionRecord]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/skills/{encode_path_param(name)}/revisions",
+            method="GET",
+            params={
+                "page": page,
+                "size": size,
+                "sort": sort,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    PageSkillRevisionRecord,
+                    parse_obj_as(
+                        type_=PageSkillRevisionRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def restore_skill_revision(
+        self,
+        name: str,
+        number: int,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[Skill]:
+        """
+        Make revision ``number``'s content current again, as a new revision with the message ``Restored from vN``.
+
+        Validated and authorised like ``PUT``. The new revision's ``restored_from`` is ``number``.
+        Restoring content that is already current changes nothing and returns the current revision.
+
+        Parameters
+        ----------
+        name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        number : int
+            The revision whose content becomes current again.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[Skill]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/skills/{encode_path_param(name)}/revisions/{encode_path_param(number)}/restore",
+            method="POST",
+            headers={
+                "If-Match": str(if_match) if if_match is not None else None,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    Skill,
+                    parse_obj_as(
+                        type_=Skill,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def get_skill(
+        self,
+        name: str,
+        *,
+        revision: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[Skill]:
+        """
+        Fetch by name at its latest revision, or at ``revision``; 404 if not visible or no such revision.
+
+        ``:path`` so slash-containing names round-trip.
+
+        Parameters
+        ----------
+        name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        revision : typing.Optional[int]
+            Read this revision instead of the latest. References to a skill elsewhere, such as an agent's ``skills``, pin a revision as ``name:N`` instead.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -234,6 +416,9 @@ class RawSkillsClient:
         _response = self._client_wrapper.httpx_client.request(
             f"api/v2/skills/{encode_path_param(name)}",
             method="GET",
+            params={
+                "revision": revision,
+            },
             request_options=request_options,
         )
         try:
@@ -273,6 +458,8 @@ class RawSkillsClient:
         name: str,
         description: str,
         body: str,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
         compatibility: typing.Optional[str] = OMIT,
@@ -281,11 +468,14 @@ class RawSkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Skill]:
         """
-        Replace a skill's content. ``name`` must match the URL identifier; renames are not supported.
+        Replace a skill's content as a new revision. ``name`` must match the URL; renames are not supported.
+
+        Sending the content that is already current changes nothing and returns the current revision.
 
         Parameters
         ----------
         name_ : str
+            The skill's `name`, slashes allowed. Not a UUID.
 
         name : str
             Unique name for this skill in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
@@ -295,6 +485,12 @@ class RawSkillsClient:
 
         body : str
             Markdown instructions the agent loads when it uses the skill.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         source : typing.Optional[str]
             Optional URL the content was sourced from.
@@ -319,6 +515,9 @@ class RawSkillsClient:
         _response = self._client_wrapper.httpx_client.request(
             f"api/v2/skills/{encode_path_param(name_)}",
             method="PUT",
+            params={
+                "message": message,
+            },
             json={
                 "name": name,
                 "description": description,
@@ -331,6 +530,7 @@ class RawSkillsClient:
             },
             headers={
                 "content-type": "application/json",
+                "If-Match": str(if_match) if if_match is not None else None,
             },
             request_options=request_options,
             omit=OMIT,
@@ -345,6 +545,17 @@ class RawSkillsClient:
                     ),
                 )
                 return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -365,13 +576,23 @@ class RawSkillsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def delete_skill(self, name: str, *, request_options: typing.Optional[RequestOptions] = None) -> HttpResponse[None]:
+    def delete_skill(
+        self,
+        name: str,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[None]:
         """
-        Delete by name. Reserved rows: H employee only.
+        Delete by name, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -383,11 +604,25 @@ class RawSkillsClient:
         _response = self._client_wrapper.httpx_client.request(
             f"api/v2/skills/{encode_path_param(name)}",
             method="DELETE",
+            headers={
+                "If-Match": str(if_match) if if_match is not None else None,
+            },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 return HttpResponse(response=_response, data=None)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -412,6 +647,8 @@ class RawSkillsClient:
         self,
         name: str,
         *,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         description: typing.Optional[str] = OMIT,
         body: typing.Optional[str] = OMIT,
         source: typing.Optional[str] = OMIT,
@@ -422,11 +659,18 @@ class RawSkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Skill]:
         """
-        Partially update a skill; only provided fields change.
+        Partially update a skill as a new revision; only provided fields change.
 
         Parameters
         ----------
         name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         description : typing.Optional[str]
 
@@ -453,6 +697,9 @@ class RawSkillsClient:
         _response = self._client_wrapper.httpx_client.request(
             f"api/v2/skills/{encode_path_param(name)}",
             method="PATCH",
+            params={
+                "message": message,
+            },
             json={
                 "description": description,
                 "body": body,
@@ -464,6 +711,7 @@ class RawSkillsClient:
             },
             headers={
                 "content-type": "application/json",
+                "If-Match": str(if_match) if if_match is not None else None,
             },
             request_options=request_options,
             omit=OMIT,
@@ -478,6 +726,17 @@ class RawSkillsClient:
                     ),
                 )
                 return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -602,6 +861,7 @@ class AsyncRawSkillsClient:
         name: str,
         description: str,
         body: str,
+        message: typing.Optional[str] = None,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
         compatibility: typing.Optional[str] = OMIT,
@@ -610,7 +870,7 @@ class AsyncRawSkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Skill]:
         """
-        Create a skill. The ``h/`` namespace is reserved for built-in skills.
+        Create a skill at revision 1. The ``h/`` namespace is reserved for built-in skills.
 
         Parameters
         ----------
@@ -622,6 +882,9 @@ class AsyncRawSkillsClient:
 
         body : str
             Markdown instructions the agent loads when it uses the skill.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
 
         source : typing.Optional[str]
             Optional URL the content was sourced from.
@@ -646,6 +909,9 @@ class AsyncRawSkillsClient:
         _response = await self._client_wrapper.httpx_client.request(
             "api/v2/skills",
             method="POST",
+            params={
+                "message": message,
+            },
             json={
                 "name": name,
                 "description": description,
@@ -692,15 +958,185 @@ class AsyncRawSkillsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def get_skill(
-        self, name: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[Skill]:
+    async def list_skill_revisions(
+        self,
+        name: str,
+        *,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[
+            typing.Union[ListSkillRevisionsRequestSortItem, typing.Sequence[ListSkillRevisionsRequestSortItem]]
+        ] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[PageSkillRevisionRecord]:
         """
-        Fetch by name; 404 if not visible. ``:path`` so slash-containing names round-trip.
+        List a skill's revisions without their content, newest first. Read one with ``?revision=N``.
+
+        Unauthenticated callers can list reserved ``h/`` skills only.
 
         Parameters
         ----------
         name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Union[ListSkillRevisionsRequestSortItem, typing.Sequence[ListSkillRevisionsRequestSortItem]]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[PageSkillRevisionRecord]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/skills/{encode_path_param(name)}/revisions",
+            method="GET",
+            params={
+                "page": page,
+                "size": size,
+                "sort": sort,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    PageSkillRevisionRecord,
+                    parse_obj_as(
+                        type_=PageSkillRevisionRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def restore_skill_revision(
+        self,
+        name: str,
+        number: int,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[Skill]:
+        """
+        Make revision ``number``'s content current again, as a new revision with the message ``Restored from vN``.
+
+        Validated and authorised like ``PUT``. The new revision's ``restored_from`` is ``number``.
+        Restoring content that is already current changes nothing and returns the current revision.
+
+        Parameters
+        ----------
+        name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        number : int
+            The revision whose content becomes current again.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[Skill]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/skills/{encode_path_param(name)}/revisions/{encode_path_param(number)}/restore",
+            method="POST",
+            headers={
+                "If-Match": str(if_match) if if_match is not None else None,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    Skill,
+                    parse_obj_as(
+                        type_=Skill,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def get_skill(
+        self,
+        name: str,
+        *,
+        revision: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[Skill]:
+        """
+        Fetch by name at its latest revision, or at ``revision``; 404 if not visible or no such revision.
+
+        ``:path`` so slash-containing names round-trip.
+
+        Parameters
+        ----------
+        name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        revision : typing.Optional[int]
+            Read this revision instead of the latest. References to a skill elsewhere, such as an agent's ``skills``, pin a revision as ``name:N`` instead.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -713,6 +1149,9 @@ class AsyncRawSkillsClient:
         _response = await self._client_wrapper.httpx_client.request(
             f"api/v2/skills/{encode_path_param(name)}",
             method="GET",
+            params={
+                "revision": revision,
+            },
             request_options=request_options,
         )
         try:
@@ -752,6 +1191,8 @@ class AsyncRawSkillsClient:
         name: str,
         description: str,
         body: str,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
         compatibility: typing.Optional[str] = OMIT,
@@ -760,11 +1201,14 @@ class AsyncRawSkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Skill]:
         """
-        Replace a skill's content. ``name`` must match the URL identifier; renames are not supported.
+        Replace a skill's content as a new revision. ``name`` must match the URL; renames are not supported.
+
+        Sending the content that is already current changes nothing and returns the current revision.
 
         Parameters
         ----------
         name_ : str
+            The skill's `name`, slashes allowed. Not a UUID.
 
         name : str
             Unique name for this skill in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
@@ -774,6 +1218,12 @@ class AsyncRawSkillsClient:
 
         body : str
             Markdown instructions the agent loads when it uses the skill.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         source : typing.Optional[str]
             Optional URL the content was sourced from.
@@ -798,6 +1248,9 @@ class AsyncRawSkillsClient:
         _response = await self._client_wrapper.httpx_client.request(
             f"api/v2/skills/{encode_path_param(name_)}",
             method="PUT",
+            params={
+                "message": message,
+            },
             json={
                 "name": name,
                 "description": description,
@@ -810,6 +1263,7 @@ class AsyncRawSkillsClient:
             },
             headers={
                 "content-type": "application/json",
+                "If-Match": str(if_match) if if_match is not None else None,
             },
             request_options=request_options,
             omit=OMIT,
@@ -824,6 +1278,17 @@ class AsyncRawSkillsClient:
                     ),
                 )
                 return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -845,14 +1310,22 @@ class AsyncRawSkillsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     async def delete_skill(
-        self, name: str, *, request_options: typing.Optional[RequestOptions] = None
+        self,
+        name: str,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[None]:
         """
-        Delete by name. Reserved rows: H employee only.
+        Delete by name, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -864,11 +1337,25 @@ class AsyncRawSkillsClient:
         _response = await self._client_wrapper.httpx_client.request(
             f"api/v2/skills/{encode_path_param(name)}",
             method="DELETE",
+            headers={
+                "If-Match": str(if_match) if if_match is not None else None,
+            },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -893,6 +1380,8 @@ class AsyncRawSkillsClient:
         self,
         name: str,
         *,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         description: typing.Optional[str] = OMIT,
         body: typing.Optional[str] = OMIT,
         source: typing.Optional[str] = OMIT,
@@ -903,11 +1392,18 @@ class AsyncRawSkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Skill]:
         """
-        Partially update a skill; only provided fields change.
+        Partially update a skill as a new revision; only provided fields change.
 
         Parameters
         ----------
         name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         description : typing.Optional[str]
 
@@ -934,6 +1430,9 @@ class AsyncRawSkillsClient:
         _response = await self._client_wrapper.httpx_client.request(
             f"api/v2/skills/{encode_path_param(name)}",
             method="PATCH",
+            params={
+                "message": message,
+            },
             json={
                 "description": description,
                 "body": body,
@@ -945,6 +1444,7 @@ class AsyncRawSkillsClient:
             },
             headers={
                 "content-type": "application/json",
+                "If-Match": str(if_match) if if_match is not None else None,
             },
             request_options=request_options,
             omit=OMIT,
@@ -959,6 +1459,17 @@ class AsyncRawSkillsClient:
                     ),
                 )
                 return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),

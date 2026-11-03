@@ -5,8 +5,10 @@ import typing
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
 from ..types.page_skill import PageSkill
+from ..types.page_skill_revision_record import PageSkillRevisionRecord
 from ..types.skill import Skill
 from .raw_client import AsyncRawSkillsClient, RawSkillsClient
+from .types.list_skill_revisions_request_sort_item import ListSkillRevisionsRequestSortItem
 from .types.list_skills_request_sort_item import ListSkillsRequestSortItem
 
 # this is used as the default value for optional parameters
@@ -88,6 +90,7 @@ class SkillsClient:
         name: str,
         description: str,
         body: str,
+        message: typing.Optional[str] = None,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
         compatibility: typing.Optional[str] = OMIT,
@@ -96,7 +99,7 @@ class SkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
         """
-        Create a skill. The ``h/`` namespace is reserved for built-in skills.
+        Create a skill at revision 1. The ``h/`` namespace is reserved for built-in skills.
 
         Parameters
         ----------
@@ -108,6 +111,9 @@ class SkillsClient:
 
         body : str
             Markdown instructions the agent loads when it uses the skill.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
 
         source : typing.Optional[str]
             Optional URL the content was sourced from.
@@ -146,6 +152,7 @@ class SkillsClient:
             name=name,
             description=description,
             body=body,
+            message=message,
             source=source,
             url_pattern=url_pattern,
             compatibility=compatibility,
@@ -155,13 +162,129 @@ class SkillsClient:
         )
         return _response.data
 
-    def get_skill(self, name: str, *, request_options: typing.Optional[RequestOptions] = None) -> Skill:
+    def list_skill_revisions(
+        self,
+        name: str,
+        *,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[
+            typing.Union[ListSkillRevisionsRequestSortItem, typing.Sequence[ListSkillRevisionsRequestSortItem]]
+        ] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> PageSkillRevisionRecord:
         """
-        Fetch by name; 404 if not visible. ``:path`` so slash-containing names round-trip.
+        List a skill's revisions without their content, newest first. Read one with ``?revision=N``.
+
+        Unauthenticated callers can list reserved ``h/`` skills only.
 
         Parameters
         ----------
         name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Union[ListSkillRevisionsRequestSortItem, typing.Sequence[ListSkillRevisionsRequestSortItem]]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        PageSkillRevisionRecord
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.skills.list_skill_revisions(
+            name="name",
+        )
+        """
+        _response = self._raw_client.list_skill_revisions(
+            name, page=page, size=size, sort=sort, request_options=request_options
+        )
+        return _response.data
+
+    def restore_skill_revision(
+        self,
+        name: str,
+        number: int,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Skill:
+        """
+        Make revision ``number``'s content current again, as a new revision with the message ``Restored from vN``.
+
+        Validated and authorised like ``PUT``. The new revision's ``restored_from`` is ``number``.
+        Restoring content that is already current changes nothing and returns the current revision.
+
+        Parameters
+        ----------
+        name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        number : int
+            The revision whose content becomes current again.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        Skill
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.skills.restore_skill_revision(
+            name="name",
+            number=1,
+        )
+        """
+        _response = self._raw_client.restore_skill_revision(
+            name, number, if_match=if_match, request_options=request_options
+        )
+        return _response.data
+
+    def get_skill(
+        self,
+        name: str,
+        *,
+        revision: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Skill:
+        """
+        Fetch by name at its latest revision, or at ``revision``; 404 if not visible or no such revision.
+
+        ``:path`` so slash-containing names round-trip.
+
+        Parameters
+        ----------
+        name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        revision : typing.Optional[int]
+            Read this revision instead of the latest. References to a skill elsewhere, such as an agent's ``skills``, pin a revision as ``name:N`` instead.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -182,7 +305,7 @@ class SkillsClient:
             name="name",
         )
         """
-        _response = self._raw_client.get_skill(name, request_options=request_options)
+        _response = self._raw_client.get_skill(name, revision=revision, request_options=request_options)
         return _response.data
 
     def update_skill(
@@ -192,6 +315,8 @@ class SkillsClient:
         name: str,
         description: str,
         body: str,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
         compatibility: typing.Optional[str] = OMIT,
@@ -200,11 +325,14 @@ class SkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
         """
-        Replace a skill's content. ``name`` must match the URL identifier; renames are not supported.
+        Replace a skill's content as a new revision. ``name`` must match the URL; renames are not supported.
+
+        Sending the content that is already current changes nothing and returns the current revision.
 
         Parameters
         ----------
         name_ : str
+            The skill's `name`, slashes allowed. Not a UUID.
 
         name : str
             Unique name for this skill in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
@@ -214,6 +342,12 @@ class SkillsClient:
 
         body : str
             Markdown instructions the agent loads when it uses the skill.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         source : typing.Optional[str]
             Optional URL the content was sourced from.
@@ -254,6 +388,8 @@ class SkillsClient:
             name=name,
             description=description,
             body=body,
+            message=message,
+            if_match=if_match,
             source=source,
             url_pattern=url_pattern,
             compatibility=compatibility,
@@ -263,13 +399,23 @@ class SkillsClient:
         )
         return _response.data
 
-    def delete_skill(self, name: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
+    def delete_skill(
+        self,
+        name: str,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
         """
-        Delete by name. Reserved rows: H employee only.
+        Delete by name, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -289,13 +435,15 @@ class SkillsClient:
             name="name",
         )
         """
-        _response = self._raw_client.delete_skill(name, request_options=request_options)
+        _response = self._raw_client.delete_skill(name, if_match=if_match, request_options=request_options)
         return _response.data
 
     def patch_skill(
         self,
         name: str,
         *,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         description: typing.Optional[str] = OMIT,
         body: typing.Optional[str] = OMIT,
         source: typing.Optional[str] = OMIT,
@@ -306,11 +454,18 @@ class SkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
         """
-        Partially update a skill; only provided fields change.
+        Partially update a skill as a new revision; only provided fields change.
 
         Parameters
         ----------
         name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         description : typing.Optional[str]
 
@@ -347,6 +502,8 @@ class SkillsClient:
         """
         _response = self._raw_client.patch_skill(
             name,
+            message=message,
+            if_match=if_match,
             description=description,
             body=body,
             source=source,
@@ -442,6 +599,7 @@ class AsyncSkillsClient:
         name: str,
         description: str,
         body: str,
+        message: typing.Optional[str] = None,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
         compatibility: typing.Optional[str] = OMIT,
@@ -450,7 +608,7 @@ class AsyncSkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
         """
-        Create a skill. The ``h/`` namespace is reserved for built-in skills.
+        Create a skill at revision 1. The ``h/`` namespace is reserved for built-in skills.
 
         Parameters
         ----------
@@ -462,6 +620,9 @@ class AsyncSkillsClient:
 
         body : str
             Markdown instructions the agent loads when it uses the skill.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
 
         source : typing.Optional[str]
             Optional URL the content was sourced from.
@@ -508,6 +669,7 @@ class AsyncSkillsClient:
             name=name,
             description=description,
             body=body,
+            message=message,
             source=source,
             url_pattern=url_pattern,
             compatibility=compatibility,
@@ -517,13 +679,145 @@ class AsyncSkillsClient:
         )
         return _response.data
 
-    async def get_skill(self, name: str, *, request_options: typing.Optional[RequestOptions] = None) -> Skill:
+    async def list_skill_revisions(
+        self,
+        name: str,
+        *,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[
+            typing.Union[ListSkillRevisionsRequestSortItem, typing.Sequence[ListSkillRevisionsRequestSortItem]]
+        ] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> PageSkillRevisionRecord:
         """
-        Fetch by name; 404 if not visible. ``:path`` so slash-containing names round-trip.
+        List a skill's revisions without their content, newest first. Read one with ``?revision=N``.
+
+        Unauthenticated callers can list reserved ``h/`` skills only.
 
         Parameters
         ----------
         name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Union[ListSkillRevisionsRequestSortItem, typing.Sequence[ListSkillRevisionsRequestSortItem]]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        PageSkillRevisionRecord
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.skills.list_skill_revisions(
+                name="name",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.list_skill_revisions(
+            name, page=page, size=size, sort=sort, request_options=request_options
+        )
+        return _response.data
+
+    async def restore_skill_revision(
+        self,
+        name: str,
+        number: int,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Skill:
+        """
+        Make revision ``number``'s content current again, as a new revision with the message ``Restored from vN``.
+
+        Validated and authorised like ``PUT``. The new revision's ``restored_from`` is ``number``.
+        Restoring content that is already current changes nothing and returns the current revision.
+
+        Parameters
+        ----------
+        name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        number : int
+            The revision whose content becomes current again.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        Skill
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.skills.restore_skill_revision(
+                name="name",
+                number=1,
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.restore_skill_revision(
+            name, number, if_match=if_match, request_options=request_options
+        )
+        return _response.data
+
+    async def get_skill(
+        self,
+        name: str,
+        *,
+        revision: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> Skill:
+        """
+        Fetch by name at its latest revision, or at ``revision``; 404 if not visible or no such revision.
+
+        ``:path`` so slash-containing names round-trip.
+
+        Parameters
+        ----------
+        name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        revision : typing.Optional[int]
+            Read this revision instead of the latest. References to a skill elsewhere, such as an agent's ``skills``, pin a revision as ``name:N`` instead.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -552,7 +846,7 @@ class AsyncSkillsClient:
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.get_skill(name, request_options=request_options)
+        _response = await self._raw_client.get_skill(name, revision=revision, request_options=request_options)
         return _response.data
 
     async def update_skill(
@@ -562,6 +856,8 @@ class AsyncSkillsClient:
         name: str,
         description: str,
         body: str,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         source: typing.Optional[str] = OMIT,
         url_pattern: typing.Optional[str] = OMIT,
         compatibility: typing.Optional[str] = OMIT,
@@ -570,11 +866,14 @@ class AsyncSkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
         """
-        Replace a skill's content. ``name`` must match the URL identifier; renames are not supported.
+        Replace a skill's content as a new revision. ``name`` must match the URL; renames are not supported.
+
+        Sending the content that is already current changes nothing and returns the current revision.
 
         Parameters
         ----------
         name_ : str
+            The skill's `name`, slashes allowed. Not a UUID.
 
         name : str
             Unique name for this skill in your catalog. Format: lowercase ASCII letters, digits and hyphens; must start and end with alphanumeric; max 63 chars per segment; optional single 'org/' namespace prefix (e.g. 'h/web-environment').
@@ -584,6 +883,12 @@ class AsyncSkillsClient:
 
         body : str
             Markdown instructions the agent loads when it uses the skill.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         source : typing.Optional[str]
             Optional URL the content was sourced from.
@@ -632,6 +937,8 @@ class AsyncSkillsClient:
             name=name,
             description=description,
             body=body,
+            message=message,
+            if_match=if_match,
             source=source,
             url_pattern=url_pattern,
             compatibility=compatibility,
@@ -641,13 +948,23 @@ class AsyncSkillsClient:
         )
         return _response.data
 
-    async def delete_skill(self, name: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
+    async def delete_skill(
+        self,
+        name: str,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
         """
-        Delete by name. Reserved rows: H employee only.
+        Delete by name, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -675,13 +992,15 @@ class AsyncSkillsClient:
 
         asyncio.run(main())
         """
-        _response = await self._raw_client.delete_skill(name, request_options=request_options)
+        _response = await self._raw_client.delete_skill(name, if_match=if_match, request_options=request_options)
         return _response.data
 
     async def patch_skill(
         self,
         name: str,
         *,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         description: typing.Optional[str] = OMIT,
         body: typing.Optional[str] = OMIT,
         source: typing.Optional[str] = OMIT,
@@ -692,11 +1011,18 @@ class AsyncSkillsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Skill:
         """
-        Partially update a skill; only provided fields change.
+        Partially update a skill as a new revision; only provided fields change.
 
         Parameters
         ----------
         name : str
+            The skill's `name`, slashes allowed. Not a UUID.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         description : typing.Optional[str]
 
@@ -741,6 +1067,8 @@ class AsyncSkillsClient:
         """
         _response = await self._raw_client.patch_skill(
             name,
+            message=message,
+            if_match=if_match,
             description=description,
             body=body,
             source=source,

@@ -21,6 +21,8 @@ from .metrics_update_data import MetricsUpdateData
 from .request_start_data import RequestStartData
 from .request_start_dispatched_data import RequestStartDispatchedData
 from .runner_session_data import RunnerSessionData
+from .tool_approval_decided_data import ToolApprovalDecidedData
+from .tool_approval_requested_data import ToolApprovalRequestedData
 
 
 class SessionEventZero_ActiveStateChangeEvent(UniversalBaseModel):
@@ -218,6 +220,36 @@ class SessionEventZero_RunnerSessionEvent(UniversalBaseModel):
             extra = pydantic.Extra.allow
 
 
+class SessionEventZero_ToolApprovalDecidedEvent(UniversalBaseModel):
+    type: typing.Literal["ToolApprovalDecidedEvent"] = "ToolApprovalDecidedEvent"
+    timestamp: dt.datetime
+    data: ToolApprovalDecidedData
+
+    if IS_PYDANTIC_V2:
+        model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
+    else:
+
+        class Config:
+            frozen = True
+            smart_union = True
+            extra = pydantic.Extra.allow
+
+
+class SessionEventZero_ToolApprovalRequestedEvent(UniversalBaseModel):
+    type: typing.Literal["ToolApprovalRequestedEvent"] = "ToolApprovalRequestedEvent"
+    timestamp: dt.datetime
+    data: ToolApprovalRequestedData
+
+    if IS_PYDANTIC_V2:
+        model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
+    else:
+
+        class Config:
+            frozen = True
+            smart_union = True
+            extra = pydantic.Extra.allow
+
+
 SessionEventZero = typing_extensions.Annotated[
     typing.Union[
         SessionEventZero_ActiveStateChangeEvent,
@@ -233,6 +265,8 @@ SessionEventZero = typing_extensions.Annotated[
         SessionEventZero_RequestStartDispatchedEvent,
         SessionEventZero_RequestStartEvent,
         SessionEventZero_RunnerSessionEvent,
+        SessionEventZero_ToolApprovalDecidedEvent,
+        SessionEventZero_ToolApprovalRequestedEvent,
     ],
     pydantic.Field(discriminator="type"),
 ]

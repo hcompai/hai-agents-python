@@ -13,6 +13,9 @@ if typing.TYPE_CHECKING:
         SendSessionMessagesRequestBody,
         SendSessionMessagesRequestBody_Batch,
         SendSessionMessagesRequestBody_UserMessage,
+        SendSessionToolApprovalsRequestBody,
+        SendSessionToolApprovalsRequestBody_Batch,
+        SendSessionToolApprovalsRequestBody_ToolApprovalResponse,
         SendSessionToolResultsRequestBody,
     )
 _dynamic_imports: typing.Dict[str, str] = {
@@ -22,6 +25,9 @@ _dynamic_imports: typing.Dict[str, str] = {
     "SendSessionMessagesRequestBody": ".types",
     "SendSessionMessagesRequestBody_Batch": ".types",
     "SendSessionMessagesRequestBody_UserMessage": ".types",
+    "SendSessionToolApprovalsRequestBody": ".types",
+    "SendSessionToolApprovalsRequestBody_Batch": ".types",
+    "SendSessionToolApprovalsRequestBody_ToolApprovalResponse": ".types",
     "SendSessionToolResultsRequestBody": ".types",
 }
 
@@ -54,5 +60,8 @@ __all__ = [
     "SendSessionMessagesRequestBody",
     "SendSessionMessagesRequestBody_Batch",
     "SendSessionMessagesRequestBody_UserMessage",
+    "SendSessionToolApprovalsRequestBody",
+    "SendSessionToolApprovalsRequestBody_Batch",
+    "SendSessionToolApprovalsRequestBody_ToolApprovalResponse",
     "SendSessionToolResultsRequestBody",
 ]

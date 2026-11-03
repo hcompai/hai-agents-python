@@ -41,6 +41,7 @@ if typing.TYPE_CHECKING:
     from .answer_event import AnswerEvent
     from .answer_event_answer import AnswerEventAnswer
     from .answer_outcome import AnswerOutcome
+    from .approval_requirement import ApprovalRequirement
     from .attachment_data import AttachmentData
     from .attachment_data_origin import AttachmentDataOrigin
     from .attachment_event import AttachmentEvent
@@ -52,10 +53,11 @@ if typing.TYPE_CHECKING:
     from .browser_profile_read import BrowserProfileRead
     from .browser_text_mode import BrowserTextMode
     from .browser_visual_mode import BrowserVisualMode
+    from .catalog_revision_ref import CatalogRevisionRef
     from .cron_timing import CronTiming
     from .cron_timing_type import CronTimingType
+    from .dependency_revisions import DependencyRevisions
     from .desktop import Desktop
-    from .desktop_host import DesktopHost
     from .detail_error_response import DetailErrorResponse
     from .environment import (
         Environment,
@@ -66,6 +68,7 @@ if typing.TYPE_CHECKING:
     )
     from .environment_kind import EnvironmentKind
     from .environment_page import EnvironmentPage
+    from .environment_revision_record import EnvironmentRevisionRecord
     from .error_event import ErrorEvent
     from .error_event_kind import ErrorEventKind
     from .error_response import ErrorResponse
@@ -97,11 +100,13 @@ if typing.TYPE_CHECKING:
     from .one_password_config import OnePasswordConfig
     from .page_agent import PageAgent
     from .page_agent_revision_record import PageAgentRevisionRecord
+    from .page_environment_revision_record import PageEnvironmentRevisionRecord
     from .page_schedule_record import PageScheduleRecord
     from .page_schedule_run_record import PageScheduleRunRecord
     from .page_session_event import PageSessionEvent
     from .page_session_summary import PageSessionSummary
     from .page_skill import PageSkill
+    from .page_skill_revision_record import PageSkillRevisionRecord
     from .page_webhook_record import PageWebhookRecord
     from .pause_schedule import PauseSchedule
     from .policy_event import PolicyEvent
@@ -142,6 +147,8 @@ if typing.TYPE_CHECKING:
         SessionEventZero_RequestStartDispatchedEvent,
         SessionEventZero_RequestStartEvent,
         SessionEventZero_RunnerSessionEvent,
+        SessionEventZero_ToolApprovalDecidedEvent,
+        SessionEventZero_ToolApprovalRequestedEvent,
     )
     from .session_request import SessionRequest
     from .session_request_agent import SessionRequestAgent
@@ -150,7 +157,19 @@ if typing.TYPE_CHECKING:
     from .session_summary import SessionSummary
     from .share_link import ShareLink
     from .skill import Skill
+    from .skill_revision_record import SkillRevisionRecord
     from .token_quota_status import TokenQuotaStatus
+    from .tool_approval_batch import ToolApprovalBatch
+    from .tool_approval_decided_data import ToolApprovalDecidedData
+    from .tool_approval_decided_event import ToolApprovalDecidedEvent
+    from .tool_approval_decision import ToolApprovalDecision
+    from .tool_approval_decision_decision import ToolApprovalDecisionDecision
+    from .tool_approval_request import ToolApprovalRequest
+    from .tool_approval_requested_data import ToolApprovalRequestedData
+    from .tool_approval_requested_event import ToolApprovalRequestedEvent
+    from .tool_approval_response_event import ToolApprovalResponseEvent
+    from .tool_approval_response_event_action import ToolApprovalResponseEventAction
+    from .tool_approval_response_event_type import ToolApprovalResponseEventType
     from .tool_definition import ToolDefinition
     from .tool_request import ToolRequest
     from .tool_result_batch import ToolResultBatch
@@ -186,7 +205,6 @@ if typing.TYPE_CHECKING:
     from .webhook_with_secret import WebhookWithSecret
     from .webhook_with_secret_last_delivery_status import WebhookWithSecretLastDeliveryStatus
     from .workstation import Workstation
-    from .workstation_host import WorkstationHost
     from .workstation_storage import WorkstationStorage
     from .write_file_response import WriteFileResponse
 _dynamic_imports: typing.Dict[str, str] = {
@@ -223,6 +241,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "AnswerEvent": ".answer_event",
     "AnswerEventAnswer": ".answer_event_answer",
     "AnswerOutcome": ".answer_outcome",
+    "ApprovalRequirement": ".approval_requirement",
     "AttachmentData": ".attachment_data",
     "AttachmentDataOrigin": ".attachment_data_origin",
     "AttachmentEvent": ".attachment_event",
@@ -236,14 +255,16 @@ _dynamic_imports: typing.Dict[str, str] = {
     "BrowserProfileRead": ".browser_profile_read",
     "BrowserTextMode": ".browser_text_mode",
     "BrowserVisualMode": ".browser_visual_mode",
+    "CatalogRevisionRef": ".catalog_revision_ref",
     "CronTiming": ".cron_timing",
     "CronTimingType": ".cron_timing_type",
+    "DependencyRevisions": ".dependency_revisions",
     "Desktop": ".desktop",
-    "DesktopHost": ".desktop_host",
     "DetailErrorResponse": ".detail_error_response",
     "Environment": ".environment",
     "EnvironmentKind": ".environment_kind",
     "EnvironmentPage": ".environment_page",
+    "EnvironmentRevisionRecord": ".environment_revision_record",
     "Environment_Android": ".environment",
     "Environment_Desktop": ".environment",
     "Environment_Web": ".environment",
@@ -279,11 +300,13 @@ _dynamic_imports: typing.Dict[str, str] = {
     "OnePasswordConfig": ".one_password_config",
     "PageAgent": ".page_agent",
     "PageAgentRevisionRecord": ".page_agent_revision_record",
+    "PageEnvironmentRevisionRecord": ".page_environment_revision_record",
     "PageScheduleRecord": ".page_schedule_record",
     "PageScheduleRunRecord": ".page_schedule_run_record",
     "PageSessionEvent": ".page_session_event",
     "PageSessionSummary": ".page_session_summary",
     "PageSkill": ".page_skill",
+    "PageSkillRevisionRecord": ".page_skill_revision_record",
     "PageWebhookRecord": ".page_webhook_record",
     "PauseSchedule": ".pause_schedule",
     "PolicyEvent": ".policy_event",
@@ -323,6 +346,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "SessionEventZero_RequestStartDispatchedEvent": ".session_event_zero",
     "SessionEventZero_RequestStartEvent": ".session_event_zero",
     "SessionEventZero_RunnerSessionEvent": ".session_event_zero",
+    "SessionEventZero_ToolApprovalDecidedEvent": ".session_event_zero",
+    "SessionEventZero_ToolApprovalRequestedEvent": ".session_event_zero",
     "SessionRequest": ".session_request",
     "SessionRequestAgent": ".session_request_agent",
     "SessionRequestMessages": ".session_request_messages",
@@ -330,7 +355,19 @@ _dynamic_imports: typing.Dict[str, str] = {
     "SessionSummary": ".session_summary",
     "ShareLink": ".share_link",
     "Skill": ".skill",
+    "SkillRevisionRecord": ".skill_revision_record",
     "TokenQuotaStatus": ".token_quota_status",
+    "ToolApprovalBatch": ".tool_approval_batch",
+    "ToolApprovalDecidedData": ".tool_approval_decided_data",
+    "ToolApprovalDecidedEvent": ".tool_approval_decided_event",
+    "ToolApprovalDecision": ".tool_approval_decision",
+    "ToolApprovalDecisionDecision": ".tool_approval_decision_decision",
+    "ToolApprovalRequest": ".tool_approval_request",
+    "ToolApprovalRequestedData": ".tool_approval_requested_data",
+    "ToolApprovalRequestedEvent": ".tool_approval_requested_event",
+    "ToolApprovalResponseEvent": ".tool_approval_response_event",
+    "ToolApprovalResponseEventAction": ".tool_approval_response_event_action",
+    "ToolApprovalResponseEventType": ".tool_approval_response_event_type",
     "ToolDefinition": ".tool_definition",
     "ToolRequest": ".tool_request",
     "ToolResultBatch": ".tool_result_batch",
@@ -362,7 +399,6 @@ _dynamic_imports: typing.Dict[str, str] = {
     "WebhookWithSecret": ".webhook_with_secret",
     "WebhookWithSecretLastDeliveryStatus": ".webhook_with_secret_last_delivery_status",
     "Workstation": ".workstation",
-    "WorkstationHost": ".workstation_host",
     "WorkstationStorage": ".workstation_storage",
     "WriteFileResponse": ".write_file_response",
 }
@@ -423,6 +459,7 @@ __all__ = [
     "AnswerEvent",
     "AnswerEventAnswer",
     "AnswerOutcome",
+    "ApprovalRequirement",
     "AttachmentData",
     "AttachmentDataOrigin",
     "AttachmentEvent",
@@ -436,14 +473,16 @@ __all__ = [
     "BrowserProfileRead",
     "BrowserTextMode",
     "BrowserVisualMode",
+    "CatalogRevisionRef",
     "CronTiming",
     "CronTimingType",
+    "DependencyRevisions",
     "Desktop",
-    "DesktopHost",
     "DetailErrorResponse",
     "Environment",
     "EnvironmentKind",
     "EnvironmentPage",
+    "EnvironmentRevisionRecord",
     "Environment_Android",
     "Environment_Desktop",
     "Environment_Web",
@@ -479,11 +518,13 @@ __all__ = [
     "OnePasswordConfig",
     "PageAgent",
     "PageAgentRevisionRecord",
+    "PageEnvironmentRevisionRecord",
     "PageScheduleRecord",
     "PageScheduleRunRecord",
     "PageSessionEvent",
     "PageSessionSummary",
     "PageSkill",
+    "PageSkillRevisionRecord",
     "PageWebhookRecord",
     "PauseSchedule",
     "PolicyEvent",
@@ -523,6 +564,8 @@ __all__ = [
     "SessionEventZero_RequestStartDispatchedEvent",
     "SessionEventZero_RequestStartEvent",
     "SessionEventZero_RunnerSessionEvent",
+    "SessionEventZero_ToolApprovalDecidedEvent",
+    "SessionEventZero_ToolApprovalRequestedEvent",
     "SessionRequest",
     "SessionRequestAgent",
     "SessionRequestMessages",
@@ -530,7 +573,19 @@ __all__ = [
     "SessionSummary",
     "ShareLink",
     "Skill",
+    "SkillRevisionRecord",
     "TokenQuotaStatus",
+    "ToolApprovalBatch",
+    "ToolApprovalDecidedData",
+    "ToolApprovalDecidedEvent",
+    "ToolApprovalDecision",
+    "ToolApprovalDecisionDecision",
+    "ToolApprovalRequest",
+    "ToolApprovalRequestedData",
+    "ToolApprovalRequestedEvent",
+    "ToolApprovalResponseEvent",
+    "ToolApprovalResponseEventAction",
+    "ToolApprovalResponseEventType",
     "ToolDefinition",
     "ToolRequest",
     "ToolResultBatch",
@@ -562,7 +617,6 @@ __all__ = [
     "WebhookWithSecret",
     "WebhookWithSecretLastDeliveryStatus",
     "Workstation",
-    "WorkstationHost",
     "WorkstationStorage",
     "WriteFileResponse",
 ]

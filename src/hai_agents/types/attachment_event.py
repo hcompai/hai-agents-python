@@ -10,7 +10,8 @@ from .attachment_data import AttachmentData
 
 class AttachmentEvent(UniversalBaseModel):
     """
-    A file passed between the user and the agent's environment; ``data.url`` downloads it.
+    A file passed between the user and the agent's environment; ``data.url`` downloads it, as does
+    ``GET /v2/files/{data.file_id}`` when the platform stored it.
     """
 
     timestamp: dt.datetime

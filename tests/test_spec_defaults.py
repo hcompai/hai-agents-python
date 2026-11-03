@@ -34,6 +34,7 @@ MINIMAL_KWARGS: dict[str, dict[str, typing.Any]] = {
     "UserMessageEvent": {"message": "hi"},
     "ErrorEvent": {"error": "boom", "origin": "loop"},
     "ToolResultBatch": {"results": []},
+    "ToolApprovalResponseEvent": {"call_id": "call_1", "action": "approve"},
     "CronTiming": {"expression": "0 9 * * *", "timezone": "Europe/Paris"},
     "Workstation": {"id": "workstation"},
 }
@@ -105,7 +106,7 @@ def test_generated_model_sends_spec_default(schema_name, prop_name, expected_def
     "instance,field,expected",
     [
         (Environment_Web(id="browser", start_url="https://x.test"), "kind", "web"),
-        (Environment_Desktop(id="box", host="user_device"), "kind", "desktop"),
+        (Environment_Desktop(id="box"), "kind", "desktop"),
         (Environment_Android(id="phone"), "kind", "android"),
         (VaultCreateRequestProviderConfig_Onepassword(op_vault_id="vault_1"), "provider", "onepassword"),
         (VaultCreateRequestProviderConfig_Internal(), "provider", "internal"),

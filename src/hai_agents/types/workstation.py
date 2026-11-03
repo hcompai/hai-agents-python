@@ -4,23 +4,17 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .workstation_host import WorkstationHost
 from .workstation_storage import WorkstationStorage
 
 
 class Workstation(UniversalBaseModel):
     """
-    A desktop computer with a browser, office apps and a shell, which the agent drives from that shell.
+    A cloud computer with a browser, apps and a shell.
     """
 
     id: str = pydantic.Field()
     """
     Catalog identifier for this environment.
-    """
-
-    host: typing.Optional[WorkstationHost] = pydantic.Field(default=None)
-    """
-    Where the workstation runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.
     """
 
     session_id: typing.Optional[str] = pydantic.Field(default=None)
@@ -30,12 +24,17 @@ class Workstation(UniversalBaseModel):
 
     storage: typing.Optional[WorkstationStorage] = pydantic.Field(default=None)
     """
-    Which disk a cloud workstation runs on. Omit to let the stage decide: the caller's default volume where the workstation is persistent by default, a fresh machine elsewhere. Ignored when session_id attaches to an existing session, and on a user_device host.
+    Which disk a cloud workstation runs on. Omit to let the stage decide: the caller's default volume where the workstation is persistent by default, a fresh machine elsewhere. Ignored when session_id attaches to an existing session.
     """
 
     lazy: typing.Optional[bool] = pydantic.Field(default=None)
     """
-    Start on the agent's first use instead of at startup. Skips the initial observation. A cloud workstation is provisioned on first use; a user_device one is not probed until then.
+    Provision on the agent's first use instead of at startup. Skips the initial observation.
+    """
+
+    screenshot_max_width: typing.Optional[int] = pydantic.Field(default=None)
+    """
+    Maximum screenshot width in pixels. Null uses 1920; images are never upscaled.
     """
 
     if IS_PYDANTIC_V2:

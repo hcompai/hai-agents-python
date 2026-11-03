@@ -695,6 +695,73 @@
         }
       }
     },
+    "/api/v2/sessions/{id}/tool_approvals": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Send Session Tool Approvals",
+        "description": "Approve or deny tool calls listed in ``pending_approvals`` (single or batch).",
+        "operationId": "send_session_tool_approvals_api_v2_sessions__id__tool_approvals_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ToolApprovalResponseEvent"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ToolApprovalBatch"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "type",
+                  "mapping": {
+                    "tool_approval_response": "#/components/schemas/ToolApprovalResponseEvent",
+                    "batch": "#/components/schemas/ToolApprovalBatch"
+                  }
+                },
+                "title": "Input"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/sessions/{id}/pause": {
       "post": {
         "tags": [
@@ -1265,8 +1332,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Storage bucket, as it appears in the resource URL an event carries.",
               "title": "Bucket"
-            }
+            },
+            "description": "Storage bucket, as it appears in the resource URL an event carries."
           },
           {
             "name": "key",
@@ -1274,8 +1343,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Object key inside the bucket, slashes allowed.",
               "title": "Key"
-            }
+            },
+            "description": "Object key inside the bucket, slashes allowed."
           }
         ],
         "responses": {
@@ -1317,8 +1388,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Opaque `file_id` from the session's `AttachmentEvent`. Not a UUID.",
               "title": "File Id"
-            }
+            },
+            "description": "Opaque `file_id` from the session's `AttachmentEvent`. Not a UUID."
           }
         ],
         "responses": {
@@ -1346,11 +1419,32 @@
           "Skills"
         ],
         "summary": "Create Skill",
-        "description": "Create a skill. The ``h/`` namespace is reserved for built-in skills.",
+        "description": "Create a skill at revision 1. The ``h/`` namespace is reserved for built-in skills.",
         "operationId": "create_skill_api_v2_skills_post",
         "security": [
           {
             "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "message",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional note stored on the revision this write creates, such as why the change was made.",
+              "title": "Message"
+            },
+            "description": "Optional note stored on the revision this write creates, such as why the change was made."
           }
         ],
         "requestBody": {
@@ -1370,6 +1464,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Skill"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -1520,13 +1622,217 @@
         }
       }
     },
+    "/api/v2/skills/{name}/revisions": {
+      "get": {
+        "tags": [
+          "Skills"
+        ],
+        "summary": "List Skill Revisions",
+        "description": "List a skill's revisions without their content, newest first. Read one with ``?revision=N``.\n\nUnauthenticated callers can list reserved ``h/`` skills only.",
+        "operationId": "list_skill_revisions_api_v2_skills__name__revisions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The skill's `name`, slashes allowed. Not a UUID.",
+              "title": "Name"
+            },
+            "description": "The skill's `name`, slashes allowed. Not a UUID."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number (1-based)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number (1-based)"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Number of items per page",
+              "default": 10,
+              "title": "Size"
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "number",
+                      "-number"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort by field",
+              "default": [
+                "-number"
+              ],
+              "title": "Sort"
+            },
+            "description": "Sort by field"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SkillRevisionRecord_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/skills/{name}/revisions/{number}/restore": {
+      "post": {
+        "tags": [
+          "Skills"
+        ],
+        "summary": "Restore Skill Revision",
+        "description": "Make revision ``number``'s content current again, as a new revision with the message ``Restored from vN``.\n\nValidated and authorised like ``PUT``. The new revision's ``restored_from`` is ``number``.\nRestoring content that is already current changes nothing and returns the current revision.",
+        "operationId": "restore_skill_revision_api_v2_skills__name__revisions__number__restore_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The skill's `name`, slashes allowed. Not a UUID.",
+              "title": "Name"
+            },
+            "description": "The skill's `name`, slashes allowed. Not a UUID."
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The revision whose content becomes current again.",
+              "title": "Number"
+            },
+            "description": "The revision whose content becomes current again."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.",
+              "title": "If-Match"
+            },
+            "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Skill"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "``If-Match`` names a revision that is no longer current; ``ETag`` has the current one.",
+            "headers": {
+              "ETag": {
+                "description": "The current revision number, e.g. ``\"4\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/skills/{name}": {
       "get": {
         "tags": [
           "Skills"
         ],
         "summary": "Get Skill",
-        "description": "Fetch by name; 404 if not visible. ``:path`` so slash-containing names round-trip.",
+        "description": "Fetch by name at its latest revision, or at ``revision``; 404 if not visible or no such revision.\n\n``:path`` so slash-containing names round-trip.",
         "operationId": "get_skill_api_v2_skills__name__get",
         "security": [
           {
@@ -1540,8 +1846,29 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The skill's `name`, slashes allowed. Not a UUID.",
               "title": "Name"
-            }
+            },
+            "description": "The skill's `name`, slashes allowed. Not a UUID."
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Read this revision instead of the latest. References to a skill elsewhere, such as an agent's ``skills``, pin a revision as ``name:N`` instead.",
+              "title": "Revision"
+            },
+            "description": "Read this revision instead of the latest. References to a skill elsewhere, such as an agent's ``skills``, pin a revision as ``name:N`` instead."
           }
         ],
         "responses": {
@@ -1551,6 +1878,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Skill"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -1572,7 +1907,7 @@
           "Skills"
         ],
         "summary": "Update Skill",
-        "description": "Replace a skill's content. ``name`` must match the URL identifier; renames are not supported.",
+        "description": "Replace a skill's content as a new revision. ``name`` must match the URL; renames are not supported.\n\nSending the content that is already current changes nothing and returns the current revision.",
         "operationId": "update_skill_api_v2_skills__name__put",
         "security": [
           {
@@ -1586,8 +1921,47 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The skill's `name`, slashes allowed. Not a UUID.",
               "title": "Name"
-            }
+            },
+            "description": "The skill's `name`, slashes allowed. Not a UUID."
+          },
+          {
+            "name": "message",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional note stored on the revision this write creates, such as why the change was made.",
+              "title": "Message"
+            },
+            "description": "Optional note stored on the revision this write creates, such as why the change was made."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.",
+              "title": "If-Match"
+            },
+            "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally."
           }
         ],
         "requestBody": {
@@ -1609,6 +1983,25 @@
                   "$ref": "#/components/schemas/Skill"
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "``If-Match`` names a revision that is no longer current; ``ETag`` has the current one.",
+            "headers": {
+              "ETag": {
+                "description": "The current revision number, e.g. ``\"4\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "422": {
@@ -1628,7 +2021,7 @@
           "Skills"
         ],
         "summary": "Patch Skill",
-        "description": "Partially update a skill; only provided fields change.",
+        "description": "Partially update a skill as a new revision; only provided fields change.",
         "operationId": "patch_skill_api_v2_skills__name__patch",
         "security": [
           {
@@ -1642,8 +2035,47 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The skill's `name`, slashes allowed. Not a UUID.",
               "title": "Name"
-            }
+            },
+            "description": "The skill's `name`, slashes allowed. Not a UUID."
+          },
+          {
+            "name": "message",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional note stored on the revision this write creates, such as why the change was made.",
+              "title": "Message"
+            },
+            "description": "Optional note stored on the revision this write creates, such as why the change was made."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.",
+              "title": "If-Match"
+            },
+            "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally."
           }
         ],
         "requestBody": {
@@ -1665,6 +2097,25 @@
                   "$ref": "#/components/schemas/Skill"
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "``If-Match`` names a revision that is no longer current; ``ETag`` has the current one.",
+            "headers": {
+              "ETag": {
+                "description": "The current revision number, e.g. ``\"4\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "422": {
@@ -1684,7 +2135,7 @@
           "Skills"
         ],
         "summary": "Delete Skill",
-        "description": "Delete by name. Reserved rows: H employee only.",
+        "description": "Delete by name, with its revisions. Reserved rows: H employee only.",
         "operationId": "delete_skill_api_v2_skills__name__delete",
         "security": [
           {
@@ -1698,13 +2149,44 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The skill's `name`, slashes allowed. Not a UUID.",
               "title": "Name"
-            }
+            },
+            "description": "The skill's `name`, slashes allowed. Not a UUID."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.",
+              "title": "If-Match"
+            },
+            "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally."
           }
         ],
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "412": {
+            "description": "``If-Match`` names a revision that is no longer current; ``ETag`` has the current one.",
+            "headers": {
+              "ETag": {
+                "description": "The current revision number, e.g. ``\"4\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1725,11 +2207,32 @@
           "Environments"
         ],
         "summary": "Create Environment",
-        "description": "Create an environment.",
+        "description": "Create an environment at revision 1. Ids cannot contain ``:``, which pins a revision in references.",
         "operationId": "create_environment_api_v2_environments_post",
         "security": [
           {
             "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "message",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional note stored on the revision this write creates, such as why the change was made.",
+              "title": "Message"
+            },
+            "description": "Optional note stored on the revision this write creates, such as why the change was made."
           }
         ],
         "requestBody": {
@@ -1772,6 +2275,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Environment"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -1937,13 +2448,217 @@
         }
       }
     },
+    "/api/v2/environments/{id}/revisions": {
+      "get": {
+        "tags": [
+          "Environments"
+        ],
+        "summary": "List Environment Revisions",
+        "description": "List an environment's revisions without their specs, newest first. Read one with ``?revision=N``.\n\nUnauthenticated callers can list reserved ``h/`` environments only.",
+        "operationId": "list_environment_revisions_api_v2_environments__id__revisions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The environment's `id` from its spec, slashes allowed. Not a UUID.",
+              "title": "Id"
+            },
+            "description": "The environment's `id` from its spec, slashes allowed. Not a UUID."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number (1-based)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number (1-based)"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Number of items per page",
+              "default": 10,
+              "title": "Size"
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "number",
+                      "-number"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort by field",
+              "default": [
+                "-number"
+              ],
+              "title": "Sort"
+            },
+            "description": "Sort by field"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_EnvironmentRevisionRecord_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/environments/{id}/revisions/{number}/restore": {
+      "post": {
+        "tags": [
+          "Environments"
+        ],
+        "summary": "Restore Environment Revision",
+        "description": "Make revision ``number``'s spec current again, as a new revision with the message ``Restored from vN``.\n\nValidated and authorised like ``PUT``. The new revision's ``restored_from`` is ``number``.\nRestoring a spec that is already current changes nothing and returns the current revision.",
+        "operationId": "restore_environment_revision_api_v2_environments__id__revisions__number__restore_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The environment's `id` from its spec, slashes allowed. Not a UUID.",
+              "title": "Id"
+            },
+            "description": "The environment's `id` from its spec, slashes allowed. Not a UUID."
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The revision whose spec becomes current again.",
+              "title": "Number"
+            },
+            "description": "The revision whose spec becomes current again."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.",
+              "title": "If-Match"
+            },
+            "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Environment"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "``If-Match`` names a revision that is no longer current; ``ETag`` has the current one.",
+            "headers": {
+              "ETag": {
+                "description": "The current revision number, e.g. ``\"4\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/environments/{id}": {
       "get": {
         "tags": [
           "Environments"
         ],
         "summary": "Get Environment",
-        "description": "Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.",
+        "description": "Fetch by id at its latest revision, or at ``revision``; 404 if not visible or no such revision.\n\n``:path`` so slash-containing ids round-trip.",
         "operationId": "get_environment_api_v2_environments__id__get",
         "security": [
           {
@@ -1957,8 +2672,29 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The environment's `id` from its spec, slashes allowed. Not a UUID.",
               "title": "Id"
-            }
+            },
+            "description": "The environment's `id` from its spec, slashes allowed. Not a UUID."
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Read this revision instead of the latest. References to an environment elsewhere, such as an agent's ``environment``, pin a revision as ``id:N`` instead.",
+              "title": "Revision"
+            },
+            "description": "Read this revision instead of the latest. References to an environment elsewhere, such as an agent's ``environment``, pin a revision as ``id:N`` instead."
           }
         ],
         "responses": {
@@ -1968,6 +2704,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Environment"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -1989,7 +2733,7 @@
           "Environments"
         ],
         "summary": "Update Environment",
-        "description": "Replace the environment spec.",
+        "description": "Replace the environment spec as a new revision. ``id`` must match the URL.\n\nSending the spec that is already current changes nothing and returns the current revision.",
         "operationId": "update_environment_api_v2_environments__id__put",
         "security": [
           {
@@ -2003,8 +2747,47 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The environment's `id` from its spec, slashes allowed. Not a UUID.",
               "title": "Id"
-            }
+            },
+            "description": "The environment's `id` from its spec, slashes allowed. Not a UUID."
+          },
+          {
+            "name": "message",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional note stored on the revision this write creates, such as why the change was made.",
+              "title": "Message"
+            },
+            "description": "Optional note stored on the revision this write creates, such as why the change was made."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.",
+              "title": "If-Match"
+            },
+            "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally."
           }
         ],
         "requestBody": {
@@ -2049,6 +2832,25 @@
                   "$ref": "#/components/schemas/Environment"
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "``If-Match`` names a revision that is no longer current; ``ETag`` has the current one.",
+            "headers": {
+              "ETag": {
+                "description": "The current revision number, e.g. ``\"4\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "422": {
@@ -2068,7 +2870,7 @@
           "Environments"
         ],
         "summary": "Patch Environment",
-        "description": "Partially update an environment spec; only provided fields change.",
+        "description": "Partially update an environment spec as a new revision; only provided fields change.",
         "operationId": "patch_environment_api_v2_environments__id__patch",
         "security": [
           {
@@ -2082,8 +2884,47 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The environment's `id` from its spec, slashes allowed. Not a UUID.",
               "title": "Id"
-            }
+            },
+            "description": "The environment's `id` from its spec, slashes allowed. Not a UUID."
+          },
+          {
+            "name": "message",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional note stored on the revision this write creates, such as why the change was made.",
+              "title": "Message"
+            },
+            "description": "Optional note stored on the revision this write creates, such as why the change was made."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.",
+              "title": "If-Match"
+            },
+            "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally."
           }
         ],
         "requestBody": {
@@ -2105,6 +2946,25 @@
                   "$ref": "#/components/schemas/Environment"
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The revision number of the returned spec, e.g. ``\"3\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "``If-Match`` names a revision that is no longer current; ``ETag`` has the current one.",
+            "headers": {
+              "ETag": {
+                "description": "The current revision number, e.g. ``\"4\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "422": {
@@ -2124,7 +2984,7 @@
           "Environments"
         ],
         "summary": "Delete Environment",
-        "description": "Delete by identifier. Reserved rows: H employee only.",
+        "description": "Delete by id, with its revisions. Reserved rows: H employee only.",
         "operationId": "delete_environment_api_v2_environments__id__delete",
         "security": [
           {
@@ -2138,13 +2998,44 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The environment's `id` from its spec, slashes allowed. Not a UUID.",
               "title": "Id"
-            }
+            },
+            "description": "The environment's `id` from its spec, slashes allowed. Not a UUID."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.",
+              "title": "If-Match"
+            },
+            "description": "The ``ETag`` of the revision this write is based on, e.g. ``\"3\"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally."
           }
         ],
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "412": {
+            "description": "``If-Match`` names a revision that is no longer current; ``ETag`` has the current one.",
+            "headers": {
+              "ETag": {
+                "description": "The current revision number, e.g. ``\"4\"``.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -2427,8 +3318,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The agent's `name` from its spec, slashes allowed. Not a UUID.",
               "title": "Agent Name"
-            }
+            },
+            "description": "The agent's `name` from its spec, slashes allowed. Not a UUID."
           },
           {
             "name": "page",
@@ -2530,8 +3423,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The agent's `name` from its spec, slashes allowed. Not a UUID.",
               "title": "Agent Name"
-            }
+            },
+            "description": "The agent's `name` from its spec, slashes allowed. Not a UUID."
           },
           {
             "name": "number",
@@ -2627,8 +3522,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The agent's `name` from its spec, slashes allowed. Not a UUID.",
               "title": "Agent Name"
-            }
+            },
+            "description": "The agent's `name` from its spec, slashes allowed. Not a UUID."
           },
           {
             "name": "revision",
@@ -2712,8 +3609,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The agent's `name` from its spec, slashes allowed. Not a UUID.",
               "title": "Agent Name"
-            }
+            },
+            "description": "The agent's `name` from its spec, slashes allowed. Not a UUID."
           },
           {
             "name": "message",
@@ -2824,8 +3723,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The agent's `name` from its spec, slashes allowed. Not a UUID.",
               "title": "Agent Name"
-            }
+            },
+            "description": "The agent's `name` from its spec, slashes allowed. Not a UUID."
           },
           {
             "name": "message",
@@ -2922,7 +3823,7 @@
           "Agents"
         ],
         "summary": "Delete Agent",
-        "description": "Delete by identifier, with its revisions. Reserved rows: H employee only.",
+        "description": "Delete by name, with its revisions. Reserved rows: H employee only.",
         "operationId": "delete_agent_api_v2_agents__agent_name__delete",
         "security": [
           {
@@ -2936,8 +3837,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The agent's `name` from its spec, slashes allowed. Not a UUID.",
               "title": "Agent Name"
-            }
+            },
+            "description": "The agent's `name` from its spec, slashes allowed. Not a UUID."
           },
           {
             "name": "If-Match",
@@ -5575,6 +6478,20 @@
               }
             ],
             "title": "Pending Tool Calls"
+          },
+          "pending_approvals": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ToolApprovalRequest"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Approvals"
           }
         },
         "additionalProperties": true,
@@ -5608,7 +6525,7 @@
           "data"
         ],
         "title": "ActiveStateChangeEvent",
-        "description": "The agent switched between running, idle and awaiting custom tool results."
+        "description": "The agent switched between running, idle and awaiting the client, for custom tool results or approvals."
       },
       "Agent": {
         "properties": {
@@ -6183,6 +7100,35 @@
         "title": "AnswerOutcome",
         "description": "Agent's self-assessment of how the task concluded, reported with the final answer."
       },
+      "ApprovalRequirement": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Who requires the approval: 'guardrail' for the policy checker, 'tool' for a tool declared as requiring approval, 'environment' for the environment running the call (e.g. a sandbox command allowlist), 'resume' for a call found waiting when its session was resumed. Other sources may appear."
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Why the call waits, for the approver."
+          },
+          "policy_clause_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Policy Clause Refs",
+            "description": "Policy clauses the source cited, when it judges against a policy."
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "reason"
+        ],
+        "title": "ApprovalRequirement",
+        "description": "One reason a tool call waits for a human decision; a call held by several sources carries one per source."
+      },
       "AttachmentData": {
         "properties": {
           "origin": {
@@ -6212,6 +7158,17 @@
           "url": {
             "type": "string",
             "title": "Url"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Id"
           }
         },
         "additionalProperties": true,
@@ -6250,7 +7207,7 @@
           "data"
         ],
         "title": "AttachmentEvent",
-        "description": "A file passed between the user and the agent's environment; ``data.url`` downloads it."
+        "description": "A file passed between the user and the agent's environment; ``data.url`` downloads it, as does\n``GET /v2/files/{data.file_id}`` when the platform stored it."
       },
       "Browser": {
         "properties": {
@@ -6679,6 +7636,36 @@
         "title": "BrowserVisualMode",
         "description": "Act on screenshots by viewport coordinates."
       },
+      "CatalogRevisionRef": {
+        "properties": {
+          "catalog_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Catalog Id",
+            "description": "Catalog id of the skill or environment; never reused, unlike its name."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The skill's name or the environment's ``id`` at that revision."
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision",
+            "description": "Revision the session ran."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "catalog_id",
+          "name",
+          "revision"
+        ],
+        "title": "CatalogRevisionRef",
+        "description": "A catalog skill or environment at the revision a session ran."
+      },
       "CreateSchedule": {
         "properties": {
           "name": {
@@ -6795,6 +7782,28 @@
         "title": "CronTiming",
         "description": "Cron cadence evaluated in an IANA timezone."
       },
+      "DependencyRevisions": {
+        "properties": {
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogRevisionRef"
+            },
+            "type": "array",
+            "title": "Skills"
+          },
+          "environments": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogRevisionRef"
+            },
+            "type": "array",
+            "title": "Environments"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DependencyRevisions",
+        "description": "The catalog skill and environment revisions a session resolved, including its subagents'."
+      },
       "Desktop": {
         "properties": {
           "id": {
@@ -6809,14 +7818,11 @@
             "title": "Kind",
             "default": "desktop"
           },
-          "host": {
-            "type": "string",
-            "enum": [
-              "user_device",
-              "cloud"
-            ],
-            "title": "Host",
-            "description": "Where the desktop runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine."
+          "shell": {
+            "type": "boolean",
+            "title": "Shell",
+            "description": "Drive the machine from a shell: commands, files, and the screen and browser through CLIs. False drives the screen with mouse and keyboard actions and a screenshot after each step.",
+            "default": false
           },
           "session_id": {
             "anyOf": [
@@ -6828,21 +7834,13 @@
               }
             ],
             "title": "Session Id",
-            "description": "Connect to an existing desktop session by id instead of starting a new one."
+            "description": "Connect to an existing desktop session by id."
           },
           "lazy": {
             "type": "boolean",
             "title": "Lazy",
-            "description": "Provision on the agent's first use instead of at startup. Skips the initial observation.",
+            "description": "Reach the desktop on the agent's first use instead of at startup. Skips the initial observation.",
             "default": false
-          },
-          "settle_s": {
-            "type": "number",
-            "maximum": 10.0,
-            "minimum": 0.0,
-            "title": "Settle S",
-            "description": "Seconds to wait after each input action.",
-            "default": 0.5
           },
           "screenshot_max_width": {
             "anyOf": [
@@ -6856,16 +7854,15 @@
               }
             ],
             "title": "Screenshot Max Width",
-            "description": "Maximum screenshot width in pixels. Null uses the host default; images are never upscaled."
+            "description": "Maximum screenshot width in pixels. Null uses 1920; images are never upscaled."
           }
         },
         "type": "object",
         "required": [
-          "id",
-          "host"
+          "id"
         ],
         "title": "Desktop",
-        "description": "A desktop the agent controls via mouse, keyboard, and screenshots."
+        "description": "Your own computer."
       },
       "DetailErrorResponse": {
         "properties": {
@@ -6943,6 +7940,67 @@
         ],
         "title": "EnvironmentPage",
         "description": "Named page subclass so OpenAPI emits a clean ``EnvironmentPage`` schema name."
+      },
+      "EnvironmentRevisionRecord": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Number",
+            "description": "Revision number, from 1. Read its spec with ``GET /v2/environments/{id}?revision={number}``."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "User who made the change. Null when unknown, and on reserved ``h/`` environments for non-H callers."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "Note sent with the change, if any."
+          },
+          "restored_from": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restored From",
+            "description": "The earlier revision whose spec this one restored, through ``POST .../revisions/{N}/restore``."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "number",
+          "created_at"
+        ],
+        "title": "EnvironmentRevisionRecord",
+        "description": "One stored revision of an environment, without its spec."
       },
       "ErrorEvent": {
         "properties": {
@@ -7805,6 +8863,32 @@
         ],
         "title": "Page[Agent]"
       },
+      "Page_EnvironmentRevisionRecord_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentRevisionRecord"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "title": "Page[EnvironmentRevisionRecord]"
+      },
       "Page_ScheduleRecord_": {
         "properties": {
           "items": {
@@ -7908,6 +8992,32 @@
           "page"
         ],
         "title": "Page[SessionSummary]"
+      },
+      "Page_SkillRevisionRecord_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SkillRevisionRecord"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page"
+        ],
+        "title": "Page[SkillRevisionRecord]"
       },
       "Page_Skill_": {
         "properties": {
@@ -8206,6 +9316,10 @@
                 "type": "null"
               }
             ]
+          },
+          "shell": {
+            "type": "boolean",
+            "title": "Shell"
           },
           "screenshot_max_width": {
             "anyOf": [
@@ -8845,7 +9959,7 @@
           },
           "request": {
             "$ref": "#/components/schemas/SessionRequest",
-            "description": "The request the session runs. Secrets read back as ``***``, with keys and list lengths kept: MCP server ``headers``, ``env`` and ``args``, code sandbox ``env``, and browser ``proxy_url``."
+            "description": "The request the session runs. Secrets read back as ``***``, with keys and list lengths kept: a browser ``proxy_url``."
           },
           "status": {
             "$ref": "#/components/schemas/SessionStatus"
@@ -8861,6 +9975,17 @@
             ],
             "title": "Agent Revision",
             "description": "Revision of the catalog agent the session runs; ``request.agent`` is that revision, resolved, with ``request.overrides`` applied. Null for inline agent specs and sessions created before agent revisions."
+          },
+          "dependency_revisions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DependencyRevisions"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Revisions of the catalog skills and environments in ``request.agent``, through every subagent. Inline ones are not listed. Null for sessions created before skill and environment revisions."
           },
           "agent_view_url": {
             "anyOf": [
@@ -9023,6 +10148,14 @@
             "type": "array",
             "title": "Pending Tool Calls",
             "default": []
+          },
+          "pending_approvals": {
+            "items": {
+              "$ref": "#/components/schemas/ToolApprovalRequest"
+            },
+            "type": "array",
+            "title": "Pending Approvals",
+            "default": []
           }
         },
         "type": "object",
@@ -9065,6 +10198,12 @@
                 "$ref": "#/components/schemas/ActiveStateChangeEvent"
               },
               {
+                "$ref": "#/components/schemas/ToolApprovalRequestedEvent"
+              },
+              {
+                "$ref": "#/components/schemas/ToolApprovalDecidedEvent"
+              },
+              {
                 "$ref": "#/components/schemas/LiveViewUrlEvent"
               },
               {
@@ -9104,7 +10243,9 @@
                 "MetricsUpdateEvent": "#/components/schemas/MetricsUpdateEvent",
                 "RequestStartDispatchedEvent": "#/components/schemas/RequestStartDispatchedEvent",
                 "RequestStartEvent": "#/components/schemas/RequestStartEvent",
-                "RunnerSessionEvent": "#/components/schemas/RunnerSessionEvent"
+                "RunnerSessionEvent": "#/components/schemas/RunnerSessionEvent",
+                "ToolApprovalDecidedEvent": "#/components/schemas/ToolApprovalDecidedEvent",
+                "ToolApprovalRequestedEvent": "#/components/schemas/ToolApprovalRequestedEvent"
               }
             }
           },
@@ -9341,6 +10482,14 @@
             "type": "array",
             "title": "Pending Tool Calls",
             "description": "Custom tool calls the agent is blocked on; echo each ``id`` back in the ToolResultEvent. Empty unless the agent is awaiting tool results (a pause keeps them)."
+          },
+          "pending_approvals": {
+            "items": {
+              "$ref": "#/components/schemas/ToolApprovalRequest"
+            },
+            "type": "array",
+            "title": "Pending Approvals",
+            "description": "Calls held for a human decision; answer each with a ToolApprovalResponseEvent naming its ``id``. Empty unless the agent is awaiting tool results (a pause keeps them)."
           }
         },
         "type": "object",
@@ -9571,6 +10720,67 @@
         "title": "Skill",
         "description": "Named instructions with optional scripts, references, and assets."
       },
+      "SkillRevisionRecord": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Number",
+            "description": "Revision number, from 1. Read its content with ``GET /v2/skills/{name}?revision={number}``."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "User who made the change. Null when unknown, and on reserved ``h/`` skills for non-H callers."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "Note sent with the change, if any."
+          },
+          "restored_from": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restored From",
+            "description": "The earlier revision whose content this one restored, through ``POST .../revisions/{N}/restore``."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "number",
+          "created_at"
+        ],
+        "title": "SkillRevisionRecord",
+        "description": "One stored revision of a skill, without its content."
+      },
       "TokenQuotaStatus": {
         "properties": {
           "limit": {
@@ -9634,6 +10844,217 @@
         ],
         "title": "TokenQuotaStatus",
         "description": "Current per-org token usage snapshot."
+      },
+      "ToolApprovalBatch": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "batch",
+            "title": "Type",
+            "default": "batch"
+          },
+          "responses": {
+            "items": {
+              "$ref": "#/components/schemas/ToolApprovalResponseEvent"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Responses"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "responses"
+        ],
+        "title": "ToolApprovalBatch",
+        "description": "Batch of decisions on held tool calls."
+      },
+      "ToolApprovalDecidedData": {
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/ToolApprovalDecision"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "ToolApprovalDecidedData"
+      },
+      "ToolApprovalDecidedEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "ToolApprovalDecidedEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ToolApprovalDecidedData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "ToolApprovalDecidedEvent",
+        "description": "A held tool call was approved or denied; the result or error settling it follows as an ``AgentEvent``."
+      },
+      "ToolApprovalDecision": {
+        "properties": {
+          "tool_req": {
+            "$ref": "#/components/schemas/ToolRequest"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "denied"
+            ],
+            "title": "Decision"
+          },
+          "decided_by": {
+            "type": "string",
+            "title": "Decided By",
+            "description": "Who decided: 'client' for a response posted through the API, 'unattended' for an agent set to settle held calls on its own, 'run_end' when the run ended with the call still waiting."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "The decider's words, which the model reads on a denial."
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool_req",
+          "decision",
+          "decided_by"
+        ],
+        "title": "ToolApprovalDecision",
+        "description": "How a held tool call was decided, reported by ``ToolApprovalDecidedEvent``."
+      },
+      "ToolApprovalRequest": {
+        "properties": {
+          "tool_req": {
+            "$ref": "#/components/schemas/ToolRequest"
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalRequirement"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Requirements",
+            "description": "Why the call waits, one entry per source that requires the approval."
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool_req",
+          "requirements"
+        ],
+        "title": "ToolApprovalRequest",
+        "description": "A tool call held for a human decision, listed in ``ActiveStateChangeEvent.pending_approvals``.\n\nAnswer it with a ``ToolApprovalResponseEvent`` naming ``tool_req.id``: an approved call runs exactly once, an\napproved custom tool call then moves to ``pending_tool_calls`` for the client to run."
+      },
+      "ToolApprovalRequestedData": {
+        "properties": {
+          "request": {
+            "$ref": "#/components/schemas/ToolApprovalRequest"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "request"
+        ],
+        "title": "ToolApprovalRequestedData"
+      },
+      "ToolApprovalRequestedEvent": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "ToolApprovalRequestedEvent",
+            "title": "Type"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ToolApprovalRequestedData"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "timestamp",
+          "type",
+          "data"
+        ],
+        "title": "ToolApprovalRequestedEvent",
+        "description": "The agent holds a tool call until a human decides on it; answer with a ``ToolApprovalResponseEvent``."
+      },
+      "ToolApprovalResponseEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "tool_approval_response",
+            "title": "Type",
+            "default": "tool_approval_response"
+          },
+          "call_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Call Id",
+            "description": "The held call's ``tool_req.id``."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "deny"
+            ],
+            "title": "Action",
+            "description": "'approve' runs the call and the rest of its step, 'deny' refuses it and skips the rest."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "Why the call is denied, as the model reads it; send files or images as a user_message."
+          }
+        },
+        "type": "object",
+        "required": [
+          "call_id",
+          "action"
+        ],
+        "title": "ToolApprovalResponseEvent",
+        "description": "The client's response to a call listed in ``ActiveStateChangeEvent.pending_approvals``; the agent reports\nthe outcome as a ``ToolApprovalDecidedEvent``."
       },
       "ToolDefinition": {
         "properties": {
@@ -10759,16 +12180,6 @@
             "title": "Kind",
             "default": "workstation"
           },
-          "host": {
-            "type": "string",
-            "enum": [
-              "user_device",
-              "cloud"
-            ],
-            "title": "Host",
-            "description": "Where the workstation runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.",
-            "default": "cloud"
-          },
           "session_id": {
             "anyOf": [
               {
@@ -10790,13 +12201,27 @@
                 "type": "null"
               }
             ],
-            "description": "Which disk a cloud workstation runs on. Omit to let the stage decide: the caller's default volume where the workstation is persistent by default, a fresh machine elsewhere. Ignored when session_id attaches to an existing session, and on a user_device host."
+            "description": "Which disk a cloud workstation runs on. Omit to let the stage decide: the caller's default volume where the workstation is persistent by default, a fresh machine elsewhere. Ignored when session_id attaches to an existing session."
           },
           "lazy": {
             "type": "boolean",
             "title": "Lazy",
-            "description": "Start on the agent's first use instead of at startup. Skips the initial observation. A cloud workstation is provisioned on first use; a user_device one is not probed until then.",
+            "description": "Provision on the agent's first use instead of at startup. Skips the initial observation.",
             "default": false
+          },
+          "screenshot_max_width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1920.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screenshot Max Width",
+            "description": "Maximum screenshot width in pixels. Null uses 1920; images are never upscaled."
           }
         },
         "type": "object",
@@ -10804,7 +12229,7 @@
           "id"
         ],
         "title": "Workstation",
-        "description": "A desktop computer with a browser, office apps and a shell, which the agent drives from that shell."
+        "description": "A cloud computer with a browser, apps and a shell."
       },
       "WorkstationStorage": {
         "properties": {

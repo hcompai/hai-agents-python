@@ -11,14 +11,17 @@ from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
 from ..core.serialization import convert_and_respect_annotation_metadata
+from ..errors.precondition_failed_error import PreconditionFailedError
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.browser_network import BrowserNetwork
 from ..types.environment import Environment
 from ..types.environment_kind import EnvironmentKind
 from ..types.environment_page import EnvironmentPage
 from ..types.error_response import ErrorResponse
+from ..types.page_environment_revision_record import PageEnvironmentRevisionRecord
 from ..types.workstation_storage import WorkstationStorage
-from .types.create_environment_request import CreateEnvironmentRequest
+from .types.create_environment_request_body import CreateEnvironmentRequestBody
+from .types.list_environment_revisions_request_sort_item import ListEnvironmentRevisionsRequestSortItem
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
 from .types.patch_environment_host import PatchEnvironmentHost
 from .types.patch_environment_mode import PatchEnvironmentMode
@@ -121,14 +124,21 @@ class RawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     def create_environment(
-        self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        request: CreateEnvironmentRequestBody,
+        message: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Environment]:
         """
-        Create an environment.
+        Create an environment at revision 1. Ids cannot contain ``:``, which pins a revision in references.
 
         Parameters
         ----------
-        request : CreateEnvironmentRequest
+        request : CreateEnvironmentRequestBody
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -141,8 +151,11 @@ class RawEnvironmentsClient:
         _response = self._client_wrapper.httpx_client.request(
             "api/v2/environments",
             method="POST",
+            params={
+                "message": message,
+            },
             json=convert_and_respect_annotation_metadata(
-                object_=request, annotation=CreateEnvironmentRequest, direction="write"
+                object_=request, annotation=CreateEnvironmentRequestBody, direction="write"
             ),
             headers={
                 "content-type": "application/json",
@@ -180,15 +193,183 @@ class RawEnvironmentsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def get_environment(
-        self, id: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> HttpResponse[Environment]:
+    def list_environment_revisions(
+        self,
+        id: str,
+        *,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[
+            typing.Union[
+                ListEnvironmentRevisionsRequestSortItem, typing.Sequence[ListEnvironmentRevisionsRequestSortItem]
+            ]
+        ] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[PageEnvironmentRevisionRecord]:
         """
-        Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
+        List an environment's revisions without their specs, newest first. Read one with ``?revision=N``.
+
+        Unauthenticated callers can list reserved ``h/`` environments only.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Union[ListEnvironmentRevisionsRequestSortItem, typing.Sequence[ListEnvironmentRevisionsRequestSortItem]]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[PageEnvironmentRevisionRecord]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/environments/{encode_path_param(id)}/revisions",
+            method="GET",
+            params={
+                "page": page,
+                "size": size,
+                "sort": sort,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    PageEnvironmentRevisionRecord,
+                    parse_obj_as(
+                        type_=PageEnvironmentRevisionRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def restore_environment_revision(
+        self,
+        id: str,
+        number: int,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[Environment]:
+        """
+        Make revision ``number``'s spec current again, as a new revision with the message ``Restored from vN``.
+
+        Validated and authorised like ``PUT``. The new revision's ``restored_from`` is ``number``.
+        Restoring a spec that is already current changes nothing and returns the current revision.
+
+        Parameters
+        ----------
+        id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        number : int
+            The revision whose spec becomes current again.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[Environment]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/environments/{encode_path_param(id)}/revisions/{encode_path_param(number)}/restore",
+            method="POST",
+            headers={
+                "If-Match": str(if_match) if if_match is not None else None,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    Environment,
+                    parse_obj_as(
+                        type_=Environment,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def get_environment(
+        self, id: str, *, revision: typing.Optional[int] = None, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[Environment]:
+        """
+        Fetch by id at its latest revision, or at ``revision``; 404 if not visible or no such revision.
+
+        ``:path`` so slash-containing ids round-trip.
+
+        Parameters
+        ----------
+        id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        revision : typing.Optional[int]
+            Read this revision instead of the latest. References to an environment elsewhere, such as an agent's ``environment``, pin a revision as ``id:N`` instead.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -201,6 +382,9 @@ class RawEnvironmentsClient:
         _response = self._client_wrapper.httpx_client.request(
             f"api/v2/environments/{encode_path_param(id)}",
             method="GET",
+            params={
+                "revision": revision,
+            },
             request_options=request_options,
         )
         try:
@@ -234,16 +418,31 @@ class RawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     def update_environment(
-        self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
+        self,
+        id: str,
+        *,
+        request: UpdateEnvironmentRequestBody,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Environment]:
         """
-        Replace the environment spec.
+        Replace the environment spec as a new revision. ``id`` must match the URL.
+
+        Sending the spec that is already current changes nothing and returns the current revision.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
 
         request : UpdateEnvironmentRequestBody
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -256,11 +455,15 @@ class RawEnvironmentsClient:
         _response = self._client_wrapper.httpx_client.request(
             f"api/v2/environments/{encode_path_param(id)}",
             method="PUT",
+            params={
+                "message": message,
+            },
             json=convert_and_respect_annotation_metadata(
                 object_=request, annotation=UpdateEnvironmentRequestBody, direction="write"
             ),
             headers={
                 "content-type": "application/json",
+                "If-Match": str(if_match) if if_match is not None else None,
             },
             request_options=request_options,
             omit=OMIT,
@@ -275,6 +478,17 @@ class RawEnvironmentsClient:
                     ),
                 )
                 return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -296,14 +510,18 @@ class RawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     def delete_environment(
-        self, id: str, *, request_options: typing.Optional[RequestOptions] = None
+        self, id: str, *, if_match: typing.Optional[str] = None, request_options: typing.Optional[RequestOptions] = None
     ) -> HttpResponse[None]:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete by id, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -315,11 +533,25 @@ class RawEnvironmentsClient:
         _response = self._client_wrapper.httpx_client.request(
             f"api/v2/environments/{encode_path_param(id)}",
             method="DELETE",
+            headers={
+                "If-Match": str(if_match) if if_match is not None else None,
+            },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 return HttpResponse(response=_response, data=None)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -344,6 +576,8 @@ class RawEnvironmentsClient:
         self,
         id: str,
         *,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         host: typing.Optional[PatchEnvironmentHost] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         headless: typing.Optional[bool] = OMIT,
@@ -356,17 +590,25 @@ class RawEnvironmentsClient:
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
+        shell: typing.Optional[bool] = OMIT,
         screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
         storage: typing.Optional[WorkstationStorage] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Environment]:
         """
-        Partially update an environment spec; only provided fields change.
+        Partially update an environment spec as a new revision; only provided fields change.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         host : typing.Optional[PatchEnvironmentHost]
 
@@ -392,6 +634,8 @@ class RawEnvironmentsClient:
 
         network : typing.Optional[BrowserNetwork]
 
+        shell : typing.Optional[bool]
+
         screenshot_max_width : typing.Optional[int]
 
         image : typing.Optional[str]
@@ -409,6 +653,9 @@ class RawEnvironmentsClient:
         _response = self._client_wrapper.httpx_client.request(
             f"api/v2/environments/{encode_path_param(id)}",
             method="PATCH",
+            params={
+                "message": message,
+            },
             json={
                 "host": host,
                 "start_url": start_url,
@@ -426,6 +673,7 @@ class RawEnvironmentsClient:
                 "network": convert_and_respect_annotation_metadata(
                     object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
                 ),
+                "shell": shell,
                 "screenshot_max_width": screenshot_max_width,
                 "image": image,
                 "storage": convert_and_respect_annotation_metadata(
@@ -434,6 +682,7 @@ class RawEnvironmentsClient:
             },
             headers={
                 "content-type": "application/json",
+                "If-Match": str(if_match) if if_match is not None else None,
             },
             request_options=request_options,
             omit=OMIT,
@@ -448,6 +697,17 @@ class RawEnvironmentsClient:
                     ),
                 )
                 return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -561,14 +821,21 @@ class AsyncRawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     async def create_environment(
-        self, *, request: CreateEnvironmentRequest, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        request: CreateEnvironmentRequestBody,
+        message: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Environment]:
         """
-        Create an environment.
+        Create an environment at revision 1. Ids cannot contain ``:``, which pins a revision in references.
 
         Parameters
         ----------
-        request : CreateEnvironmentRequest
+        request : CreateEnvironmentRequestBody
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -581,8 +848,11 @@ class AsyncRawEnvironmentsClient:
         _response = await self._client_wrapper.httpx_client.request(
             "api/v2/environments",
             method="POST",
+            params={
+                "message": message,
+            },
             json=convert_and_respect_annotation_metadata(
-                object_=request, annotation=CreateEnvironmentRequest, direction="write"
+                object_=request, annotation=CreateEnvironmentRequestBody, direction="write"
             ),
             headers={
                 "content-type": "application/json",
@@ -620,15 +890,183 @@ class AsyncRawEnvironmentsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def get_environment(
-        self, id: str, *, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[Environment]:
+    async def list_environment_revisions(
+        self,
+        id: str,
+        *,
+        page: typing.Optional[int] = None,
+        size: typing.Optional[int] = None,
+        sort: typing.Optional[
+            typing.Union[
+                ListEnvironmentRevisionsRequestSortItem, typing.Sequence[ListEnvironmentRevisionsRequestSortItem]
+            ]
+        ] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[PageEnvironmentRevisionRecord]:
         """
-        Fetch by identifier; 404 if not visible. ``:path`` so slash-containing ids round-trip.
+        List an environment's revisions without their specs, newest first. Read one with ``?revision=N``.
+
+        Unauthenticated callers can list reserved ``h/`` environments only.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        page : typing.Optional[int]
+            Page number (1-based)
+
+        size : typing.Optional[int]
+            Number of items per page
+
+        sort : typing.Optional[typing.Union[ListEnvironmentRevisionsRequestSortItem, typing.Sequence[ListEnvironmentRevisionsRequestSortItem]]]
+            Sort by field
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[PageEnvironmentRevisionRecord]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/environments/{encode_path_param(id)}/revisions",
+            method="GET",
+            params={
+                "page": page,
+                "size": size,
+                "sort": sort,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    PageEnvironmentRevisionRecord,
+                    parse_obj_as(
+                        type_=PageEnvironmentRevisionRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def restore_environment_revision(
+        self,
+        id: str,
+        number: int,
+        *,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[Environment]:
+        """
+        Make revision ``number``'s spec current again, as a new revision with the message ``Restored from vN``.
+
+        Validated and authorised like ``PUT``. The new revision's ``restored_from`` is ``number``.
+        Restoring a spec that is already current changes nothing and returns the current revision.
+
+        Parameters
+        ----------
+        id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        number : int
+            The revision whose spec becomes current again.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[Environment]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/environments/{encode_path_param(id)}/revisions/{encode_path_param(number)}/restore",
+            method="POST",
+            headers={
+                "If-Match": str(if_match) if if_match is not None else None,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    Environment,
+                    parse_obj_as(
+                        type_=Environment,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def get_environment(
+        self, id: str, *, revision: typing.Optional[int] = None, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[Environment]:
+        """
+        Fetch by id at its latest revision, or at ``revision``; 404 if not visible or no such revision.
+
+        ``:path`` so slash-containing ids round-trip.
+
+        Parameters
+        ----------
+        id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        revision : typing.Optional[int]
+            Read this revision instead of the latest. References to an environment elsewhere, such as an agent's ``environment``, pin a revision as ``id:N`` instead.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -641,6 +1079,9 @@ class AsyncRawEnvironmentsClient:
         _response = await self._client_wrapper.httpx_client.request(
             f"api/v2/environments/{encode_path_param(id)}",
             method="GET",
+            params={
+                "revision": revision,
+            },
             request_options=request_options,
         )
         try:
@@ -674,16 +1115,31 @@ class AsyncRawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     async def update_environment(
-        self, id: str, *, request: UpdateEnvironmentRequestBody, request_options: typing.Optional[RequestOptions] = None
+        self,
+        id: str,
+        *,
+        request: UpdateEnvironmentRequestBody,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Environment]:
         """
-        Replace the environment spec.
+        Replace the environment spec as a new revision. ``id`` must match the URL.
+
+        Sending the spec that is already current changes nothing and returns the current revision.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
 
         request : UpdateEnvironmentRequestBody
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -696,11 +1152,15 @@ class AsyncRawEnvironmentsClient:
         _response = await self._client_wrapper.httpx_client.request(
             f"api/v2/environments/{encode_path_param(id)}",
             method="PUT",
+            params={
+                "message": message,
+            },
             json=convert_and_respect_annotation_metadata(
                 object_=request, annotation=UpdateEnvironmentRequestBody, direction="write"
             ),
             headers={
                 "content-type": "application/json",
+                "If-Match": str(if_match) if if_match is not None else None,
             },
             request_options=request_options,
             omit=OMIT,
@@ -715,6 +1175,17 @@ class AsyncRawEnvironmentsClient:
                     ),
                 )
                 return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -736,14 +1207,18 @@ class AsyncRawEnvironmentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     async def delete_environment(
-        self, id: str, *, request_options: typing.Optional[RequestOptions] = None
+        self, id: str, *, if_match: typing.Optional[str] = None, request_options: typing.Optional[RequestOptions] = None
     ) -> AsyncHttpResponse[None]:
         """
-        Delete by identifier. Reserved rows: H employee only.
+        Delete by id, with its revisions. Reserved rows: H employee only.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -755,11 +1230,25 @@ class AsyncRawEnvironmentsClient:
         _response = await self._client_wrapper.httpx_client.request(
             f"api/v2/environments/{encode_path_param(id)}",
             method="DELETE",
+            headers={
+                "If-Match": str(if_match) if if_match is not None else None,
+            },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -784,6 +1273,8 @@ class AsyncRawEnvironmentsClient:
         self,
         id: str,
         *,
+        message: typing.Optional[str] = None,
+        if_match: typing.Optional[str] = None,
         host: typing.Optional[PatchEnvironmentHost] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         headless: typing.Optional[bool] = OMIT,
@@ -796,17 +1287,25 @@ class AsyncRawEnvironmentsClient:
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
+        shell: typing.Optional[bool] = OMIT,
         screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
         storage: typing.Optional[WorkstationStorage] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Environment]:
         """
-        Partially update an environment spec; only provided fields change.
+        Partially update an environment spec as a new revision; only provided fields change.
 
         Parameters
         ----------
         id : str
+            The environment's `id` from its spec, slashes allowed. Not a UUID.
+
+        message : typing.Optional[str]
+            Optional note stored on the revision this write creates, such as why the change was made.
+
+        if_match : typing.Optional[str]
+            The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         host : typing.Optional[PatchEnvironmentHost]
 
@@ -832,6 +1331,8 @@ class AsyncRawEnvironmentsClient:
 
         network : typing.Optional[BrowserNetwork]
 
+        shell : typing.Optional[bool]
+
         screenshot_max_width : typing.Optional[int]
 
         image : typing.Optional[str]
@@ -849,6 +1350,9 @@ class AsyncRawEnvironmentsClient:
         _response = await self._client_wrapper.httpx_client.request(
             f"api/v2/environments/{encode_path_param(id)}",
             method="PATCH",
+            params={
+                "message": message,
+            },
             json={
                 "host": host,
                 "start_url": start_url,
@@ -866,6 +1370,7 @@ class AsyncRawEnvironmentsClient:
                 "network": convert_and_respect_annotation_metadata(
                     object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
                 ),
+                "shell": shell,
                 "screenshot_max_width": screenshot_max_width,
                 "image": image,
                 "storage": convert_and_respect_annotation_metadata(
@@ -874,6 +1379,7 @@ class AsyncRawEnvironmentsClient:
             },
             headers={
                 "content-type": "application/json",
+                "If-Match": str(if_match) if if_match is not None else None,
             },
             request_options=request_options,
             omit=OMIT,
@@ -888,6 +1394,17 @@ class AsyncRawEnvironmentsClient:
                     ),
                 )
                 return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 412:
+                raise PreconditionFailedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),

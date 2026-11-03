@@ -10,6 +10,7 @@ from .metrics import Metrics
 from .session_changes_answer import SessionChangesAnswer
 from .session_error_code import SessionErrorCode
 from .session_event import SessionEvent
+from .tool_approval_request import ToolApprovalRequest
 from .tool_request import ToolRequest
 from .trajectory_status import TrajectoryStatus
 
@@ -30,6 +31,7 @@ class SessionChanges(UniversalBaseModel):
     outcome: typing.Optional[AnswerOutcome] = None
     metrics: typing.Optional[Metrics] = None
     pending_tool_calls: typing.Optional[typing.List[ToolRequest]] = None
+    pending_approvals: typing.Optional[typing.List[ToolApprovalRequest]] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

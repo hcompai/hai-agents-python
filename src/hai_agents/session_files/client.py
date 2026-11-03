@@ -38,6 +38,7 @@ class SessionFilesClient:
         Parameters
         ----------
         file_id : str
+            Opaque `file_id` from the session's `AttachmentEvent`. Not a UUID.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration. You can pass in configuration such as `chunk_size`, and more to customize the request and response.
@@ -222,6 +223,7 @@ class AsyncSessionFilesClient:
         Parameters
         ----------
         file_id : str
+            Opaque `file_id` from the session's `AttachmentEvent`. Not a UUID.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration. You can pass in configuration such as `chunk_size`, and more to customize the request and response.

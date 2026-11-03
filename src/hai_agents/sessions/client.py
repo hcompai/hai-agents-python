@@ -20,6 +20,7 @@ from .types.list_session_events_request_sort_item import ListSessionEventsReques
 from .types.list_sessions_request_owner import ListSessionsRequestOwner
 from .types.list_sessions_request_sort_item import ListSessionsRequestSortItem
 from .types.send_session_messages_request_body import SendSessionMessagesRequestBody
+from .types.send_session_tool_approvals_request_body import SendSessionToolApprovalsRequestBody
 from .types.send_session_tool_results_request_body import SendSessionToolResultsRequestBody
 
 # this is used as the default value for optional parameters
@@ -433,6 +434,51 @@ class SessionsClient:
         _response = self._raw_client.send_session_tool_results(id, request=request, request_options=request_options)
         return _response.data
 
+    def send_session_tool_approvals(
+        self,
+        id: str,
+        *,
+        request: SendSessionToolApprovalsRequestBody,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
+        """
+        Approve or deny tool calls listed in ``pending_approvals`` (single or batch).
+
+        Parameters
+        ----------
+        id : str
+
+        request : SendSessionToolApprovalsRequestBody
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from hai_agents import Client
+        from hai_agents.sessions import (
+            SendSessionToolApprovalsRequestBody_ToolApprovalResponse,
+        )
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.sessions.send_session_tool_approvals(
+            id="id",
+            request=SendSessionToolApprovalsRequestBody_ToolApprovalResponse(
+                call_id="call_id",
+                action="approve",
+                type="tool_approval_response",
+            ),
+        )
+        """
+        _response = self._raw_client.send_session_tool_approvals(id, request=request, request_options=request_options)
+        return _response.data
+
     def pause_session(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         """
         Pause the session.
@@ -785,8 +831,10 @@ class SessionsClient:
         id : str
 
         bucket : str
+            Storage bucket, as it appears in the resource URL an event carries.
 
         key : str
+            Object key inside the bucket, slashes allowed.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration. You can pass in configuration such as `chunk_size`, and more to customize the request and response.
@@ -1289,6 +1337,61 @@ class AsyncSessionsClient:
         )
         return _response.data
 
+    async def send_session_tool_approvals(
+        self,
+        id: str,
+        *,
+        request: SendSessionToolApprovalsRequestBody,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
+        """
+        Approve or deny tool calls listed in ``pending_approvals`` (single or batch).
+
+        Parameters
+        ----------
+        id : str
+
+        request : SendSessionToolApprovalsRequestBody
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+        from hai_agents.sessions import (
+            SendSessionToolApprovalsRequestBody_ToolApprovalResponse,
+        )
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.sessions.send_session_tool_approvals(
+                id="id",
+                request=SendSessionToolApprovalsRequestBody_ToolApprovalResponse(
+                    call_id="call_id",
+                    action="approve",
+                    type="tool_approval_response",
+                ),
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.send_session_tool_approvals(
+            id, request=request, request_options=request_options
+        )
+        return _response.data
+
     async def pause_session(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
         """
         Pause the session.
@@ -1713,8 +1816,10 @@ class AsyncSessionsClient:
         id : str
 
         bucket : str
+            Storage bucket, as it appears in the resource URL an event carries.
 
         key : str
+            Object key inside the bucket, slashes allowed.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration. You can pass in configuration such as `chunk_size`, and more to customize the request and response.

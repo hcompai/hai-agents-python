@@ -4,12 +4,11 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .desktop_host import DesktopHost
 
 
 class Desktop(UniversalBaseModel):
     """
-    A desktop the agent controls via mouse, keyboard, and screenshots.
+    Your own computer.
     """
 
     id: str = pydantic.Field()
@@ -17,29 +16,24 @@ class Desktop(UniversalBaseModel):
     Catalog identifier for this environment.
     """
 
-    host: DesktopHost = pydantic.Field()
+    shell: typing.Optional[bool] = pydantic.Field(default=None)
     """
-    Where the desktop runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.
+    Drive the machine from a shell: commands, files, and the screen and browser through CLIs. False drives the screen with mouse and keyboard actions and a screenshot after each step.
     """
 
     session_id: typing.Optional[str] = pydantic.Field(default=None)
     """
-    Connect to an existing desktop session by id instead of starting a new one.
+    Connect to an existing desktop session by id.
     """
 
     lazy: typing.Optional[bool] = pydantic.Field(default=None)
     """
-    Provision on the agent's first use instead of at startup. Skips the initial observation.
-    """
-
-    settle_s: typing.Optional[float] = pydantic.Field(default=None)
-    """
-    Seconds to wait after each input action.
+    Reach the desktop on the agent's first use instead of at startup. Skips the initial observation.
     """
 
     screenshot_max_width: typing.Optional[int] = pydantic.Field(default=None)
     """
-    Maximum screenshot width in pixels. Null uses the host default; images are never upscaled.
+    Maximum screenshot width in pixels. Null uses 1920; images are never upscaled.
     """
 
     if IS_PYDANTIC_V2:
