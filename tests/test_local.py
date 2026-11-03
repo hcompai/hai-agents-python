@@ -46,6 +46,13 @@ class TestLocalizeAgent:
         assert envs[0]["kind"] == "web"
         assert "session_id" not in agent["environments"][0]
 
+    @pytest.mark.parametrize(("shell", "bridge_type"), [(False, PyautoguiDesktopBridge), (True, WorkstationBridge)])
+    def test_a_desktop_is_this_machine_and_its_shell_flag_picks_the_bridge(self, shell, bridge_type):
+        agent = {"name": "x", "environments": [{"id": "box", "kind": "desktop", "shell": shell}]}
+        localized, [bridge], _ = localize_agent(agent, api_key=API_KEY)
+        assert isinstance(bridge, bridge_type)
+        assert localized["environments"][0] == {**agent["environments"][0], "session_id": bridge.session_id}
+
     def test_second_unclaimed_env_of_same_kind_raises(self):
         agent = {
             "name": "orchestrator",
@@ -54,7 +61,7 @@ class TestLocalizeAgent:
                 {"name": "child", "environments": [{"id": "laptop-2", "kind": "web", "host": "user_device"}]}
             ],
         }
-        with pytest.raises(ValueError, match="multiple user_device web"):
+        with pytest.raises(ValueError, match="multiple local web"):
             localize_agent(agent, api_key=API_KEY)
 
     def test_claimed_env_does_not_count_against_the_kind(self):
@@ -86,12 +93,12 @@ class TestLocalizeAgent:
     def test_named_leaves_are_routed_by_override_unless_claimed(self):
         resolved = {
             ("environment", "my-laptop"): Browser(id="my-laptop", host="user_device"),
-            ("agent", "helper"): {"name": "helper", "environments": [{"kind": "desktop", "host": "user_device"}]},
+            ("agent", "helper"): {"name": "helper", "environments": [{"kind": "desktop", "shell": True}]},
             ("agent", "claimed"): {"name": "claimed", "environments": [{"kind": "web", "host": "user_device"}]},
         }
         agent = {
             "name": "x",
-            "environments": ["my-laptop", "cloud-browser", {"id": "vm", "kind": "desktop"}],
+            "environments": ["my-laptop", "cloud-browser", {"id": "vm", "kind": "workstation"}],
             "subagents": ["helper", "claimed"],
         }
         claimed = {"agent.subagents[name=claimed].environments[kind=web]": {"kind": "web", "host": "cloud"}}
@@ -99,6 +106,7 @@ class TestLocalizeAgent:
             agent, api_key=API_KEY, resolved=resolved, claimed=claimed
         )
         assert localized == agent
+        assert isinstance(desktop, WorkstationBridge)
         assert overrides == {
             "agent.environments[kind=web].session_id": web.session_id,
             "agent.subagents[name=helper].environments[kind=desktop].session_id": desktop.session_id,

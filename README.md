@@ -127,7 +127,7 @@ An agent that drives this desktop, like `h/holo-desktop`, uses your mouse and ke
 | `holo agents` | `list` agents, `get` one, `use` one as the default |
 | `holo skills` | browse available skills |
 | `holo mcp install` | let Cursor, Claude Code, Codex, and other MCP clients run agents through `holo mcp`; `--remote` adds the hosted server instead |
-| `holo local` | serve a browser, desktop, or workstation on this machine for a session started elsewhere |
+| `holo local` | serve a browser or desktop (`--shell` for a shell) on this machine for a session started elsewhere |
 | `holo login`, `logout`, `whoami`, `doctor` | manage and check your credentials and setup |
 
 ### Scripts and CI
@@ -325,7 +325,8 @@ asyncio.run(main())
 ### Local agents
 
 `Client.local()` and `await AsyncClient.local()` run the agent on this machine through a local agent runtime,
-started on demand or passed in with `runtime=...`. Each environment picks `host="user_device"` or `host="cloud"`.
+started on demand or passed in with `runtime=...`. A desktop is this machine; a browser picks `host="user_device"` or
+`host="cloud"`.
 `Client()` keeps using the hosted Agents API. Closing the client stops a runtime it started, unless other clients still
 have active sessions there.
 
@@ -336,11 +337,9 @@ with Client.local(local_options={"binary_path": "/path/to/hai-agent-runtime"}) a
     session = client.sessions.create_session(
         agent={
             "name": "local-example",
-            "description": "Local workstation example",
-            "instructions": "Answer the user's task using the workstation tools.",
-            "environments": [
-                {"id": "workstation", "kind": "workstation", "host": "user_device"}
-            ],
+            "description": "Local desktop example",
+            "instructions": "Answer the user's task using the shell.",
+            "environments": [{"id": "my-laptop", "kind": "desktop", "shell": True}],
         },
         messages=[{"type": "user_message", "message": "Print hello using the shell."}],
         max_steps=8,
@@ -352,8 +351,8 @@ with Client.local(local_options={"binary_path": "/path/to/hai-agent-runtime"}) a
 Inference stays hosted (`HAI_API_KEY`) unless you pass `inference=Inference.self_hosted(url, model=...)`
 (`from hai_agents_local.runtime import Inference`).
 
-One agent drives this machine's desktop at a time: a second process asking for a `desktop` or `workstation` bridge
-fails fast instead of sharing the mouse. `holo local stop` stops every local turn on the machine; so does a double Esc
+One agent drives this machine's desktop at a time: a second process asking for a desktop bridge fails fast instead of
+sharing the mouse. `holo local stop` stops every local turn on the machine; so does a double Esc
 once `hai_agents_local.killswitch.arm_esc_listener()` is armed (macOS, Windows, and X11 Linux).
 
 ### Inspect and share sessions

@@ -1488,10 +1488,22 @@ def local_desktop(
     quality: int = typer.Option(
         desktop_defaults.DEFAULT_QUALITY, "--quality", help="Encoding quality (1-100) for jpeg/webp."
     ),
+    shell: bool = typer.Option(
+        False,
+        "--shell",
+        help="Serve a desktop with `shell: true`: a shell on this machine, running as you, that drives its "
+        "screen and a Chrome.",
+    ),
+    workspace: str | None = typer.Option(
+        None, "--workspace", help="With --shell, the folder the shell starts in. Defaults to ~/hai/<session id>."
+    ),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""
-    from hai_agents_local import PyautoguiDesktopBridge
+    from hai_agents_local import PyautoguiDesktopBridge, WorkstationBridge
 
+    if shell:
+        _run_bridge(_state(ctx), WorkstationBridge, session_id, workspace=workspace)
+        return
     if image_format not in ("png", "jpeg", "webp"):
         _raise_cli_error(ValueError(f"--image-format must be png, jpeg, or webp; got {image_format!r}"))
     _run_bridge(
@@ -1505,7 +1517,7 @@ def local_desktop(
     )
 
 
-@local_app.command("workstation")
+@local_app.command("workstation", hidden=True)
 def local_workstation(
     ctx: typer.Context,
     session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
@@ -1513,7 +1525,7 @@ def local_workstation(
         None, "--workspace", help="Folder the shell starts in. Defaults to ~/hai/<session id>."
     ),
 ) -> None:
-    """Serve workstation commands: a shell on this machine, running as you, that drives its screen and a Chrome."""
+    """Same as `holo local desktop --shell`."""
     from hai_agents_local import WorkstationBridge
 
     _run_bridge(_state(ctx), WorkstationBridge, session_id, workspace=workspace)
@@ -1550,10 +1562,8 @@ def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str
         f"[bold]Local {bridge.environment_kind} bridge[/bold] serving session id "
         f"[cyan]{bridge.session_id}[/cyan]. Press Ctrl-C to stop, or run `holo local stop` from any terminal."
     )
-    console.print(
-        "[dim]Point a user_device environment at it: "
-        f'{{"kind": "{bridge.environment_kind}", "host": "user_device", "session_id": "{bridge.session_id}"}}[/dim]'
-    )
+    environment = json.dumps({**bridge.environment, "session_id": bridge.session_id})
+    console.print(f"[dim]Point an environment at it: {escape(environment)}[/dim]")
     try:
         asyncio.run(_serve_bridge(bridge))
     except KeyboardInterrupt:
@@ -1734,14 +1744,15 @@ def _local_kinds(client: Any, agent: Any) -> list[str]:
 
 
 def _drives_a_machine(client: Any, agent: Any) -> bool:
-    """Read-back specs carry their bridges' session ids, which `_local_kinds` skips, so scan for the host too."""
-    return _has_user_device(to_jsonable(agent)) or bool(_local_kinds(client, agent))
+    """Read-back specs carry their bridges' session ids, which `_local_kinds` skips, so scan the specs too."""
+    return _has_local_environment(to_jsonable(agent)) or bool(_local_kinds(client, agent))
 
 
-def _has_user_device(value: Any) -> bool:
+def _has_local_environment(value: Any) -> bool:
     if isinstance(value, dict):
-        return value.get("host") == "user_device" or any(map(_has_user_device, value.values()))
-    return isinstance(value, list) and any(map(_has_user_device, value))
+        local = value.get("host") == "user_device" or value.get("kind") == "desktop"
+        return local or any(map(_has_local_environment, value.values()))
+    return isinstance(value, list) and any(map(_has_local_environment, value))
 
 
 _CLIPBOARD_TOOLS = (

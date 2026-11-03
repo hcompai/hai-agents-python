@@ -1,4 +1,4 @@
-"""Spawns local bridges for user_device environments: inline ones are stamped, named ones routed by overrides."""
+"""Spawns bridges for environments on this machine: inline ones are stamped, named ones routed by overrides."""
 
 from __future__ import annotations
 
@@ -111,41 +111,46 @@ class _Walk:
         key = f"{path}.environments[kind={kind}].session_id"
         if any(key == claim or key.startswith(f"{claim}.") for claim in self.claimed):
             return env
+        serve = SERVE_COMMANDS[_bridge_type(env, kind).environment_kind]
         if not by_name:
-            return _replace(env, kind=kind, session_id=self.bridge(kind, env).session_id)
+            return _replace(env, kind=kind, session_id=self.bridge(env, kind).session_id)
         if sum(_kind(sibling) == kind for sibling in siblings) > 1:
             raise ValueError(
-                f"{path} has several {kind} environments, so the platform cannot route its user_device {kind} "
-                f"by kind; give it an explicit session_id and serve it with `holo local {_CLI_KIND[kind]} --session-id <id>`"
+                f"{path} has several {kind} environments, so the platform cannot route its local {kind} "
+                f"by kind; give it an explicit session_id and serve it with `{serve} --session-id <id>`"
             )
         if not all(_SEGMENT.match(segment) for segment in key.split(".")):
             raise ValueError(
-                f"cannot route the user_device {kind} at {path}: override paths split on dots, so a subagent "
+                f"cannot route the local {kind} at {path}: override paths split on dots, so a subagent "
                 f"name with '.', '[' or ']' cannot be addressed; rename it, or give the environment an explicit "
-                f"session_id and serve it with `holo local {_CLI_KIND[kind]} --session-id <id>`"
+                f"session_id and serve it with `{serve} --session-id <id>`"
             )
-        self.overrides[key] = self.bridge(kind, env).session_id
+        self.overrides[key] = self.bridge(env, kind).session_id
         return env
 
     def lookup(self, env: EnvironmentLike) -> Any:
         return self.resolved.get(("environment", env), env) if isinstance(env, str) else env
 
-    def bridge(self, kind: str, env: EnvironmentLike) -> LocalBridge:
-        if any(bridge.environment_kind == kind for bridge in self.bridges):
+    def bridge(self, env: EnvironmentLike, kind: str) -> LocalBridge:
+        bridge_type = _bridge_type(env, kind)
+        if any(type(bridge) is bridge_type for bridge in self.bridges):
             raise ValueError(
-                f"the agent tree has multiple user_device {kind} environments, but this machine can only "
-                f"serve one local {kind}; give the extra environments an explicit session_id and serve each "
-                "from its own machine with `holo local browser|desktop|workstation --session-id <id>`"
+                f"the agent tree has multiple local {kind} environments that this machine would serve the same "
+                "way, but it can only serve one; give the extra environments an explicit session_id and serve "
+                f"each from its own machine with `{SERVE_COMMANDS[bridge_type.environment_kind]} --session-id <id>`"
             )
-        session_id = None if self.seed is None else str(uuid.uuid5(uuid.NAMESPACE_URL, f"{self.seed}:{kind}"))
-        bridge = BRIDGE_TYPES[kind](
-            _read(env, "id"), api_key=self.api_key, base_url=self.base_url, session_id=session_id
-        )
+        seed = f"{self.seed}:{bridge_type.environment_kind}"
+        session_id = None if self.seed is None else str(uuid.uuid5(uuid.NAMESPACE_URL, seed))
+        bridge = bridge_type(_read(env, "id"), api_key=self.api_key, base_url=self.base_url, session_id=session_id)
         self.bridges.append(bridge)
         return bridge
 
 
-_CLI_KIND = {"web": "browser", "desktop": "desktop", "workstation": "workstation"}
+SERVE_COMMANDS = {
+    SeleniumBrowserBridge.environment_kind: "holo local browser",
+    PyautoguiDesktopBridge.environment_kind: "holo local desktop",
+    WorkstationBridge.environment_kind: "holo local desktop --shell",
+}
 _SEGMENT = re.compile(r"^[A-Za-z_]\w*(?:\[[^\[\]]+\])?$")
 
 
@@ -161,15 +166,24 @@ def _kind(env: Any) -> str | None:
 
 
 def _local_kind(env: EnvironmentLike) -> str | None:
+    """The kind of ``env`` when this machine serves it: a desktop always, a browser or workstation on user_device."""
+    kind = _kind(env)
+    if kind == "desktop":
+        return kind
     if _read(env, "host") != "user_device":
         return None
-    kind = _kind(env)
     if kind not in BRIDGE_TYPES:
         raise ValueError(
             f"user_device environment {_read(env, 'id')!r} has kind {kind!r}, which cannot be served by a "
             f"local bridge; supported kinds: {sorted(BRIDGE_TYPES)}"
         )
     return kind
+
+
+def _bridge_type(env: EnvironmentLike, kind: str) -> type[LocalBridge]:
+    if kind == "desktop" and _read(env, "shell"):
+        return WorkstationBridge
+    return BRIDGE_TYPES[kind]
 
 
 def _model_kind(env: EnvironmentLike) -> str | None:
