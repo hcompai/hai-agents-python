@@ -74,7 +74,7 @@ skills_app = typer.Typer(no_args_is_help=True, help="Browse available skills.")
 mcp_app = typer.Typer()
 local_app = typer.Typer(
     no_args_is_help=True,
-    help="Manually run the local browser, desktop or workstation bridge. Only needed when the session is started "
+    help="Manually run the local browser or desktop bridge. Only needed when the session is started "
     "elsewhere (the web app, another machine, or an agent referenced by name); sessions created "
     "from the Python SDK with an inline agent start it automatically.",
 )
@@ -209,7 +209,7 @@ def doctor(ctx: typer.Context) -> None:
     else:
         for r in results:
             ui.check(console, "ok" if r.ok else "fail", r.name, r.detail, fix=r.fix)
-        if _interactive() and any(r.name in ("desktop", "workstation") and not r.ok for r in results):
+        if _interactive() and any(r.name == "desktop" and not r.ok for r in results):
             _offer_privacy_settings()
     if not all(r.ok for r in results):
         raise typer.Exit(1)
@@ -1521,20 +1521,6 @@ def local_desktop(
         image_format=image_format,
         quality=quality,
     )
-
-
-@local_app.command("workstation", hidden=True)
-def local_workstation(
-    ctx: typer.Context,
-    session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
-    workspace: str | None = typer.Option(
-        None, "--workspace", help="Folder the shell starts in. Defaults to ~/hai/<session id>."
-    ),
-) -> None:
-    """Same as `holo local desktop --shell`."""
-    from hai_agents_local import WorkstationBridge
-
-    _run_bridge(_state(ctx), WorkstationBridge, session_id, workspace=workspace)
 
 
 @local_app.command("stop")

@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
-import os
-import shutil
 import socket
 import sys
-import sysconfig
 from dataclasses import dataclass
 
 from hai_agents.environment import HaiAgentsEnvironment
@@ -76,11 +73,6 @@ def check_desktop() -> CheckResult:
     return _check_machine("desktop", installed and importlib.util.find_spec("hai_drivers.desktop") is not None)
 
 
-def check_workstation() -> CheckResult:
-    path = os.pathsep.join([sysconfig.get_path("scripts"), os.environ.get("PATH", os.defpath)])
-    return _check_machine("workstation", shutil.which("desk", path=path) is not None)
-
-
 def _check_machine(kind: str, installed: bool) -> CheckResult:
     if not installed:
         return CheckResult(
@@ -132,5 +124,5 @@ def run_checks(api_key: str | None, base_url: str | None) -> list[CheckResult]:
     checks = [login]
     if login.ok:
         checks.append(check_platform(api_key, base_url))
-    checks.extend([check_runtime(), check_browser(), check_desktop(), check_workstation()])
+    checks.extend([check_runtime(), check_browser(), check_desktop()])
     return checks
