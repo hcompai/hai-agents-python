@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import errno
 import json
 import os
@@ -12,14 +13,13 @@ import struct
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
 HOST_NAME = "ai.hcompany.hai"
 STORE_EXTENSION_ID = "hlaoiikljjgcjdhkakedfngifaopbcop"
 DEV_EXTENSION_ENV = "HAI_HOLOTAB_EXTENSION_ID"
 SHARED_DIR_ENV = "HAI_HOLOTAB_DIR"
 FRAME = struct.Struct("<I")
-STALE_SOCKET_ERRORS = frozenset({errno.ECONNREFUSED, errno.ENOENT})
 MAX_FRAME_BYTES = 2 * 1024 * 1024
 SOL_LOCAL = 0
 LOCAL_PEERCRED = 1
@@ -55,6 +55,30 @@ def peer_uid(conn: socket.socket) -> int | None:
     return None
 
 
+class EndpointBusy(RuntimeError):
+    """Another live process already serves the endpoint."""
+
+
+def claim_lock(path: Path) -> IO[bytes]:
+    """An exclusive lock the operating system drops with the process, so one owner wins a race and a crash frees it."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(path, "a+b")
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as exc:
+        handle.close()
+        raise EndpointBusy(f"HoloTab native messaging is already served through {path}") from exc
+    return handle
+
+
 class Endpoint(ABC):
     """One place the link listens and the shim, or another local process, connects."""
 
@@ -62,7 +86,7 @@ class Endpoint(ABC):
 
     @abstractmethod
     def bind(self) -> socket.socket:
-        """A listening socket; raises RuntimeError while another process serves this endpoint."""
+        """A listening socket; raises EndpointBusy while another process serves this endpoint."""
 
     @abstractmethod
     def release(self, server: socket.socket) -> None:
@@ -95,48 +119,53 @@ class UnixEndpoint(Endpoint):
     def __init__(self, path: Path) -> None:
         self.path = path
         self._inode: int | None = None
+        self._claim_handle: IO[bytes] | None = None
 
     def bind(self) -> socket.socket:
         path = self.path
-        if os.path.lexists(path):
-            found = path.lstat()
-            if not stat.S_ISSOCK(found.st_mode) or found.st_uid != own_uid():
-                raise RuntimeError(f"refusing to replace unsafe HoloTab socket path at {path}")
-            probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            try:
-                if probe.connect_ex(str(path)) not in STALE_SOCKET_ERRORS:
-                    raise RuntimeError(f"HoloTab native messaging is already served at {path}")
-            finally:
-                probe.close()
-            path.unlink()
         path.parent.mkdir(parents=True, exist_ok=True)
         os.chmod(path.parent, 0o700)
-        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        claim = claim_lock(path.with_suffix(".lock"))
         try:
-            server.bind(str(path))
-        except OSError as exc:
-            server.close()
-            if exc.errno == errno.EADDRINUSE:
-                raise RuntimeError(f"HoloTab native messaging is already served at {path}") from exc
-            raise
-        try:
-            os.chmod(path, 0o600)
-            server.listen(8)
-            self._inode = path.stat().st_ino
+            if os.path.lexists(path):
+                found = path.lstat()
+                if not stat.S_ISSOCK(found.st_mode) or found.st_uid != own_uid():
+                    raise RuntimeError(f"refusing to replace unsafe HoloTab socket path at {path}")
+                path.unlink()
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            try:
+                server.bind(str(path))
+            except OSError as exc:
+                server.close()
+                if exc.errno == errno.EADDRINUSE:
+                    raise RuntimeError(f"HoloTab native messaging is already served at {path}") from exc
+                raise
+            try:
+                os.chmod(path, 0o600)
+                server.listen(8)
+                self._inode = path.stat().st_ino
+            except BaseException:
+                server.close()
+                path.unlink(missing_ok=True)
+                raise
         except BaseException:
-            server.close()
-            path.unlink(missing_ok=True)
+            claim.close()
             raise
+        self._claim_handle = claim
         return server
 
     def release(self, server: socket.socket) -> None:
         inode, self._inode = self._inode, None
+        claim, self._claim_handle = self._claim_handle, None
         try:
             current = self.path.lstat()
             if inode is not None and stat.S_ISSOCK(current.st_mode) and current.st_ino == inode:
                 self.path.unlink()
         except FileNotFoundError:
             pass
+        finally:
+            if claim is not None:
+                claim.close()
 
     def connect(self) -> socket.socket:
         conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -163,6 +192,7 @@ class TcpEndpoint(Endpoint):
     def __init__(self, info_path: Path) -> None:
         self.info_path = info_path
         self._token: str | None = None
+        self._claim_handle: IO[bytes] | None = None
 
     def _read(self) -> dict[str, Any]:
         try:
@@ -174,35 +204,30 @@ class TcpEndpoint(Endpoint):
         return info
 
     def bind(self) -> socket.socket:
-        if self.info_path.exists():
-            try:
-                self.connect().close()
-            except OSError:
-                pass
-            else:
-                raise RuntimeError(f"HoloTab native messaging is already served through {self.info_path}")
+        claim = claim_lock(self.info_path.with_suffix(".lock"))
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             server.bind(("127.0.0.1", 0))
             server.listen(8)
             self._token = secrets.token_urlsafe(32)
-            self.info_path.parent.mkdir(parents=True, exist_ok=True)
             self.info_path.write_text(
                 json.dumps({"port": server.getsockname()[1], "token": self._token}), encoding="utf-8"
             )
             os.chmod(self.info_path, 0o600)
         except BaseException:
             server.close()
+            claim.close()
             raise
+        self._claim_handle = claim
         return server
 
     def release(self, server: socket.socket) -> None:
-        token, self._token = self._token, None
-        try:
-            if token is not None and self._read().get("token") == token:
-                self.info_path.unlink()
-        except (OSError, ConnectionRefusedError):
-            pass
+        self._token = None
+        claim, self._claim_handle = self._claim_handle, None
+        if claim is not None:
+            with contextlib.suppress(OSError):
+                self.info_path.unlink(missing_ok=True)
+            claim.close()
 
     def connect(self) -> socket.socket:
         conn = socket.create_connection(("127.0.0.1", self._read()["port"]), timeout=2.0)

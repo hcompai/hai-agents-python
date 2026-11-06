@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import errno
 import socket
 import sys
 import tempfile
@@ -10,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from hai_agents_local.holotab.endpoint import UnixEndpoint
+from hai_agents_local.holotab.endpoint import TcpEndpoint, UnixEndpoint
 
 pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="Unix sockets")
 
@@ -55,18 +54,20 @@ def test_a_socket_nothing_answers_on_is_replaced(socket_path: Path) -> None:
         endpoint.release(server)
 
 
-def test_a_socket_that_cannot_be_probed_is_not_assumed_stale(
-    socket_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_a_token_file_that_cannot_be_deleted_still_frees_the_endpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    owner = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    owner.bind(str(socket_path))
-    owner.listen(0)
-    real_connect_ex = socket.socket.connect_ex
-    monkeypatch.setattr(socket.socket, "connect_ex", lambda self, address: errno.EAGAIN)
-    try:
-        with pytest.raises(RuntimeError, match="already served"):
-            UnixEndpoint(socket_path).bind()
-    finally:
-        monkeypatch.setattr(socket.socket, "connect_ex", real_connect_ex)
-        owner.close()
-    assert socket_path.exists()
+    first, second = TcpEndpoint(tmp_path / "link.json"), TcpEndpoint(tmp_path / "link.json")
+    server = first.bind()
+
+    def refuse(self: Path, missing_ok: bool = False) -> None:
+        raise PermissionError("the file is open in another process")
+
+    monkeypatch.setattr(Path, "unlink", refuse)
+    server.close()
+    first.release(server)
+    monkeypatch.undo()
+
+    replacement = second.bind()
+    replacement.close()
+    second.release(replacement)
