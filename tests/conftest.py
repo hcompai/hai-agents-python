@@ -1,7 +1,7 @@
 import pytest
 
 from hai_agents_cli import holo_dir, welcome
-from hai_agents_local import desktop_lock
+from hai_agents_local import desktop_lock, routing
 from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR
 
 
@@ -24,3 +24,9 @@ def holo_home(monkeypatch, tmp_path):
 @pytest.fixture(autouse=True)
 def _no_update_check(monkeypatch):
     monkeypatch.setattr(welcome, "latest_version", lambda: None)
+
+
+@pytest.fixture(autouse=True)
+def _holotab_absent(monkeypatch, tmp_path):
+    monkeypatch.setenv("HAI_HOLOTAB_DIR", str(tmp_path / "holotab"))
+    monkeypatch.setattr(routing, "require_holotab", lambda *_: None)

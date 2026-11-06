@@ -58,7 +58,7 @@ class HoloTabBrowserBridge(WebBridge["WebDriverInterface"]):
     ``upload_roots`` are the only folders HoloTab may upload files from; without them it refuses uploads.
     """
 
-    environment = {"kind": "web", "host": "user_device"}
+    environment = {"kind": "web", "host": "holotab"}
     startup_hint = "HoloTab must be installed in Chrome with `Connect to desktop apps` turned on"
 
     def __init__(

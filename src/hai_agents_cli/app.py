@@ -1472,26 +1472,31 @@ def local_browser(
         None, "--debug-port", help="Chrome remote-debugging port to attach to with Selenium. [default: 9222]"
     ),
     holotab: bool = typer.Option(
-        False,
-        "--holotab",
-        help="Drive your own signed-in Chrome through the HoloTab extension, not a debug-port Chrome.",
+        False, "--holotab", help="Drive your own signed-in Chrome through the HoloTab extension."
+    ),
+    label: str | None = typer.Option(
+        None, "--label", help="Name of the tab group in Chrome; defaults to the app name. Used with HoloTab."
     ),
 ) -> None:
-    """Serve browser commands on this machine through Chrome on --debug-port, or through HoloTab."""
+    """Serve a host="user_device" web environment through a debug-port Chrome with Selenium, or, with --holotab, a
+    host="holotab" one through your own signed-in Chrome with HoloTab."""
+    from hai_agents_local import HoloTabBrowserBridge, SeleniumBrowserBridge
+
     if holotab and debug_port is not None:
         _raise_cli_error(ValueError("--debug-port drives a debug-port Chrome with Selenium; drop it to use --holotab"))
     if holotab:
-        from hai_agents_local import HoloTabBrowserBridge
-        from hai_agents_local.holotab.bridge import install_host
+        from hai_agents_local.holotab.connect import require_holotab
 
+        state = _state(ctx)
+        _sign_in_if_needed(state)
         try:
-            install_host()
-        except (ImportError, OSError, ValueError) as exc:
+            require_holotab(credentials.resolve_api_key(state.api_key), "Holo CLI")
+        except (ImportError, OSError, RuntimeError, ValueError) as exc:
             _raise_cli_error(exc)
-        _run_bridge(_state(ctx), HoloTabBrowserBridge, session_id, client="Holo CLI", stop_on_refusal=True)
+        _run_bridge(state, HoloTabBrowserBridge, session_id, client="Holo CLI", label=label, stop_on_refusal=True)
         return
-    from hai_agents_local import SeleniumBrowserBridge
-
+    if label is not None:
+        _raise_cli_error(ValueError("--label names HoloTab's tab group; use it with --holotab"))
     port = {} if debug_port is None else {"debugging_port": debug_port}
     _run_bridge(_state(ctx), SeleniumBrowserBridge, session_id, **port)
 

@@ -192,10 +192,10 @@ BUNDLE = {
 }
 
 
-def test_the_bridge_is_the_web_bridge_for_the_users_device() -> None:
+def test_the_bridge_is_the_web_bridge_for_holotab_environments() -> None:
     assert issubclass(HoloTabBrowserBridge, LocalBridge)
     assert HoloTabBrowserBridge.environment_kind == "web"
-    assert HoloTabBrowserBridge.environment == {"kind": "web", "host": "user_device"}
+    assert HoloTabBrowserBridge.environment == {"kind": "web", "host": "holotab"}
     assert HoloTabBrowserBridge(api_key=API_KEY, holotab=FakeHoloTab()).driver_interface() is WebDriverInterface  # type: ignore[arg-type]
 
 

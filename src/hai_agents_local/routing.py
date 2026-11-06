@@ -11,6 +11,8 @@ from pydantic import BaseModel
 from .bridge import LocalBridge, TokenSource
 from .browser import SeleniumBrowserBridge
 from .desktop import PyautoguiDesktopBridge
+from .holotab.bridge import HoloTabBrowserBridge
+from .holotab.connect import require_holotab
 from .workstation import WorkstationBridge
 
 if TYPE_CHECKING:
@@ -25,6 +27,7 @@ BRIDGE_TYPES: dict[str, type[LocalBridge]] = {
     PyautoguiDesktopBridge.environment_kind: PyautoguiDesktopBridge,
     WorkstationBridge.environment_kind: WorkstationBridge,
 }
+LOCAL_HOSTS: dict[str, Collection[str]] = {"user_device": BRIDGE_TYPES.keys(), "holotab": {"web"}}
 
 
 class Localized(NamedTuple):
@@ -77,7 +80,7 @@ def localize_agent(
     claimed: Collection[str] = (),
     seed: str | None = None,
 ) -> Localized:
-    """Bridges for unclaimed user_device envs; a ``seed`` makes their session ids reproducible across retries."""
+    """Bridges for unclaimed user_device and holotab envs; a ``seed`` makes their session ids reproducible."""
     walk = _Walk(api_key, base_url, resolved or {}, frozenset(claimed), seed)
     return Localized(walk.agent(agent, "agent", by_name=False), walk.bridges, walk.overrides)
 
@@ -128,7 +131,7 @@ class _Walk:
         key = f"{path}.environments[kind={kind}].session_id"
         if any(key == claim or key.startswith(f"{claim}.") for claim in self.claimed):
             return env
-        serve = SERVE_COMMANDS[_bridge_type(env, kind).environment_kind]
+        serve = SERVE_COMMANDS[_bridge_type(env, kind)]
         if not by_name:
             return _replace(env, kind=kind, session_id=self.bridge(env, kind).session_id)
         if sum(_kind(sibling) == kind for sibling in siblings) > 1:
@@ -150,23 +153,29 @@ class _Walk:
 
     def bridge(self, env: EnvironmentLike, kind: str) -> LocalBridge:
         bridge_type = _bridge_type(env, kind)
-        if any(type(bridge) is bridge_type for bridge in self.bridges):
+        if any(bridge.environment_kind == bridge_type.environment_kind for bridge in self.bridges):
             raise ValueError(
                 f"the agent tree has multiple local {kind} environments that this machine would serve the same "
                 "way, but it can only serve one; give the extra environments an explicit session_id and serve "
-                f"each from its own machine with `{SERVE_COMMANDS[bridge_type.environment_kind]} --session-id <id>`"
+                f"each from its own machine with `{SERVE_COMMANDS[bridge_type]} --session-id <id>`"
             )
+        if bridge_type is HoloTabBrowserBridge:
+            require_holotab(self.api_key)
         seed = f"{self.seed}:{bridge_type.environment_kind}"
         session_id = None if self.seed is None else str(uuid.uuid5(uuid.NAMESPACE_URL, seed))
-        bridge = bridge_type(_read(env, "id"), api_key=self.api_key, base_url=self.base_url, session_id=session_id)
+        options = {"stop_on_refusal": True} if bridge_type is HoloTabBrowserBridge else {}
+        bridge = bridge_type(
+            _read(env, "id"), api_key=self.api_key, base_url=self.base_url, session_id=session_id, **options
+        )
         self.bridges.append(bridge)
         return bridge
 
 
-SERVE_COMMANDS = {
-    SeleniumBrowserBridge.environment_kind: "holo local browser",
-    PyautoguiDesktopBridge.environment_kind: "holo local desktop",
-    WorkstationBridge.environment_kind: "holo local desktop --shell",
+SERVE_COMMANDS: dict[type[LocalBridge], str] = {
+    SeleniumBrowserBridge: "holo local browser",
+    HoloTabBrowserBridge: "holo local browser --holotab",
+    PyautoguiDesktopBridge: "holo local desktop",
+    WorkstationBridge: "holo local desktop --shell",
 }
 _SEGMENT = re.compile(r"^[A-Za-z_]\w*(?:\[[^\[\]]+\])?$")
 
@@ -183,16 +192,18 @@ def _kind(env: Any) -> str | None:
 
 
 def _local_kind(env: EnvironmentLike) -> str | None:
-    """The kind of ``env`` when this machine serves it: a desktop always, a browser or workstation on user_device."""
+    """The kind of ``env`` when this machine serves it: a desktop always, a browser or workstation on user_device,
+    a browser on holotab."""
     kind = _kind(env)
     if kind == "desktop":
         return kind
-    if _read(env, "host") != "user_device":
+    host = _read(env, "host")
+    if host not in LOCAL_HOSTS:
         return None
-    if kind not in BRIDGE_TYPES:
+    if kind not in LOCAL_HOSTS[host]:
         raise ValueError(
-            f"user_device environment {_read(env, 'id')!r} has kind {kind!r}, which cannot be served by a "
-            f"local bridge; supported kinds: {sorted(BRIDGE_TYPES)}"
+            f"{host} environment {_read(env, 'id')!r} has kind {kind!r}, which cannot be served by a "
+            f"local bridge; supported kinds: {sorted(LOCAL_HOSTS[host])}"
         )
     return kind
 
@@ -200,6 +211,8 @@ def _local_kind(env: EnvironmentLike) -> str | None:
 def _bridge_type(env: EnvironmentLike, kind: str) -> type[LocalBridge]:
     if kind == "desktop" and _read(env, "shell"):
         return WorkstationBridge
+    if kind == "web" and _read(env, "host") == "holotab":
+        return HoloTabBrowserBridge
     return BRIDGE_TYPES[kind]
 
 

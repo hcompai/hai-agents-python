@@ -69,9 +69,9 @@ def _caller(api_key: TokenSource, base_url: typing.Optional[str]) -> str:
 
 def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) -> None:
     overrides = kwargs.get("overrides")
-    if overrides and "user_device" in json.dumps(overrides, default=str):
+    if overrides and any(host in json.dumps(overrides, default=str) for host in ("user_device", "holotab")):
         logger.warning(
-            "session overrides mention user_device, but auto-started bridges are derived from the agent "
+            "session overrides mention user_device or holotab, but auto-started bridges are derived from the agent "
             "spec only; serve override-injected environments manually with `holo local browser|desktop|workstation`"
         )
 
@@ -533,7 +533,7 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
         if _wants_bridges(self._auto_bridges, kwargs):
             wrapper = self._raw_client._client_wrapper
             resolved = await _resolve_references_async(wrapper, kwargs["agent"])
-            bridges = _localize(wrapper, self._runtime, kwargs, resolved)
+            bridges = await asyncio.to_thread(_localize, wrapper, self._runtime, kwargs, resolved)
         if bridges:
             _apply_runaway_budgets(kwargs)
         # Native permission prompts must run before bridge startup moves to a worker.

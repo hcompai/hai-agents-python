@@ -355,6 +355,16 @@ One agent drives this machine's desktop at a time: a second process asking for a
 sharing the mouse. `holo local stop` stops every local turn on the machine; so does a double Esc
 once `hai_agents_local.killswitch.arm_esc_listener()` is armed (macOS, Windows, and X11 Linux).
 
+A web environment with `host="user_device"` is served by a Chrome on a debug port, driven with Selenium. To hand the
+agent your own signed-in Chrome through the HoloTab extension instead, install `hai-agents[holotab]`, give the web
+environment `host="holotab"`, or serve it by hand with `holo local browser --holotab`. A `holotab` environment
+registers HoloTab's hub, the Chrome native messaging host `ai.hcompany.hai` from `hai-drivers`, for your user (macOS
+and Linux: a file under Chrome's `NativeMessagingHosts`; Windows: a registry key under `HKCU`), connects this process
+to it with your API key, and waits up to a minute for HoloTab to connect; if it does not, the session fails with the
+reason instead of falling back to Selenium. Turn on "Connect to desktop apps" in HoloTab, and allow the app in
+HoloTab's side panel the first time it asks. When several Chrome profiles run HoloTab, the one that already allowed
+the app serves, else the most recently started one.
+
 ### Inspect and share sessions
 
 List past sessions and create a public replay link:
