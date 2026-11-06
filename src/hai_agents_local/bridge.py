@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import contextlib
 import functools
 import inspect
@@ -41,6 +42,24 @@ MIN_RATE_LIMIT_BACKOFF_S = 1.0
 RESULT_CACHE_SIZE = 512
 
 DriverT = TypeVar("DriverT")
+
+
+def resolve_token(source: TokenSource) -> str:
+    """Resolve a token source to a string, wherever the caller runs."""
+    token = source() if callable(source) else source
+    if not inspect.isawaitable(token):
+        return token
+
+    async def consume() -> str:
+        return await token
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(consume())
+    # This thread already runs a loop; asyncio.run must happen on another one.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: asyncio.run(consume())).result()
 
 
 class _BearerAuth(httpx.Auth):

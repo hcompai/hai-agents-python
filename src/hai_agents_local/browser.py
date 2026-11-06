@@ -7,12 +7,13 @@ import platform
 import shutil
 import subprocess
 import time
+from abc import abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import httpx
 
-from .bridge import LocalBridge, TokenSource
+from .bridge import DriverT, LocalBridge, TokenSource
 
 if TYPE_CHECKING:
     from hai_drivers.web.selenium import SeleniumWebDriver
@@ -37,10 +38,34 @@ _CHROME_CANDIDATES = {
 _CHROME_COMMANDS = ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome")
 
 
-class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
-    """Serves web environments by attaching Selenium to a Chrome debugging port on this machine."""
+class WebBridge(LocalBridge[DriverT]):
+    """A bridge whose driver is a hai-drivers `WebDriverInterface`, which needs the `browser` extra."""
 
     environment_kind = "web"
+
+    def create_driver(self) -> DriverT:
+        try:
+            self.driver_interface()
+        except ImportError as exc:
+            raise ImportError(
+                "Local browser control requires extra deps. Install with: pip install 'hai-agents[browser]'"
+            ) from exc
+        return self.create_web_driver()
+
+    @abstractmethod
+    def create_web_driver(self) -> DriverT:
+        """The driver; it may import the `browser` extra."""
+
+    def driver_interface(self) -> type:
+        # Runtime import: hai-drivers is absent unless installed with hai-agents[browser].
+        from hai_drivers.web.interface import WebDriverInterface
+
+        return WebDriverInterface
+
+
+class SeleniumBrowserBridge(WebBridge["SeleniumWebDriver"]):
+    """Serves web environments by attaching Selenium to a Chrome debugging port on this machine."""
+
     environment = {"kind": "web", "host": "user_device"}
     startup_hint = (
         "a stale Chrome or Chromium already holding the debug port (default 9222) is the usual cause; "
@@ -59,22 +84,11 @@ class SeleniumBrowserBridge(LocalBridge["SeleniumWebDriver"]):
         super().__init__(environment_id, api_key=api_key, base_url=base_url, session_id=session_id)
         self.debugging_port = debugging_port
 
-    def create_driver(self) -> SeleniumWebDriver:
-        # Runtime import: hai-drivers is absent unless installed with hai-agents[browser].
-        try:
-            from hai_drivers.web.selenium import SeleniumWebDriver
-        except ImportError as exc:
-            raise ImportError(
-                "Local browser control requires extra deps. Install with: pip install 'hai-agents[browser]'"
-            ) from exc
+    def create_web_driver(self) -> SeleniumWebDriver:
+        from hai_drivers.web.selenium import SeleniumWebDriver
+
         self._ensure_local_chrome()
         return SeleniumWebDriver(debugging_port=self.debugging_port)
-
-    def driver_interface(self) -> type:
-        # Runtime import: hai-drivers is absent unless installed with hai-agents[browser].
-        from hai_drivers.web.interface import WebDriverInterface
-
-        return WebDriverInterface
 
     def _ensure_local_chrome(self) -> None:
         """Reuse a Chrome already listening on the debugging port, or launch one with a dedicated profile."""

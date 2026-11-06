@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import atexit
-import concurrent.futures
 import contextlib
 import functools
 import hashlib
 import hmac
-import inspect
 import json
 import logging
 import threading
@@ -27,7 +25,7 @@ from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
 from hai_agents.sessions.types.send_session_messages_request_body import SendSessionMessagesRequestBody
 from hai_agents.types.session_status import SessionStatus
 
-from .bridge import LocalBridge, TokenSource
+from .bridge import LocalBridge, TokenSource, resolve_token
 from .config import auto_bridges_enabled
 from .killswitch import StopWatcher
 from .manager import ensure_bridges, serving_bridges, stop_bridges
@@ -64,27 +62,9 @@ def _token_source(client_wrapper: typing.Any) -> TokenSource:
     return getattr(client_wrapper, "_async_token", None) or client_wrapper._get_api_key
 
 
-def _resolve_token(source: TokenSource) -> str:
-    """Resolve a token source to a string, wherever the caller runs."""
-    token = source() if callable(source) else source
-    if not inspect.isawaitable(token):
-        return token
-
-    async def consume() -> str:
-        return await token
-
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(consume())
-    # This thread already runs a loop; asyncio.run must happen on another one.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(lambda: asyncio.run(consume())).result()
-
-
 def _caller(api_key: TokenSource, base_url: typing.Optional[str]) -> str:
     """Idempotency keys are scoped per caller on the platform, so bridge ids seeded from them must be too."""
-    return hmac.new(_resolve_token(api_key).encode(), f"{base_url}".encode(), hashlib.sha256).hexdigest()
+    return hmac.new(resolve_token(api_key).encode(), f"{base_url}".encode(), hashlib.sha256).hexdigest()
 
 
 def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) -> None:
@@ -246,7 +226,7 @@ def _cancel_remote_session(client_wrapper: typing.Any, runtime: typing.Optional[
         http, base_url, api_key = runtime.http_client(), runtime.base_url, runtime.api_key
     else:
         http = httpx.Client(timeout=REMOTE_CANCEL_TIMEOUT_S, follow_redirects=True)
-        base_url, api_key = client_wrapper.get_base_url(), _resolve_token(_token_source(client_wrapper))
+        base_url, api_key = client_wrapper.get_base_url(), resolve_token(_token_source(client_wrapper))
     with http:
         BaseClient(base_url=base_url, api_key=api_key, httpx_client=http).sessions.cancel_session(session_id)
 

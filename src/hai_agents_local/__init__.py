@@ -3,11 +3,13 @@
 from .bridge import LocalBridge
 from .browser import SeleniumBrowserBridge
 from .desktop import PyautoguiDesktopBridge
+from .holotab.bridge import HoloTabBrowserBridge
 from .manager import BridgeManager, ensure_bridges, stop_bridges
 from .workstation import WorkstationBridge
 
 __all__ = [
     "BridgeManager",
+    "HoloTabBrowserBridge",
     "LocalBridge",
     "PyautoguiDesktopBridge",
     "SeleniumBrowserBridge",
