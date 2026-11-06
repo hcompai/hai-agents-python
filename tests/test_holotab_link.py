@@ -530,3 +530,44 @@ def test_stopping_a_channel_ends_its_waiting_serve_at_once(link: HoloTabLink) ->
     send(conn, {"type": "SERVING", "channel": "run-1"})
     assert json.loads(reader.readline()) == {"type": "STOP_CHANNEL", "channel": "run-1"}
     conn.close()
+
+
+def test_a_served_channel_is_asked_for_again_when_the_extension_reconnects(link: HoloTabLink) -> None:
+    conn = hello(link)
+    reader = conn.makefile("rb")
+    answers: dict[str, object] = {}
+    worker = serve_in_thread(link, "keep", answers)
+    reader.readline()
+    send(conn, {"type": "SERVING", "channel": "keep"})
+    worker.join(WAIT_S)
+    reader.close()
+    conn.close()
+    deadline = time.monotonic() + WAIT_S
+    while (link.connected or link.serving) and time.monotonic() < deadline:
+        time.sleep(0.01)
+
+    again = hello(link)
+    assert json.loads(again.makefile("rb").readline())["channel"] == "keep"
+    again.close()
+
+
+def test_a_stopped_channel_is_not_asked_for_again(link: HoloTabLink) -> None:
+    conn = hello(link)
+    reader = conn.makefile("rb")
+    worker = serve_in_thread(link, "gone", {})
+    reader.readline()
+    send(conn, {"type": "SERVING", "channel": "gone"})
+    worker.join(WAIT_S)
+    link.stop("gone")
+    reader.readline()
+    reader.close()
+    conn.close()
+    deadline = time.monotonic() + WAIT_S
+    while link.connected and time.monotonic() < deadline:
+        time.sleep(0.01)
+
+    again = hello(link)
+    again.settimeout(0.3)
+    with pytest.raises(TimeoutError):
+        again.recv(1)
+    again.close()

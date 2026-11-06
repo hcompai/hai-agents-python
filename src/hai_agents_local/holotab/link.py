@@ -56,6 +56,7 @@ class HoloTabLink:
         self._seen_at = 0.0
         self._consent_until: dict[str, float] = {}
         self._on_stopped: dict[str, Callable[[str], None]] = {}
+        self._wanted: dict[str, dict[str, Any]] = {}
 
     @property
     def connected(self) -> bool:
@@ -116,6 +117,7 @@ class HoloTabLink:
             self._clients.clear()
             self.extension = None
             self.serving.clear()
+            self._wanted.clear()
             self._fail_waiting("the HoloTab link closed")
             self._arrived.notify_all()
         for item in {*clients, conn, server}:
@@ -192,6 +194,7 @@ class HoloTabLink:
             with self._arrived:
                 self._seen_at = time.monotonic()
                 self._arrived.notify_all()
+            self._resume()
         elif kind == "CONSENT_PENDING":
             with self._lock:
                 waiting = channel in self._answers
@@ -216,6 +219,7 @@ class HoloTabLink:
                 self._answer(channel, message)
         elif kind == "STOPPED":
             self.serving.pop(channel, None)
+            self._wanted.pop(channel, None)
             with self._lock:
                 self._answer(channel, message)
                 on_stopped = self._on_stopped.pop(channel, None)
@@ -228,6 +232,13 @@ class HoloTabLink:
             with self._lock:
                 self._abandoned.discard(channel)
                 self._answer(channel, message)
+
+    def _resume(self) -> None:
+        """A channel this process asked for and the extension no longer serves is asked for again."""
+        for channel, request in list(self._wanted.items()):
+            if channel not in self.serving and channel not in self._answers:
+                with contextlib.suppress(HoloTabRefused):
+                    self._send(request)
 
     def _send(self, message: dict[str, Any]) -> None:
         """Raises `HoloTabRefused` when the message cannot reach the extension."""
@@ -294,6 +305,7 @@ class HoloTabLink:
                 )
             if message.get("type") != "SERVING":
                 raise HoloTabRefused("HoloTab did not serve the Chrome channel")
+            self._wanted[channel] = request
             if on_stopped is not None:
                 with self._lock:
                     self._on_stopped[channel] = on_stopped
@@ -326,6 +338,7 @@ class HoloTabLink:
 
     def stop(self, channel: str) -> None:
         """Asks the extension to stop the channel; a serve still waiting for it ends at once."""
+        self._wanted.pop(channel, None)
         with self._lock:
             self._on_stopped.pop(channel, None)
             answer = self._answers.get(channel)

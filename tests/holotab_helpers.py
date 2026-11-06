@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import socket
+import sys
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -17,7 +18,7 @@ HELLO = {"type": "HELLO", "extension": STORE_EXTENSION_ID, "version": "1.4.11", 
 @contextmanager
 def short_dir() -> Iterator[Path]:
     """A short path: a Unix socket's takes at most 104 bytes on a Mac."""
-    with tempfile.TemporaryDirectory(dir="/tmp") as folder:
+    with tempfile.TemporaryDirectory(dir=None if sys.platform == "win32" else "/tmp") as folder:
         yield Path(folder)
 
 
