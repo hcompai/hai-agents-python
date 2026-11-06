@@ -91,7 +91,7 @@ def test_an_endpoint_another_process_serves_is_never_replaced(link: HoloTabLink)
         )
     )
     with pytest.raises(RuntimeError, match="already served"):
-        second.start()
+        second.start(attach=False)
     second.close()
     assert link.connected is False
     link.endpoint.connect().close()

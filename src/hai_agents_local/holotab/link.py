@@ -5,22 +5,30 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import random
 import socket
 import threading
 import time
 from typing import Any
 from urllib.parse import urlsplit
 
-from .endpoint import Endpoint, default_endpoint
+from .endpoint import Endpoint, EndpointBusy, default_endpoint
 
 logger = logging.getLogger(__name__)
 
 SERVE_TIMEOUT_S = 12.0
+TAKEOVER_ATTEMPTS = 40
+TAKEOVER_PAUSE_S = 0.25
 
 
 class HoloTabLink:
     """What the extension says (`HELLO`, `SERVING`, `STOPPED`, `ERROR`) and what this process asks of it
-    (`SERVE_CHANNEL`, `LABEL_CHANNEL`, `STOP_CHANNEL`), over the one connection the shim holds open."""
+    (`SERVE_CHANNEL`, `LABEL_CHANNEL`, `STOP_CHANNEL`).
+
+    One process per user owns the endpoint and holds the connection the shim opens. Any other process attaches to the
+    owner as a client: its requests go through the owner, and the owner relays the extension's answers about a channel
+    back to the client that asked. When the owner exits, a client takes the endpoint over.
+    """
 
     def __init__(self, endpoint: Endpoint | None = None) -> None:
         self.endpoint = endpoint or default_endpoint()
@@ -37,6 +45,17 @@ class HoloTabLink:
         self._clients: set[socket.socket] = set()
         self._stopping = threading.Event()
         self._seen_at = 0.0
+        self._upstream: socket.socket | None = None
+        self._peers: dict[socket.socket, set[str]] = {}
+        self._channel_peer: dict[str, socket.socket] = {}
+        self._wanted: dict[str, dict[str, Any]] = {}
+        self._pending: dict[str, float] = {}
+
+    @property
+    def role(self) -> str | None:
+        if self._server is not None:
+            return "owner"
+        return "client" if self._upstream is not None else None
 
     @property
     def connected(self) -> bool:
@@ -57,13 +76,77 @@ class HoloTabLink:
                 self._arrived.wait(left)
         return True
 
-    def start(self) -> None:
-        if self._server is not None:
+    def start(self, *, attach: bool = True) -> None:
+        """Owns the endpoint, or with ``attach`` attaches to the process that does."""
+        if self.role is not None:
             return
-        server = self.endpoint.bind()
         self._stopping.clear()
+        try:
+            self._own()
+        except EndpointBusy:
+            if not attach:
+                raise
+            self._attach()
+
+    def _own(self) -> None:
+        server = self.endpoint.bind()
         self._server = server
         threading.Thread(target=self._accept_loop, args=(server,), name="holotab-link", daemon=True).start()
+
+    def _attach(self) -> None:
+        conn = self.endpoint.open()
+        try:
+            conn.sendall(json.dumps({"type": "ATTACH"}).encode("utf-8") + b"\n")
+            with self._lock:
+                if self._stopping.is_set():
+                    raise OSError("the link is closing")
+                self._upstream = self._conn = conn
+        except OSError:
+            conn.close()
+            raise
+        threading.Thread(target=self._client_loop, args=(conn,), name="holotab-client", daemon=True).start()
+
+    def _client_loop(self, conn: socket.socket) -> None:
+        try:
+            lines = conn.makefile("rb")
+            while (message := self._next_message(lines)) is not None:
+                self._handle(message)
+        except (OSError, ValueError) as exc:
+            logger.info("holotab owner link closed: %s", exc)
+        finally:
+            conn.close()
+            with self._lock:
+                gone = self._upstream is conn
+                if gone:
+                    if self.extension is not None:
+                        self._seen_at = time.monotonic()
+                    self._upstream = self._conn = None
+                    self.extension = None
+                    self.serving.clear()
+            if gone and not self._stopping.is_set():
+                threading.Thread(target=self._take_over, name="holotab-takeover", daemon=True).start()
+
+    def _take_over(self) -> None:
+        """The owner exited: own the endpoint, or attach to whichever client got there first."""
+        for _ in range(TAKEOVER_ATTEMPTS):
+            if self._stopping.is_set():
+                return
+            try:
+                with self._lock:
+                    if self._stopping.is_set():
+                        return
+                    self._own()
+                return
+            except EndpointBusy:
+                try:
+                    self._attach()
+                    return
+                except OSError:
+                    pass
+            except OSError:
+                pass
+            time.sleep(TAKEOVER_PAUSE_S * (1 + random.random()))
+        logger.warning("no process serves the HoloTab link and this one could not take it over")
 
     def _accept_loop(self, server: socket.socket) -> None:
         while not self._stopping.is_set():
@@ -94,6 +177,11 @@ class HoloTabLink:
             clients = list(self._clients)
             self._conn = None
             self._server = None
+            self._upstream = None
+            self._peers.clear()
+            self._channel_peer.clear()
+            self._wanted.clear()
+            self._pending.clear()
             self._clients.clear()
             self.extension = None
             self.serving.clear()
@@ -115,18 +203,25 @@ class HoloTabLink:
             conn.close()
 
     def _read_loop(self, conn: socket.socket) -> None:
-        active = False
+        active = peer = False
         try:
             lines = conn.makefile("rb")
             greeting = None
             if self.endpoint.greeting_required:
                 greeting = self._next_message(lines)
             if not self.endpoint.admits(conn, greeting):
-                if self._stopping.is_set():
+                if self._stopping.is_set() or (self.endpoint.greeting_required and greeting is None):
                     return
                 logger.warning("refused a HoloTab link connection that is not this user's")
                 return
             while (message := self._next_message(lines)) is not None:
+                if not active and not peer and message.get("type") == "ATTACH":
+                    peer = True
+                    self._admit_peer(conn)
+                    continue
+                if peer:
+                    self._handle_peer(conn, message)
+                    continue
                 if not active:
                     if message.get("type") != "HELLO":
                         raise ValueError("HoloTab connection did not begin with HELLO")
@@ -145,13 +240,69 @@ class HoloTabLink:
             logger.info("holotab link closed: %s", exc)
         finally:
             conn.close()
+            if peer:
+                self._drop_peer(conn)
             with self._lock:
                 self._clients.discard(conn)
-                if active and self._conn is conn:
+                lost = active and self._conn is conn
+                if lost:
                     self._conn = None
                     self.extension = None
                     self.serving.clear()
                     self._seen_at = time.monotonic()
+            if lost:
+                self._tell_peers({"type": "EXTENSION_GONE"})
+
+    def _admit_peer(self, conn: socket.socket) -> None:
+        with self._lock:
+            self._peers[conn] = set()
+            extension = self.extension
+        if extension is not None:
+            self._send_to(conn, {"type": "HELLO", "extension": extension["id"], "version": extension["version"]})
+
+    def _handle_peer(self, conn: socket.socket, message: dict[str, Any]) -> None:
+        kind, channel = message.get("type"), str(message.get("channel") or "")
+        if kind not in {"SERVE_CHANNEL", "LABEL_CHANNEL", "STOP_CHANNEL"} or not channel:
+            return
+        if kind == "SERVE_CHANNEL":
+            with self._lock:
+                self._peers.get(conn, set()).add(channel)
+                self._channel_peer[channel] = conn
+        if not self._send(message) and kind == "SERVE_CHANNEL":
+            self._send_to(conn, {"type": "ERROR", "channel": channel, "error": self.last_error})
+
+    def _drop_peer(self, conn: socket.socket) -> None:
+        with self._lock:
+            channels = self._peers.pop(conn, set())
+            for channel in channels:
+                self._channel_peer.pop(channel, None)
+                self._pending.pop(channel, None)
+        for channel in channels:
+            self.stop(channel)
+
+    def _tell_peers(self, message: dict[str, Any]) -> None:
+        with self._lock:
+            peers = list(self._peers)
+        for peer in peers:
+            self._send_to(peer, message)
+
+    def _relay(self, message: dict[str, Any]) -> None:
+        channel = str(message.get("channel") or "")
+        with self._lock:
+            peer = self._channel_peer.get(channel)
+            if peer is not None and message.get("type") in {"STOPPED", "ERROR"}:
+                self._peers.get(peer, set()).discard(channel)
+                self._channel_peer.pop(channel, None)
+        if peer is not None:
+            self._send_to(peer, message)
+
+    @staticmethod
+    def _send_to(conn: socket.socket, message: dict[str, Any]) -> bool:
+        try:
+            conn.sendall(json.dumps(message).encode("utf-8") + b"\n")
+        except OSError:
+            return False
+        return True
 
     @staticmethod
     def _next_message(lines: Any) -> dict[str, Any] | None:
@@ -174,8 +325,16 @@ class HoloTabLink:
             with self._arrived:
                 self._seen_at = time.monotonic()
                 self._arrived.notify_all()
+            self._tell_peers(message)
+            self._resume()
+        elif kind == "EXTENSION_GONE":
+            with self._lock:
+                self.extension = None
+                self.serving.clear()
+                self._seen_at = time.monotonic()
         elif kind == "SERVING":
             with self._lock:
+                self._pending.pop(channel, None)
                 late = channel in self._abandoned
                 self._abandoned.discard(channel)
             if late:
@@ -186,37 +345,59 @@ class HoloTabLink:
             self.serving[channel] = message
             self._last[channel] = message
             self._acknowledge(channel)
+            self._relay(message)
         elif kind == "STOPPED":
+            with self._lock:
+                self._pending.pop(channel, None)
             self.serving.pop(channel, None)
+            self._wanted.pop(channel, None)
             self._last[channel] = message
             self._acknowledge(channel)
+            self._relay(message)
         elif kind == "ERROR":
             self.last_error = str(message.get("error") or "HoloTab reported an unknown error")
             logger.warning("HoloTab error: %s", self.last_error)
             with self._lock:
-                self._abandoned.discard(channel)
                 target = channel or (self._oldest_pending() if message.get("for") == "SERVE_CHANNEL" else "")
+                self._abandoned.discard(target)
+                self._pending.pop(target, None)
                 event = self._acks.get(target)
                 if event is not None:
                     self._last[target] = message
             if event is not None:
                 event.set()
+            self._relay({**message, "channel": target} if target and not channel else message)
         elif kind == "HOST_UNAVAILABLE":
             self.last_error = str(message.get("reason") or "HoloTab could not reach the local link")
             logger.info("shim gave up: %s", self.last_error)
 
     def _oldest_pending(self) -> str:
         """The extension answers requests in order, so an error that names only its request type is the oldest
-        serve still waiting. The caller holds the lock."""
-        return next((channel for channel in self._acks if channel not in self._last), "")
+        serve still waiting, this process's or a client's. The caller holds the lock."""
+        now = time.monotonic()
+        for channel, sent_at in list(self._pending.items()):
+            if channel in self._acks or now - sent_at < SERVE_TIMEOUT_S:
+                return channel
+            del self._pending[channel]
+        return ""
+
+    def _resume(self) -> None:
+        """A channel this process asked for and the extension no longer serves is asked for again."""
+        for channel, request in list(self._wanted.items()):
+            if channel not in self.serving and channel not in self._acks:
+                self._send(request)
 
     def _acknowledge(self, channel: str) -> None:
         if channel in self._acks:
             self._acks[channel].set()
 
     def _send(self, message: dict[str, Any]) -> bool:
+        serve = str(message.get("channel") or "") if message.get("type") == "SERVE_CHANNEL" else ""
         with self._lock:
             conn = self._conn
+            if conn is not None and serve:
+                self._pending.pop(serve, None)
+                self._pending[serve] = time.monotonic()
         if conn is None:
             self.last_error = "Chrome is not connected through the HoloTab extension"
             return False
@@ -225,6 +406,8 @@ class HoloTabLink:
         except OSError as exc:
             logger.warning("holotab link send failed: %s", exc)
             self.last_error = "The HoloTab connection closed"
+            with self._lock:
+                self._pending.pop(serve, None)
             return False
         return True
 
@@ -256,18 +439,16 @@ class HoloTabLink:
             self._last.pop(channel, None)
         self.last_error = None
         try:
-            sent = self._send(
-                {
-                    "type": "SERVE_CHANNEL",
-                    "channel": channel,
-                    "base_url": base_url,
-                    "api_key": api_key,
-                    "start_url": start_url,
-                    "label": label,
-                    "client": client,
-                }
-            )
-            if not sent:
+            request = {
+                "type": "SERVE_CHANNEL",
+                "channel": channel,
+                "base_url": base_url,
+                "api_key": api_key,
+                "start_url": start_url,
+                "label": label,
+                "client": client,
+            }
+            if not self._send(request):
                 return None
             if not event.wait(timeout_s):
                 with self._lock:
@@ -280,7 +461,9 @@ class HoloTabLink:
             last = self._last.get(channel)
             if last and last.get("type") == "ERROR":
                 return None
-            return self.serving.get(channel)
+            if served := self.serving.get(channel):
+                self._wanted[channel] = request
+            return served
         finally:
             with self._lock:
                 self._acks.pop(channel, None)
@@ -289,6 +472,7 @@ class HoloTabLink:
         self._send({"type": "LABEL_CHANNEL", "channel": channel, "title": title})
 
     def stop(self, channel: str) -> None:
+        self._wanted.pop(channel, None)
         self._send({"type": "STOP_CHANNEL", "channel": channel})
 
 
