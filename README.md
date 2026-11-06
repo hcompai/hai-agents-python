@@ -355,6 +355,13 @@ One agent drives this machine's desktop at a time: a second process asking for a
 sharing the mouse. `holo local stop` stops every local turn on the machine; so does a double Esc
 once `hai_agents_local.killswitch.arm_esc_listener()` is armed (macOS, Windows, and X11 Linux).
 
+A web environment with `host="user_device"` is served by HoloTab when it is connected, and by a Chrome on a debug port
+otherwise. Creating a session with one installs the Chrome native messaging host manifest `ai.hcompany.hai` for your user
+(macOS and Linux: a file under Chrome's `NativeMessagingHosts`; Windows: a registry key under `HKCU`), so HoloTab
+can reach this process. Turn on "Connect to desktop apps" in HoloTab; the first connection can take up to a minute.
+Set `HAI_LOCAL_BROWSER=holotab` or `HAI_LOCAL_BROWSER=selenium` to force one, or use `holo local browser --holotab` and
+`--selenium`.
+
 ### Inspect and share sessions
 
 List past sessions and create a public replay link:

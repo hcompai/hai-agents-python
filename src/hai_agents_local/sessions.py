@@ -553,7 +553,7 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
         if _wants_bridges(self._auto_bridges, kwargs):
             wrapper = self._raw_client._client_wrapper
             resolved = await _resolve_references_async(wrapper, kwargs["agent"])
-            bridges = _localize(wrapper, self._runtime, kwargs, resolved)
+            bridges = await asyncio.to_thread(_localize, wrapper, self._runtime, kwargs, resolved)
         if bridges:
             _apply_runaway_budgets(kwargs)
         # Native permission prompts must run before bridge startup moves to a worker.

@@ -1470,24 +1470,31 @@ def local_browser(
     session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
     debug_port: int = typer.Option(9222, "--debug-port", help="Chrome remote-debugging port to attach to."),
     holotab: bool = typer.Option(
-        False,
-        "--holotab",
-        help="Drive your own signed-in Chrome through the HoloTab extension, not a debug-port Chrome.",
+        False, "--holotab", help="Drive your own signed-in Chrome through the HoloTab extension."
+    ),
+    selenium: bool = typer.Option(False, "--selenium", help="Drive a debug-port Chrome with Selenium."),
+    label: str | None = typer.Option(
+        None, "--label", help="Name of the tab group in Chrome; defaults to the app name. Used with HoloTab."
     ),
 ) -> None:
-    """Serve browser commands on this machine through Chrome on --debug-port, or through HoloTab."""
-    if holotab:
-        from hai_agents_local import HoloTabBrowserBridge
-        from hai_agents_local.holotab.install import install_host
+    """Serve browser commands on this machine: through HoloTab when it is connected, else Chrome on --debug-port.
 
+    HAI_LOCAL_BROWSER=holotab|selenium forces one; --holotab and --selenium do too and win over it.
+    """
+    from hai_agents_local import HoloTabBrowserBridge, SeleniumBrowserBridge
+    from hai_agents_local.holotab.install import install_host
+    from hai_agents_local.routing import browser_bridge_type
+
+    if holotab and selenium:
+        _raise_cli_error(ValueError("choose one of --holotab and --selenium"))
+    bridge_type = HoloTabBrowserBridge if holotab else SeleniumBrowserBridge if selenium else browser_bridge_type()
+    if bridge_type is HoloTabBrowserBridge:
         try:
             install_host()
         except (OSError, ValueError) as exc:
             _raise_cli_error(exc)
-        _run_bridge(_state(ctx), HoloTabBrowserBridge, session_id, client="Holo CLI")
+        _run_bridge(_state(ctx), HoloTabBrowserBridge, session_id, client="Holo CLI", label=label)
         return
-    from hai_agents_local import SeleniumBrowserBridge
-
     _run_bridge(_state(ctx), SeleniumBrowserBridge, session_id, debugging_port=debug_port)
 
 
