@@ -14,6 +14,7 @@ import stat
 import struct
 import sys
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import IO, Any
 
@@ -272,6 +273,15 @@ def _matches(received: Any, expected: str) -> bool:
 
 def send_line(conn: socket.socket, message: dict[str, Any]) -> None:
     conn.sendall(json.dumps(message).encode("utf-8") + b"\n")
+
+
+def read_messages(lines: Iterable[bytes]) -> Iterator[dict[str, Any]]:
+    for line in lines:
+        if line.strip():
+            message = json.loads(line)
+            if not isinstance(message, dict):
+                raise ValueError("a HoloTab link message must be a JSON object")
+            yield message
 
 
 def _read_line(conn: socket.socket) -> dict[str, Any]:
