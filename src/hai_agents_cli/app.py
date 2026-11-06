@@ -1469,8 +1469,23 @@ def local_browser(
     ctx: typer.Context,
     session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
     debug_port: int = typer.Option(9222, "--debug-port", help="Chrome remote-debugging port to attach to."),
+    holotab: bool = typer.Option(
+        False,
+        "--holotab",
+        help="Drive your own signed-in Chrome through the HoloTab extension, not a debug-port Chrome.",
+    ),
 ) -> None:
-    """Serve browser commands on this machine through Chrome on --debug-port."""
+    """Serve browser commands on this machine through Chrome on --debug-port, or through HoloTab."""
+    if holotab:
+        from hai_agents_local import HoloTabBrowserBridge
+        from hai_agents_local.holotab.install import install_host
+
+        try:
+            install_host()
+        except (OSError, ValueError) as exc:
+            _raise_cli_error(exc)
+        _run_bridge(_state(ctx), HoloTabBrowserBridge, session_id, client="Holo CLI")
+        return
     from hai_agents_local import SeleniumBrowserBridge
 
     _run_bridge(_state(ctx), SeleniumBrowserBridge, session_id, debugging_port=debug_port)
