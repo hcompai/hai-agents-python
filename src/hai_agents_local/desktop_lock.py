@@ -5,44 +5,16 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-import sys
 import threading
 import time
 
+from .file_lock import try_lock, unlock
 from .killswitch import STOP_PATH
 
 LOCK_PATH = STOP_PATH.parent / "desktop.lock"
 # Covers a previous agent process that is still shutting down.
 CLAIM_GRACE_S = 10.0
 CLAIM_POLL_S = 0.1
-
-if sys.platform == "win32":
-    import msvcrt
-
-    def _try_lock(fd: int) -> bool:
-        try:
-            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-        except OSError:
-            return False
-        return True
-
-    def _unlock(fd: int) -> None:
-        with contextlib.suppress(OSError):
-            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-
-else:
-    import fcntl
-
-    def _try_lock(fd: int) -> bool:
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            return False
-        return True
-
-    def _unlock(fd: int) -> None:
-        with contextlib.suppress(OSError):
-            fcntl.flock(fd, fcntl.LOCK_UN)
 
 
 class DesktopBusyError(RuntimeError):
@@ -60,7 +32,7 @@ def _claim_for_process() -> bool:
         if _holders == 0:
             LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
             fd = os.open(LOCK_PATH, os.O_RDWR | os.O_CREAT, 0o600)
-            if not _try_lock(fd):
+            if not try_lock(fd):
                 os.close(fd)
                 return False
             _fd = fd
@@ -73,7 +45,7 @@ def _release_for_process() -> None:
     with _process_lock:
         _holders -= 1
         if _holders == 0 and _fd is not None:
-            _unlock(_fd)
+            unlock(_fd)
             os.close(_fd)
             _fd = None
 

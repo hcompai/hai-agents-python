@@ -20,6 +20,7 @@ import httpx
 
 from hai_agents.base_client import BaseClient
 
+from ..file_lock import try_lock, unlock
 from . import identity
 from .errors import (
     BinaryIncompatibleError,
@@ -510,29 +511,13 @@ def _startup_lock(cache_dir: pathlib.Path, port: int, timeout_s: float):
     fd = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
     with os.fdopen(fd, "r+b") as handle:
         deadline = time.monotonic() + timeout_s
-        while True:
-            try:
-                if os.name == "posix":
-                    import fcntl
-
-                    fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                else:
-                    import msvcrt
-
-                    handle.seek(0)
-                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-                break
-            except (BlockingIOError, OSError):
-                if time.monotonic() >= deadline:
-                    raise LocalRuntimeError("timed out waiting for local runtime startup lock")
-                time.sleep(0.05)
+        while not try_lock(handle.fileno()):
+            if time.monotonic() >= deadline:
+                raise LocalRuntimeError("timed out waiting for local runtime startup lock")
+            time.sleep(0.05)
         held.add(path)
         try:
             yield
         finally:
             held.discard(path)
-            if os.name == "posix":
-                fcntl.flock(handle, fcntl.LOCK_UN)
-            else:
-                handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            unlock(handle.fileno())
