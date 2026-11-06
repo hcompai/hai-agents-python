@@ -10,7 +10,11 @@ from pydantic import BaseModel
 
 from .bridge import LocalBridge, TokenSource
 from .browser import SeleniumBrowserBridge
+from .config import local_browser_choice
 from .desktop import PyautoguiDesktopBridge
+from .holotab.bridge import HoloTabBrowserBridge
+from .holotab.connect import holotab_connected
+from .holotab.install import install_host
 from .workstation import WorkstationBridge
 
 if TYPE_CHECKING:
@@ -25,6 +29,18 @@ BRIDGE_TYPES: dict[str, type[LocalBridge]] = {
     PyautoguiDesktopBridge.environment_kind: PyautoguiDesktopBridge,
     WorkstationBridge.environment_kind: WorkstationBridge,
 }
+
+
+def browser_bridge_type() -> type[LocalBridge]:
+    """HoloTab when it is connected, else Selenium on a debug-port Chrome; HAI_LOCAL_BROWSER forces one, and a forced
+    HoloTab still registers the native host Chrome starts it through."""
+    choice = local_browser_choice()
+    if choice is None:
+        return HoloTabBrowserBridge if holotab_connected() else SeleniumBrowserBridge
+    if choice == "holotab":
+        install_host()
+        return HoloTabBrowserBridge
+    return SeleniumBrowserBridge
 
 
 class Localized(NamedTuple):
@@ -62,7 +78,7 @@ def local_bridge_types(agent: AgentLike, resolved: Mapping[Reference, Any] | Non
         spec = resolved.get(("environment", env)) if isinstance(env, str) else env
         kind = None if spec is None else _local_kind(spec)
         if kind is not None:
-            found.append(_bridge_type(spec, kind))
+            found.append(_bridge_type(spec, kind, probe=False))
     for sub in _read(agent, "subagents") or []:
         found += local_bridge_types(sub, resolved)
     return found
@@ -128,7 +144,7 @@ class _Walk:
         key = f"{path}.environments[kind={kind}].session_id"
         if any(key == claim or key.startswith(f"{claim}.") for claim in self.claimed):
             return env
-        serve = SERVE_COMMANDS[_bridge_type(env, kind).environment_kind]
+        serve = SERVE_COMMANDS[_bridge_type(env, kind, probe=False).environment_kind]
         if not by_name:
             return _replace(env, kind=kind, session_id=self.bridge(env, kind).session_id)
         if sum(_kind(sibling) == kind for sibling in siblings) > 1:
@@ -149,13 +165,14 @@ class _Walk:
         return self.resolved.get(("environment", env), env) if isinstance(env, str) else env
 
     def bridge(self, env: EnvironmentLike, kind: str) -> LocalBridge:
-        bridge_type = _bridge_type(env, kind)
-        if any(type(bridge) is bridge_type for bridge in self.bridges):
+        served_kind = _bridge_type(env, kind, probe=False).environment_kind
+        if any(bridge.environment_kind == served_kind for bridge in self.bridges):
             raise ValueError(
                 f"the agent tree has multiple local {kind} environments that this machine would serve the same "
                 "way, but it can only serve one; give the extra environments an explicit session_id and serve "
-                f"each from its own machine with `{SERVE_COMMANDS[bridge_type.environment_kind]} --session-id <id>`"
+                f"each from its own machine with `{SERVE_COMMANDS[served_kind]} --session-id <id>`"
             )
+        bridge_type = _bridge_type(env, kind)
         seed = f"{self.seed}:{bridge_type.environment_kind}"
         session_id = None if self.seed is None else str(uuid.uuid5(uuid.NAMESPACE_URL, seed))
         bridge = bridge_type(_read(env, "id"), api_key=self.api_key, base_url=self.base_url, session_id=session_id)
@@ -164,7 +181,7 @@ class _Walk:
 
 
 SERVE_COMMANDS = {
-    SeleniumBrowserBridge.environment_kind: "holo local browser",
+    SeleniumBrowserBridge.environment_kind: "holo local browser [--holotab|--selenium]",
     PyautoguiDesktopBridge.environment_kind: "holo local desktop",
     WorkstationBridge.environment_kind: "holo local desktop --shell",
 }
@@ -197,9 +214,11 @@ def _local_kind(env: EnvironmentLike) -> str | None:
     return kind
 
 
-def _bridge_type(env: EnvironmentLike, kind: str) -> type[LocalBridge]:
+def _bridge_type(env: EnvironmentLike, kind: str, *, probe: bool = True) -> type[LocalBridge]:
     if kind == "desktop" and _read(env, "shell"):
         return WorkstationBridge
+    if kind == "web" and probe:
+        return browser_bridge_type()
     return BRIDGE_TYPES[kind]
 
 

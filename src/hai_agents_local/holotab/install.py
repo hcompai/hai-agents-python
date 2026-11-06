@@ -102,6 +102,20 @@ def _register_manifest(manifest: Path) -> None:
         winreg.SetValueEx(key, "", 0, winreg.REG_SZ, str(manifest))
 
 
+def host_registered(hosts: list[Path] | None = None) -> bool:
+    """Whether Chrome already has a manifest for the host whose shim program exists."""
+    manifests = [folder / f"{HOST_NAME}.json" for folder in (hosts or hosts_dirs())]
+    if platform_name() == "win32" and (registered := _registered_manifest()) is not None:
+        manifests = [registered]
+    for manifest in manifests:
+        try:
+            if shim_works(Path(json.loads(manifest.read_text(encoding="utf-8")).get("path", ""))):
+                return True
+        except (OSError, ValueError, AttributeError):
+            continue
+    return False
+
+
 def install_host(
     *,
     shim_command: list[str] | None = None,
