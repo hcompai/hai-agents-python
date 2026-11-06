@@ -40,8 +40,9 @@ class LocalChromeDriver(WebDriverInterface):
     """The methods are generated from the interface, so one added upstream arrives wired, with the parameter names the
     model is shown. The extension eases the pointer to each point it is sent, like a hand (`glides`).
 
-    ``opener`` runs once, before the first command, and ``closer`` once on ``destroy`` if the opener ran: nothing
-    opens in the user's Chrome until the agent first uses it.
+    ``opener`` runs before the first command and ``closer`` once on ``destroy`` if the opener succeeded: nothing opens
+    in the user's Chrome until the agent first uses it. An opener that raises fails that command only; the next
+    command runs it again. Only ``destroy`` is final.
     """
 
     glides = True
@@ -61,6 +62,10 @@ class LocalChromeDriver(WebDriverInterface):
         self._opened = opener is None
         self._destroyed = False
         self._open_lock = threading.Lock()
+
+    @property
+    def destroyed(self) -> bool:
+        return self._destroyed
 
     def _call(self, name: str, payload: dict[str, Any]) -> Any:
         self._ensure_open()

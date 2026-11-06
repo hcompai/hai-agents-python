@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atexit
 import contextlib
 import json
 import logging
@@ -12,6 +13,7 @@ import time
 from typing import Any
 from urllib.parse import urlsplit
 
+from ..manager import stop_bridges
 from .endpoint import Endpoint, EndpointBusy, default_endpoint
 
 logger = logging.getLogger(__name__)
@@ -485,3 +487,27 @@ def base_url_error(base_url: str) -> str | None:
     if parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "::1", "localhost"}:
         return None
     return "base_url must use HTTPS (HTTP is allowed only for localhost)"
+
+
+_process_link: HoloTabLink | None = None
+_process_link_lock = threading.Lock()
+
+
+def process_link() -> HoloTabLink:
+    """The one link this process shares between its bridges; it owns the endpoint or attaches to whoever does."""
+    global _process_link
+    with _process_link_lock:
+        if _process_link is None:
+            _process_link = HoloTabLink()
+            atexit.register(_close_at_exit, _process_link)
+        return _process_link
+
+
+def _close_at_exit(link: HoloTabLink) -> None:
+    """The bridges stop first, so the `STOP_CHANNEL` each one sends still reaches the extension."""
+    try:
+        stop_bridges()
+    except TimeoutError as exc:
+        logger.warning("closing the HoloTab link before every bridge stopped: %s", exc)
+    finally:
+        link.close()
