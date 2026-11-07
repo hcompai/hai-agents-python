@@ -11796,7 +11796,6 @@
                 "username",
                 "password",
                 "email",
-                "totp",
                 "api_key"
               ]
             },
@@ -11814,17 +11813,17 @@
             ],
             "title": "Totp Code"
           },
-          "totp_valid_until": {
+          "totp_expires_in": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "date-time"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Totp Valid Until"
+            "title": "Totp Expires In",
+            "description": "Whole seconds the code stays valid, counted when it was generated; at least 3, as a nearly spent code is waited out. Count down from when you sent the request: that ends early by the request's travel time, and is unaffected by your clock's skew."
           }
         },
         "type": "object",
