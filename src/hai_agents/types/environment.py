@@ -10,6 +10,7 @@ from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from .browser_host import BrowserHost
 from .browser_mode import BrowserMode
 from .browser_network import BrowserNetwork
+from .desktop_mode import DesktopMode
 from .workstation_storage import WorkstationStorage
 
 
@@ -33,6 +34,7 @@ class Environment_Android(UniversalBaseModel):
 class Environment_Desktop(UniversalBaseModel):
     kind: typing.Literal["desktop"] = "desktop"
     id: str
+    mode: typing.Optional[DesktopMode] = None
     session_id: typing.Optional[str] = None
     lazy: typing.Optional[bool] = None
     screenshot_max_width: typing.Optional[int] = None

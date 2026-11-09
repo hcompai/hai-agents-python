@@ -10,6 +10,7 @@ from ...core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from ...types.browser_host import BrowserHost
 from ...types.browser_mode import BrowserMode
 from ...types.browser_network import BrowserNetwork
+from ...types.desktop_mode import DesktopMode
 from ...types.workstation_storage import WorkstationStorage
 
 
@@ -42,6 +43,7 @@ class UpdateEnvironmentRequestBody_Web(UniversalBaseModel):
 class UpdateEnvironmentRequestBody_Desktop(UniversalBaseModel):
     kind: typing.Literal["desktop"] = "desktop"
     id: str
+    mode: typing.Optional[DesktopMode] = None
     session_id: typing.Optional[str] = None
     lazy: typing.Optional[bool] = None
     screenshot_max_width: typing.Optional[int] = None
