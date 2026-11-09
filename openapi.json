@@ -6643,21 +6643,6 @@
             "title": "Skills",
             "description": "Skills the agent can draw on. Each entry is a registered skill's name or an inline definition."
           },
-          "registry_skills": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Registry Skills",
-            "description": "Exact first-party registry skill IDs, loaded on demand from the runtime-pinned release. Omitted, null, or empty disables registry skills. No wildcards or subagent inheritance. Only text-only packages are supported. Separate from user-authored skills."
-          },
           "answer_format": {
             "anyOf": [
               {
@@ -7817,12 +7802,6 @@
             "const": "desktop",
             "title": "Kind",
             "default": "desktop"
-          },
-          "shell": {
-            "type": "boolean",
-            "title": "Shell",
-            "description": "Drive the machine from a shell: commands, files, and the screen and browser through CLIs. False drives the screen with mouse and keyboard actions and a screenshot after each step.",
-            "default": false
           },
           "session_id": {
             "anyOf": [
@@ -9173,20 +9152,6 @@
             ],
             "title": "Skills"
           },
-          "registry_skills": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Registry Skills"
-          },
           "answer_format": {
             "anyOf": [
               {
@@ -9316,10 +9281,6 @@
                 "type": "null"
               }
             ]
-          },
-          "shell": {
-            "type": "boolean",
-            "title": "Shell"
           },
           "screenshot_max_width": {
             "anyOf": [

@@ -391,7 +391,6 @@ class EnvironmentsClient:
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
-        shell: typing.Optional[bool] = OMIT,
         screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
         storage: typing.Optional[WorkstationStorage] = OMIT,
@@ -435,8 +434,6 @@ class EnvironmentsClient:
 
         network : typing.Optional[BrowserNetwork]
 
-        shell : typing.Optional[bool]
-
         screenshot_max_width : typing.Optional[int]
 
         image : typing.Optional[str]
@@ -478,7 +475,6 @@ class EnvironmentsClient:
             use_default_browser_profile=use_default_browser_profile,
             persist_browser_profile=persist_browser_profile,
             network=network,
-            shell=shell,
             screenshot_max_width=screenshot_max_width,
             image=image,
             storage=storage,
@@ -912,7 +908,6 @@ class AsyncEnvironmentsClient:
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
-        shell: typing.Optional[bool] = OMIT,
         screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
         storage: typing.Optional[WorkstationStorage] = OMIT,
@@ -955,8 +950,6 @@ class AsyncEnvironmentsClient:
         persist_browser_profile : typing.Optional[bool]
 
         network : typing.Optional[BrowserNetwork]
-
-        shell : typing.Optional[bool]
 
         screenshot_max_width : typing.Optional[int]
 
@@ -1007,7 +1000,6 @@ class AsyncEnvironmentsClient:
             use_default_browser_profile=use_default_browser_profile,
             persist_browser_profile=persist_browser_profile,
             network=network,
-            shell=shell,
             screenshot_max_width=screenshot_max_width,
             image=image,
             storage=storage,

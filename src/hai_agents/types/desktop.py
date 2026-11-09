@@ -16,11 +16,6 @@ class Desktop(UniversalBaseModel):
     Catalog identifier for this environment.
     """
 
-    shell: typing.Optional[bool] = pydantic.Field(default=None)
-    """
-    Drive the machine from a shell: commands, files, and the screen and browser through CLIs. False drives the screen with mouse and keyboard actions and a screenshot after each step.
-    """
-
     session_id: typing.Optional[str] = pydantic.Field(default=None)
     """
     Connect to an existing desktop session by id.

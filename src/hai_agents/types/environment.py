@@ -33,7 +33,6 @@ class Environment_Android(UniversalBaseModel):
 class Environment_Desktop(UniversalBaseModel):
     kind: typing.Literal["desktop"] = "desktop"
     id: str
-    shell: typing.Optional[bool] = None
     session_id: typing.Optional[str] = None
     lazy: typing.Optional[bool] = None
     screenshot_max_width: typing.Optional[int] = None
