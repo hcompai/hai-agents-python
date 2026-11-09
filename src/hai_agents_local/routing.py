@@ -158,7 +158,13 @@ class _Walk:
             )
         seed = f"{self.seed}:{bridge_type.environment_kind}"
         session_id = None if self.seed is None else str(uuid.uuid5(uuid.NAMESPACE_URL, seed))
-        bridge = bridge_type(_read(env, "id"), api_key=self.api_key, base_url=self.base_url, session_id=session_id)
+        options: dict[str, Any] = {}
+        width = _read(env, "screenshot_max_width")
+        if bridge_type is WorkstationBridge and width:
+            options["environment_variables"] = {"WEB_MAX_IMAGE_WIDTH": str(width), "DESK_MAX_IMAGE_WIDTH": str(width)}
+        bridge = bridge_type(
+            _read(env, "id"), api_key=self.api_key, base_url=self.base_url, session_id=session_id, **options
+        )
         self.bridges.append(bridge)
         return bridge
 
@@ -198,7 +204,7 @@ def _local_kind(env: EnvironmentLike) -> str | None:
 
 
 def _bridge_type(env: EnvironmentLike, kind: str) -> type[LocalBridge]:
-    if kind == "desktop" and _read(env, "shell"):
+    if kind == "desktop" and _read(_read(env, "mode"), "type") == "shell":
         return WorkstationBridge
     return BRIDGE_TYPES[kind]
 

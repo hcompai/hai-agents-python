@@ -46,12 +46,22 @@ class TestLocalizeAgent:
         assert envs[0]["kind"] == "web"
         assert "session_id" not in agent["environments"][0]
 
-    @pytest.mark.parametrize(("shell", "bridge_type"), [(False, PyautoguiDesktopBridge), (True, WorkstationBridge)])
-    def test_a_desktop_is_this_machine_and_its_shell_flag_picks_the_bridge(self, shell, bridge_type):
-        agent = {"name": "x", "environments": [{"id": "box", "kind": "desktop", "shell": shell}]}
+    @pytest.mark.parametrize(
+        ("mode", "bridge_type"), [("visual", PyautoguiDesktopBridge), ("shell", WorkstationBridge)]
+    )
+    def test_a_desktop_is_this_machine_and_its_mode_picks_the_bridge(self, mode, bridge_type):
+        agent = {"name": "x", "environments": [{"id": "box", "kind": "desktop", "mode": {"type": mode}}]}
         localized, [bridge], _ = localize_agent(agent, api_key=API_KEY)
         assert isinstance(bridge, bridge_type)
         assert localized["environments"][0] == {**agent["environments"][0], "session_id": bridge.session_id}
+
+    def test_a_shell_desktop_caps_its_cli_screenshots_at_the_spec_width(self):
+        agent = {
+            "name": "x",
+            "environments": [{"kind": "desktop", "mode": {"type": "shell"}, "screenshot_max_width": 1280}],
+        }
+        _, [bridge], _ = localize_agent(agent, api_key=API_KEY)
+        assert bridge.environment_variables == {"WEB_MAX_IMAGE_WIDTH": "1280", "DESK_MAX_IMAGE_WIDTH": "1280"}
 
     def test_second_unclaimed_env_of_same_kind_raises(self):
         agent = {
@@ -93,7 +103,7 @@ class TestLocalizeAgent:
     def test_named_leaves_are_routed_by_override_unless_claimed(self):
         resolved = {
             ("environment", "my-laptop"): Browser(id="my-laptop", host="user_device"),
-            ("agent", "helper"): {"name": "helper", "environments": [{"kind": "desktop", "shell": True}]},
+            ("agent", "helper"): {"name": "helper", "environments": [{"kind": "desktop", "mode": {"type": "shell"}}]},
             ("agent", "claimed"): {"name": "claimed", "environments": [{"kind": "web", "host": "user_device"}]},
         }
         agent = {

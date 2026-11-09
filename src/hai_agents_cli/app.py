@@ -1494,7 +1494,7 @@ def local_desktop(
         False,
         "--shell",
         hidden=True,
-        help="Serve a desktop with `shell: true`: a shell on this machine, running as you, that drives its "
+        help="Serve a shell-mode desktop: a shell on this machine, running as you, that drives its "
         "screen and a Chrome.",
     ),
     workspace: str | None = typer.Option(
