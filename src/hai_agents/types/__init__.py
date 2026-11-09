@@ -58,6 +58,9 @@ if typing.TYPE_CHECKING:
     from .cron_timing_type import CronTimingType
     from .dependency_revisions import DependencyRevisions
     from .desktop import Desktop
+    from .desktop_mode import DesktopMode, DesktopMode_Shell, DesktopMode_Visual
+    from .desktop_shell_mode import DesktopShellMode
+    from .desktop_visual_mode import DesktopVisualMode
     from .detail_error_response import DetailErrorResponse
     from .environment import (
         Environment,
@@ -260,6 +263,11 @@ _dynamic_imports: typing.Dict[str, str] = {
     "CronTimingType": ".cron_timing_type",
     "DependencyRevisions": ".dependency_revisions",
     "Desktop": ".desktop",
+    "DesktopMode": ".desktop_mode",
+    "DesktopMode_Shell": ".desktop_mode",
+    "DesktopMode_Visual": ".desktop_mode",
+    "DesktopShellMode": ".desktop_shell_mode",
+    "DesktopVisualMode": ".desktop_visual_mode",
     "DetailErrorResponse": ".detail_error_response",
     "Environment": ".environment",
     "EnvironmentKind": ".environment_kind",
@@ -478,6 +486,11 @@ __all__ = [
     "CronTimingType",
     "DependencyRevisions",
     "Desktop",
+    "DesktopMode",
+    "DesktopMode_Shell",
+    "DesktopMode_Visual",
+    "DesktopShellMode",
+    "DesktopVisualMode",
     "DetailErrorResponse",
     "Environment",
     "EnvironmentKind",

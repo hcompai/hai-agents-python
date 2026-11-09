@@ -4,6 +4,7 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .desktop_mode import DesktopMode
 
 
 class Desktop(UniversalBaseModel):
@@ -14,6 +15,11 @@ class Desktop(UniversalBaseModel):
     id: str = pydantic.Field()
     """
     Catalog identifier for this environment.
+    """
+
+    mode: typing.Optional[DesktopMode] = pydantic.Field(default=None)
+    """
+    How the agent perceives and drives the machine.
     """
 
     session_id: typing.Optional[str] = pydantic.Field(default=None)

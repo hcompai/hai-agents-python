@@ -7803,6 +7803,25 @@
             "title": "Kind",
             "default": "desktop"
           },
+          "mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DesktopVisualMode"
+              },
+              {
+                "$ref": "#/components/schemas/DesktopShellMode"
+              }
+            ],
+            "title": "Mode",
+            "description": "How the agent perceives and drives the machine.",
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "shell": "#/components/schemas/DesktopShellMode",
+                "visual": "#/components/schemas/DesktopVisualMode"
+              }
+            }
+          },
           "session_id": {
             "anyOf": [
               {
@@ -7842,6 +7861,40 @@
         ],
         "title": "Desktop",
         "description": "Your own computer."
+      },
+      "DesktopShellMode": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "shell",
+            "title": "Type",
+            "default": "shell"
+          }
+        },
+        "type": "object",
+        "title": "DesktopShellMode",
+        "description": "Drive the machine from a shell: commands, files, and the screen and browser through CLIs."
+      },
+      "DesktopVisualMode": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "visual",
+            "title": "Type",
+            "default": "visual"
+          },
+          "settle_s": {
+            "type": "number",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Settle S",
+            "description": "Seconds to wait after each mouse or keyboard action.",
+            "default": 0.5
+          }
+        },
+        "type": "object",
+        "title": "DesktopVisualMode",
+        "description": "Drive the screen with mouse and keyboard actions and a screenshot after each step."
       },
       "DetailErrorResponse": {
         "properties": {
@@ -9213,22 +9266,43 @@
             "title": "Session Id"
           },
           "mode": {
-            "oneOf": [
+            "anyOf": [
               {
-                "$ref": "#/components/schemas/BrowserVisualMode"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BrowserVisualMode"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BrowserTextMode"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "type",
+                  "mapping": {
+                    "text": "#/components/schemas/BrowserTextMode",
+                    "visual": "#/components/schemas/BrowserVisualMode"
+                  }
+                }
               },
               {
-                "$ref": "#/components/schemas/BrowserTextMode"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/DesktopVisualMode"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DesktopShellMode"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "type",
+                  "mapping": {
+                    "shell": "#/components/schemas/DesktopShellMode",
+                    "visual": "#/components/schemas/DesktopVisualMode"
+                  }
+                }
               }
             ],
-            "title": "Mode",
-            "discriminator": {
-              "propertyName": "type",
-              "mapping": {
-                "text": "#/components/schemas/BrowserTextMode",
-                "visual": "#/components/schemas/BrowserVisualMode"
-              }
-            }
+            "title": "Mode"
           },
           "lazy": {
             "type": "boolean",
@@ -12215,12 +12289,12 @@
             "type": "boolean",
             "title": "Ephemeral",
             "description": "A fresh machine whose files do not outlive the session, whatever the stage's default.",
-            "default": false
+            "default": true
           }
         },
         "type": "object",
         "title": "WorkstationStorage",
-        "description": "Which disk a cloud workstation runs on. Exactly one of the three."
+        "description": "Which disk a cloud workstation runs on. Exactly one of the three, ephemeral unless a volume is set."
       },
       "WriteFileRequest": {
         "properties": {

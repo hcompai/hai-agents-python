@@ -8,7 +8,7 @@ from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 
 class WorkstationStorage(UniversalBaseModel):
     """
-    Which disk a cloud workstation runs on. Exactly one of the three.
+    Which disk a cloud workstation runs on. Exactly one of the three, ephemeral unless a volume is set.
     """
 
     volume_id: typing.Optional[str] = pydantic.Field(default=None)
