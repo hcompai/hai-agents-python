@@ -590,7 +590,6 @@ class RawEnvironmentsClient:
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
-        shell: typing.Optional[bool] = OMIT,
         screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
         storage: typing.Optional[WorkstationStorage] = OMIT,
@@ -634,8 +633,6 @@ class RawEnvironmentsClient:
 
         network : typing.Optional[BrowserNetwork]
 
-        shell : typing.Optional[bool]
-
         screenshot_max_width : typing.Optional[int]
 
         image : typing.Optional[str]
@@ -673,7 +670,6 @@ class RawEnvironmentsClient:
                 "network": convert_and_respect_annotation_metadata(
                     object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
                 ),
-                "shell": shell,
                 "screenshot_max_width": screenshot_max_width,
                 "image": image,
                 "storage": convert_and_respect_annotation_metadata(
@@ -1287,7 +1283,6 @@ class AsyncRawEnvironmentsClient:
         use_default_browser_profile: typing.Optional[bool] = OMIT,
         persist_browser_profile: typing.Optional[bool] = OMIT,
         network: typing.Optional[BrowserNetwork] = OMIT,
-        shell: typing.Optional[bool] = OMIT,
         screenshot_max_width: typing.Optional[int] = OMIT,
         image: typing.Optional[str] = OMIT,
         storage: typing.Optional[WorkstationStorage] = OMIT,
@@ -1331,8 +1326,6 @@ class AsyncRawEnvironmentsClient:
 
         network : typing.Optional[BrowserNetwork]
 
-        shell : typing.Optional[bool]
-
         screenshot_max_width : typing.Optional[int]
 
         image : typing.Optional[str]
@@ -1370,7 +1363,6 @@ class AsyncRawEnvironmentsClient:
                 "network": convert_and_respect_annotation_metadata(
                     object_=network, annotation=typing.Optional[BrowserNetwork], direction="write"
                 ),
-                "shell": shell,
                 "screenshot_max_width": screenshot_max_width,
                 "image": image,
                 "storage": convert_and_respect_annotation_metadata(
