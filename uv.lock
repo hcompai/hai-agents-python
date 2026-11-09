@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -422,14 +422,14 @@ wheels = [
 
 [[package]]
 name = "cua-driver"
-version = "0.34.1"
+version = "0.44.0"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ad/24/427db935e527732e36d3dd9a3bf92b2271fb7d09ff7a4095180f64aed1d5/cua_driver-0.34.1-py3-none-macosx_13_0_universal2.whl", hash = "sha256:c52697dab7e5a71bcf45de722d9a4b85f04074c4fbe6215f7e10d0f7ec7b15cb", size = 44417918, upload-time = "2026-10-09T17:28:35.379Z" },
-    { url = "https://files.pythonhosted.org/packages/95/b4/33517b9f92c0e6d12ace18ce25caf8ac09298182564c0deeceaca3ca8e4d/cua_driver-0.34.1-py3-none-manylinux_2_31_aarch64.whl", hash = "sha256:6baed892351c1882644918fe68a7ca3120735891248af69df4ab02b77f51b271", size = 33263029, upload-time = "2026-10-09T17:28:39.167Z" },
-    { url = "https://files.pythonhosted.org/packages/bb/5b/9d839dd0b6ee832f47d4f2e27fb55e5e8a0dc2ea47d164a8d6a3117b600e/cua_driver-0.34.1-py3-none-manylinux_2_31_x86_64.whl", hash = "sha256:206d4daddd2184b41d1b7087a99e062907933d14b1955df8abf37dacd7a3fe2f", size = 32995887, upload-time = "2026-10-09T17:28:42.843Z" },
-    { url = "https://files.pythonhosted.org/packages/cd/16/1ef6801d648d576cc2ed17ed438889c3605be8966d38a0a34f6886b5a0c3/cua_driver-0.34.1-py3-none-win_amd64.whl", hash = "sha256:0b21aa96e3fedaeb01e8fe9c907717e726877f774f9f08f4089247b729bfd140", size = 28926959, upload-time = "2026-10-09T17:28:46.452Z" },
-    { url = "https://files.pythonhosted.org/packages/68/be/c56aa422614d90459aea4a0a659f28c09690ded4b7e76afcf8267706f27e/cua_driver-0.34.1-py3-none-win_arm64.whl", hash = "sha256:f9bc7c10ae62f55454fbb5e2539429523884825236bb452867b23182c6661375", size = 26995995, upload-time = "2026-10-09T17:28:50.221Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/ca/0033755367a669b5684e580f879fe8012cee8fc1d9b2fe950e8caaca4b4f/cua_driver-0.44.0-py3-none-macosx_13_0_universal2.whl", hash = "sha256:f5f336ef0440c680ecadc1be34e1ee195523fe57e58ce1ab40b0118e0f328616", size = 51661554, upload-time = "2026-11-08T14:53:57.806Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/da/80f50cbb931bcf7eb1b0a93cc252f211d7fedb4dd8998770dcda1e4d48e1/cua_driver-0.44.0-py3-none-manylinux_2_31_aarch64.whl", hash = "sha256:8a20722ed2401b6119d103f44e38653d2895e45eda3f87ff2712690fc161579f", size = 36626543, upload-time = "2026-11-08T14:54:01.144Z" },
+    { url = "https://files.pythonhosted.org/packages/75/e4/6d22cacd4a26849f9417ca09bc4f52e93a83f240ad5b412aedcbab485c4b/cua_driver-0.44.0-py3-none-manylinux_2_31_x86_64.whl", hash = "sha256:643c19637fe29e9e49ff2594d9156dbf6224f8ae49faf434b3054e0dbf7eb508", size = 36445230, upload-time = "2026-11-08T14:54:04.133Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/81/6192287039ccf5f1fc76211b789cc86e187c01cf82379097e109c2e348e6/cua_driver-0.44.0-py3-none-win_amd64.whl", hash = "sha256:1fba13e3a3f513117ce36e11949150708e25af5b035058cf870d9148f102db0f", size = 32794115, upload-time = "2026-11-08T14:54:07.214Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/6a/66b011ec251e599eab656be2739cb5e845d96ea3a05973e29f55baf40784/cua_driver-0.44.0-py3-none-win_arm64.whl", hash = "sha256:bf1561ba87ce40505edbc21c18cc64de649976efe0153389f711a6ddb9e2df38", size = 30564334, upload-time = "2026-11-08T14:54:10.384Z" },
 ]
 
 [[package]]
@@ -452,7 +452,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -730,7 +730,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "hai-agents", extras = ["browser", "cli", "desktop", "workstation"], marker = "extra == 'all'" },
-    { name = "hai-drivers", extras = ["browser-cli", "cua-cli", "desktop-cli"], marker = "extra == 'workstation'", specifier = ">=0.1.13" },
+    { name = "hai-drivers", extras = ["browser-cli", "cua-cli", "desktop-cli"], marker = "extra == 'workstation'", specifier = ">=0.1.18" },
     { name = "hai-drivers", extras = ["desktop"], marker = "extra == 'desktop'", specifier = ">=0.1.3" },
     { name = "hai-drivers", extras = ["web"], marker = "extra == 'browser'", specifier = ">=0.1.3" },
     { name = "httpx", specifier = ">=0.23.0,<0.29.0" },
@@ -759,7 +759,7 @@ dev = [
 
 [[package]]
 name = "hai-drivers"
-version = "0.1.13"
+version = "0.1.18"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdownify" },
@@ -767,7 +767,7 @@ dependencies = [
     { name = "pydantic" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/c4/59570e3784d8d56ba814e37da80a997ace627ec21d078b41fd15d64ef7ca/hai_drivers-0.1.13-py3-none-any.whl", hash = "sha256:056229c90c00039b0afe34887f8212cc0cc9aa6e55473b79f95da194be9819e8", size = 295144, upload-time = "2026-10-13T18:24:08.776Z" },
+    { url = "https://files.pythonhosted.org/packages/a5/39/f2196e41593920601c70d387f1ab4bceda5209b2ff077a863b6b2dc8743d/hai_drivers-0.1.18-py3-none-any.whl", hash = "sha256:d76fa44886cb2cd8e1eb019b5d0c8d55a6a97f3cbabb345759dfae4f190658b1", size = 321442, upload-time = "2026-11-09T13:22:16.523Z" },
 ]
 
 [package.optional-dependencies]
@@ -1602,9 +1602,9 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "pydantic", marker = "python_full_version < '3.11'" },
-    { name = "python-dotenv", marker = "python_full_version < '3.11'" },
-    { name = "typing-inspection", marker = "python_full_version < '3.11'" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "typing-inspection" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/68/ca/31c57507b13119d7d3cfa1576dad2911a4861e3be07b579395f4e9d393f9/pydantic_settings-2.15.0.tar.gz", hash = "sha256:694b793e84f766ba76a90ebdefc01d0a9a045dab0382bee70393da93712ad117", size = 261253, upload-time = "2026-08-07T09:24:57.419Z" }
 wheels = [
@@ -1623,10 +1623,10 @@ resolution-markers = [
     "python_full_version >= '3.11' and python_full_version < '3.13'",
 ]
 dependencies = [
-    { name = "pydantic", marker = "python_full_version >= '3.11'" },
-    { name = "python-dotenv", marker = "python_full_version >= '3.11'" },
-    { name = "typing-extensions", marker = "python_full_version >= '3.11'" },
-    { name = "typing-inspection", marker = "python_full_version >= '3.11'" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "typing-extensions" },
+    { name = "typing-inspection" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/05/ca/7817b4bf0c4b15c6a6ab8cdf4cb96c268335a8ca2f525de93b6ebe4c7d28/pydantic_settings-2.16.1.tar.gz", hash = "sha256:aff602a1886338c2df3d1e958e2193a8dc33cec75b91f202e83fd98484b4b0da", size = 303436, upload-time = "2026-10-20T11:37:19.024Z" }
 wheels = [
@@ -1727,10 +1727,10 @@ name = "pyobjc-framework-applicationservices"
 version = "12.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core", marker = "python_full_version < '3.13' or sys_platform != 'win32'" },
-    { name = "pyobjc-framework-cocoa", marker = "python_full_version < '3.13' or sys_platform != 'win32'" },
-    { name = "pyobjc-framework-coretext", marker = "python_full_version < '3.13' or sys_platform != 'win32'" },
-    { name = "pyobjc-framework-quartz", marker = "python_full_version < '3.13' or sys_platform != 'win32'" },
+    { name = "pyobjc-core" },
+    { name = "pyobjc-framework-cocoa" },
+    { name = "pyobjc-framework-coretext" },
+    { name = "pyobjc-framework-quartz" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/5e/4d/0ebdd8144aba94b8fe9828ccee5616a4bf53d1f8bc51cff55f3cce86d695/pyobjc_framework_applicationservices-12.2.1.tar.gz", hash = "sha256:048ea663c9ac75c44a15dc7d5b8d78cbb4c97bf1c76e83835e8d5498e184001f", size = 109342, upload-time = "2026-06-19T16:19:46.149Z" }
 wheels = [
@@ -1750,7 +1750,7 @@ name = "pyobjc-framework-cocoa"
 version = "12.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core", marker = "python_full_version < '3.13' or sys_platform != 'win32'" },
+    { name = "pyobjc-core" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/51/34/fbe38a204643aa4e1b91391cdce07a34da565a69171ebcad08de7438a556/pyobjc_framework_cocoa-12.2.1.tar.gz", hash = "sha256:b94b37fe5730e5ae1fb0052912cd174e6ec329b0bfba4a012ae5db1014b5864b", size = 3125751, upload-time = "2026-06-19T16:20:05.159Z" }
 wheels = [
@@ -1770,9 +1770,9 @@ name = "pyobjc-framework-coretext"
 version = "12.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core", marker = "python_full_version < '3.13' or sys_platform != 'win32'" },
-    { name = "pyobjc-framework-cocoa", marker = "python_full_version < '3.13' or sys_platform != 'win32'" },
-    { name = "pyobjc-framework-quartz", marker = "python_full_version < '3.13' or sys_platform != 'win32'" },
+    { name = "pyobjc-core" },
+    { name = "pyobjc-framework-cocoa" },
+    { name = "pyobjc-framework-quartz" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/5a/9c/4c7f452059dc1d3845b8e627b9113c247a997b9b07518e848c2ab7ff3149/pyobjc_framework_coretext-12.2.1.tar.gz", hash = "sha256:af740e784d7c592c34025ec7165f4f6c1a69b5a2d9075f06e41e4f77c212aed2", size = 97349, upload-time = "2026-06-19T16:20:22.508Z" }
 wheels = [
@@ -1792,8 +1792,8 @@ name = "pyobjc-framework-quartz"
 version = "12.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core", marker = "python_full_version < '3.13' or sys_platform != 'win32'" },
-    { name = "pyobjc-framework-cocoa", marker = "python_full_version < '3.13' or sys_platform != 'win32'" },
+    { name = "pyobjc-core" },
+    { name = "pyobjc-framework-cocoa" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3b/f6/2a8b84dbf1fe7c04dd96ea73d991678d4e09a909f51971ecc51629bb2ab4/pyobjc_framework_quartz-12.2.1.tar.gz", hash = "sha256:b3b8b6f71e66147f8ff9e6213864cc8527e3a0b1ee90835b93ce221f4802d9b0", size = 3215521, upload-time = "2026-06-19T16:21:30.199Z" }
 wheels = [
@@ -2427,8 +2427,8 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "anyio", marker = "python_full_version < '3.11'" },
-    { name = "starlette", version = "1.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "anyio" },
+    { name = "starlette", version = "1.7.0", source = { registry = "https://pypi.org/simple" } },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/af/2e/16b9cce59c2eebd2f944b41b01df119f8ee65535ce839c462f1b2c9ae2e0/sse_starlette-3.5.1.tar.gz", hash = "sha256:dbb1461cd53c1e284537c3ddcf92f54f24178519a3f1e335e49e5283993db0f7", size = 38356, upload-time = "2026-10-24T08:45:12.444Z" }
 wheels = [
@@ -2447,8 +2447,8 @@ resolution-markers = [
     "python_full_version >= '3.11' and python_full_version < '3.13'",
 ]
 dependencies = [
-    { name = "anyio", marker = "python_full_version >= '3.11'" },
-    { name = "starlette", version = "1.10.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "anyio" },
+    { name = "starlette", version = "1.10.0", source = { registry = "https://pypi.org/simple" } },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/71/7f/3b8ec4f27833f7b8c270a3ef960b6d435e1065439847bc0fcd1e58ae898b/sse_starlette-3.6.0.tar.gz", hash = "sha256:623151d6c20dc0eebf1b3379c27faae91fff883bac7ab6665f16f46440a88b3a", size = 41174, upload-time = "2026-10-25T20:31:59.372Z" }
 wheels = [
@@ -2463,8 +2463,8 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "anyio", marker = "python_full_version < '3.11'" },
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "anyio" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7b/2b/3850dc6bf7ef71b088962eba31dafc6cffd2f96e577ebb0bb316df96da3e/starlette-1.7.0.tar.gz", hash = "sha256:c79f74ea63cff761804fbbfb182f1e0b440c2d07b164d24700c5a1bab5d6ff5d", size = 2736246, upload-time = "2026-09-23T07:30:26.35Z" }
 wheels = [
@@ -2483,8 +2483,8 @@ resolution-markers = [
     "python_full_version >= '3.11' and python_full_version < '3.13'",
 ]
 dependencies = [
-    { name = "anyio", marker = "python_full_version >= '3.11'" },
-    { name = "typing-extensions", marker = "python_full_version >= '3.11' and python_full_version < '3.13'" },
+    { name = "anyio" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/48/bb/3d8757f21e9a53d9035c9eb039a777047139a16bfdbedfc7a58241c3d914/starlette-1.10.0.tar.gz", hash = "sha256:b8399098d4c1e3522734f7235dc79b1fc967f96cf139c81e0fa30479e0685f9b", size = 2734356, upload-time = "2026-10-24T15:04:12.342Z" }
 wheels = [
@@ -2583,7 +2583,7 @@ name = "typeguard"
 version = "4.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version >= '3.13'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b4/de/4420db493fa8fc0856d5e5c1b159c63a323d2de2317babe36b01568928e8/typeguard-4.6.0.tar.gz", hash = "sha256:e7414f09111317de3e335de92cd397c5c0ca00b1cc1676de12e1d444a79b3f21", size = 82330, upload-time = "2026-07-26T08:40:23.207Z" }
 wheels = [
@@ -2635,11 +2635,11 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "colorama", marker = "python_full_version < '3.13' and sys_platform == 'win32'" },
-    { name = "docstring-parser", marker = "python_full_version < '3.13'" },
-    { name = "rich", marker = "python_full_version < '3.13'" },
-    { name = "shtab", marker = "python_full_version < '3.13'" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "docstring-parser" },
+    { name = "rich" },
+    { name = "shtab" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/91/9a/a471d988dd9ac8ea657714734c6834c056dad9928c270652c4f0e030a226/tyro-0.8.14.tar.gz", hash = "sha256:2516e34d21763575159459c3b15fe4a13472a2166dff32169c9d7aab70853058", size = 141970, upload-time = "2024-10-23T10:04:44.327Z" }
 wheels = [
@@ -2657,12 +2657,12 @@ resolution-markers = [
     "python_full_version == '3.13.*' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "colorama", marker = "python_full_version >= '3.13' and sys_platform == 'win32'" },
-    { name = "docstring-parser", marker = "python_full_version >= '3.13'" },
-    { name = "rich", marker = "python_full_version >= '3.13'" },
-    { name = "shtab", marker = "python_full_version >= '3.13'" },
-    { name = "typeguard", marker = "python_full_version >= '3.13'" },
-    { name = "typing-extensions", marker = "python_full_version >= '3.13'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "docstring-parser" },
+    { name = "rich" },
+    { name = "shtab" },
+    { name = "typeguard" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4d/40/7a84e7652f75526b31f45c2565b5db9e9e21d37201fd44bc341ea90edc53/tyro-0.9.35.tar.gz", hash = "sha256:e38dd3528ae6f8fc74e21c7e21ac412d22d237739758d521f470e7a20eb46e92", size = 325648, upload-time = "2025-10-13T08:55:57.631Z" }
 wheels = [
