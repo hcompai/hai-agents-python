@@ -673,12 +673,16 @@ class RawSkillsClient:
             The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         description : typing.Optional[str]
+            When to use this skill. The agent reads this to decide whether to load it.
 
         body : typing.Optional[str]
+            Markdown instructions the agent loads when it uses the skill.
 
         source : typing.Optional[str]
+            Optional URL the content was sourced from.
 
         url_pattern : typing.Optional[str]
+            Optional regex hinting at URLs where this skill applies.
 
         compatibility : typing.Optional[str]
 
@@ -1406,12 +1410,16 @@ class AsyncRawSkillsClient:
             The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         description : typing.Optional[str]
+            When to use this skill. The agent reads this to decide whether to load it.
 
         body : typing.Optional[str]
+            Markdown instructions the agent loads when it uses the skill.
 
         source : typing.Optional[str]
+            Optional URL the content was sourced from.
 
         url_pattern : typing.Optional[str]
+            Optional regex hinting at URLs where this skill applies.
 
         compatibility : typing.Optional[str]
 
