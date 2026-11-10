@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .bridge import LocalBridge, TokenSource
+from .config import shell_policy
 from .desktop import ensure_macos_input_permissions
 
 if TYPE_CHECKING:
@@ -40,10 +41,19 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         base_url: str | None = None,
         session_id: str | None = None,
         environment_variables: Mapping[str, str] | None = None,
+        policy: str | None = None,
     ) -> None:
+        """Build the bridge.
+
+        Args:
+            policy: This machine's allowlist file, one command prefix a line; defaults to ``HAI_SHELL_POLICY``.
+                With one, the shell runs the commands it covers and holds any other until the session's client
+                approves it, and the agent's file tools stay inside the workspace. Without one, every command runs.
+        """
         super().__init__(environment_id, api_key=api_key, base_url=base_url, session_id=session_id)
         self.workspace = Path(workspace).expanduser() if workspace else Path.home() / "hai" / self.session_id
         self.environment_variables = dict(environment_variables or {})
+        self.policy = policy or shell_policy()
 
     def preflight(self) -> None:
         if sys.platform == "darwin":
@@ -60,6 +70,12 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             raise ImportError(INSTALL_HINT)
         subprocess.run([desk, "aliases"], check=True, capture_output=True)
         logger.info("workstation workspace: %s", self.workspace)
+        policy = None
+        if self.policy:
+            from hai_drivers.code_sandbox.local.policy import SafetyPolicy
+
+            policy = SafetyPolicy(self.policy)
+            logger.info("commands outside %s wait for approval", policy.allowed_path)
         return LocalCodeSandbox(
             str(self.workspace),
             environment_variables={
@@ -69,6 +85,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
                 "CUA_SESSION": self.session_id,
                 "PATH": os.pathsep.join([os.path.dirname(desk), path]),
             },
+            policy=policy,
         )
 
     async def interrupt_driver(self) -> None:

@@ -1015,6 +1015,27 @@ class TestDriverInterfaces:
         finally:
             bridge._driver.close()
 
+    def test_workstation_holds_a_command_its_machine_does_not_allow_until_approved(self, tmp_path, monkeypatch):
+        pytest.importorskip("hai_drivers.code_sandbox.local.policy")
+        allowed = tmp_path / "allowed"
+        allowed.write_text("echo\n")
+        monkeypatch.setenv("HAI_SHELL_POLICY", str(allowed))
+        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"))
+        bridge._driver = bridge.create_driver()
+        try:
+            result, error = bridge._dispatch("execute", {"command": "echo hi"})
+            assert error is None and result["stdout"].strip() == "hi"
+
+            result, error = bridge._dispatch("execute", {"command": "touch made"})
+            assert result is None and error.startswith("approval required: ")
+            assert not (tmp_path / "workspace" / "made").exists()
+
+            assert bridge._dispatch("approve_command", {"command": "touch made"}) == (None, None)
+            result, error = bridge._dispatch("execute", {"command": "touch made"})
+            assert error is None and (tmp_path / "workspace" / "made").exists()
+        finally:
+            bridge._driver.close()
+
 
 class ServingBridge(FakeBridge):
     def __init__(self, environment_id: str | None = None, **kwargs: Any) -> None:

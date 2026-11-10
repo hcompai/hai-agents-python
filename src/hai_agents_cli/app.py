@@ -1503,12 +1503,19 @@ def local_desktop(
         hidden=True,
         help="With --shell, the folder the shell starts in. Defaults to ~/hai/<session id>.",
     ),
+    policy: str | None = typer.Option(
+        None,
+        "--policy",
+        hidden=True,
+        help="With --shell, this machine's allowlist file, one command prefix a line: a command it does not "
+        "cover waits for approval. Defaults to $HAI_SHELL_POLICY; without one every command runs.",
+    ),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""
     from hai_agents_local import PyautoguiDesktopBridge, WorkstationBridge
 
     if shell:
-        _run_bridge(_state(ctx), WorkstationBridge, session_id, workspace=workspace)
+        _run_bridge(_state(ctx), WorkstationBridge, session_id, workspace=workspace, policy=policy)
         return
     if image_format not in ("png", "jpeg", "webp"):
         _raise_cli_error(ValueError(f"--image-format must be png, jpeg, or webp; got {image_format!r}"))
