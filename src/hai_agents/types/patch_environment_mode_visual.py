@@ -8,13 +8,28 @@ from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 
 class PatchEnvironmentModeVisual(UniversalBaseModel):
     """
-    The `visual` fields of every kind that has them; the stored kind validates them.
+    The `visual` fields of every kind that has them. The patch replaces the stored value whole: a field left out takes its default, and one the environment's kind does not have is rejected.
     """
 
-    width: typing.Optional[int] = None
-    height: typing.Optional[int] = None
-    markdown: typing.Optional[bool] = None
-    settle_s: typing.Optional[float] = None
+    width: typing.Optional[int] = pydantic.Field(default=None)
+    """
+    Viewport width in pixels.
+    """
+
+    height: typing.Optional[int] = pydantic.Field(default=None)
+    """
+    Viewport height in pixels.
+    """
+
+    markdown: typing.Optional[bool] = pydantic.Field(default=None)
+    """
+    Also include the viewport's text as markdown alongside each screenshot.
+    """
+
+    settle_s: typing.Optional[float] = pydantic.Field(default=None)
+    """
+    Seconds to wait after each mouse or keyboard action.
+    """
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

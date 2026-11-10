@@ -9108,7 +9108,8 @@
           "description": {
             "type": "string",
             "minLength": 1,
-            "title": "Description"
+            "title": "Description",
+            "description": "What the agent does. Parent agents read this to decide when to delegate to it."
           },
           "environments": {
             "items": {
@@ -9122,7 +9123,8 @@
               ]
             },
             "type": "array",
-            "title": "Environments"
+            "title": "Environments",
+            "description": "Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools."
           },
           "model": {
             "anyOf": [
@@ -9133,7 +9135,8 @@
                 "type": "null"
               }
             ],
-            "title": "Model"
+            "title": "Model",
+            "description": "Model that serves the agent. Defaults to the platform model if omitted."
           },
           "reasoning_effort": {
             "anyOf": [
@@ -9150,7 +9153,8 @@
                 "type": "null"
               }
             ],
-            "title": "Reasoning Effort"
+            "title": "Reasoning Effort",
+            "description": "How much the model thinks before each step: more is slower and more careful. Null uses the model's default. Models without effort levels only honor 'disabled'."
           },
           "instructions": {
             "anyOf": [
@@ -9161,7 +9165,8 @@
                 "type": "null"
               }
             ],
-            "title": "Instructions"
+            "title": "Instructions",
+            "description": "Instructions appended to the agent's system prompt to steer behavior."
           },
           "subagents": {
             "anyOf": [
@@ -9182,7 +9187,8 @@
                 "type": "null"
               }
             ],
-            "title": "Subagents"
+            "title": "Subagents",
+            "description": "Agents this one can delegate to. Each entry is a registered agent's name or an inline definition."
           },
           "skills": {
             "anyOf": [
@@ -9203,7 +9209,8 @@
                 "type": "null"
               }
             ],
-            "title": "Skills"
+            "title": "Skills",
+            "description": "Skills the agent can draw on. Each entry is a registered skill's name or an inline definition."
           },
           "answer_format": {
             "anyOf": [
@@ -9215,7 +9222,8 @@
                 "type": "null"
               }
             ],
-            "title": "Answer Format"
+            "title": "Answer Format",
+            "description": "JSON Schema the agent's final answer must conform to. Null returns a free-form text answer."
           },
           "tools": {
             "anyOf": [
@@ -9229,7 +9237,8 @@
                 "type": "null"
               }
             ],
-            "title": "Tools"
+            "title": "Tools",
+            "description": "Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result."
           }
         },
         "type": "object",
@@ -9244,15 +9253,18 @@
               "user_device",
               "cloud"
             ],
-            "title": "Host"
+            "title": "Host",
+            "description": "Where the browser runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine."
           },
           "start_url": {
             "type": "string",
-            "title": "Start Url"
+            "title": "Start Url",
+            "description": "Initial URL to open."
           },
           "headless": {
             "type": "boolean",
-            "title": "Headless"
+            "title": "Headless",
+            "description": "Run the browser without a visible window."
           },
           "session_id": {
             "anyOf": [
@@ -9295,7 +9307,8 @@
             "type": "number",
             "maximum": 10.0,
             "minimum": 0.0,
-            "title": "Settle S"
+            "title": "Settle S",
+            "description": "Seconds to wait after each page action."
           },
           "vault_id": {
             "anyOf": [
@@ -9307,7 +9320,8 @@
                 "type": "null"
               }
             ],
-            "title": "Vault Id"
+            "title": "Vault Id",
+            "description": "Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run without secret access."
           },
           "browser_profile_id": {
             "anyOf": [
@@ -9319,15 +9333,18 @@
                 "type": "null"
               }
             ],
-            "title": "Browser Profile Id"
+            "title": "Browser Profile Id",
+            "description": "Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run with a fresh profile."
           },
           "use_default_browser_profile": {
             "type": "boolean",
-            "title": "Use Default Browser Profile"
+            "title": "Use Default Browser Profile",
+            "description": "When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile. Only supported on cloud-hosted browsers."
           },
           "persist_browser_profile": {
             "type": "boolean",
-            "title": "Persist Browser Profile"
+            "title": "Persist Browser Profile",
+            "description": "When true, the browser profile is updated with this session's final browser state (cookies, storage) when the session ends. Requires browser_profile_id or use_default_browser_profile. Only one active session at a time may persist a given profile; concurrent read-only use is always allowed."
           },
           "network": {
             "anyOf": [
@@ -9337,7 +9354,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set)."
           },
           "screenshot_max_width": {
             "anyOf": [
@@ -9350,7 +9368,8 @@
                 "type": "null"
               }
             ],
-            "title": "Screenshot Max Width"
+            "title": "Screenshot Max Width",
+            "description": "Maximum screenshot width in pixels. Null uses 1920; images are never upscaled."
           },
           "image": {
             "anyOf": [
@@ -9361,7 +9380,8 @@
                 "type": "null"
               }
             ],
-            "title": "Image"
+            "title": "Image",
+            "description": "Emulator image to boot instead of the default one, e.g. an image with an app preinstalled. Ignored when session_id attaches to an existing session."
           },
           "storage": {
             "anyOf": [
@@ -9371,7 +9391,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Which disk a cloud workstation runs on. Omit to let the stage decide: the caller's default volume where the workstation is persistent by default, a fresh machine elsewhere. Ignored when session_id attaches to an existing session."
           }
         },
         "type": "object",
@@ -9389,39 +9410,45 @@
           "width": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
-            "title": "Width"
+            "title": "Width",
+            "description": "Viewport width in pixels."
           },
           "height": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
-            "title": "Height"
+            "title": "Height",
+            "description": "Viewport height in pixels."
           },
           "markdown": {
             "type": "boolean",
-            "title": "Markdown"
+            "title": "Markdown",
+            "description": "Also include the viewport's text as markdown alongside each screenshot."
           },
           "settle_s": {
             "type": "number",
             "maximum": 10.0,
             "minimum": 0.0,
-            "title": "Settle S"
+            "title": "Settle S",
+            "description": "Seconds to wait after each mouse or keyboard action."
           }
         },
         "type": "object",
         "title": "PatchEnvironmentModeVisual",
-        "description": "The `visual` fields of every kind that has them; the stored kind validates them."
+        "description": "The `visual` fields of every kind that has them. The patch replaces the stored value whole: a field left out takes its default, and one the environment's kind does not have is rejected."
       },
       "PatchSkill": {
         "properties": {
           "description": {
             "type": "string",
             "minLength": 1,
-            "title": "Description"
+            "title": "Description",
+            "description": "When to use this skill. The agent reads this to decide whether to load it."
           },
           "body": {
             "type": "string",
             "minLength": 1,
-            "title": "Body"
+            "title": "Body",
+            "description": "Markdown instructions the agent loads when it uses the skill."
           },
           "source": {
             "anyOf": [
@@ -9432,7 +9459,8 @@
                 "type": "null"
               }
             ],
-            "title": "Source"
+            "title": "Source",
+            "description": "Optional URL the content was sourced from."
           },
           "url_pattern": {
             "anyOf": [
@@ -9445,7 +9473,8 @@
                 "type": "null"
               }
             ],
-            "title": "Url Pattern"
+            "title": "Url Pattern",
+            "description": "Optional regex hinting at URLs where this skill applies."
           },
           "compatibility": {
             "anyOf": [
@@ -11313,7 +11342,8 @@
             "$ref": "#/components/schemas/CronTiming"
           },
           "session_request": {
-            "$ref": "#/components/schemas/SessionRequest"
+            "$ref": "#/components/schemas/SessionRequest",
+            "description": "Template used to create each scheduled session; re-resolved on every fire."
           },
           "repeats": {
             "anyOf": [
@@ -11325,7 +11355,8 @@
                 "type": "null"
               }
             ],
-            "title": "Repeats"
+            "title": "Repeats",
+            "description": "How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted."
           }
         },
         "type": "object",
@@ -11345,7 +11376,8 @@
               "type": "string"
             },
             "type": "array",
-            "title": "Enabled Events"
+            "title": "Enabled Events",
+            "description": "Event types delivered to this webhook. '*' subscribes to the session.status_updated firehose; granular session.* types are delivered only when listed explicitly."
           },
           "description": {
             "anyOf": [

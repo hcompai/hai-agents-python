@@ -341,6 +341,7 @@ class RawWebhooksClient:
         url : typing.Optional[str]
 
         enabled_events : typing.Optional[typing.Sequence[str]]
+            Event types delivered to this webhook. '*' subscribes to the session.status_updated firehose; granular session.* types are delivered only when listed explicitly.
 
         description : typing.Optional[str]
 
@@ -823,6 +824,7 @@ class AsyncRawWebhooksClient:
         url : typing.Optional[str]
 
         enabled_events : typing.Optional[typing.Sequence[str]]
+            Event types delivered to this webhook. '*' subscribes to the session.status_updated firehose; granular session.* types are delivered only when listed explicitly.
 
         description : typing.Optional[str]
 

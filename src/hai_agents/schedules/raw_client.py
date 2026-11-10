@@ -312,8 +312,10 @@ class RawSchedulesClient:
         timing : typing.Optional[CronTiming]
 
         session_request : typing.Optional[SessionRequest]
+            Template used to create each scheduled session; re-resolved on every fire.
 
         repeats : typing.Optional[int]
+            How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -905,8 +907,10 @@ class AsyncRawSchedulesClient:
         timing : typing.Optional[CronTiming]
 
         session_request : typing.Optional[SessionRequest]
+            Template used to create each scheduled session; re-resolved on every fire.
 
         repeats : typing.Optional[int]
+            How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.

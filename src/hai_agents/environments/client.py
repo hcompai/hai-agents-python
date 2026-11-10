@@ -411,10 +411,13 @@ class EnvironmentsClient:
             The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         host : typing.Optional[PatchEnvironmentHost]
+            Where the browser runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.
 
         start_url : typing.Optional[str]
+            Initial URL to open.
 
         headless : typing.Optional[bool]
+            Run the browser without a visible window.
 
         session_id : typing.Optional[str]
 
@@ -423,22 +426,31 @@ class EnvironmentsClient:
         lazy : typing.Optional[bool]
 
         settle_s : typing.Optional[float]
+            Seconds to wait after each page action.
 
         vault_id : typing.Optional[str]
+            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run without secret access.
 
         browser_profile_id : typing.Optional[str]
+            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run with a fresh profile.
 
         use_default_browser_profile : typing.Optional[bool]
+            When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile. Only supported on cloud-hosted browsers.
 
         persist_browser_profile : typing.Optional[bool]
+            When true, the browser profile is updated with this session's final browser state (cookies, storage) when the session ends. Requires browser_profile_id or use_default_browser_profile. Only one active session at a time may persist a given profile; concurrent read-only use is always allowed.
 
         network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
 
         screenshot_max_width : typing.Optional[int]
+            Maximum screenshot width in pixels. Null uses 1920; images are never upscaled.
 
         image : typing.Optional[str]
+            Emulator image to boot instead of the default one, e.g. an image with an app preinstalled. Ignored when session_id attaches to an existing session.
 
         storage : typing.Optional[WorkstationStorage]
+            Which disk a cloud workstation runs on. Omit to let the stage decide: the caller's default volume where the workstation is persistent by default, a fresh machine elsewhere. Ignored when session_id attaches to an existing session.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -928,10 +940,13 @@ class AsyncEnvironmentsClient:
             The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         host : typing.Optional[PatchEnvironmentHost]
+            Where the browser runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.
 
         start_url : typing.Optional[str]
+            Initial URL to open.
 
         headless : typing.Optional[bool]
+            Run the browser without a visible window.
 
         session_id : typing.Optional[str]
 
@@ -940,22 +955,31 @@ class AsyncEnvironmentsClient:
         lazy : typing.Optional[bool]
 
         settle_s : typing.Optional[float]
+            Seconds to wait after each page action.
 
         vault_id : typing.Optional[str]
+            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run without secret access.
 
         browser_profile_id : typing.Optional[str]
+            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run with a fresh profile.
 
         use_default_browser_profile : typing.Optional[bool]
+            When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile. Only supported on cloud-hosted browsers.
 
         persist_browser_profile : typing.Optional[bool]
+            When true, the browser profile is updated with this session's final browser state (cookies, storage) when the session ends. Requires browser_profile_id or use_default_browser_profile. Only one active session at a time may persist a given profile; concurrent read-only use is always allowed.
 
         network : typing.Optional[BrowserNetwork]
+            Optional network configuration for the remote browser session. Applied only when a new runner session is provisioned (not when session_id is set).
 
         screenshot_max_width : typing.Optional[int]
+            Maximum screenshot width in pixels. Null uses 1920; images are never upscaled.
 
         image : typing.Optional[str]
+            Emulator image to boot instead of the default one, e.g. an image with an app preinstalled. Ignored when session_id attaches to an existing session.
 
         storage : typing.Optional[WorkstationStorage]
+            Which disk a cloud workstation runs on. Omit to let the stage decide: the caller's default volume where the workstation is persistent by default, a fresh machine elsewhere. Ignored when session_id attaches to an existing session.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.

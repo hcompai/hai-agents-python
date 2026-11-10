@@ -737,22 +737,31 @@ class RawAgentsClient:
             The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         description : typing.Optional[str]
+            What the agent does. Parent agents read this to decide when to delegate to it.
 
         environments : typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]]
+            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
 
         model : typing.Optional[str]
+            Model that serves the agent. Defaults to the platform model if omitted.
 
         reasoning_effort : typing.Optional[PatchAgentReasoningEffort]
+            How much the model thinks before each step: more is slower and more careful. Null uses the model's default. Models without effort levels only honor 'disabled'.
 
         instructions : typing.Optional[str]
+            Instructions appended to the agent's system prompt to steer behavior.
 
         subagents : typing.Optional[typing.Sequence[PatchAgentSubagentsItem]]
+            Agents this one can delegate to. Each entry is a registered agent's name or an inline definition.
 
         skills : typing.Optional[typing.Sequence[PatchAgentSkillsItem]]
+            Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
 
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+            JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
         tools : typing.Optional[typing.Sequence[ToolDefinition]]
+            Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -1540,22 +1549,31 @@ class AsyncRawAgentsClient:
             The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
         description : typing.Optional[str]
+            What the agent does. Parent agents read this to decide when to delegate to it.
 
         environments : typing.Optional[typing.Sequence[PatchAgentEnvironmentsItem]]
+            Environments the agent runs in. Each entry is a registered environment's id or an inline definition. At most one per kind. Required unless the agent delegates to subagents or uses client-executed custom tools.
 
         model : typing.Optional[str]
+            Model that serves the agent. Defaults to the platform model if omitted.
 
         reasoning_effort : typing.Optional[PatchAgentReasoningEffort]
+            How much the model thinks before each step: more is slower and more careful. Null uses the model's default. Models without effort levels only honor 'disabled'.
 
         instructions : typing.Optional[str]
+            Instructions appended to the agent's system prompt to steer behavior.
 
         subagents : typing.Optional[typing.Sequence[PatchAgentSubagentsItem]]
+            Agents this one can delegate to. Each entry is a registered agent's name or an inline definition.
 
         skills : typing.Optional[typing.Sequence[PatchAgentSkillsItem]]
+            Skills the agent can draw on. Each entry is a registered skill's name or an inline definition.
 
         answer_format : typing.Optional[typing.Dict[str, typing.Any]]
+            JSON Schema the agent's final answer must conform to. Null returns a free-form text answer.
 
         tools : typing.Optional[typing.Sequence[ToolDefinition]]
+            Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
