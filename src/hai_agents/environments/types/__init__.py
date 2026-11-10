@@ -16,16 +16,11 @@ if typing.TYPE_CHECKING:
     from .list_environment_revisions_request_sort_item import ListEnvironmentRevisionsRequestSortItem
     from .list_environments_request_sort_item import ListEnvironmentsRequestSortItem
     from .patch_environment_host import PatchEnvironmentHost
-    from .patch_environment_mode import PatchEnvironmentMode
-    from .patch_environment_mode_one import (
-        PatchEnvironmentModeOne,
-        PatchEnvironmentModeOne_Shell,
-        PatchEnvironmentModeOne_Visual,
-    )
-    from .patch_environment_mode_zero import (
-        PatchEnvironmentModeZero,
-        PatchEnvironmentModeZero_Text,
-        PatchEnvironmentModeZero_Visual,
+    from .patch_environment_mode import (
+        PatchEnvironmentMode,
+        PatchEnvironmentMode_Shell,
+        PatchEnvironmentMode_Text,
+        PatchEnvironmentMode_Visual,
     )
     from .update_environment_request_body import (
         UpdateEnvironmentRequestBody,
@@ -44,12 +39,9 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ListEnvironmentsRequestSortItem": ".list_environments_request_sort_item",
     "PatchEnvironmentHost": ".patch_environment_host",
     "PatchEnvironmentMode": ".patch_environment_mode",
-    "PatchEnvironmentModeOne": ".patch_environment_mode_one",
-    "PatchEnvironmentModeOne_Shell": ".patch_environment_mode_one",
-    "PatchEnvironmentModeOne_Visual": ".patch_environment_mode_one",
-    "PatchEnvironmentModeZero": ".patch_environment_mode_zero",
-    "PatchEnvironmentModeZero_Text": ".patch_environment_mode_zero",
-    "PatchEnvironmentModeZero_Visual": ".patch_environment_mode_zero",
+    "PatchEnvironmentMode_Shell": ".patch_environment_mode",
+    "PatchEnvironmentMode_Text": ".patch_environment_mode",
+    "PatchEnvironmentMode_Visual": ".patch_environment_mode",
     "UpdateEnvironmentRequestBody": ".update_environment_request_body",
     "UpdateEnvironmentRequestBody_Android": ".update_environment_request_body",
     "UpdateEnvironmentRequestBody_Desktop": ".update_environment_request_body",
@@ -89,12 +81,9 @@ __all__ = [
     "ListEnvironmentsRequestSortItem",
     "PatchEnvironmentHost",
     "PatchEnvironmentMode",
-    "PatchEnvironmentModeOne",
-    "PatchEnvironmentModeOne_Shell",
-    "PatchEnvironmentModeOne_Visual",
-    "PatchEnvironmentModeZero",
-    "PatchEnvironmentModeZero_Text",
-    "PatchEnvironmentModeZero_Visual",
+    "PatchEnvironmentMode_Shell",
+    "PatchEnvironmentMode_Text",
+    "PatchEnvironmentMode_Visual",
     "UpdateEnvironmentRequestBody",
     "UpdateEnvironmentRequestBody_Android",
     "UpdateEnvironmentRequestBody_Desktop",
