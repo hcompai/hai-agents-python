@@ -178,12 +178,15 @@ class LocalBridge(ABC, Generic[DriverT]):
                 backoff = max(exc.retry_after, MIN_RATE_LIMIT_BACKOFF_S) * (1 + random.uniform(0, 0.25))
                 if attempt == CHANNEL_SETUP_ATTEMPTS or time.monotonic() + backoff > deadline:
                     raise RuntimeError(
-                        "the platform kept rate-limiting command-channel setup; wait a minute and retry"
+                        f"the platform refused command-channel setup: {exc.reason}"
+                        if exc.reason
+                        else "the platform kept rate-limiting command-channel setup; wait a minute and retry"
                     ) from exc
                 logger.warning(
-                    "platform rate-limited channel setup (attempt %d/%d); retrying in %.1fs",
+                    "platform refused channel setup (attempt %d/%d): %s; retrying in %.1fs",
                     attempt,
                     CHANNEL_SETUP_ATTEMPTS,
+                    exc,
                     backoff,
                 )
                 if await self._interruptible_sleep(backoff):
@@ -236,7 +239,7 @@ class LocalBridge(ABC, Generic[DriverT]):
                 retry_delay = min(retry_delay * 2, MAX_RECONNECT_DELAY_S)
             except RateLimitedError as exc:
                 backoff = max(exc.retry_after, MIN_RATE_LIMIT_BACKOFF_S)
-                logger.warning("rate limited; backing off %.0fs", backoff)
+                logger.warning("rate limited: %s; backing off %.0fs", exc, backoff)
                 if await self._interruptible_sleep(backoff):
                     break
             except httpx.HTTPError as exc:
@@ -357,7 +360,7 @@ class LocalBridge(ABC, Generic[DriverT]):
                 if attempt == POST_RESULT_RETRIES:
                     raise
                 delay = max(exc.retry_after, MIN_RATE_LIMIT_BACKOFF_S)
-                logger.warning("post result for %s rate limited; retrying in %.0fs", command_id, delay)
+                logger.warning("post result for %s rate limited: %s; retrying in %.0fs", command_id, exc, delay)
             except httpx.HTTPError as exc:
                 if attempt == POST_RESULT_RETRIES:
                     raise

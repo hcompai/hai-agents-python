@@ -85,9 +85,9 @@ class CommandExchange:
     async def ensure_channel(self, session_id: str) -> None:
         check = await self._client.get(f"{self._base}/api/v1/trajectories/{session_id}")
         if check.status_code in {HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN}:
-            raise AuthError(f"auth error checking channel ({check.status_code})")
+            raise AuthError(_said(f"auth error checking channel ({check.status_code})", check))
         if check.status_code == HTTPStatus.TOO_MANY_REQUESTS:
-            raise RateLimitedError(_retry_after(check))
+            raise _rate_limited(check)
         if check.status_code == HTTPStatus.OK:
             return
         resp = await self._client.post(
@@ -95,13 +95,13 @@ class CommandExchange:
             json={"id": session_id, "task": {"type": "interactive"}, "launch": False},
         )
         if resp.status_code in {HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN}:
-            raise AuthError(f"auth error creating channel ({resp.status_code})")
+            raise AuthError(_said(f"auth error creating channel ({resp.status_code})", resp))
         if resp.status_code == HTTPStatus.TOO_MANY_REQUESTS:
-            raise RateLimitedError(_retry_after(resp))
+            raise _rate_limited(resp)
         if resp.status_code == HTTPStatus.CONFLICT:
             return
         _raise_if_gone(resp, session_id)
-        resp.raise_for_status()
+        _raise_for_status(resp)
 
     async def fetch_commands(
         self,
@@ -119,15 +119,15 @@ class CommandExchange:
                 case HTTPStatus.NO_CONTENT:
                     return None
                 case HTTPStatus.NOT_FOUND:
-                    raise SessionNotFoundError(f"channel {session_id!r} not found")
+                    raise SessionNotFoundError(_said(f"channel {session_id!r} not found", resp))
                 case HTTPStatus.UNAUTHORIZED | HTTPStatus.FORBIDDEN:
-                    raise AuthError(f"auth error ({resp.status_code})")
+                    raise AuthError(_said(f"auth error ({resp.status_code})", resp))
                 case HTTPStatus.TOO_MANY_REQUESTS:
-                    raise RateLimitedError(_retry_after(resp))
+                    raise _rate_limited(resp)
                 case status if status in TRANSIENT_STATUS_CODES and attempt < max_retries:
                     continue
                 case _:
-                    resp.raise_for_status()
+                    _raise_for_status(resp)
                     return _parse_commands(resp)
         return None
 
@@ -138,9 +138,9 @@ class CommandExchange:
         body = {"result": result, "error": error, "command_uid": command_uid}
         resp = await self._client.post(url, json=body, timeout=timeout)
         if resp.status_code in {HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN}:
-            raise AuthError(f"auth error posting result ({resp.status_code})")
+            raise AuthError(_said(f"auth error posting result ({resp.status_code})", resp))
         if resp.status_code == HTTPStatus.TOO_MANY_REQUESTS:
-            raise RateLimitedError(_retry_after(resp))
+            raise _rate_limited(resp)
         if resp.status_code == HTTPStatus.CONFLICT:
             # Another delivery of the same command_uid already landed; the result is recorded.
             return
@@ -148,12 +148,46 @@ class CommandExchange:
             logger.warning("platform no longer knows command %s; dropping its result", command_id)
             return
         _raise_if_gone(resp, command_id)
-        resp.raise_for_status()
+        _raise_for_status(resp)
 
 
 def _raise_if_gone(resp: httpx.Response, channel: str) -> None:
     if resp.status_code == HTTPStatus.GONE:
-        raise ChannelClosedError(f"channel for {channel!r} is closed")
+        raise ChannelClosedError(_said(f"channel for {channel!r} is closed", resp))
+
+
+def _rate_limited(resp: httpx.Response) -> RateLimitedError:
+    return RateLimitedError(_retry_after(resp), _platform_message(resp))
+
+
+def _raise_for_status(resp: httpx.Response) -> None:
+    """``raise_for_status`` with the platform's own words in the error."""
+    if resp.is_error:
+        raise httpx.HTTPStatusError(
+            _said(f"HTTP {resp.status_code} from {resp.request.method} {resp.request.url.path}", resp),
+            request=resp.request,
+            response=resp,
+        )
+
+
+def _said(text: str, resp: httpx.Response) -> str:
+    message = _platform_message(resp)
+    return f"{text}: {message}" if message else text
+
+
+def _platform_message(resp: httpx.Response) -> str | None:
+    """Why the platform refused, from its error body (`message`, or a FastAPI string `detail`), when it says."""
+    try:
+        body = resp.json()
+    except ValueError:
+        return None
+    if not isinstance(body, dict):
+        return None
+    for field in ("message", "detail"):
+        value = body.get(field)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
 def _retry_after(resp: httpx.Response) -> float:
