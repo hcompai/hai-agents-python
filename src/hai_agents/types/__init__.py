@@ -111,6 +111,7 @@ if typing.TYPE_CHECKING:
     from .page_skill import PageSkill
     from .page_skill_revision_record import PageSkillRevisionRecord
     from .page_webhook_record import PageWebhookRecord
+    from .patch_environment_mode_visual import PatchEnvironmentModeVisual
     from .pause_schedule import PauseSchedule
     from .policy_event import PolicyEvent
     from .proxy_pool import ProxyPool
@@ -316,6 +317,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PageSkill": ".page_skill",
     "PageSkillRevisionRecord": ".page_skill_revision_record",
     "PageWebhookRecord": ".page_webhook_record",
+    "PatchEnvironmentModeVisual": ".patch_environment_mode_visual",
     "PauseSchedule": ".pause_schedule",
     "PolicyEvent": ".policy_event",
     "ProxyPool": ".proxy_pool",
@@ -539,6 +541,7 @@ __all__ = [
     "PageSkill",
     "PageSkillRevisionRecord",
     "PageWebhookRecord",
+    "PatchEnvironmentModeVisual",
     "PauseSchedule",
     "PolicyEvent",
     "ProxyPool",

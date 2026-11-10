@@ -9266,43 +9266,26 @@
             "title": "Session Id"
           },
           "mode": {
-            "anyOf": [
+            "oneOf": [
               {
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/BrowserVisualMode"
-                  },
-                  {
-                    "$ref": "#/components/schemas/BrowserTextMode"
-                  }
-                ],
-                "discriminator": {
-                  "propertyName": "type",
-                  "mapping": {
-                    "text": "#/components/schemas/BrowserTextMode",
-                    "visual": "#/components/schemas/BrowserVisualMode"
-                  }
-                }
+                "$ref": "#/components/schemas/PatchEnvironmentModeVisual"
               },
               {
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/DesktopVisualMode"
-                  },
-                  {
-                    "$ref": "#/components/schemas/DesktopShellMode"
-                  }
-                ],
-                "discriminator": {
-                  "propertyName": "type",
-                  "mapping": {
-                    "shell": "#/components/schemas/DesktopShellMode",
-                    "visual": "#/components/schemas/DesktopVisualMode"
-                  }
-                }
+                "$ref": "#/components/schemas/BrowserTextMode"
+              },
+              {
+                "$ref": "#/components/schemas/DesktopShellMode"
               }
             ],
-            "title": "Mode"
+            "title": "Mode",
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "shell": "#/components/schemas/DesktopShellMode",
+                "text": "#/components/schemas/BrowserTextMode",
+                "visual": "#/components/schemas/PatchEnvironmentModeVisual"
+              }
+            }
           },
           "lazy": {
             "type": "boolean",
@@ -9394,6 +9377,39 @@
         "type": "object",
         "title": "PatchEnvironment",
         "description": "Partial environment update."
+      },
+      "PatchEnvironmentModeVisual": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "visual",
+            "title": "Type",
+            "default": "visual"
+          },
+          "width": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Height"
+          },
+          "markdown": {
+            "type": "boolean",
+            "title": "Markdown"
+          },
+          "settle_s": {
+            "type": "number",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Settle S"
+          }
+        },
+        "type": "object",
+        "title": "PatchEnvironmentModeVisual",
+        "description": "The `visual` fields of every kind that has them; the stored kind validates them."
       },
       "PatchSkill": {
         "properties": {
