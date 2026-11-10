@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 import sys
 import threading
 import types
@@ -648,6 +649,45 @@ class TestChannelSetup:
             transport=httpx.MockTransport(lambda request: httpx.Response(429, headers={"Retry-After": "0"}))
         ) as client:
             with pytest.raises(RuntimeError, match="rate-limiting"):
+                await bridge._open_channel(CommandExchange(client, "http://test"))
+
+    async def test_429_gives_up_with_the_platforms_reason(self, monkeypatch):
+        async def instant_sleep(self, seconds: float) -> bool:
+            return False
+
+        monkeypatch.setattr(FakeBridge, "_interruptible_sleep", instant_sleep)
+        from hai_agents_local.transport import CommandExchange
+
+        full = {"message": "capacity is temporarily full. Please try again later.", "detail": [{"type": "capacity"}]}
+        bridge = FakeBridge(api_key="k")
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda request: httpx.Response(429, json=full, headers={"Retry-After": "0"}))
+        ) as client:
+            with pytest.raises(RuntimeError, match="refused command-channel setup: capacity is temporarily full"):
+                await bridge._open_channel(CommandExchange(client, "http://test"))
+
+    @pytest.mark.parametrize(
+        ("status", "body", "error", "words"),
+        [
+            (401, {"message": "API key revoked"}, AuthError, "auth error checking channel (401): API key revoked"),
+            (400, {"detail": "unknown agent surferh"}, httpx.HTTPStatusError, "HTTP 400 from POST"),
+            (400, {"detail": "unknown agent surferh"}, httpx.HTTPStatusError, ": unknown agent surferh"),
+            (400, "not json", httpx.HTTPStatusError, "HTTP 400 from POST /api/v1/trajectories/"),
+        ],
+    )
+    async def test_errors_carry_the_platforms_words(self, status, body, error, words):
+        from hai_agents_local.transport import CommandExchange
+
+        def responder(request: httpx.Request) -> httpx.Response:
+            if request.method == "GET" and status == 400:
+                return httpx.Response(404)
+            if isinstance(body, dict):
+                return httpx.Response(status, json=body)
+            return httpx.Response(status, text=body)
+
+        bridge = FakeBridge(api_key="k")
+        async with httpx.AsyncClient(transport=httpx.MockTransport(responder)) as client:
+            with pytest.raises(error, match=re.escape(words)):
                 await bridge._open_channel(CommandExchange(client, "http://test"))
 
     async def test_auth_error_is_not_retried(self):

@@ -16,6 +16,7 @@ class ChannelClosedError(Exception):
 class RateLimitedError(Exception):
     """The platform asked the bridge to back off polling."""
 
-    def __init__(self, retry_after: float) -> None:
-        super().__init__(f"rate limited; retry after {retry_after:.0f}s")
+    def __init__(self, retry_after: float, reason: str | None = None) -> None:
+        super().__init__(reason or f"rate limited; retry after {retry_after:.0f}s")
         self.retry_after = retry_after
+        self.reason = reason
