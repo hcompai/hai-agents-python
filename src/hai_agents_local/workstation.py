@@ -25,10 +25,10 @@ INSTALL_HINT = "A desktop with a shell requires extra deps. Install with: pip in
 
 
 class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
-    """Serves desktops with ``shell: true`` with a shell in ~/hai/<session_id>, running as the current user."""
+    """Serves shell-mode desktops with a shell in ~/hai/<session_id>, running as the current user."""
 
     environment_kind = "workstation"
-    environment = {"kind": "desktop", "shell": True}
+    environment = {"kind": "desktop", "mode": {"type": "shell"}}
     drives_desktop = True
 
     def __init__(
