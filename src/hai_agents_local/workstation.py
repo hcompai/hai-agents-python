@@ -23,6 +23,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 INSTALL_HINT = "A desktop with a shell requires extra deps. Install with: pip install 'hai-agents[workstation]'"
+STARTER_ALLOWLIST = """\
+# Commands the agent runs on this machine without asking, one prefix a line. Any other waits for your approval.
+# `cua` sees and drives this screen: its clicks and keys do whatever you can do here, outside any sandbox.
+cua
+"""
 
 
 class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
@@ -50,6 +55,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             policy: This machine's allowlist file, one command prefix a line; defaults to ``HAI_SHELL_POLICY``.
                 With one, the shell runs the commands it covers and holds any other until the session's client
                 approves it, and the agent's file tools stay inside the workspace. Without one, every command runs.
+                A file that does not exist yet starts with ``cua`` allowed.
             sandbox: This machine's sandbox-runtime settings file; defaults to ``HAI_SHELL_SANDBOX`` and needs
                 ``policy``. With one, every command runs under ``srt`` by its rules: it writes in the workspace
                 and reaches the ``cua`` daemon, which this bridge starts outside the sandbox.
@@ -88,7 +94,12 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         if self.policy:
             from hai_drivers.code_sandbox.local.policy import SafetyPolicy
 
-            policy = SafetyPolicy(self.policy, self.sandbox, **(_host_cua(environment) if self.sandbox else {}))
+            allowed = Path(self.policy).expanduser()
+            if not allowed.exists():
+                allowed.parent.mkdir(parents=True, exist_ok=True)
+                allowed.write_text(STARTER_ALLOWLIST, encoding="utf-8")
+                logger.info("wrote a starter allowlist: %s", allowed)
+            policy = SafetyPolicy(allowed, self.sandbox, **(_host_cua(environment) if self.sandbox else {}))
             logger.info("commands outside %s wait for approval", policy.allowed_path)
             if policy.sandbox_path:
                 logger.info("commands run confined by %s", policy.sandbox_path)

@@ -1038,6 +1038,20 @@ class TestDriverInterfaces:
         finally:
             bridge._driver.close()
 
+    def test_workstation_starts_a_missing_allowlist_with_cua_and_keeps_an_existing_one(self, tmp_path):
+        pytest.importorskip("hai_drivers.code_sandbox.local.policy")
+        from hai_drivers.code_sandbox.local.policy import SafetyPolicy
+
+        allowed = tmp_path / "config" / "allowed"
+        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), policy=str(allowed))
+        bridge.create_driver().close()
+        assert SafetyPolicy(allowed).allows("cua shot && cua click 3")
+        assert not SafetyPolicy(allowed).allows("echo hi")
+
+        allowed.write_text("echo\n")
+        bridge.create_driver().close()
+        assert allowed.read_text() == "echo\n"
+
     @pytest.mark.skipif(os.name == "nt", reason="the sandbox runs on macOS and Linux")
     def test_workstation_runs_commands_under_srt_by_the_machine_sandbox_settings(self, tmp_path, monkeypatch):
         pytest.importorskip("hai_drivers.code_sandbox.local.policy")

@@ -1508,7 +1508,8 @@ def local_desktop(
         "--policy",
         hidden=True,
         help="With --shell, this machine's allowlist file, one command prefix a line: a command it does not "
-        "cover waits for approval. Defaults to $HAI_SHELL_POLICY; without one every command runs.",
+        "cover waits for approval. Created with `cua` allowed when missing. Defaults to $HAI_SHELL_POLICY; "
+        "without one every command runs.",
     ),
     sandbox: str | None = typer.Option(
         None,
