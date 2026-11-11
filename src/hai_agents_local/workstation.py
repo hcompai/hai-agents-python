@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .bridge import LocalBridge, TokenSource
-from .config import shell_policy
+from .config import shell_policy, shell_sandbox
 from .desktop import ensure_macos_input_permissions
 
 if TYPE_CHECKING:
@@ -42,6 +42,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         session_id: str | None = None,
         environment_variables: Mapping[str, str] | None = None,
         policy: str | None = None,
+        sandbox: str | None = None,
     ) -> None:
         """Build the bridge.
 
@@ -49,11 +50,17 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             policy: This machine's allowlist file, one command prefix a line; defaults to ``HAI_SHELL_POLICY``.
                 With one, the shell runs the commands it covers and holds any other until the session's client
                 approves it, and the agent's file tools stay inside the workspace. Without one, every command runs.
+            sandbox: This machine's sandbox-runtime settings file; defaults to ``HAI_SHELL_SANDBOX`` and needs
+                ``policy``. With one, every command runs under ``srt`` by its rules: it writes in the workspace
+                and reaches the ``cua`` daemon, which this bridge starts outside the sandbox.
         """
         super().__init__(environment_id, api_key=api_key, base_url=base_url, session_id=session_id)
         self.workspace = Path(workspace).expanduser() if workspace else Path.home() / "hai" / self.session_id
         self.environment_variables = dict(environment_variables or {})
         self.policy = policy or shell_policy()
+        self.sandbox = sandbox or shell_sandbox()
+        if self.sandbox and not self.policy:
+            raise ValueError("a sandbox needs a policy: the allowlist names the commands that run without approval")
 
     def preflight(self) -> None:
         if sys.platform == "darwin":
@@ -70,23 +77,22 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             raise ImportError(INSTALL_HINT)
         subprocess.run([desk, "aliases"], check=True, capture_output=True)
         logger.info("workstation workspace: %s", self.workspace)
+        environment = {
+            **self.environment_variables,
+            "COORDINATE_SYSTEM": "0-1000",
+            "CUA_CURSOR": os.environ.get("CUA_CURSOR", "off"),
+            "CUA_SESSION": self.session_id,
+            "PATH": os.pathsep.join([os.path.dirname(desk), path]),
+        }
         policy = None
         if self.policy:
             from hai_drivers.code_sandbox.local.policy import SafetyPolicy
 
-            policy = SafetyPolicy(self.policy)
+            policy = SafetyPolicy(self.policy, self.sandbox, **(_host_cua(environment) if self.sandbox else {}))
             logger.info("commands outside %s wait for approval", policy.allowed_path)
-        return LocalCodeSandbox(
-            str(self.workspace),
-            environment_variables={
-                **self.environment_variables,
-                "COORDINATE_SYSTEM": "0-1000",
-                "CUA_CURSOR": os.environ.get("CUA_CURSOR", "off"),
-                "CUA_SESSION": self.session_id,
-                "PATH": os.pathsep.join([os.path.dirname(desk), path]),
-            },
-            policy=policy,
-        )
+            if policy.sandbox_path:
+                logger.info("commands run confined by %s", policy.sandbox_path)
+        return LocalCodeSandbox(str(self.workspace), environment_variables=environment, policy=policy)
 
     async def interrupt_driver(self) -> None:
         # This bridge creates one sandbox per run; close owns only that run's children.
@@ -97,3 +103,17 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         from hai_drivers.code_sandbox.interface import ManagedCodeSandboxInterface
 
         return ManagedCodeSandboxInterface
+
+
+def _host_cua(environment: dict[str, str]) -> dict[str, list[Path]]:
+    """Start the cua daemon here, where it can drive the screen, and give the confined commands its socket."""
+    from cua_cli.config import load
+
+    host = {**os.environ, **environment}
+    started = subprocess.run(["cua", "windows"], env=host, capture_output=True, text=True)
+    if started.returncode:
+        raise RuntimeError(f"the cua daemon did not start: {(started.stderr or started.stdout).strip()}")
+    cua = load(host)
+    # With CUA_SOCKET set, a cua command never starts a daemon: one started inside the sandbox cannot see the screen.
+    environment["CUA_SOCKET"] = str(cua.socket)
+    return {"writable_paths": [cua.state()], "socket_paths": [cua.socket]}

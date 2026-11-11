@@ -1510,12 +1510,19 @@ def local_desktop(
         help="With --shell, this machine's allowlist file, one command prefix a line: a command it does not "
         "cover waits for approval. Defaults to $HAI_SHELL_POLICY; without one every command runs.",
     ),
+    sandbox: str | None = typer.Option(
+        None,
+        "--sandbox",
+        hidden=True,
+        help="With --policy, this machine's sandbox-runtime settings file: every command runs under srt by its "
+        "rules and writes in the workspace. Defaults to $HAI_SHELL_SANDBOX; without one commands run unconfined.",
+    ),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""
     from hai_agents_local import PyautoguiDesktopBridge, WorkstationBridge
 
     if shell:
-        _run_bridge(_state(ctx), WorkstationBridge, session_id, workspace=workspace, policy=policy)
+        _run_bridge(_state(ctx), WorkstationBridge, session_id, workspace=workspace, policy=policy, sandbox=sandbox)
         return
     if image_format not in ("png", "jpeg", "webp"):
         _raise_cli_error(ValueError(f"--image-format must be png, jpeg, or webp; got {image_format!r}"))

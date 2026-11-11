@@ -1,10 +1,12 @@
 import asyncio
 import json
 import logging
+import os
 import re
 import sys
 import threading
 import types
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -1035,6 +1037,38 @@ class TestDriverInterfaces:
             assert error is None and (tmp_path / "workspace" / "made").exists()
         finally:
             bridge._driver.close()
+
+    @pytest.mark.skipif(os.name == "nt", reason="the sandbox runs on macOS and Linux")
+    def test_workstation_runs_commands_under_srt_by_the_machine_sandbox_settings(self, tmp_path, monkeypatch):
+        pytest.importorskip("hai_drivers.code_sandbox.local.policy")
+        from hai_agents_local import workstation
+
+        srt = tmp_path / "bin" / "srt"
+        srt.parent.mkdir()
+        srt.write_text('#!/bin/sh\nSRT_SETTINGS="$2" exec bash -c "$4"\n')
+        srt.chmod(0o755)
+        monkeypatch.setenv("PATH", f"{srt.parent}{os.pathsep}{os.environ['PATH']}")
+        monkeypatch.setattr(workstation, "_host_cua", lambda environment: {"socket_paths": ["/tmp/cua.sock"]})
+        allowed, settings = tmp_path / "allowed", tmp_path / "sandbox.json"
+        allowed.write_text("echo\n")
+        settings.write_text(
+            '{"network": {"allowedDomains": [], "deniedDomains": []},'
+            ' "filesystem": {"denyRead": [], "allowWrite": [], "denyWrite": []}}'
+        )
+        with pytest.raises(ValueError, match="needs a policy"):
+            WorkstationBridge(api_key="k", sandbox=str(settings))
+        bridge = WorkstationBridge(
+            api_key="k", workspace=str(tmp_path / "workspace"), policy=str(allowed), sandbox=str(settings)
+        )
+        bridge._driver = bridge.create_driver()
+        try:
+            result, error = bridge._dispatch("execute", {"command": 'echo "$SRT_SETTINGS"'})
+            assert error is None
+            applied = json.loads(Path(result["stdout"].strip()).read_text())
+        finally:
+            bridge._driver.close()
+        assert applied["filesystem"]["allowWrite"] == [str((tmp_path / "workspace").resolve())]
+        assert applied["network"]["allowUnixSockets"] == ["/tmp/cua.sock"]
 
 
 class ServingBridge(FakeBridge):
