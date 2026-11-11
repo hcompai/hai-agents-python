@@ -1058,7 +1058,7 @@ class TestDriverInterfaces:
 
     @pytest.mark.skipif(os.name == "nt", reason="the sandbox runs on macOS and Linux")
     def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(self, tmp_path, monkeypatch):
-        pytest.importorskip("hai_drivers.code_sandbox.local.srt")
+        pytest.importorskip("hai_drivers.code_sandbox.local.sandbox_runtime")
         from hai_agents_local import workstation
 
         monkeypatch.setenv("HOME", str(tmp_path))

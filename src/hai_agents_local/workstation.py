@@ -111,12 +111,12 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             policy = Allowlist(allowed)
             logger.info("commands outside %s wait for approval", allowed)
         if self.sandbox:
-            from hai_drivers.code_sandbox.local.srt import Srt
+            from hai_drivers.code_sandbox.local.sandbox_runtime import SandboxRuntime
 
             if shutil.which("srt") is None:
                 raise RuntimeError(SANDBOX_HINT)
             settings = _starting_with(self.sandbox, _starter_sandbox())
-            sandbox = Srt(settings, protected=[policy.path] if policy else [], **_host_cua(environment))
+            sandbox = SandboxRuntime(settings, protected=[policy.path] if policy else [], **_host_cua(environment))
             logger.info("commands run confined by %s", settings)
         else:
             logger.warning("commands run unconfined, as you: no sandbox is on")
