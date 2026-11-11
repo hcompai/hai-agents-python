@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+import sys
 
+from hai_agents.client import credentials_path
 from hai_agents.environment import HaiAgentsEnvironment
 
 BASE_URL_ENV_VAR = "HAI_API_BASE_URL"
@@ -26,8 +28,12 @@ def shell_policy() -> str | None:
 
 
 def shell_sandbox() -> str | None:
-    """This machine's sandbox-runtime settings file for shell desktops, when it has one."""
-    return os.getenv(SHELL_SANDBOX_ENV_VAR, "").strip() or None
+    """This machine's sandbox-runtime settings file for shell desktops; None runs their commands unconfined."""
+    value = os.getenv(SHELL_SANDBOX_ENV_VAR, "").strip()
+    if value.lower() in _FLAG_FALSE:
+        return None
+    # Confinement is the default where it is proven: macOS. Elsewhere it takes the variable.
+    return value or (str(credentials_path().with_name("sandbox.json")) if sys.platform == "darwin" else None)
 
 
 def auto_bridges_enabled() -> bool:

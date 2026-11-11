@@ -1536,15 +1536,20 @@ def local_desktop(
         None,
         "--sandbox",
         hidden=True,
-        help="With --policy, this machine's sandbox-runtime settings file: every command runs under srt by its "
-        "rules and writes in the workspace. Defaults to $HAI_SHELL_SANDBOX; without one commands run unconfined.",
+        help="With --shell, this machine's sandbox-runtime settings file: every command runs under srt by its "
+        "rules and writes in the workspace. Created with starter rules when missing. Defaults to "
+        "$HAI_SHELL_SANDBOX, else on macOS to sandbox.json beside the stored credentials.",
+    ),
+    no_sandbox: bool = typer.Option(
+        False, "--no-sandbox", hidden=True, help="With --shell, run commands unconfined, as you."
     ),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""
     from hai_agents_local import PyautoguiDesktopBridge, WorkstationBridge
 
     if shell:
-        _run_bridge(_state(ctx), WorkstationBridge, session_id, workspace=workspace, policy=policy, sandbox=sandbox)
+        confinement = False if no_sandbox else sandbox
+        _run_bridge(_state(ctx), WorkstationBridge, session_id, workspace=workspace, policy=policy, sandbox=confinement)
         return
     if image_format not in ("png", "jpeg", "webp"):
         _raise_cli_error(ValueError(f"--image-format must be png, jpeg, or webp; got {image_format!r}"))
