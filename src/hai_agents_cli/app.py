@@ -656,7 +656,12 @@ class _Conversation:
         steering = None
         if not self.controls_machine and _interactive() and keys.supported():
             steering = steer.Steering(
-                self.client, str(self.session.id), feed, err_console, local_command=self._command_mid_turn
+                self.client,
+                str(self.session.id),
+                feed,
+                err_console,
+                local_command=self._command_mid_turn,
+                box=ui.InputBox(text=self._draft),
             )
         with steering.watch() if steering else contextlib.nullcontext():
             try:
