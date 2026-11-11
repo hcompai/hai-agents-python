@@ -144,11 +144,11 @@ def _starting_with(path: str, starter: str) -> Path:
 
 
 def _starter_sandbox() -> str:
-    """Sandbox-runtime settings to start from: the package registries reachable, the usual secrets unreadable."""
+    """Sandbox-runtime settings to start from: the package registries reachable, the usual secrets unreadable, git usable."""
     secrets = [*STARTER_SECRETS, str(credentials_path().parent)]
     rules = {
         "network": {"allowedDomains": STARTER_REGISTRIES, "deniedDomains": []},
-        "filesystem": {"denyRead": secrets, "allowWrite": [], "denyWrite": []},
+        "filesystem": {"denyRead": secrets, "allowWrite": [], "denyWrite": [], "allowGitConfig": True},
     }
     return json.dumps(rules, indent=2) + "\n"
 

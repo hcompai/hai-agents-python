@@ -1089,6 +1089,7 @@ class TestDriverInterfaces:
             bridge._driver.close()
         assert applied["filesystem"]["allowWrite"] == [str((tmp_path / "workspace").resolve())]
         assert applied["filesystem"]["denyRead"][-1] == str(settings.parent)
+        assert applied["filesystem"]["allowGitConfig"] is True
         assert applied["network"]["allowedDomains"] == json.loads(settings.read_text())["network"]["allowedDomains"]
         assert applied["network"]["allowUnixSockets"] == ["/tmp/cua.sock"]
 
