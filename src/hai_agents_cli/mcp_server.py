@@ -16,6 +16,7 @@ from mcp.server.fastmcp import Context, FastMCP
 
 from hai_agents import AsyncClient
 from hai_agents_common import credentials
+from hai_agents_common.jsonable import to_jsonable
 from hai_agents_local.killswitch import KILL_SWITCH_UNAVAILABLE_HINT, StopSentinel, arm_esc_listener
 from hai_agents_local.routing import split_revision
 
@@ -113,11 +114,19 @@ async def run_agent(
                 steps = 0
                 async for event in handle.stream():
                     steps = await _report(ctx, event, steps)
+                    if _held(event):
+                        break
                 result = await handle.wait_for_completion()
         finally:
             # A settled session keeps its machine claimed; only a shield lets the cancel outlive the call's own.
             with anyio.CancelScope(shield=True), contextlib.suppress(Exception):
                 await handle.cancel()
+    if held := getattr(result, "pending_approvals", None):
+        asked = "; ".join(" ".join(tools.label(request["tool_req"])) for request in to_jsonable(held))
+        raise RuntimeError(
+            f"the agent asked to {asked}, which waits on a person's approval this host cannot give. "
+            "The run was ended: the user can run the task with `holo` in a terminal and answer there."
+        )
     if result.status not in ("completed", "idle"):
         if StopSentinel(started_at).stop_requested():
             return "The user stopped this run. Do not run it again unless they ask."
@@ -125,6 +134,16 @@ async def run_agent(
     if result.answer is None or isinstance(result.answer, str):
         return result.answer or ""
     return json.dumps(result.answer, default=str)
+
+
+def _held(event: Any) -> bool:
+    """The session waits on an approval, which ends no stream by itself."""
+    kind, data, _ = ui.unwrap(event)
+    return (
+        kind == "ActiveStateChangeEvent"
+        and data.get("state") == "awaiting_tool_results"
+        and bool(data.get("pending_approvals"))
+    )
 
 
 async def _report(ctx: Context, event: Any, steps: int) -> int:

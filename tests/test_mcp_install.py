@@ -215,6 +215,47 @@ async def test_a_desktop_run_streams_progress_under_the_kill_switch_and_always_e
     assert progress == ["Wait"] and Handle.cancelled and switch == ["armed", "disarmed"]
 
 
+async def test_a_held_call_ends_the_run_and_tells_the_host_what_waits(monkeypatch) -> None:
+    from mcp.shared.memory import create_connected_server_and_client_session
+
+    from hai_agents_cli import mcp_server
+
+    held = {"tool_req": {"id": "call_1", "tool_name": "shell", "args": {"command": "rm -rf build"}}, "requirements": []}
+
+    class Handle:
+        id = "sess_1"
+        cancelled = False
+
+        async def stream(self):
+            yield {
+                "type": "ActiveStateChangeEvent",
+                "data": {"state": "awaiting_tool_results", "pending_approvals": [held]},
+            }
+            pytest.fail("the stream of a held session never ends")
+
+        async def wait_for_completion(self):
+            return SimpleNamespace(status="awaiting_tool_results", answer=None, error=None, pending_approvals=[held])
+
+        async def cancel(self):
+            Handle.cancelled = True
+
+    class Client:
+        sessions = SimpleNamespace(bridged_kinds=lambda session_id: [])
+
+        async def start_session(self, **params):
+            return Handle()
+
+        async def aclose(self):
+            pass
+
+    monkeypatch.setattr(mcp_server.credentials, "make_async_client", Client)
+
+    async with create_connected_server_and_client_session(mcp_server.server) as session:
+        result = await session.call_tool("run_agent", {"task": "clean up"})
+
+    assert result.isError and "run rm -rf build" in result.content[0].text and Handle.cancelled
+
+
 async def test_a_run_cancelled_while_its_session_is_created_cancels_that_session() -> None:
     import asyncio
 
