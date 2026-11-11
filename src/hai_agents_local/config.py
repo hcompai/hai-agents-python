@@ -16,6 +16,7 @@ SHELL_SANDBOX_ENV_VAR = "HAI_SHELL_SANDBOX"
 DEFAULT_BASE_URL = HaiAgentsEnvironment.EU.value
 
 _FLAG_FALSE = {"0", "false", "no"}
+_FLAG_TRUE = {"1", "true", "yes"}
 
 
 def default_base_url() -> str:
@@ -32,8 +33,10 @@ def shell_sandbox() -> str | None:
     value = os.getenv(SHELL_SANDBOX_ENV_VAR, "").strip()
     if value.lower() in _FLAG_FALSE:
         return None
+    if value and value.lower() not in _FLAG_TRUE:
+        return value
     # Confinement is the default where it is proven: macOS. Elsewhere it takes the variable.
-    return value or (str(credentials_path().with_name("sandbox.json")) if sys.platform == "darwin" else None)
+    return str(credentials_path().with_name("sandbox.json")) if value or sys.platform == "darwin" else None
 
 
 def auto_bridges_enabled() -> bool:

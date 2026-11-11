@@ -1068,6 +1068,8 @@ class TestDriverInterfaces:
         settings = tmp_path / ".config" / "hai" / "sandbox.json"
         assert WorkstationBridge(api_key="k").sandbox == (str(settings) if sys.platform == "darwin" else None)
         assert WorkstationBridge(api_key="k", sandbox=False).sandbox is None
+        monkeypatch.setenv("HAI_SHELL_SANDBOX", "1")
+        assert WorkstationBridge(api_key="k").sandbox == str(settings)
         bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), sandbox=str(settings))
 
         monkeypatch.setenv("PATH", os.defpath)
