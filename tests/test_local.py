@@ -3,6 +3,8 @@ import json
 import logging
 import os
 import re
+import shutil
+import subprocess
 import sys
 import threading
 import types
@@ -1070,30 +1072,81 @@ class TestDriverInterfaces:
         assert WorkstationBridge(api_key="k", sandbox=False).sandbox is None
         monkeypatch.setenv("HAI_SHELL_SANDBOX", "1")
         assert WorkstationBridge(api_key="k").sandbox == str(settings)
-        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), sandbox=str(settings))
+        passed = {"PASSED_TOKEN": "p"}
+        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), environment_variables=passed)
 
         monkeypatch.setenv("PATH", os.defpath)
-        with pytest.raises(RuntimeError, match="--no-sandbox"):
-            bridge.create_driver()
+        monkeypatch.setenv("SOME_API_KEY", "s")
+        monkeypatch.setenv("PASSED_TOKEN", "h")
+        monkeypatch.setattr(workstation, "SRT_HOMES", [])
+        with pytest.raises(RuntimeError, match="HAI_SHELL_SANDBOX=0"):
+            bridge.preflight()
 
         srt = tmp_path / "bin" / "srt"
         srt.parent.mkdir()
         srt.write_text('#!/bin/sh\nSRT_SETTINGS="$2" exec bash -c "$4"\n')
         srt.chmod(0o755)
-        monkeypatch.setenv("PATH", f"{srt.parent}{os.pathsep}{os.environ['PATH']}")
+        monkeypatch.setattr(workstation, "SRT_HOMES", [str(tmp_path / "*")])
+
+        def applied() -> dict:
+            bridge._driver = bridge.create_driver()
+            try:
+                result, error = bridge._dispatch("execute", {"command": 'echo "$SRT_SETTINGS"'})
+                assert error is None
+                assert "outside the workspace" in bridge._dispatch("read_file", {"path": str(settings)})[1]
+                return json.loads(Path(result["stdout"].strip()).read_text())
+            finally:
+                bridge._driver.close()
+
+        built_in = applied()
+        assert not settings.exists()
+        assert built_in["filesystem"]["allowWrite"][0] == str((tmp_path / "workspace").resolve())
+        assert {"~/Library/Keychains", "~/.npmrc", str(settings.parent)} < set(built_in["filesystem"]["denyRead"])
+        assert "allowGitConfig" not in built_in["filesystem"]
+        assert built_in["network"]["allowedDomains"] == workstation.STARTER_REGISTRIES
+        assert built_in["network"]["allowUnixSockets"] == ["/tmp/cua.sock"]
+        unset = {variable["name"] for variable in built_in["credentials"]["envVars"]}
+        assert "SOME_API_KEY" in unset and not unset & {"PASSED_TOKEN", "PATH", "HOME"}
+
+        own = {"network": {"allowedDomains": ["example.com"], "deniedDomains": []}}
+        settings.parent.mkdir(parents=True)
+        settings.write_text(json.dumps({**own, "filesystem": {"denyRead": [], "allowWrite": [], "denyWrite": []}}))
+        theirs = applied()
+        assert theirs["network"]["allowedDomains"] == ["example.com"] and "credentials" not in theirs
+
+    @pytest.mark.skipif(
+        shutil.which("srt") is None, reason="needs Anthropic's sandbox-runtime on PATH, and the network"
+    )
+    def test_workstation_built_in_rules_install_packages_and_keep_secrets_out_of_reach(self, tmp_path, monkeypatch):
+        pytest.importorskip("hai_drivers.code_sandbox.local.sandbox_runtime")
+        from hai_agents_local import workstation
+
+        monkeypatch.setenv("HAI_SHELL_SANDBOX", str(tmp_path / "none.json"))
+        monkeypatch.setenv("SOME_API_KEY", "s")
+        monkeypatch.setattr(workstation, "_host_cua", lambda environment: {})
+        workspace = tmp_path / "workspace"
+        subprocess.run(["git", "init", "-q", str(workspace / "repo")], check=True)
+        commands = {
+            "pip": "python3 -m venv v && v/bin/pip install -q idna && v/bin/python -c 'import idna'",
+            "npm": "npm init -y > /dev/null && npm install --silent is-number && node -e 'require(\"is-number\")'",
+            "git": "cd repo && touch a && git add a && git -c user.name=a -c user.email=a@b.c commit -qm first",
+            "config": "cd repo && ! git config core.fsmonitor 'touch escaped'",
+            "token": 'test -z "$SOME_API_KEY"',
+            "secrets": "! ls ~/.ssh && ! head -c 1 ~/Library/Keychains/login.keychain-db",
+            "elsewhere": f"! touch {tmp_path}/escaped && ! curl -sf -m 10 https://example.com",
+        }
+        bridge = WorkstationBridge(api_key="k", workspace=str(workspace))
         bridge._driver = bridge.create_driver()
         try:
-            result, error = bridge._dispatch("execute", {"command": 'echo "$SRT_SETTINGS"'})
-            assert error is None
-            applied = json.loads(Path(result["stdout"].strip()).read_text())
-            assert "outside the workspace" in bridge._dispatch("read_file", {"path": str(settings)})[1]
+            failed = {
+                name: result or error
+                for name, command in commands.items()
+                for result, error in [bridge._dispatch("execute", {"command": command})]
+                if error or result["exit_code"]
+            }
         finally:
             bridge._driver.close()
-        assert applied["filesystem"]["allowWrite"] == [str((tmp_path / "workspace").resolve())]
-        assert applied["filesystem"]["denyRead"][-1] == str(settings.parent)
-        assert applied["filesystem"]["allowGitConfig"] is True
-        assert applied["network"]["allowedDomains"] == json.loads(settings.read_text())["network"]["allowedDomains"]
-        assert applied["network"]["allowUnixSockets"] == ["/tmp/cua.sock"]
+        assert not failed
 
 
 class ServingBridge(FakeBridge):

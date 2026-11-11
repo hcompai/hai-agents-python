@@ -1542,8 +1542,8 @@ def local_desktop(
         "--sandbox",
         hidden=True,
         help="With --shell, this machine's sandbox-runtime settings file: every command runs under srt by its "
-        "rules and writes in the workspace. Created with starter rules when missing. Defaults to "
-        "$HAI_SHELL_SANDBOX, else on macOS to sandbox.json beside the stored credentials.",
+        "rules and writes in the workspace. Defaults to $HAI_SHELL_SANDBOX, else on macOS to sandbox.json beside "
+        "the stored credentials; where that file does not exist, to the built-in rules.",
     ),
     no_sandbox: bool = typer.Option(
         False, "--no-sandbox", hidden=True, help="With --shell, run commands unconfined, as you."

@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+import glob
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
 import sysconfig
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import IO, TYPE_CHECKING, Literal
 
 from hai_agents.client import credentials_path
 
@@ -27,16 +30,43 @@ logger = logging.getLogger(__name__)
 
 INSTALL_HINT = "A desktop with a shell requires extra deps. Install with: pip install 'hai-agents[workstation]'"
 SANDBOX_HINT = (
-    "A desktop with a shell confines its commands with Anthropic's sandbox-runtime, which is not installed: "
-    "npm install -g @anthropic-ai/sandbox-runtime. To run them unconfined, as you: HAI_SHELL_SANDBOX=0 or --no-sandbox."
+    "A desktop with a shell confines its commands with Anthropic's sandbox-runtime, which needs Node 22.12 or later: "
+    "npm install -g @anthropic-ai/sandbox-runtime. To run them unconfined, as you: HAI_SHELL_SANDBOX=0."
 )
+# Where npm puts `srt`: an app started from the Dock gives its children a PATH without them.
+SRT_HOMES = ["/opt/homebrew/bin", "/usr/local/bin", "~/.volta/bin", "~/.npm-global/bin", "~/.nvm/versions/node/*/bin"]
 STARTER_ALLOWLIST = """\
 # Commands the agent runs on this machine without asking, one prefix a line. Any other waits for your approval.
 # `cua` sees and drives this screen: its clicks and keys do whatever you can do here, outside any sandbox.
 cua
 """
 STARTER_REGISTRIES = ["pypi.org", "files.pythonhosted.org", "registry.npmjs.org"]
-STARTER_SECRETS = ["~/.ssh", "~/.aws", "~/.gnupg", "~/.netrc", "~/.kube", "~/.config/gcloud"]
+STARTER_SECRETS = [
+    "~/.ssh",
+    "~/.aws",
+    "~/.azure",
+    "~/.gnupg",
+    "~/.netrc",
+    "~/.kube",
+    "~/.config/gcloud",
+    "~/.config/gh",
+    "~/.git-credentials",
+    "~/.docker/config.json",
+    "~/.npmrc",
+    "~/.pypirc",
+    "~/.pip",
+    "~/.config/pip",
+    "~/.codex",
+    "~/.claude.json",
+    "~/.cursor/mcp.json",
+    "~/.bash_history",
+    "~/.zsh_history",
+    "~/Library/Keychains",
+    "~/Library/Cookies",
+    "~/Library/Application Support/Google/Chrome",
+]
+_SECRET_NAME = re.compile(r"API_?KEY|ACCESS_KEY|PRIVATE_KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL", re.IGNORECASE)
+_SECRET_URL = re.compile(r"://[^/\s:@]+:[^/\s@]+@")
 
 
 class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
@@ -68,8 +98,9 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             sandbox: This machine's sandbox-runtime settings file. Every command runs under ``srt`` by its rules:
                 it writes in the workspace and reaches the ``cua`` daemon, which this bridge starts outside the
                 sandbox. Defaults to ``HAI_SHELL_SANDBOX``, else on macOS to ``sandbox.json`` beside the stored
-                credentials; a file that does not exist yet starts with the package registries reachable and the
-                usual credential folders unreadable. ``False`` runs commands unconfined.
+                credentials. Where that file does not exist, the rules are the built-in ones: the package
+                registries reachable, the usual credential files unreadable, the environment's tokens unset.
+                ``False`` runs commands unconfined.
 
         Under either, the agent's file tools stay inside the workspace.
         """
@@ -78,8 +109,11 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         self.environment_variables = dict(environment_variables or {})
         self.policy = policy or shell_policy()
         self.sandbox = None if sandbox is False else sandbox or shell_sandbox()
+        self._starter: IO[str] | None = None
 
     def preflight(self) -> None:
+        if self.sandbox:
+            _sandbox_runtime()
         if sys.platform == "darwin":
             ensure_macos_input_permissions(prompt=True)
 
@@ -113,11 +147,19 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         if self.sandbox:
             from hai_drivers.code_sandbox.local.sandbox_runtime import SandboxRuntime
 
-            if shutil.which("srt") is None:
-                raise RuntimeError(SANDBOX_HINT)
-            settings = _starting_with(self.sandbox, _starter_sandbox())
-            sandbox = SandboxRuntime(settings, protected=[policy.path] if policy else [], **_host_cua(environment))
-            logger.info("commands run confined by %s", settings)
+            srt = _sandbox_runtime()
+            settings = Path(self.sandbox).expanduser()
+            rules = f"the rules in {settings}"
+            if not settings.exists():
+                rules = f"the built-in rules; a {settings} replaces them"
+                self._starter = tempfile.NamedTemporaryFile("w", prefix="hai-sandbox-", suffix=".json")
+                json.dump(_starter_sandbox(self.environment_variables), self._starter)
+                self._starter.flush()
+                settings = Path(self._starter.name)
+            protected = [policy.path] if policy else []
+            sandbox = SandboxRuntime(settings, protected=protected, program=srt, **_host_cua(environment))
+            # A warning, so that it shows where nothing sets logging up: `holo`, `holo mcp`, a script.
+            logger.warning("shell commands are confined to %s by %s", self.workspace, rules)
         else:
             logger.warning("commands run unconfined, as you: no sandbox is on")
         return LocalCodeSandbox(str(self.workspace), environment_variables=environment, policy=policy, sandbox=sandbox)
@@ -143,14 +185,36 @@ def _starting_with(path: str, starter: str) -> Path:
     return rules
 
 
-def _starter_sandbox() -> str:
-    """Sandbox-runtime settings to start from: the package registries reachable, the usual secrets unreadable, git usable."""
+def _sandbox_runtime() -> str:
+    """This machine's `srt`, on PATH or where npm puts it."""
+    if os.name == "nt":
+        raise RuntimeError(
+            "The sandbox runs on macOS and Linux. To run commands unconfined, as you: HAI_SHELL_SANDBOX=0."
+        )
+    homes = [home for pattern in SRT_HOMES for home in sorted(glob.glob(os.path.expanduser(pattern)), reverse=True)]
+    srt = shutil.which("srt", path=os.pathsep.join([os.environ.get("PATH", os.defpath), *homes]))
+    if srt is None:
+        raise RuntimeError(SANDBOX_HINT)
+    node = os.pathsep.join([os.environ.get("PATH", os.defpath), os.path.dirname(srt)])
+    started = subprocess.run([srt, "--version"], capture_output=True, text=True, env={**os.environ, "PATH": node})
+    if started.returncode:
+        raise RuntimeError(f"{SANDBOX_HINT} {srt} did not start: {started.stderr.strip()[-300:]}")
+    return srt
+
+
+def _starter_sandbox(passed: Mapping[str, str]) -> dict[str, object]:
+    """Sandbox-runtime settings for a machine with none of its own; `passed` are the variables the host gives the agent."""
     secrets = [*STARTER_SECRETS, str(credentials_path().parent)]
-    rules = {
+    tokens = sorted(
+        name
+        for name, value in os.environ.items()
+        if name not in passed and (_SECRET_NAME.search(name) or _SECRET_URL.search(value))
+    )
+    return {
         "network": {"allowedDomains": STARTER_REGISTRIES, "deniedDomains": []},
-        "filesystem": {"denyRead": secrets, "allowWrite": [], "denyWrite": [], "allowGitConfig": True},
+        "filesystem": {"denyRead": secrets, "allowWrite": [], "denyWrite": []},
+        "credentials": {"envVars": [{"name": name, "mode": "deny"} for name in tokens]},
     }
-    return json.dumps(rules, indent=2) + "\n"
 
 
 def _host_cua(environment: dict[str, str]) -> dict[str, list[Path]]:
