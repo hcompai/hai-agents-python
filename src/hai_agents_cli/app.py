@@ -1593,7 +1593,7 @@ def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str
             **options,
         )
         bridge.preflight()
-    except (RuntimeError, ValueError, PermissionError) as exc:
+    except (RuntimeError, ValueError, PermissionError, ImportError) as exc:
         _raise_cli_error(exc)
 
     console.print(

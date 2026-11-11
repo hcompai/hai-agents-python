@@ -195,8 +195,11 @@ def _sandbox_runtime() -> str:
     srt = shutil.which("srt", path=os.pathsep.join([os.environ.get("PATH", os.defpath), *homes]))
     if srt is None:
         raise RuntimeError(SANDBOX_HINT)
-    node = os.pathsep.join([os.environ.get("PATH", os.defpath), os.path.dirname(srt)])
-    started = subprocess.run([srt, "--version"], capture_output=True, text=True, env={**os.environ, "PATH": node})
+    try:
+        from hai_drivers.code_sandbox.local.sandbox_runtime import launch
+    except ImportError as exc:
+        raise ImportError(INSTALL_HINT) from exc
+    started = subprocess.run([*launch(srt), "--version"], capture_output=True, text=True)
     if started.returncode:
         raise RuntimeError(f"{SANDBOX_HINT} {srt} did not start: {started.stderr.strip()[-300:]}")
     return srt
