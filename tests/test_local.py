@@ -1071,9 +1071,11 @@ class TestDriverInterfaces:
         bridge.create_driver().close()
         assert allowed.read_text() == "echo\n"
 
-        inside = WorkstationBridge(api_key="k", workspace=str(tmp_path), policy=str(allowed))
+        unwritten = tmp_path / "workspace" / "allowed"
+        inside = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), policy=str(unwritten))
         with pytest.raises(ValueError, match="inside the workspace"):
             inside.create_driver()
+        assert not unwritten.exists()
 
     @pytest.mark.skipif(os.name == "nt", reason="the sandbox runs on macOS and Linux")
     def test_workstation_applies_what_the_agent_asks_and_what_the_machine_set_itself_wins(
@@ -1173,6 +1175,7 @@ class TestDriverInterfaces:
         srt.write_text('#!/bin/sh\nSRT_SETTINGS="$2" exec bash -c "$4"\n')
         srt.chmod(0o755)
         monkeypatch.setattr(workstation, "SRT_HOMES", [str(tmp_path / "*")])
+        assert max(["node/v22.9.0/bin", "node/v22.12.0/bin"], key=workstation._version) == "node/v22.12.0/bin"
 
         def applied() -> dict:
             bridge._driver = bridge.create_driver()

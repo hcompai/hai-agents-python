@@ -161,9 +161,10 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         if self.policy:
             from hai_drivers.code_sandbox.local.allowlist import Allowlist
 
-            allowed = _starting_with(self.policy, STARTER_ALLOWLIST)
+            allowed = Path(self.policy).expanduser()
             if allowed.resolve().is_relative_to(self.workspace.resolve()):
                 raise ValueError(f"{allowed} is inside the workspace, where the agent writes")
+            _starting_with(allowed, STARTER_ALLOWLIST)
             policy = Allowlist(allowed, also=self.allowed_commands)
             logger.info("commands outside %s wait for approval", allowed)
         srt = self._sandbox_runtime()
@@ -224,21 +225,23 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         return ManagedCodeSandboxInterface
 
 
-def _starting_with(path: str, starter: str) -> Path:
-    """The machine's rules file at `path`, written with `starter` when it does not exist yet."""
-    rules = Path(path).expanduser()
+def _starting_with(rules: Path, starter: str) -> None:
+    """Write the machine's rules file with `starter` when it does not exist yet."""
     if not rules.exists():
         rules.parent.mkdir(parents=True, exist_ok=True)
         rules.write_text(starter, encoding="utf-8")
         logger.info("wrote starter rules: %s", rules)
-    return rules
 
 
 def _sandbox_runtime() -> str:
     """This machine's `srt`, on PATH or where npm puts it."""
     if os.name == "nt":
         raise RuntimeError("The sandbox runs on macOS and Linux.")
-    homes = [home for pattern in SRT_HOMES for home in sorted(glob.glob(os.path.expanduser(pattern)), reverse=True)]
+    homes = [
+        home
+        for pattern in SRT_HOMES
+        for home in sorted(glob.glob(os.path.expanduser(pattern)), key=_version, reverse=True)
+    ]
     srt = shutil.which("srt", path=os.pathsep.join([os.environ.get("PATH", os.defpath), *homes]))
     if srt is None:
         raise RuntimeError(f"The sandbox this session requires is not installed. {SANDBOX_HINT}")
@@ -250,6 +253,10 @@ def _sandbox_runtime() -> str:
     if started.returncode:
         raise RuntimeError(f"{srt} did not start: {started.stderr.strip()[-300:]} {SANDBOX_HINT}")
     return srt
+
+
+def _version(home: str) -> list[int]:
+    return [int(number) for number in re.findall(r"\d+", home)]
 
 
 def _starter_sandbox(passed: Mapping[str, str], domains: Sequence[str] = ()) -> dict[str, object]:
