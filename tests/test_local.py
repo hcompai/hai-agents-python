@@ -1086,7 +1086,7 @@ class TestDriverInterfaces:
             inside.create_driver()
         assert not unwritten.exists()
 
-    @pytest.mark.skipif(os.name == "nt", reason="the sandbox runs on macOS and Linux")
+    @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
     def test_workstation_applies_what_the_agent_asks_and_what_the_machine_set_itself_wins(
         self, tmp_path, monkeypatch, caplog
     ):
@@ -1147,6 +1147,13 @@ class TestDriverInterfaces:
         with pytest.raises(RuntimeError, match="requires the sandbox"):
             served()
 
+    def test_cua_runs_outside_the_sandbox_where_the_sandbox_cannot_open_its_daemon_alone(self, monkeypatch):
+        from hai_agents_local import workstation
+
+        monkeypatch.setattr(sys, "platform", "linux")
+        environment: dict[str, str] = {}
+        assert workstation._host_cua(environment) == {"outside": ["cua"]} and not environment
+
     def test_sandbox_rules_of_the_machine_s_own_confine_commands_where_confinement_is_not_the_default(
         self, tmp_path, monkeypatch
     ):
@@ -1159,7 +1166,7 @@ class TestDriverInterfaces:
         rules.write_text("{}")
         assert shell_sandbox() == str(rules)
 
-    @pytest.mark.skipif(os.name == "nt", reason="the sandbox runs on macOS and Linux")
+    @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
     def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(
         self, tmp_path, monkeypatch, caplog, request
     ):

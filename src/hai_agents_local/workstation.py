@@ -26,6 +26,7 @@ from .runtime.install import install_artifact
 from .runtime.manifest import RuntimeArtifact, platform_key
 
 if TYPE_CHECKING:
+    from cua_cli.config import Config
     from hai_drivers.code_sandbox.interface import ManagedCodeSandboxInterface
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,8 @@ logger = logging.getLogger(__name__)
 INSTALL_HINT = "A desktop with a shell requires extra deps. Install with: pip install 'hai-agents[workstation]'"
 SANDBOX_HINT = (
     "Anthropic's sandbox-runtime confines shell commands to the workspace. macOS downloads it on the first session; "
-    "elsewhere: npm install -g --omit=optional @anthropic-ai/sandbox-runtime (needs Node 22.12 or later)"
+    "elsewhere: npm install -g --omit=optional @anthropic-ai/sandbox-runtime (needs Node 22.12 or later), "
+    "then on Windows, once and as an administrator: srt windows-install"
 )
 # Standalone builds of sandbox-runtime, which need no Node: hai's publish_sandbox_runtime.sh makes and uploads them.
 SRT_CDN = "https://assets.hcompanyprod.fr/sandbox-runtime"
@@ -210,7 +212,13 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             logger.warning("shell commands run unconfined, as you. %s", SANDBOX_HINT)
         else:
             logger.warning("commands run unconfined, as you: no sandbox is on")
-        return LocalCodeSandbox(str(self.workspace), environment_variables=environment, policy=policy, sandbox=sandbox)
+        return LocalCodeSandbox(
+            str(self.workspace),
+            environment_variables=environment,
+            policy=policy,
+            sandbox=sandbox,
+            folders=[_cua({**os.environ, **environment}).state()],
+        )
 
     def _sandbox_runtime(self) -> str | None:
         """This machine's `srt`; None where commands run unconfined."""
@@ -248,8 +256,6 @@ def _starting_with(rules: Path, starter: str) -> None:
 
 def _sandbox_runtime() -> str:
     """This machine's `srt`: its own on PATH, else the pinned build, downloaded on its first use."""
-    if os.name == "nt":
-        raise RuntimeError("The sandbox runs on macOS and Linux.")
     srt = shutil.which("srt") or _pinned_sandbox_runtime()
     if srt is None:
         raise RuntimeError(f"The sandbox this session requires is not installed. {SANDBOX_HINT}")
@@ -296,15 +302,24 @@ def _starter_sandbox(passed: Mapping[str, str], domains: Sequence[str] = ()) -> 
     }
 
 
-def _host_cua(environment: dict[str, str]) -> dict[str, list[Path]]:
-    """Start the cua daemon here, where it can drive the screen, and give the confined commands its socket."""
-    from cua_cli.config import load
+def _cua(environment: Mapping[str, str]) -> Config:
+    try:
+        from cua_cli.config import load
+    except ImportError as exc:
+        raise ImportError(INSTALL_HINT) from exc
+    return load(environment)
 
+
+def _host_cua(environment: dict[str, str]) -> dict[str, Sequence[str | Path]]:
+    """What lets a confined shell drive the screen: `cua` outside the sandbox, or on macOS its daemon's socket."""
+    if sys.platform != "darwin":
+        # Only macOS opens one socket by its path: a Linux sandbox opens every socket or none, a Windows one no pipe.
+        return {"outside": ["cua"]}
     host = {**os.environ, **environment}
     started = subprocess.run(["cua", "windows"], env=host, capture_output=True, text=True)
     if started.returncode:
         raise RuntimeError(f"the cua daemon did not start: {(started.stderr or started.stdout).strip()}")
-    cua = load(host)
+    cua = _cua(host)
     # With CUA_SOCKET set, a cua command never starts a daemon: one started inside the sandbox cannot see the screen.
     environment["CUA_SOCKET"] = str(cua.socket)
     return {"writable": [cua.state()], "sockets": [cua.socket]}
