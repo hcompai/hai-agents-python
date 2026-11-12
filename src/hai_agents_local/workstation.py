@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import glob
 import json
 import logging
 import os
@@ -23,6 +21,9 @@ from hai_agents.client import credentials_path
 from .bridge import LocalBridge, TokenSource
 from .config import SHELL_SANDBOX_ENV_VAR, agent_shell_policy, shell_policy, shell_sandbox
 from .desktop import ensure_macos_input_permissions
+from .runtime.errors import LocalRuntimeError
+from .runtime.install import install_artifact
+from .runtime.manifest import RuntimeArtifact, platform_key
 
 if TYPE_CHECKING:
     from hai_drivers.code_sandbox.interface import ManagedCodeSandboxInterface
@@ -31,14 +32,17 @@ logger = logging.getLogger(__name__)
 
 INSTALL_HINT = "A desktop with a shell requires extra deps. Install with: pip install 'hai-agents[workstation]'"
 SANDBOX_HINT = (
-    "Anthropic's sandbox-runtime confines shell commands to the workspace. It installs itself on a machine with "
-    "Node 22.12 or later; by hand: npm install -g --omit=optional @anthropic-ai/sandbox-runtime"
+    "Anthropic's sandbox-runtime confines shell commands to the workspace. macOS downloads it on the first session; "
+    "elsewhere: npm install -g --omit=optional @anthropic-ai/sandbox-runtime (needs Node 22.12 or later)"
 )
-SRT_PACKAGE = "@anthropic-ai/sandbox-runtime@0.0.82"
-SRT_REGISTRY = "https://registry.npmjs.org"
+# Standalone builds of sandbox-runtime, which need no Node: hai's publish_sandbox_runtime.sh makes and uploads them.
+SRT_CDN = "https://assets.hcompanyprod.fr/sandbox-runtime"
+SRT_VERSION = "0.0.82"
+SRT_SHA256 = {
+    "darwin-arm64": "51e9de47563827184a1b50d91edbd3077c2a8ac79ffe7e7d82b7c0efa9280dca",
+    "darwin-x86_64": "09d1654458ffb79d7ffcfcf1c066257cd6a3d842afed923797f40aa8a2f4e75b",
+}
 SRT_HOME = Path.home() / ".hai" / "sandbox-runtime"
-# Where npm puts `srt`: an app started from the Dock gives its children a PATH without them.
-SRT_HOMES = ["/opt/homebrew/bin", "/usr/local/bin", "~/.volta/bin", "~/.npm-global/bin", "~/.nvm/versions/node/*/bin"]
 STARTER_ALLOWLIST = """\
 # Commands the agent runs on this machine without asking, one prefix a line. Any other waits for your approval.
 # `cua` sees and drives this screen: its clicks and keys do whatever you can do here, outside any sandbox.
@@ -113,10 +117,10 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
                 sandbox. Defaults to ``HAI_SHELL_SANDBOX``, else on macOS to ``sandbox.json`` beside the stored
                 credentials. Where that file does not exist, the rules are the built-in ones: the package
                 registries reachable, the usual credential files unreadable, the environment's tokens unset.
-                ``False`` runs commands unconfined. A machine without ``srt`` gets it installed under ``~/.hai`` on
-                its first session. Where that takes a Node it lacks, the default sandbox gives way with a warning
-                and commands run unconfined; one asked for here, by ``HAI_SHELL_SANDBOX`` or by a settings file of
-                the machine's own fails the session.
+                ``False`` runs commands unconfined. A Mac without ``srt`` downloads it under ``~/.hai`` on its
+                first session. Where there is none and none to download, the default sandbox gives way with a
+                warning and commands run unconfined; one asked for here, by ``HAI_SHELL_SANDBOX`` or by a settings
+                file of the machine's own fails the session.
             require_approval: Hold commands for approval on a machine without an allowlist too, by the one beside
                 the stored credentials.
             allowed_commands: Prefixes that run without approval besides that file's.
@@ -243,19 +247,10 @@ def _starting_with(rules: Path, starter: str) -> None:
 
 
 def _sandbox_runtime() -> str:
-    """This machine's `srt`: on PATH, where npm puts it, or installed for this user on its first use."""
+    """This machine's `srt`: its own on PATH, else the pinned build, downloaded on its first use."""
     if os.name == "nt":
         raise RuntimeError("The sandbox runs on macOS and Linux.")
-    homes = [
-        home
-        for pattern in SRT_HOMES
-        for home in sorted(glob.glob(os.path.expanduser(pattern)), key=_version, reverse=True)
-    ]
-    path = os.pathsep.join([os.environ.get("PATH", os.defpath), *homes, str(SRT_HOME / "node_modules" / ".bin")])
-    srt = shutil.which("srt", path=path)
-    if srt is None:
-        _install_sandbox_runtime(path)
-        srt = shutil.which("srt", path=path)
+    srt = shutil.which("srt") or _pinned_sandbox_runtime()
     if srt is None:
         raise RuntimeError(f"The sandbox this session requires is not installed. {SANDBOX_HINT}")
     try:
@@ -265,37 +260,25 @@ def _sandbox_runtime() -> str:
     started = subprocess.run([*launch(srt), "--version"], capture_output=True, text=True)
     if started.returncode:
         raise RuntimeError(f"{srt} did not start: {started.stderr.strip()[-300:]} {SANDBOX_HINT}")
-    return srt
+    return str(srt)
 
 
-def _install_sandbox_runtime(path: str) -> None:
-    """Install sandbox-runtime in `SRT_HOME` with the npm that `path` holds."""
-    npm = shutil.which("npm", path=path)
-    if npm is None:
-        return
-    logger.warning("installing %s in %s, once", SRT_PACKAGE, SRT_HOME)
-    SRT_HOME.parent.mkdir(parents=True, exist_ok=True)
-    # Installed aside and moved in whole: of sessions starting together, each finds none of it or all of it.
-    with tempfile.TemporaryDirectory(dir=SRT_HOME.parent, ignore_cleanup_errors=True) as aside:
-        install = [npm, "install", "--prefix", aside, "--userconfig", os.devnull, "--registry", SRT_REGISTRY]
-        install += ["--omit=optional", "--ignore-scripts", "--no-audit", "--no-fund", SRT_PACKAGE]
-        try:
-            subprocess.run(
-                install, check=True, capture_output=True, text=True, timeout=300, env={**os.environ, "PATH": path}
-            )
-        except (subprocess.SubprocessError, OSError) as error:
-            reason = getattr(error, "stderr", None) or str(error)
-            logger.warning("%s was not installed: %s", SRT_PACKAGE, reason.strip()[-300:])
-            return
-        node = Path(npm).with_name("node")
-        if node.exists():
-            (Path(aside) / "node_modules" / ".bin" / "node").symlink_to(node)
-        with contextlib.suppress(OSError):
-            os.rename(aside, SRT_HOME)
+def _pinned_sandbox_runtime() -> Path | None:
+    """The pinned `srt` under `SRT_HOME`, downloaded where a build of it is published; None where there is none."""
+    home, platform = SRT_HOME / SRT_VERSION, platform_key()
+    if _srt_in(home) or platform not in SRT_SHA256:
+        return _srt_in(home)
+    logger.warning("downloading the sandbox for shell commands into %s, once", home)
+    artifact = RuntimeArtifact(url=f"{SRT_CDN}/{SRT_VERSION}/srt-{platform}.zip", sha256=SRT_SHA256[platform])
+    try:
+        return install_artifact(artifact, home, _srt_in, "sandbox-runtime")
+    except (LocalRuntimeError, OSError) as error:
+        logger.warning("%s", error)
+        return None
 
 
-def _version(home: str) -> list[int]:
-    return [int(number) for number in re.findall(r"\d+", home)]
+def _srt_in(home: Path) -> Path | None:
+    return home / "srt" if (home / "srt").is_file() else None
 
 
 def _starter_sandbox(passed: Mapping[str, str], domains: Sequence[str] = ()) -> dict[str, object]:

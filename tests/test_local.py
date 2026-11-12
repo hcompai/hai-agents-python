@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -8,6 +9,9 @@ import subprocess
 import sys
 import threading
 import types
+import zipfile
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +33,7 @@ from hai_agents_local import (
 from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR
 from hai_agents_local.errors import AuthError, RateLimitedError, SessionNotFoundError
 from hai_agents_local.routing import localize_agent
+from hai_agents_local.runtime.manifest import platform_key
 from hai_agents_local.transport import Command, CommandExchange, deserialize_args, serialize_result
 
 API_KEY = "test-key"
@@ -1087,13 +1092,12 @@ class TestDriverInterfaces:
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
         monkeypatch.delenv("HAI_SHELL_SANDBOX")
-        monkeypatch.setenv("PATH", os.defpath)
         monkeypatch.setattr(workstation, "_host_cua", lambda environment: {})
         srt = tmp_path / "bin" / "srt"
         srt.parent.mkdir()
         srt.write_text('#!/bin/sh\nSRT_SETTINGS="$2" exec bash -c "$4"\n')
         srt.chmod(0o755)
-        monkeypatch.setattr(workstation, "SRT_HOMES", [str(tmp_path / "*")])
+        monkeypatch.setenv("PATH", os.pathsep.join([str(srt.parent), os.defpath]))
         config, folder = tmp_path / ".config" / "hai", str(tmp_path / "app")
         asks = {
             "require_approval": True,
@@ -1141,7 +1145,7 @@ class TestDriverInterfaces:
 
     @pytest.mark.skipif(os.name == "nt", reason="the sandbox runs on macOS and Linux")
     def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(
-        self, tmp_path, monkeypatch, caplog
+        self, tmp_path, monkeypatch, caplog, request
     ):
         pytest.importorskip("hai_drivers.code_sandbox.local.sandbox_runtime")
         from hai_agents_local import workstation
@@ -1160,27 +1164,30 @@ class TestDriverInterfaces:
         assert WorkstationBridge(api_key="k").sandbox == str(settings)
         bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), environment_variables=passed)
 
-        npm, srt = tmp_path / "bin" / "npm", tmp_path / ".hai" / "sandbox-runtime" / "node_modules" / ".bin" / "srt"
-        npm.parent.mkdir()
-        npm.write_text("#!/bin/sh\necho offline >&2; exit 1\n")
-        npm.chmod(0o755)
-        monkeypatch.setenv("PATH", os.pathsep.join([str(npm.parent), os.defpath]))
+        published = tmp_path / "cdn" / "9.9.9" / f"srt-{platform_key()}.zip"
+        published.parent.mkdir(parents=True)
+        with zipfile.ZipFile(published, "w") as archive:
+            archive.writestr("srt", '#!/bin/sh\nSRT_SETTINGS="$2" exec bash -c "$4"\n')
+        cdn = ThreadingHTTPServer(("127.0.0.1", 0), partial(SimpleHTTPRequestHandler, directory=str(tmp_path / "cdn")))
+        threading.Thread(target=cdn.serve_forever, daemon=True).start()
+        request.addfinalizer(cdn.shutdown)
+        srt = tmp_path / ".hai" / "sandbox-runtime" / "9.9.9" / "srt"
+        monkeypatch.setenv("PATH", os.defpath)
         monkeypatch.setenv("SOME_API_KEY", "s")
         monkeypatch.setenv("PASSED_TOKEN", "h")
-        monkeypatch.setattr(workstation, "SRT_HOMES", [])
-        monkeypatch.setattr(workstation, "SRT_HOME", srt.parents[2])
+        monkeypatch.setattr(workstation, "SRT_HOME", srt.parents[1])
+        monkeypatch.setattr(workstation, "SRT_VERSION", "9.9.9")
+        monkeypatch.setattr(workstation, "SRT_CDN", f"http://127.0.0.1:{cdn.server_port}")
+        monkeypatch.setattr(workstation, "SRT_SHA256", {platform_key(): "0" * 64})
         with pytest.raises(RuntimeError, match="sandbox-runtime"):
             bridge.preflight()
         with caplog.at_level(logging.WARNING), default.create_driver() as unconfined:
             assert unconfined.execute(f"touch {tmp_path}/outside").success and (tmp_path / "outside").exists()
-        assert "was not installed: offline" in caplog.text
+        assert "failed sha256 verification" in caplog.text and not srt.exists()
         assert "run unconfined, as you. Anthropic's sandbox-runtime" in caplog.text
 
-        npm.write_text(
-            '#!/bin/sh\nmkdir -p "$3/node_modules/.bin" && cd "$3/node_modules/.bin" && '
-            'printf \'#!/bin/sh\\nSRT_SETTINGS="$2" exec bash -c "$4"\\n\' > srt && chmod +x srt\n'
-        )
-        assert max(["node/v22.9.0/bin", "node/v22.12.0/bin"], key=workstation._version) == "node/v22.12.0/bin"
+        digest = hashlib.sha256(published.read_bytes()).hexdigest()
+        monkeypatch.setattr(workstation, "SRT_SHA256", {platform_key(): digest})
 
         def applied() -> dict:
             bridge._driver = bridge.create_driver()
@@ -1193,7 +1200,7 @@ class TestDriverInterfaces:
                 bridge._driver.close()
 
         built_in = applied()
-        assert srt.exists() and str(srt.parents[2]) in built_in["filesystem"]["denyWrite"]
+        assert srt.exists() and str(srt.parents[1]) in built_in["filesystem"]["denyWrite"]
         assert not settings.exists()
         assert built_in["filesystem"]["allowWrite"][0] == str((tmp_path / "workspace").resolve())
         assert {"~/Library/Keychains", "~/.npmrc", str(settings.parent)} < set(built_in["filesystem"]["denyRead"])
