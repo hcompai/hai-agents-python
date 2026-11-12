@@ -242,8 +242,7 @@ def needs_you(out: Console, action: str, lines: list[str], options: list[str], *
     body: list[RenderableType] = [
         Text("Needs you", style="attention"),
         Text(""),
-        Text.from_markup(f"  {action}"),
-        *(Text.from_markup(f"  {line}") for line in lines),
+        *(Text(f"  {_as_written(line)}") for line in (action, *lines)),
     ]
     if options:
         body += [Text(""), Text("Do you want to proceed?")]
@@ -252,6 +251,11 @@ def needs_you(out: Console, action: str, lines: list[str], options: list[str], *
         body.append(Text(f"{mark} {i + 1}. {option}", style=style))
     out.print(Panel(Group(*body), box=box.ROUNDED, border_style="warn", expand=False, padding=(0, 1)))
     out.print()
+
+
+def _as_written(text: str) -> str:
+    """``text`` with each character a terminal would act on or hide spelled out: what is read is what was sent."""
+    return "".join(char if char.isprintable() or char == "\n" else repr(char)[1:-1] for char in text)
 
 
 def duration(seconds: float) -> str:

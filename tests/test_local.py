@@ -30,7 +30,7 @@ from hai_agents_local import (
     SeleniumBrowserBridge,
     WorkstationBridge,
 )
-from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR
+from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR, shell_sandbox
 from hai_agents_local.errors import AuthError, RateLimitedError, SessionNotFoundError
 from hai_agents_local.routing import localize_agent
 from hai_agents_local.runtime.manifest import platform_key
@@ -85,6 +85,10 @@ class TestLocalizeAgent:
         _, [bridge], _ = localize_agent(agent, api_key=API_KEY)
         assert bridge.policy and bridge.allowed_commands == ["git status"] and bridge.require_sandbox
         assert (bridge.allowed_domains, bridge.writable_folders) == (["github.com"], ["~/Projects/app"])
+
+        agent["environments"][0]["mode"] = {"type": "shell", "allowed_commands": "git status"}
+        with pytest.raises(TypeError, match="list of strings"):
+            localize_agent(agent, api_key=API_KEY)
 
         agent["environments"][0]["mode"] = {"type": "shell"}
         _, [plain], _ = localize_agent(agent, api_key=API_KEY)
@@ -1142,6 +1146,18 @@ class TestDriverInterfaces:
         monkeypatch.setenv("HAI_SHELL_SANDBOX", "0")
         with pytest.raises(RuntimeError, match="requires the sandbox"):
             served()
+
+    def test_sandbox_rules_of_the_machine_s_own_confine_commands_where_confinement_is_not_the_default(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        monkeypatch.delenv("HAI_SHELL_SANDBOX")
+        monkeypatch.setattr(sys, "platform", "linux")
+        assert shell_sandbox() is None
+        rules = tmp_path / "hai" / "sandbox.json"
+        rules.parent.mkdir()
+        rules.write_text("{}")
+        assert shell_sandbox() == str(rules)
 
     @pytest.mark.skipif(os.name == "nt", reason="the sandbox runs on macOS and Linux")
     def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(

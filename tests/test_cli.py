@@ -187,9 +187,9 @@ def test_a_client_tool_wait_ends_the_session_and_the_next_message_starts_a_new_o
     assert ("cancel",) in client.sessions.calls
 
 
-def _held_then_done(reason: str = "not on this machine's allowlist"):
+def _held_then_done(reason: str = "not on this machine's allowlist", command: str = "rm -rf [build]"):
     held = ToolApprovalRequest(
-        tool_req=ToolRequest(id="call_1", tool_name="shell", args={"command": "rm -rf [build]"}),
+        tool_req=ToolRequest(id="call_1", tool_name="shell", args={"command": command}),
         requirements=[ApprovalRequirement(source="environment", reason=reason)],
     )
     return iter(
@@ -208,7 +208,7 @@ def _held_then_done(reason: str = "not on this machine's allowlist"):
     ids=["approve", "deny"],
 )
 def test_a_held_call_asks_the_person_at_the_terminal_and_the_turn_goes_on(monkeypatch, typed, sent) -> None:
-    client, results, followed = _RunClient(), _held_then_done(), []
+    client, results, followed = _RunClient(), _held_then_done(command="rm -rf [build] \x1b[8m"), []
     monkeypatch.setattr(app_module, "_client", lambda state: client)
     monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
     monkeypatch.setattr(app_module, "_follow", lambda *a, from_index, **k: followed.append(from_index))
@@ -218,7 +218,7 @@ def test_a_held_call_asks_the_person_at_the_terminal_and_the_turn_goes_on(monkey
     result = runner.invoke(app, ["run", "clean up", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"}, input=typed)
 
     assert result.exit_code == 0, result.output
-    assert "run rm -rf [build]" in result.output and "not on this machine's allowlist" in result.output
+    assert "run rm -rf [build] \\x1b[8m" in result.output and "not on this machine's allowlist" in result.output
     assert client.sessions.calls == [sent]
     assert followed == [0, 2]
 
@@ -246,7 +246,7 @@ def test_always_allowing_a_command_this_machine_held_adds_its_rule_to_the_allowl
     )
 
     assert result.exit_code == 0, result.output
-    assert ("always allow: rm -rf '[build]'" in result.output) == held_here
+    assert ("always allow what starts with: rm -rf '[build]'" in result.output) == held_here
     assert allowlist.path.exists() == held_here and bool(allowlist.hold("rm -rf [build]")) != held_here
     assert client.sessions.calls == [("approve", "call_1") if held_here else ("deny", "call_1", None)]
 

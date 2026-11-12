@@ -167,7 +167,9 @@ class _Walk:
             options["require_approval"] = _read(mode, "command_approval") == "required"
             options["require_sandbox"] = _read(mode, "sandbox") == "required"
             for asked in ("allowed_commands", "allowed_domains", "writable_folders"):
-                options[asked] = _read(mode, asked) or ()
+                options[asked] = given = _read(mode, asked) or ()
+                if not isinstance(given, (list, tuple)):
+                    raise TypeError(f"mode.{asked} is a list of strings, not {given!r}")
         bridge = bridge_type(
             _read(env, "id"), api_key=self.api_key, base_url=self.base_url, session_id=session_id, **options
         )

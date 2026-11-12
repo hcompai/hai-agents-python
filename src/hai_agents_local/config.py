@@ -40,9 +40,10 @@ def shell_sandbox(required: bool = False) -> str | None:
         return None
     if value and value.lower() not in _FLAG_TRUE:
         return value
-    # Confinement is the default where it is proven: macOS. Elsewhere it takes the variable, or an agent's requirement.
-    on = value or required or sys.platform == "darwin"
-    return str(credentials_path().with_name("sandbox.json")) if on else None
+    # Confinement is the default where it is proven: macOS. Elsewhere it takes the variable, the machine's own rules,
+    # or an agent's requirement.
+    rules = credentials_path().with_name("sandbox.json")
+    return str(rules) if value or required or sys.platform == "darwin" or rules.exists() else None
 
 
 def auto_bridges_enabled() -> bool:

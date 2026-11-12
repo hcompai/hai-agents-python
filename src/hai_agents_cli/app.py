@@ -982,11 +982,11 @@ def _decide(client: Any, session_id: str, held: list[Any], feed: ui.StepFeed) ->
             call = request["tool_req"]
             command = (call.get("args") or {}).get("command")
             action = f"run {command}" if isinstance(command, str) else " ".join(tools.label(call))
-            reasons = [escape(need["reason"]) for need in request["requirements"]]
+            reasons = [need["reason"] for need in request["requirements"]]
             allowlist, rules = _standing_rules(request)
             if rules:
-                reasons.append(escape(f"a = yes, and always allow: {', '.join(rules)}"))
-            ui.needs_you(err_console, escape(action), reasons, [])
+                reasons.append(f"a = yes, and always allow what starts with: {', '.join(rules)}")
+            ui.needs_you(err_console, action, reasons, [])
             choices = "y/a/N" if rules else "y/N"
             answer = typer.prompt(f"Do you want to proceed? [{choices}]", default="n", show_default=False, err=True)
             answer = answer.strip().lower()
