@@ -68,6 +68,23 @@ class TestLocalizeAgent:
         _, [bridge], _ = localize_agent(agent, api_key=API_KEY)
         assert bridge.environment_variables == {"WEB_MAX_IMAGE_WIDTH": "1280", "DESK_MAX_IMAGE_WIDTH": "1280"}
 
+    def test_a_shell_desktop_brings_what_its_mode_asks_of_the_machine(self):
+        asks = {
+            "command_approval": "required",
+            "allowed_commands": ["git status"],
+            "sandbox": "required",
+            "allowed_domains": ["github.com"],
+            "writable_folders": ["~/Projects/app"],
+        }
+        agent = {"name": "x", "environments": [{"kind": "desktop", "mode": {"type": "shell", **asks}}]}
+        _, [bridge], _ = localize_agent(agent, api_key=API_KEY)
+        assert bridge.policy and bridge.allowed_commands == ["git status"] and bridge.require_sandbox
+        assert (bridge.allowed_domains, bridge.writable_folders) == (["github.com"], ["~/Projects/app"])
+
+        agent["environments"][0]["mode"] = {"type": "shell"}
+        _, [plain], _ = localize_agent(agent, api_key=API_KEY)
+        assert plain.policy is None and not plain.require_sandbox and not plain.allowed_domains
+
     def test_second_unclaimed_env_of_same_kind_raises(self):
         agent = {
             "name": "orchestrator",
@@ -1057,6 +1074,68 @@ class TestDriverInterfaces:
         inside = WorkstationBridge(api_key="k", workspace=str(tmp_path), policy=str(allowed))
         with pytest.raises(ValueError, match="inside the workspace"):
             inside.create_driver()
+
+    @pytest.mark.skipif(os.name == "nt", reason="the sandbox runs on macOS and Linux")
+    def test_workstation_applies_what_the_agent_asks_and_what_the_machine_set_itself_wins(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        pytest.importorskip("hai_drivers.code_sandbox.local.sandbox_runtime")
+        from hai_agents_local import workstation
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.delenv("HAI_SHELL_SANDBOX")
+        monkeypatch.setenv("PATH", os.defpath)
+        monkeypatch.setattr(workstation, "_host_cua", lambda environment: {})
+        srt = tmp_path / "bin" / "srt"
+        srt.parent.mkdir()
+        srt.write_text('#!/bin/sh\nSRT_SETTINGS="$2" exec bash -c "$4"\n')
+        srt.chmod(0o755)
+        monkeypatch.setattr(workstation, "SRT_HOMES", [str(tmp_path / "*")])
+        config, folder = tmp_path / ".config" / "hai", str(tmp_path / "app")
+        asks = {
+            "require_approval": True,
+            "allowed_commands": ["echo"],
+            "require_sandbox": True,
+            "allowed_domains": ["github.com"],
+            "writable_folders": [folder],
+        }
+
+        def served(**machine) -> tuple[list[str], dict, str | None]:
+            bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), **asks, **machine)
+            bridge.preflight()
+            bridge._driver = bridge.create_driver()
+            try:
+                result, error = bridge._dispatch("execute", {"command": 'echo "$SRT_SETTINGS"'})
+                rules = json.loads(Path(result["stdout"].strip()).read_text()) if error is None else {}
+                return bridge._driver.guards(), rules, error
+            finally:
+                bridge._driver.close()
+
+        monkeypatch.setattr(workstation, "ensure_macos_input_permissions", lambda prompt: None)
+        with caplog.at_level(logging.WARNING):
+            guards, rules, _ = served()
+        assert guards == ["command_approval", "sandbox"]
+        assert (config / "allowed-commands").read_text() == workstation.STARTER_ALLOWLIST
+        assert rules["network"]["allowedDomains"] == [*workstation.STARTER_REGISTRIES, "github.com"]
+        assert folder in rules["filesystem"]["allowWrite"] and str(config) in rules["filesystem"]["denyWrite"]
+        assert f"may reach github.com and write {folder} as the agent asks" in caplog.text
+
+        own_list, own_rules = tmp_path / "own-allowed", config / "sandbox.json"
+        own_list.write_text("true\n")
+        own_rules.write_text(json.dumps(workstation._starter_sandbox({})))
+        assert "allowlist" in served(policy=str(own_list))[2]
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            rules = served()[1]
+        assert (
+            "github.com" not in rules["network"]["allowedDomains"] and folder not in rules["filesystem"]["allowWrite"]
+        )
+        assert "decide alone" in caplog.text
+
+        monkeypatch.setenv("HAI_SHELL_SANDBOX", "0")
+        with pytest.raises(RuntimeError, match="requires the sandbox"):
+            served()
 
     @pytest.mark.skipif(os.name == "nt", reason="the sandbox runs on macOS and Linux")
     def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(

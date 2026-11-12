@@ -1004,14 +1004,14 @@ def _decide(client: Any, session_id: str, held: list[Any], feed: ui.StepFeed) ->
 
 def _standing_rules(request: dict[str, Any]) -> tuple[Any, list[str]]:
     """This machine's allowlist and the lines that would let the held command run from now on, when it is what holds it."""
-    from hai_agents_local.config import shell_policy
+    from hai_agents_local.config import agent_shell_policy, shell_policy
 
-    command, path = (request["tool_req"].get("args") or {}).get("command"), shell_policy()
+    command, path = (request["tool_req"].get("args") or {}).get("command"), shell_policy() or agent_shell_policy()
     try:
         from hai_drivers.code_sandbox.local.allowlist import Allowlist
     except ImportError:
         return None, []
-    if not path or not isinstance(command, str):
+    if not isinstance(command, str):
         return None, []
     allowlist = Allowlist(path)
     if [need["reason"] for need in request["requirements"]] != [allowlist.hold(command)]:

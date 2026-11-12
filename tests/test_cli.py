@@ -223,11 +223,15 @@ def test_a_held_call_asks_the_person_at_the_terminal_and_the_turn_goes_on(monkey
     assert followed == [0, 2]
 
 
-@pytest.mark.parametrize("held_here", [True, False], ids=["held by this machine", "held elsewhere"])
+@pytest.mark.parametrize(
+    ("file", "held_here"),
+    [("allowed", True), ("hai/allowed-commands", True), ("allowed", False)],
+    ids=["held by this machine's list", "held for an agent that requires approval", "held elsewhere"],
+)
 def test_always_allowing_a_command_this_machine_held_adds_its_rule_to_the_allowlist(
-    monkeypatch, tmp_path, held_here
+    monkeypatch, tmp_path, file, held_here
 ) -> None:
-    allowlist = pytest.importorskip("hai_drivers.code_sandbox.local.allowlist").Allowlist(tmp_path / "allowed")
+    allowlist = pytest.importorskip("hai_drivers.code_sandbox.local.allowlist").Allowlist(tmp_path / file)
     reason = allowlist.hold("rm -rf [build]") if held_here else "held by another machine"
     client, results = _RunClient(), _held_then_done(reason)
     monkeypatch.setattr(app_module, "_client", lambda state: client)
@@ -235,9 +239,11 @@ def test_always_allowing_a_command_this_machine_held_adds_its_rule_to_the_allowl
     monkeypatch.setattr(app_module, "_follow", _no_events)
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: None)
-    env = {"HAI_API_KEY": "hk-test", "HAI_SHELL_POLICY": str(allowlist.path)}
+    machine = {"HAI_SHELL_POLICY": str(allowlist.path)} if file == "allowed" else {"XDG_CONFIG_HOME": str(tmp_path)}
 
-    result = runner.invoke(app, ["run", "clean up", "-a", "h/test-agent"], env=env, input="a\n\n")
+    result = runner.invoke(
+        app, ["run", "clean up", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test", **machine}, input="a\n\n"
+    )
 
     assert result.exit_code == 0, result.output
     assert ("always allow: rm -rf '[build]'" in result.output) == held_here

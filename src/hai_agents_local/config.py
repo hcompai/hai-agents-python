@@ -28,15 +28,21 @@ def shell_policy() -> str | None:
     return os.getenv(SHELL_POLICY_ENV_VAR, "").strip() or None
 
 
-def shell_sandbox() -> str | None:
+def agent_shell_policy() -> str:
+    """The allowlist file of a machine without one, for an agent that requires approval."""
+    return str(credentials_path().with_name("allowed-commands"))
+
+
+def shell_sandbox(required: bool = False) -> str | None:
     """This machine's sandbox-runtime settings file for shell desktops; None runs their commands unconfined."""
     value = os.getenv(SHELL_SANDBOX_ENV_VAR, "").strip()
     if value.lower() in _FLAG_FALSE:
         return None
     if value and value.lower() not in _FLAG_TRUE:
         return value
-    # Confinement is the default where it is proven: macOS. Elsewhere it takes the variable.
-    return str(credentials_path().with_name("sandbox.json")) if value or sys.platform == "darwin" else None
+    # Confinement is the default where it is proven: macOS. Elsewhere it takes the variable, or an agent's requirement.
+    on = value or required or sys.platform == "darwin"
+    return str(credentials_path().with_name("sandbox.json")) if on else None
 
 
 def auto_bridges_enabled() -> bool:

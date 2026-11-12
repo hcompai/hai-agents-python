@@ -13,14 +13,14 @@ import subprocess
 import sys
 import sysconfig
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Literal
 
 from hai_agents.client import credentials_path
 
 from .bridge import LocalBridge, TokenSource
-from .config import SHELL_SANDBOX_ENV_VAR, shell_policy, shell_sandbox
+from .config import SHELL_SANDBOX_ENV_VAR, agent_shell_policy, shell_policy, shell_sandbox
 from .desktop import ensure_macos_input_permissions
 
 if TYPE_CHECKING:
@@ -87,8 +87,17 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         environment_variables: Mapping[str, str] | None = None,
         policy: str | None = None,
         sandbox: str | Literal[False] | None = None,
+        require_approval: bool = False,
+        allowed_commands: Sequence[str] = (),
+        require_sandbox: bool = False,
+        allowed_domains: Sequence[str] = (),
+        writable_folders: Sequence[str] = (),
     ) -> None:
         """Build the bridge.
+
+        The last five are the agent's, from its desktop's shell mode. What the machine sets itself wins: its own
+        allowlist decides alone which commands wait, its own settings file what the sandbox lets through, and it
+        serves no agent that requires a sandbox it turned off.
 
         Args:
             policy: This machine's allowlist file, one command prefix a line; defaults to ``HAI_SHELL_POLICY``.
@@ -103,6 +112,12 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
                 ``False`` runs commands unconfined. Where ``srt`` is not installed, the default sandbox gives way
                 with a warning and commands run unconfined; one asked for here, by ``HAI_SHELL_SANDBOX`` or by a
                 settings file of the machine's own fails the session.
+            require_approval: Hold commands for approval on a machine without an allowlist too, by the one beside
+                the stored credentials.
+            allowed_commands: Prefixes that run without approval besides that file's.
+            require_sandbox: Serve no session whose commands would run unconfined.
+            allowed_domains: Hosts the built-in rules let commands reach besides the registries.
+            writable_folders: Folders the built-in rules let commands write besides the workspace.
 
         Under either, the agent's file tools stay inside the workspace.
         """
@@ -110,8 +125,13 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         self.workspace = Path(workspace).expanduser() if workspace else Path.home() / "hai" / self.session_id
         self.environment_variables = dict(environment_variables or {})
         self.policy = policy or shell_policy()
-        self.sandbox = None if sandbox is False else sandbox or shell_sandbox()
-        self._sandbox_asked = bool(sandbox or os.getenv(SHELL_SANDBOX_ENV_VAR, "").strip())
+        self.allowed_commands: list[str] = []
+        if require_approval and not self.policy:
+            self.policy, self.allowed_commands = agent_shell_policy(), list(allowed_commands)
+        self.sandbox = None if sandbox is False else sandbox or shell_sandbox(required=require_sandbox)
+        self.require_sandbox = require_sandbox
+        self._sandbox_asked = bool(sandbox or require_sandbox or os.getenv(SHELL_SANDBOX_ENV_VAR, "").strip())
+        self.allowed_domains, self.writable_folders = list(allowed_domains), list(writable_folders)
         self._starter: IO[str] | None = None
 
     def preflight(self) -> None:
@@ -144,22 +164,32 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             allowed = _starting_with(self.policy, STARTER_ALLOWLIST)
             if allowed.resolve().is_relative_to(self.workspace.resolve()):
                 raise ValueError(f"{allowed} is inside the workspace, where the agent writes")
-            policy = Allowlist(allowed)
+            policy = Allowlist(allowed, also=self.allowed_commands)
             logger.info("commands outside %s wait for approval", allowed)
         srt = self._sandbox_runtime()
         if srt:
             from hai_drivers.code_sandbox.local.sandbox_runtime import SandboxRuntime
 
             settings = Path(self.sandbox).expanduser()
-            rules = f"the rules in {settings}"
-            if not settings.exists():
-                rules = f"the built-in rules; a {settings} replaces them"
+            host = _host_cua(environment)
+            asked = [
+                f"{does} {', '.join(what)}"
+                for does, what in (("reach", self.allowed_domains), ("write", self.writable_folders))
+                if what
+            ]
+            if settings.exists():
+                rules = f"the rules in {settings}"
+                rules += f", which decide alone: the agent's asks to {' and '.join(asked)} are not added" * bool(asked)
+            else:
+                rules = "the built-in rules" + f", and may {' and '.join(asked)} as the agent asks" * bool(asked)
+                rules += f"; a {settings} replaces them"
                 self._starter = tempfile.NamedTemporaryFile("w", prefix="hai-sandbox-", suffix=".json")
-                json.dump(_starter_sandbox(self.environment_variables), self._starter)
+                json.dump(_starter_sandbox(self.environment_variables, self.allowed_domains), self._starter)
                 self._starter.flush()
+                host["writable"] = [*host.get("writable", []), *map(Path, self.writable_folders)]
                 settings = Path(self._starter.name)
-            protected = [policy.path] if policy else []
-            sandbox = SandboxRuntime(settings, protected=protected, program=srt, **_host_cua(environment))
+            protected = [credentials_path().parent, *([policy.path] if policy else [])]
+            sandbox = SandboxRuntime(settings, protected=protected, program=srt, **host)
             # A warning, so that it shows where nothing sets logging up: `holo`, `holo mcp`, a script.
             logger.warning("shell commands are confined to %s by %s", self.workspace, rules)
         elif self.sandbox:
@@ -171,6 +201,10 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
     def _sandbox_runtime(self) -> str | None:
         """This machine's `srt`; None where commands run unconfined."""
         if not self.sandbox:
+            if self.require_sandbox:
+                raise RuntimeError(
+                    f"The agent requires the sandbox, and this machine turns it off: unset {SHELL_SANDBOX_ENV_VAR}."
+                )
             return None
         try:
             return _sandbox_runtime()
@@ -207,7 +241,7 @@ def _sandbox_runtime() -> str:
     homes = [home for pattern in SRT_HOMES for home in sorted(glob.glob(os.path.expanduser(pattern)), reverse=True)]
     srt = shutil.which("srt", path=os.pathsep.join([os.environ.get("PATH", os.defpath), *homes]))
     if srt is None:
-        raise RuntimeError(f"The sandbox this machine asks for is not installed. {SANDBOX_HINT}")
+        raise RuntimeError(f"The sandbox this session requires is not installed. {SANDBOX_HINT}")
     try:
         from hai_drivers.code_sandbox.local.sandbox_runtime import launch
     except ImportError as exc:
@@ -218,7 +252,7 @@ def _sandbox_runtime() -> str:
     return srt
 
 
-def _starter_sandbox(passed: Mapping[str, str]) -> dict[str, object]:
+def _starter_sandbox(passed: Mapping[str, str], domains: Sequence[str] = ()) -> dict[str, object]:
     """Sandbox-runtime settings for a machine with none of its own; `passed` are the variables the host gives the agent."""
     secrets = [*STARTER_SECRETS, str(credentials_path().parent)]
     tokens = sorted(
@@ -227,7 +261,7 @@ def _starter_sandbox(passed: Mapping[str, str]) -> dict[str, object]:
         if name not in passed and (_SECRET_NAME.search(name) or _SECRET_URL.search(value))
     )
     return {
-        "network": {"allowedDomains": STARTER_REGISTRIES, "deniedDomains": []},
+        "network": {"allowedDomains": [*STARTER_REGISTRIES, *domains], "deniedDomains": []},
         "filesystem": {"denyRead": secrets, "allowWrite": [], "denyWrite": []},
         "credentials": {"envVars": [{"name": name, "mode": "deny"} for name in tokens]},
     }
