@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 INSTALL_HINT = "A desktop with a shell requires extra deps. Install with: pip install 'hai-agents[workstation]'"
 SANDBOX_HINT = (
     "Anthropic's sandbox-runtime confines shell commands to the workspace: "
-    "npm install -g @anthropic-ai/sandbox-runtime (needs Node 22.12 or later)."
+    "npm install -g --omit=optional @anthropic-ai/sandbox-runtime (needs Node 22.12 or later)."
 )
 # Where npm puts `srt`: an app started from the Dock gives its children a PATH without them.
 SRT_HOMES = ["/opt/homebrew/bin", "/usr/local/bin", "~/.volta/bin", "~/.npm-global/bin", "~/.nvm/versions/node/*/bin"]
