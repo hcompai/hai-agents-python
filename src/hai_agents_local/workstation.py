@@ -14,7 +14,7 @@ import sysconfig
 import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal
 
 from hai_agents.client import credentials_path
 
@@ -143,7 +143,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         self.require_sandbox = require_sandbox
         self._sandbox_asked = bool(sandbox or require_sandbox or os.getenv(SHELL_SANDBOX_ENV_VAR, "").strip())
         self.allowed_domains, self.writable_folders = list(allowed_domains), list(writable_folders)
-        self._starter: IO[str] | None = None
+        self._starter: tempfile.TemporaryDirectory[str] | None = None
 
     def preflight(self) -> None:
         self._sandbox_runtime()
@@ -195,11 +195,12 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             else:
                 rules = "the built-in rules" + f", and may {' and '.join(asked)} as the agent asks" * bool(asked)
                 rules += f"; a {settings} replaces them"
-                self._starter = tempfile.NamedTemporaryFile("w", prefix="hai-sandbox-", suffix=".json")
-                json.dump(_starter_sandbox(self.environment_variables, self.allowed_domains), self._starter)
-                self._starter.flush()
+                # A folder: Windows opens a temporary file a second time for nobody while it is open.
+                self._starter = tempfile.TemporaryDirectory(prefix="hai-sandbox-")
+                settings = Path(self._starter.name) / "sandbox.json"
+                built_in = _starter_sandbox(self.environment_variables, self.allowed_domains)
+                settings.write_text(json.dumps(built_in), encoding="utf-8")
                 host["writable"] = [*host.get("writable", []), *map(Path, self.writable_folders)]
-                settings = Path(self._starter.name)
             protected = [
                 credentials_path().parent,
                 *filter(Path.exists, [SRT_HOME]),
