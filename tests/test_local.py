@@ -1160,21 +1160,26 @@ class TestDriverInterfaces:
         assert WorkstationBridge(api_key="k").sandbox == str(settings)
         bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), environment_variables=passed)
 
-        monkeypatch.setenv("PATH", os.defpath)
+        npm, srt = tmp_path / "bin" / "npm", tmp_path / ".hai" / "sandbox-runtime" / "node_modules" / ".bin" / "srt"
+        npm.parent.mkdir()
+        npm.write_text("#!/bin/sh\necho offline >&2; exit 1\n")
+        npm.chmod(0o755)
+        monkeypatch.setenv("PATH", os.pathsep.join([str(npm.parent), os.defpath]))
         monkeypatch.setenv("SOME_API_KEY", "s")
         monkeypatch.setenv("PASSED_TOKEN", "h")
         monkeypatch.setattr(workstation, "SRT_HOMES", [])
+        monkeypatch.setattr(workstation, "SRT_HOME", srt.parents[2])
         with pytest.raises(RuntimeError, match="sandbox-runtime"):
             bridge.preflight()
         with caplog.at_level(logging.WARNING), default.create_driver() as unconfined:
             assert unconfined.execute(f"touch {tmp_path}/outside").success and (tmp_path / "outside").exists()
+        assert "was not installed: offline" in caplog.text
         assert "run unconfined, as you. Anthropic's sandbox-runtime" in caplog.text
 
-        srt = tmp_path / "bin" / "srt"
-        srt.parent.mkdir()
-        srt.write_text('#!/bin/sh\nSRT_SETTINGS="$2" exec bash -c "$4"\n')
-        srt.chmod(0o755)
-        monkeypatch.setattr(workstation, "SRT_HOMES", [str(tmp_path / "*")])
+        npm.write_text(
+            '#!/bin/sh\nmkdir -p "$3/node_modules/.bin" && cd "$3/node_modules/.bin" && '
+            'printf \'#!/bin/sh\\nSRT_SETTINGS="$2" exec bash -c "$4"\\n\' > srt && chmod +x srt\n'
+        )
         assert max(["node/v22.9.0/bin", "node/v22.12.0/bin"], key=workstation._version) == "node/v22.12.0/bin"
 
         def applied() -> dict:
@@ -1188,6 +1193,7 @@ class TestDriverInterfaces:
                 bridge._driver.close()
 
         built_in = applied()
+        assert srt.exists() and str(srt.parents[2]) in built_in["filesystem"]["denyWrite"]
         assert not settings.exists()
         assert built_in["filesystem"]["allowWrite"][0] == str((tmp_path / "workspace").resolve())
         assert {"~/Library/Keychains", "~/.npmrc", str(settings.parent)} < set(built_in["filesystem"]["denyRead"])
