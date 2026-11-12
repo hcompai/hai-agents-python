@@ -20,7 +20,7 @@ from typing import IO, TYPE_CHECKING, Literal
 from hai_agents.client import credentials_path
 
 from .bridge import LocalBridge, TokenSource
-from .config import shell_policy, shell_sandbox
+from .config import SHELL_SANDBOX_ENV_VAR, shell_policy, shell_sandbox
 from .desktop import ensure_macos_input_permissions
 
 if TYPE_CHECKING:
@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
 
 INSTALL_HINT = "A desktop with a shell requires extra deps. Install with: pip install 'hai-agents[workstation]'"
 SANDBOX_HINT = (
-    "A desktop with a shell confines its commands with Anthropic's sandbox-runtime, which needs Node 22.12 or later: "
-    "npm install -g @anthropic-ai/sandbox-runtime. To run them unconfined, as you: HAI_SHELL_SANDBOX=0."
+    "Anthropic's sandbox-runtime confines shell commands to the workspace: "
+    "npm install -g @anthropic-ai/sandbox-runtime (needs Node 22.12 or later)."
 )
 # Where npm puts `srt`: an app started from the Dock gives its children a PATH without them.
 SRT_HOMES = ["/opt/homebrew/bin", "/usr/local/bin", "~/.volta/bin", "~/.npm-global/bin", "~/.nvm/versions/node/*/bin"]
@@ -100,7 +100,9 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
                 sandbox. Defaults to ``HAI_SHELL_SANDBOX``, else on macOS to ``sandbox.json`` beside the stored
                 credentials. Where that file does not exist, the rules are the built-in ones: the package
                 registries reachable, the usual credential files unreadable, the environment's tokens unset.
-                ``False`` runs commands unconfined.
+                ``False`` runs commands unconfined. Where ``srt`` is not installed, the default sandbox gives way
+                with a warning and commands run unconfined; one asked for here, by ``HAI_SHELL_SANDBOX`` or by a
+                settings file of the machine's own fails the session.
 
         Under either, the agent's file tools stay inside the workspace.
         """
@@ -109,11 +111,11 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         self.environment_variables = dict(environment_variables or {})
         self.policy = policy or shell_policy()
         self.sandbox = None if sandbox is False else sandbox or shell_sandbox()
+        self._sandbox_asked = bool(sandbox or os.getenv(SHELL_SANDBOX_ENV_VAR, "").strip())
         self._starter: IO[str] | None = None
 
     def preflight(self) -> None:
-        if self.sandbox:
-            _sandbox_runtime()
+        self._sandbox_runtime()
         if sys.platform == "darwin":
             ensure_macos_input_permissions(prompt=True)
 
@@ -144,10 +146,10 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
                 raise ValueError(f"{allowed} is inside the workspace, where the agent writes")
             policy = Allowlist(allowed)
             logger.info("commands outside %s wait for approval", allowed)
-        if self.sandbox:
+        srt = self._sandbox_runtime()
+        if srt:
             from hai_drivers.code_sandbox.local.sandbox_runtime import SandboxRuntime
 
-            srt = _sandbox_runtime()
             settings = Path(self.sandbox).expanduser()
             rules = f"the rules in {settings}"
             if not settings.exists():
@@ -160,9 +162,22 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             sandbox = SandboxRuntime(settings, protected=protected, program=srt, **_host_cua(environment))
             # A warning, so that it shows where nothing sets logging up: `holo`, `holo mcp`, a script.
             logger.warning("shell commands are confined to %s by %s", self.workspace, rules)
+        elif self.sandbox:
+            logger.warning("shell commands run unconfined, as you. %s", SANDBOX_HINT)
         else:
             logger.warning("commands run unconfined, as you: no sandbox is on")
         return LocalCodeSandbox(str(self.workspace), environment_variables=environment, policy=policy, sandbox=sandbox)
+
+    def _sandbox_runtime(self) -> str | None:
+        """This machine's `srt`; None where commands run unconfined."""
+        if not self.sandbox:
+            return None
+        try:
+            return _sandbox_runtime()
+        except RuntimeError:
+            if self._sandbox_asked or Path(self.sandbox).expanduser().exists():
+                raise
+            return None
 
     async def interrupt_driver(self) -> None:
         # This bridge creates one sandbox per run; close owns only that run's children.
@@ -188,20 +203,18 @@ def _starting_with(path: str, starter: str) -> Path:
 def _sandbox_runtime() -> str:
     """This machine's `srt`, on PATH or where npm puts it."""
     if os.name == "nt":
-        raise RuntimeError(
-            "The sandbox runs on macOS and Linux. To run commands unconfined, as you: HAI_SHELL_SANDBOX=0."
-        )
+        raise RuntimeError("The sandbox runs on macOS and Linux.")
     homes = [home for pattern in SRT_HOMES for home in sorted(glob.glob(os.path.expanduser(pattern)), reverse=True)]
     srt = shutil.which("srt", path=os.pathsep.join([os.environ.get("PATH", os.defpath), *homes]))
     if srt is None:
-        raise RuntimeError(SANDBOX_HINT)
+        raise RuntimeError(f"The sandbox this machine asks for is not installed. {SANDBOX_HINT}")
     try:
         from hai_drivers.code_sandbox.local.sandbox_runtime import launch
     except ImportError as exc:
         raise ImportError(INSTALL_HINT) from exc
     started = subprocess.run([*launch(srt), "--version"], capture_output=True, text=True)
     if started.returncode:
-        raise RuntimeError(f"{SANDBOX_HINT} {srt} did not start: {started.stderr.strip()[-300:]}")
+        raise RuntimeError(f"{srt} did not start: {started.stderr.strip()[-300:]} {SANDBOX_HINT}")
     return srt
 
 

@@ -187,10 +187,10 @@ def test_a_client_tool_wait_ends_the_session_and_the_next_message_starts_a_new_o
     assert ("cancel",) in client.sessions.calls
 
 
-def _held_then_done():
+def _held_then_done(reason: str = "not on this machine's allowlist"):
     held = ToolApprovalRequest(
         tool_req=ToolRequest(id="call_1", tool_name="shell", args={"command": "rm -rf [build]"}),
-        requirements=[ApprovalRequirement(source="environment", reason="not on this machine's allowlist")],
+        requirements=[ApprovalRequirement(source="environment", reason=reason)],
     )
     return iter(
         [
@@ -221,6 +221,28 @@ def test_a_held_call_asks_the_person_at_the_terminal_and_the_turn_goes_on(monkey
     assert "run rm -rf [build]" in result.output and "not on this machine's allowlist" in result.output
     assert client.sessions.calls == [sent]
     assert followed == [0, 2]
+
+
+@pytest.mark.parametrize("held_here", [True, False], ids=["held by this machine", "held elsewhere"])
+def test_always_allowing_a_command_this_machine_held_adds_its_rule_to_the_allowlist(
+    monkeypatch, tmp_path, held_here
+) -> None:
+    allowlist = pytest.importorskip("hai_drivers.code_sandbox.local.allowlist").Allowlist(tmp_path / "allowed")
+    reason = allowlist.hold("rm -rf [build]") if held_here else "held by another machine"
+    client, results = _RunClient(), _held_then_done(reason)
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
+    monkeypatch.setattr(app_module, "_follow", _no_events)
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+    monkeypatch.setattr(app_module, "_read_message", lambda convo: None)
+    env = {"HAI_API_KEY": "hk-test", "HAI_SHELL_POLICY": str(allowlist.path)}
+
+    result = runner.invoke(app, ["run", "clean up", "-a", "h/test-agent"], env=env, input="a\n\n")
+
+    assert result.exit_code == 0, result.output
+    assert ("always allow: rm -rf '[build]'" in result.output) == held_here
+    assert allowlist.path.exists() == held_here and bool(allowlist.hold("rm -rf [build]")) != held_here
+    assert client.sessions.calls == [("approve", "call_1") if held_here else ("deny", "call_1", None)]
 
 
 def test_a_held_call_ends_a_run_nobody_can_answer_and_names_the_wait(monkeypatch) -> None:

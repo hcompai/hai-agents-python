@@ -982,13 +982,41 @@ def _decide(client: Any, session_id: str, held: list[Any], feed: ui.StepFeed) ->
             call = request["tool_req"]
             command = (call.get("args") or {}).get("command")
             action = f"run {command}" if isinstance(command, str) else " ".join(tools.label(call))
-            ui.needs_you(err_console, escape(action), [escape(need["reason"]) for need in request["requirements"]], [])
-            if typer.confirm("Do you want to proceed?", default=False, err=True):
+            reasons = [escape(need["reason"]) for need in request["requirements"]]
+            allowlist, rules = _standing_rules(request)
+            if rules:
+                reasons.append(escape(f"a = yes, and always allow: {', '.join(rules)}"))
+            ui.needs_you(err_console, escape(action), reasons, [])
+            choices = "y/a/N" if rules else "y/N"
+            answer = typer.prompt(f"Do you want to proceed? [{choices}]", default="n", show_default=False, err=True)
+            answer = answer.strip().lower()
+            if rules and answer in ("a", "always"):
+                allowlist.add(rules)
+                err_console.print(f"Added to {escape(str(allowlist.path))}", style="dim")
+                answer = "y"
+            if answer in ("y", "yes"):
                 session.approve(call["id"])
             else:
                 why = typer.prompt("Tell the agent why (optional)", default="", show_default=False, err=True)
                 session.deny(call["id"], why or None)
             err_console.print()
+
+
+def _standing_rules(request: dict[str, Any]) -> tuple[Any, list[str]]:
+    """This machine's allowlist and the lines that would let the held command run from now on, when it is what holds it."""
+    from hai_agents_local.config import shell_policy
+
+    command, path = (request["tool_req"].get("args") or {}).get("command"), shell_policy()
+    try:
+        from hai_drivers.code_sandbox.local.allowlist import Allowlist
+    except ImportError:
+        return None, []
+    if not path or not isinstance(command, str):
+        return None, []
+    allowlist = Allowlist(path)
+    if [need["reason"] for need in request["requirements"]] != [allowlist.hold(command)]:
+        return None, []
+    return allowlist, allowlist.missing(command)
 
 
 def _poll_agents(client: Any, feed: ui.StepFeed, stop: threading.Event) -> None:

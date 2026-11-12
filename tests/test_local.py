@@ -1059,7 +1059,9 @@ class TestDriverInterfaces:
             inside.create_driver()
 
     @pytest.mark.skipif(os.name == "nt", reason="the sandbox runs on macOS and Linux")
-    def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(self, tmp_path, monkeypatch):
+    def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(
+        self, tmp_path, monkeypatch, caplog
+    ):
         pytest.importorskip("hai_drivers.code_sandbox.local.sandbox_runtime")
         from hai_agents_local import workstation
 
@@ -1070,17 +1072,22 @@ class TestDriverInterfaces:
         settings = tmp_path / ".config" / "hai" / "sandbox.json"
         assert WorkstationBridge(api_key="k").sandbox == (str(settings) if sys.platform == "darwin" else None)
         assert WorkstationBridge(api_key="k", sandbox=False).sandbox is None
+        passed = {"PASSED_TOKEN": "p"}
+        default = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"))
+        default.sandbox = str(settings)
         monkeypatch.setenv("HAI_SHELL_SANDBOX", "1")
         assert WorkstationBridge(api_key="k").sandbox == str(settings)
-        passed = {"PASSED_TOKEN": "p"}
         bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), environment_variables=passed)
 
         monkeypatch.setenv("PATH", os.defpath)
         monkeypatch.setenv("SOME_API_KEY", "s")
         monkeypatch.setenv("PASSED_TOKEN", "h")
         monkeypatch.setattr(workstation, "SRT_HOMES", [])
-        with pytest.raises(RuntimeError, match="HAI_SHELL_SANDBOX=0"):
+        with pytest.raises(RuntimeError, match="sandbox-runtime"):
             bridge.preflight()
+        with caplog.at_level(logging.WARNING), default.create_driver() as unconfined:
+            assert unconfined.execute(f"touch {tmp_path}/outside").success and (tmp_path / "outside").exists()
+        assert "run unconfined, as you. Anthropic's sandbox-runtime" in caplog.text
 
         srt = tmp_path / "bin" / "srt"
         srt.parent.mkdir()
