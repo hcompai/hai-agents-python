@@ -162,6 +162,14 @@ class _Walk:
         width = _read(env, "screenshot_max_width")
         if bridge_type is WorkstationBridge and width:
             options["environment_variables"] = {"WEB_MAX_IMAGE_WIDTH": str(width), "DESK_MAX_IMAGE_WIDTH": str(width)}
+        if bridge_type is WorkstationBridge:
+            mode = _read(env, "mode")
+            options["require_approval"] = _read(mode, "command_approval") == "required"
+            options["require_sandbox"] = _read(mode, "sandbox") == "required"
+            for asked in ("allowed_commands", "allowed_domains", "writable_folders"):
+                options[asked] = given = _read(mode, asked) or ()
+                if not isinstance(given, (list, tuple)):
+                    raise TypeError(f"mode.{asked} is a list of strings, not {given!r}")
         bridge = bridge_type(
             _read(env, "id"), api_key=self.api_key, base_url=self.base_url, session_id=session_id, **options
         )

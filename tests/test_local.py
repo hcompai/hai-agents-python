@@ -1,10 +1,18 @@
 import asyncio
+import hashlib
 import json
 import logging
+import os
 import re
+import shutil
+import subprocess
 import sys
 import threading
 import types
+import zipfile
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -22,9 +30,10 @@ from hai_agents_local import (
     SeleniumBrowserBridge,
     WorkstationBridge,
 )
-from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR
+from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR, SHELL_WORKSPACE_ENV_VAR, shell_sandbox
 from hai_agents_local.errors import AuthError, RateLimitedError, SessionNotFoundError
 from hai_agents_local.routing import localize_agent
+from hai_agents_local.runtime.manifest import platform_key
 from hai_agents_local.transport import Command, CommandExchange, deserialize_args, serialize_result
 
 API_KEY = "test-key"
@@ -63,6 +72,36 @@ class TestLocalizeAgent:
         }
         _, [bridge], _ = localize_agent(agent, api_key=API_KEY)
         assert bridge.environment_variables == {"WEB_MAX_IMAGE_WIDTH": "1280", "DESK_MAX_IMAGE_WIDTH": "1280"}
+
+    def test_a_shell_desktop_brings_what_its_mode_asks_of_the_machine(self):
+        asks = {
+            "command_approval": "required",
+            "allowed_commands": ["git status"],
+            "sandbox": "required",
+            "allowed_domains": ["github.com"],
+            "writable_folders": ["~/Projects/app"],
+        }
+        agent = {"name": "x", "environments": [{"kind": "desktop", "mode": {"type": "shell", **asks}}]}
+        _, [bridge], _ = localize_agent(agent, api_key=API_KEY)
+        assert bridge.policy and bridge.allowed_commands == ["git status"] and bridge.require_sandbox
+        assert (bridge.allowed_domains, bridge.writable_folders) == (["github.com"], ["~/Projects/app"])
+
+        agent["environments"][0]["mode"] = {"type": "shell", "allowed_commands": "git status"}
+        with pytest.raises(TypeError, match="list of strings"):
+            localize_agent(agent, api_key=API_KEY)
+
+        agent["environments"][0]["mode"] = {"type": "shell"}
+        _, [plain], _ = localize_agent(agent, api_key=API_KEY)
+        assert plain.policy is None and not plain.require_sandbox and not plain.allowed_domains
+
+    def test_a_shell_desktop_works_in_the_folder_this_machine_names(self, monkeypatch, tmp_path):
+        agent = {"name": "x", "environments": [{"kind": "desktop", "mode": {"type": "shell"}}]}
+        _, [own], _ = localize_agent(agent, api_key=API_KEY)
+        assert own.workspace == Path.home() / "hai" / own.session_id
+
+        monkeypatch.setenv(SHELL_WORKSPACE_ENV_VAR, str(tmp_path))
+        _, [named], _ = localize_agent(agent, api_key=API_KEY)
+        assert named.workspace == tmp_path
 
     def test_second_unclaimed_env_of_same_kind_raises(self):
         agent = {
@@ -1014,6 +1053,234 @@ class TestDriverInterfaces:
             assert out[1:5] == ["0-1000", bridge.session_id, "off", "/run/config.json"] and len(out) == 9
         finally:
             bridge._driver.close()
+
+    def test_workstation_holds_a_command_its_machine_does_not_allow_until_approved(self, tmp_path, monkeypatch):
+        pytest.importorskip("hai_drivers.code_sandbox.local.allowlist")
+        allowed = tmp_path / "allowed"
+        allowed.write_text("echo\n")
+        monkeypatch.setenv("HAI_SHELL_POLICY", str(allowed))
+        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"))
+        bridge._driver = bridge.create_driver()
+        try:
+            result, error = bridge._dispatch("execute", {"command": "echo hi"})
+            assert error is None and result["stdout"].strip() == "hi"
+
+            result, error = bridge._dispatch("execute", {"command": "touch made"})
+            assert result is None and error.startswith("approval required: ")
+            assert not (tmp_path / "workspace" / "made").exists()
+
+            assert bridge._dispatch("approve_command", {"command": "touch made"}) == (None, None)
+            result, error = bridge._dispatch("execute", {"command": "touch made"})
+            assert error is None and (tmp_path / "workspace" / "made").exists()
+        finally:
+            bridge._driver.close()
+
+    def test_workstation_starts_a_missing_allowlist_with_cua_and_keeps_an_existing_one(self, tmp_path):
+        pytest.importorskip("hai_drivers.code_sandbox.local.allowlist")
+        from hai_drivers.code_sandbox.local.allowlist import Allowlist
+
+        allowed = tmp_path / "config" / "allowed"
+        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), policy=str(allowed))
+        bridge.create_driver().close()
+        assert Allowlist(allowed).hold("cua shot && cua click 3") is None
+        assert Allowlist(allowed).hold("echo hi")
+
+        allowed.write_text("echo\n")
+        bridge.create_driver().close()
+        assert allowed.read_text() == "echo\n"
+
+        unwritten = tmp_path / "workspace" / "allowed"
+        inside = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), policy=str(unwritten))
+        with pytest.raises(ValueError, match="inside the workspace"):
+            inside.create_driver()
+        assert not unwritten.exists()
+
+    @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
+    def test_workstation_applies_what_the_agent_asks_and_what_the_machine_set_itself_wins(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        pytest.importorskip("hai_drivers.code_sandbox.local.sandbox_runtime")
+        from hai_agents_local import workstation
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.delenv("HAI_SHELL_SANDBOX")
+        monkeypatch.setattr(workstation, "_host_cua", lambda environment: {})
+        srt = tmp_path / "bin" / "srt"
+        srt.parent.mkdir()
+        srt.write_text('#!/bin/sh\nSRT_SETTINGS="$2" exec bash -c "$4"\n')
+        srt.chmod(0o755)
+        monkeypatch.setenv("PATH", os.pathsep.join([str(srt.parent), os.defpath]))
+        config, folder = tmp_path / ".config" / "hai", str(tmp_path / "app")
+        asks = {
+            "require_approval": True,
+            "allowed_commands": ["echo"],
+            "require_sandbox": True,
+            "allowed_domains": ["github.com"],
+            "writable_folders": [folder],
+        }
+
+        def served(**machine) -> tuple[list[str], dict, str | None]:
+            bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), **asks, **machine)
+            bridge.preflight()
+            bridge._driver = bridge.create_driver()
+            try:
+                result, error = bridge._dispatch("execute", {"command": 'echo "$SRT_SETTINGS"'})
+                rules = json.loads(Path(result["stdout"].strip()).read_text()) if error is None else {}
+                return bridge._driver.guards(), rules, error
+            finally:
+                bridge._driver.close()
+
+        monkeypatch.setattr(workstation, "ensure_macos_input_permissions", lambda prompt: None)
+        with caplog.at_level(logging.WARNING):
+            guards, rules, _ = served()
+        assert guards == ["command_approval", "sandbox"]
+        assert (config / "allowed-commands").read_text() == workstation.STARTER_ALLOWLIST
+        assert rules["network"]["allowedDomains"] == [*workstation.STARTER_REGISTRIES, "github.com"]
+        assert folder in rules["filesystem"]["allowWrite"] and str(config) in rules["filesystem"]["denyWrite"]
+        assert f"may reach github.com and write {folder} as the agent asks" in caplog.text
+
+        own_list, own_rules = tmp_path / "own-allowed", config / "sandbox.json"
+        own_list.write_text("true\n")
+        own_rules.write_text(json.dumps(workstation._starter_sandbox({})))
+        assert "allowlist" in served(policy=str(own_list))[2]
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            rules = served()[1]
+        assert (
+            "github.com" not in rules["network"]["allowedDomains"] and folder not in rules["filesystem"]["allowWrite"]
+        )
+        assert "decide alone" in caplog.text
+
+        monkeypatch.setenv("HAI_SHELL_SANDBOX", "0")
+        with pytest.raises(RuntimeError, match="requires the sandbox"):
+            served()
+
+    def test_cua_runs_outside_the_sandbox_where_the_sandbox_cannot_open_its_daemon_alone(self, monkeypatch):
+        from hai_agents_local import workstation
+
+        monkeypatch.setattr(sys, "platform", "linux")
+        environment: dict[str, str] = {}
+        assert workstation._host_cua(environment) == {"outside": ["cua"]} and not environment
+
+    def test_sandbox_rules_of_the_machine_s_own_confine_commands_where_confinement_is_not_the_default(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        monkeypatch.delenv("HAI_SHELL_SANDBOX")
+        monkeypatch.setattr(sys, "platform", "linux")
+        assert shell_sandbox() is None
+        rules = tmp_path / "hai" / "sandbox.json"
+        rules.parent.mkdir()
+        rules.write_text("{}")
+        assert shell_sandbox() == str(rules)
+
+    @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
+    def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(
+        self, tmp_path, monkeypatch, caplog, request
+    ):
+        pytest.importorskip("hai_drivers.code_sandbox.local.sandbox_runtime")
+        from hai_agents_local import workstation
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.delenv("HAI_SHELL_SANDBOX")
+        monkeypatch.setattr(workstation, "_host_cua", lambda environment: {"sockets": ["/tmp/cua.sock"]})
+        settings = tmp_path / ".config" / "hai" / "sandbox.json"
+        assert WorkstationBridge(api_key="k").sandbox == (str(settings) if sys.platform == "darwin" else None)
+        assert WorkstationBridge(api_key="k", sandbox=False).sandbox is None
+        passed = {"PASSED_TOKEN": "p"}
+        default = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"))
+        default.sandbox = str(settings)
+        monkeypatch.setenv("HAI_SHELL_SANDBOX", "1")
+        assert WorkstationBridge(api_key="k").sandbox == str(settings)
+        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), environment_variables=passed)
+
+        published = tmp_path / "cdn" / "9.9.9" / f"srt-{platform_key()}.zip"
+        published.parent.mkdir(parents=True)
+        with zipfile.ZipFile(published, "w") as archive:
+            archive.writestr("srt", '#!/bin/sh\nSRT_SETTINGS="$2" exec bash -c "$4"\n')
+        cdn = ThreadingHTTPServer(("127.0.0.1", 0), partial(SimpleHTTPRequestHandler, directory=str(tmp_path / "cdn")))
+        threading.Thread(target=cdn.serve_forever, daemon=True).start()
+        request.addfinalizer(cdn.shutdown)
+        srt = tmp_path / ".hai" / "sandbox-runtime" / "9.9.9" / "srt"
+        monkeypatch.setenv("PATH", os.defpath)
+        monkeypatch.setenv("SOME_API_KEY", "s")
+        monkeypatch.setenv("PASSED_TOKEN", "h")
+        monkeypatch.setattr(workstation, "SRT_HOME", srt.parents[1])
+        monkeypatch.setattr(workstation, "SRT_VERSION", "9.9.9")
+        monkeypatch.setattr(workstation, "SRT_CDN", f"http://127.0.0.1:{cdn.server_port}")
+        monkeypatch.setattr(workstation, "SRT_SHA256", {platform_key(): "0" * 64})
+        with pytest.raises(RuntimeError, match="sandbox-runtime"):
+            bridge.preflight()
+        with caplog.at_level(logging.WARNING), default.create_driver() as unconfined:
+            assert unconfined.execute(f"touch {tmp_path}/outside").success and (tmp_path / "outside").exists()
+        assert "failed sha256 verification" in caplog.text and not srt.exists()
+        assert "run unconfined, as you. Anthropic's sandbox-runtime" in caplog.text
+
+        digest = hashlib.sha256(published.read_bytes()).hexdigest()
+        monkeypatch.setattr(workstation, "SRT_SHA256", {platform_key(): digest})
+
+        def applied() -> dict:
+            bridge._driver = bridge.create_driver()
+            try:
+                result, error = bridge._dispatch("execute", {"command": 'echo "$SRT_SETTINGS"'})
+                assert error is None
+                assert "outside the workspace" in bridge._dispatch("read_file", {"path": str(settings)})[1]
+                return json.loads(Path(result["stdout"].strip()).read_text())
+            finally:
+                bridge._driver.close()
+
+        built_in = applied()
+        assert srt.exists() and str(srt.parents[1]) in built_in["filesystem"]["denyWrite"]
+        assert not settings.exists()
+        assert built_in["filesystem"]["allowWrite"][0] == str((tmp_path / "workspace").resolve())
+        assert {"~/Library/Keychains", "~/.npmrc", str(settings.parent)} < set(built_in["filesystem"]["denyRead"])
+        assert "allowGitConfig" not in built_in["filesystem"]
+        assert built_in["network"]["allowedDomains"] == workstation.STARTER_REGISTRIES
+        assert built_in["network"]["allowUnixSockets"] == ["/tmp/cua.sock"]
+        unset = {variable["name"] for variable in built_in["credentials"]["envVars"]}
+        assert "SOME_API_KEY" in unset and not unset & {"PASSED_TOKEN", "PATH", "HOME"}
+
+        own = {"network": {"allowedDomains": ["example.com"], "deniedDomains": []}}
+        settings.parent.mkdir(parents=True)
+        settings.write_text(json.dumps({**own, "filesystem": {"denyRead": [], "allowWrite": [], "denyWrite": []}}))
+        theirs = applied()
+        assert theirs["network"]["allowedDomains"] == ["example.com"] and "credentials" not in theirs
+
+    @pytest.mark.skipif(
+        shutil.which("srt") is None, reason="needs Anthropic's sandbox-runtime on PATH, and the network"
+    )
+    def test_workstation_built_in_rules_install_packages_and_keep_secrets_out_of_reach(self, tmp_path, monkeypatch):
+        pytest.importorskip("hai_drivers.code_sandbox.local.sandbox_runtime")
+        from hai_agents_local import workstation
+
+        monkeypatch.setenv("HAI_SHELL_SANDBOX", str(tmp_path / "none.json"))
+        monkeypatch.setenv("SOME_API_KEY", "s")
+        monkeypatch.setattr(workstation, "_host_cua", lambda environment: {})
+        workspace = tmp_path / "workspace"
+        subprocess.run(["git", "init", "-q", str(workspace / "repo")], check=True)
+        commands = {
+            "pip": "python3 -m venv v && v/bin/pip install -q idna && v/bin/python -c 'import idna'",
+            "npm": "npm init -y > /dev/null && npm install --silent is-number && node -e 'require(\"is-number\")'",
+            "git": "cd repo && touch a && git add a && git -c user.name=a -c user.email=a@b.c commit -qm first",
+            "config": "cd repo && ! git config core.fsmonitor 'touch escaped'",
+            "token": 'test -z "$SOME_API_KEY"',
+            "secrets": "! ls ~/.ssh && ! head -c 1 ~/Library/Keychains/login.keychain-db",
+            "elsewhere": f"! touch {tmp_path}/escaped && ! curl -sf -m 10 https://example.com",
+        }
+        bridge = WorkstationBridge(api_key="k", workspace=str(workspace))
+        bridge._driver = bridge.create_driver()
+        try:
+            failed = {
+                name: result or error
+                for name, command in commands.items()
+                for result, error in [bridge._dispatch("execute", {"command": command})]
+                if error or result["exit_code"]
+            }
+        finally:
+            bridge._driver.close()
+        assert not failed
 
 
 class ServingBridge(FakeBridge):

@@ -41,7 +41,7 @@ from hai_agents_common.credentials import absolute_share_url, make_client
 from hai_agents_common.jsonable import to_jsonable
 from hai_agents_local import desktop as desktop_defaults
 
-from . import _CLI_HINT, auth, holo_dir, keys, mcp_hosts, steer, ui, welcome
+from . import _CLI_HINT, auth, holo_dir, keys, mcp_hosts, steer, tools, ui, welcome
 
 if TYPE_CHECKING:
     from hai_agents_local import LocalBridge
@@ -587,7 +587,6 @@ class _Conversation:
                 self.turn(message)
                 return
         feed = None
-        steering = None
         if self.human:
             stop_hint = "esc esc to stop" if self.controls_machine and self._listener else "ctrl+c to stop"
             feed = ui.StepFeed(
@@ -599,41 +598,24 @@ class _Conversation:
                 stop_hint=stop_hint,
                 starting=self.next_index == 0,
             )
-            if not self.controls_machine and _interactive() and keys.supported():
-                steering = steer.Steering(
-                    self.client, str(self.session.id), feed, err_console, local_command=self._command_mid_turn
-                )
         timeout = self.max_time_s + _TURN_GRACE_S if self.max_time_s else None
+        index, shown = self.next_index, 0
         try:
-            if feed is not None:
-                with steering.watch() if steering else contextlib.nullcontext():
-                    try:
-                        _follow(
-                            self.client,
-                            self.session.id,
-                            feed,
-                            timeout_s=timeout,
-                            from_index=self.next_index,
-                            stop_at_tool_wait=True,
-                        )
-                    except KeyboardInterrupt:
-                        if steering is not None:
-                            steering.stop()
-                        raise
-                    finally:
-                        if steering is not None:
-                            steering.finish()
-                            self._draft = steering.box.text
-                            if steering.pending:
-                                self._pending, self._pending_shown = steering.pending, steering.pending_shown
-            result = wait_for_session(self.client, self.session.id, from_index=self.next_index, timeout_seconds=timeout)
-        except KeyboardInterrupt:
+            while True:
+                if feed is not None:
+                    self._show(feed, index, timeout)
+                result = wait_for_session(self.client, self.session.id, from_index=index, timeout_seconds=timeout)
+                if feed is None or not self.followups or not result.pending_approvals:
+                    break
+                _decide(self.client, self.session.id, result.pending_approvals, feed)
+                index, shown = result.next_from_index, feed.handled
+        except (KeyboardInterrupt, typer.Abort):
             self._cancel_turn(feed)
             return
         except Exception as exc:
             if feed is not None:
                 feed.close()
-                self.next_index += feed.handled
+                self.next_index = index + feed.handled - shown
                 self.steps, self.cost, self.run_steps = feed.steps, feed.cost, feed.run_steps
             if not self.followups:
                 _raise_cli_error(exc)
@@ -668,6 +650,32 @@ class _Conversation:
             self._end_session()
             if self.followups:
                 ui.hint(err_console, "session ended; the next message starts a new one")
+
+    def _show(self, feed: ui.StepFeed, index: int, timeout: float | None) -> None:
+        """Render the turn from `index` until the session settles or waits on this client."""
+        steering = None
+        if not self.controls_machine and _interactive() and keys.supported():
+            steering = steer.Steering(
+                self.client,
+                str(self.session.id),
+                feed,
+                err_console,
+                local_command=self._command_mid_turn,
+                box=ui.InputBox(text=self._draft),
+            )
+        with steering.watch() if steering else contextlib.nullcontext():
+            try:
+                _follow(self.client, self.session.id, feed, timeout_s=timeout, from_index=index, stop_at_tool_wait=True)
+            except KeyboardInterrupt:
+                if steering is not None:
+                    steering.stop()
+                raise
+            finally:
+                if steering is not None:
+                    steering.finish()
+                    self._draft = steering.box.text
+                    if steering.pending:
+                        self._pending, self._pending_shown = steering.pending, steering.pending_shown
 
     def _create_session(self, message: str) -> Any:
         """On ctrl+c, the session is cancelled once the create call returns, even if ctrl+c is pressed again."""
@@ -963,6 +971,52 @@ def _follow(
                 return
     finally:
         stop.set()
+
+
+def _decide(client: Any, session_id: str, held: list[Any], feed: ui.StepFeed) -> None:
+    """Ask the person at the terminal about each call held for approval, and send each answer."""
+    session = client.session(session_id)
+    ui.notify(err_console, "holo: the agent needs your approval")
+    with feed.prompting():
+        for request in to_jsonable(held):
+            call = request["tool_req"]
+            command = (call.get("args") or {}).get("command")
+            action = f"run {command}" if isinstance(command, str) else " ".join(tools.label(call))
+            reasons = [need["reason"] for need in request["requirements"]]
+            allowlist, rules = _standing_rules(request)
+            if rules:
+                reasons.append(f"a = yes, and always allow what starts with: {', '.join(rules)}")
+            ui.needs_you(err_console, action, reasons, [])
+            choices = "y/a/N" if rules else "y/N"
+            answer = typer.prompt(f"Do you want to proceed? [{choices}]", default="n", show_default=False, err=True)
+            answer = answer.strip().lower()
+            if rules and answer in ("a", "always"):
+                allowlist.add(rules)
+                err_console.print(f"Added to {escape(str(allowlist.path))}", style="dim")
+                answer = "y"
+            if answer in ("y", "yes"):
+                session.approve(call["id"])
+            else:
+                why = typer.prompt("Tell the agent why (optional)", default="", show_default=False, err=True)
+                session.deny(call["id"], why or None)
+            err_console.print()
+
+
+def _standing_rules(request: dict[str, Any]) -> tuple[Any, list[str]]:
+    """This machine's allowlist and the lines that would let the held command run from now on, when it is what holds it."""
+    from hai_agents_local.config import agent_shell_policy, shell_policy
+
+    command, path = (request["tool_req"].get("args") or {}).get("command"), shell_policy() or agent_shell_policy()
+    try:
+        from hai_drivers.code_sandbox.local.allowlist import Allowlist
+    except ImportError:
+        return None, []
+    if not isinstance(command, str):
+        return None, []
+    allowlist = Allowlist(path)
+    if [need["reason"] for need in request["requirements"]] != [allowlist.hold(command)]:
+        return None, []
+    return allowlist, allowlist.missing(command)
 
 
 def _poll_agents(client: Any, feed: ui.StepFeed, stop: threading.Event) -> None:
@@ -1493,22 +1547,37 @@ def local_desktop(
     shell: bool = typer.Option(
         False,
         "--shell",
-        hidden=True,
         help="Serve a shell-mode desktop: a shell on this machine, running as you, that drives its "
         "screen and a Chrome.",
     ),
     workspace: str | None = typer.Option(
         None,
         "--workspace",
-        hidden=True,
-        help="With --shell, the folder the shell starts in. Defaults to ~/hai/<session id>.",
+        help="With --shell, the folder the shell starts in. Defaults to $HAI_SHELL_WORKSPACE, else to "
+        "~/hai/<session id>.",
     ),
+    policy: str | None = typer.Option(
+        None,
+        "--policy",
+        help="With --shell, this machine's allowlist file, one command prefix a line: a command it does not "
+        "cover waits for approval. Created with `cua` allowed when missing. Defaults to $HAI_SHELL_POLICY; "
+        "without one every command runs.",
+    ),
+    sandbox: str | None = typer.Option(
+        None,
+        "--sandbox",
+        help="With --shell, this machine's sandbox-runtime settings file: every command runs under srt by its "
+        "rules and writes in the workspace. Defaults to $HAI_SHELL_SANDBOX, else on macOS to sandbox.json beside "
+        "the stored credentials; where that file does not exist, to the built-in rules.",
+    ),
+    no_sandbox: bool = typer.Option(False, "--no-sandbox", help="With --shell, run commands unconfined, as you."),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""
     from hai_agents_local import PyautoguiDesktopBridge, WorkstationBridge
 
     if shell:
-        _run_bridge(_state(ctx), WorkstationBridge, session_id, workspace=workspace)
+        confinement = False if no_sandbox else sandbox
+        _run_bridge(_state(ctx), WorkstationBridge, session_id, workspace=workspace, policy=policy, sandbox=confinement)
         return
     if image_format not in ("png", "jpeg", "webp"):
         _raise_cli_error(ValueError(f"--image-format must be png, jpeg, or webp; got {image_format!r}"))
@@ -1547,7 +1616,7 @@ def _run_bridge(state: AppState, bridge_type: type[LocalBridge], session_id: str
             **options,
         )
         bridge.preflight()
-    except (RuntimeError, ValueError, PermissionError) as exc:
+    except (RuntimeError, ValueError, PermissionError, ImportError) as exc:
         _raise_cli_error(exc)
 
     console.print(
@@ -1779,6 +1848,7 @@ def _print_run_result(
         "error": result.error,
         "error_code": result.error_code,
         "agent_view_url": agent_view_url,
+        "pending_approvals": result.pending_approvals,
     }
     if json_output:
         _print_json(payload)
@@ -1790,6 +1860,8 @@ def _print_run_result(
     error_text = _error_line(result.error, result.error_code)
     if _awaits_tools(result):
         error_text = "the agent is waiting on client-side tools the CLI cannot run; drive it from the SDK with tools"
+    if result.pending_approvals:
+        error_text = "the agent is waiting on your approval; run holo in a terminal to answer it"
     if stopped:
         error_text = "stopped by the kill switch"
     if feed is not None:

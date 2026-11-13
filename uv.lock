@@ -730,7 +730,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "hai-agents", extras = ["browser", "cli", "desktop", "workstation"], marker = "extra == 'all'" },
-    { name = "hai-drivers", extras = ["browser-cli", "cua-cli", "desktop-cli"], marker = "extra == 'workstation'", specifier = ">=0.1.19" },
+    { name = "hai-drivers", extras = ["browser-cli", "cua-cli", "desktop-cli"], marker = "extra == 'workstation'", specifier = ">=0.1.21" },
     { name = "hai-drivers", extras = ["desktop"], marker = "extra == 'desktop'", specifier = ">=0.1.3" },
     { name = "hai-drivers", extras = ["web"], marker = "extra == 'browser'", specifier = ">=0.1.3" },
     { name = "httpx", specifier = ">=0.23.0,<0.29.0" },
@@ -759,7 +759,7 @@ dev = [
 
 [[package]]
 name = "hai-drivers"
-version = "0.1.20"
+version = "0.1.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdownify" },
@@ -767,7 +767,7 @@ dependencies = [
     { name = "pydantic" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/02/ae/90d0bafed61d25ce2c2e49930b91a2894a1bee853a659c682ebaefe2db2d/hai_drivers-0.1.20-py3-none-any.whl", hash = "sha256:a9456562a07636539a475a4d47b790d3ec9fd9a097c3c6518259710b45c2a5af", size = 323675, upload-time = "2026-11-12T12:37:18.407Z" },
+    { url = "https://files.pythonhosted.org/packages/69/f6/2242a52dc9eda567535c93a067855b6fe8c5caee8423cca11d9017b5ea64/hai_drivers-0.1.21-py3-none-any.whl", hash = "sha256:de757c6d9d4b9a16478999eacaf01aea1878d46150b56806d6a834b82045e12f", size = 380381, upload-time = "2026-11-13T12:50:53.167Z" },
 ]
 
 [package.optional-dependencies]

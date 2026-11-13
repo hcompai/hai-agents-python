@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
 import sys
 import threading
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
@@ -240,16 +242,20 @@ def needs_you(out: Console, action: str, lines: list[str], options: list[str], *
     body: list[RenderableType] = [
         Text("Needs you", style="attention"),
         Text(""),
-        Text.from_markup(f"  {action}"),
-        *(Text.from_markup(f"  {line}") for line in lines),
-        Text(""),
-        Text("Do you want to proceed?"),
+        *(Text(f"  {_as_written(line)}") for line in (action, *lines)),
     ]
+    if options:
+        body += [Text(""), Text("Do you want to proceed?")]
     for i, option in enumerate(options):
         mark, style = (POINTER, "accent") if i == selected else (" ", "")
         body.append(Text(f"{mark} {i + 1}. {option}", style=style))
     out.print(Panel(Group(*body), box=box.ROUNDED, border_style="warn", expand=False, padding=(0, 1)))
     out.print()
+
+
+def _as_written(text: str) -> str:
+    """``text`` with each character a terminal would act on or hide spelled out: what is read is what was sent."""
+    return "".join(char if char.isprintable() or char == "\n" else repr(char)[1:-1] for char in text)
 
 
 def duration(seconds: float) -> str:
@@ -462,6 +468,17 @@ class StepFeed:
         if self._live is not None:
             self._live.stop()
             self._live = None
+
+    @contextlib.contextmanager
+    def prompting(self) -> Iterator[None]:
+        """Leave the terminal to a prompt: the step in flight draws again once it is answered."""
+        with self._lock:
+            self._stop_live()
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._start_live()
 
     def _handle(self, event: Any) -> None:
         kind, data, ts = unwrap(event)

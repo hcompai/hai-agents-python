@@ -1,4 +1,4 @@
-"""Verified download and atomic install of the hai-agent-runtime binary; consent is the caller's ``download=True``."""
+"""Verified download and atomic install of a pinned binary; for hai-agent-runtime, consent is the caller's ``download=True``."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ def _require_secure_url(url: str) -> None:
     parsed = urlsplit(url)
     if parsed.scheme == "https" or (parsed.scheme == "http" and parsed.hostname in _LOOPBACK_HOSTS):
         return
-    raise LocalRuntimeError(f"refusing insecure hai-agent-runtime download URL (need https): {url}")
+    raise LocalRuntimeError(f"refusing insecure download URL (need https): {url}")
 
 
 def bin_dir(version: str, *, cache_dir: typing.Optional[_PathInput] = None) -> pathlib.Path:
@@ -97,18 +97,27 @@ def install_runtime(
     artifact: RuntimeArtifact, *, version: str, cache_dir: typing.Optional[_PathInput] = None
 ) -> pathlib.Path:
     """Download, sha256-verify, and atomically install `artifact` as `version`; returns the executable path."""
-    root = resolve_cache_dir(cache_dir) / "bin"
+    return install_artifact(artifact, bin_dir(version, cache_dir=cache_dir), _find_binary, "hai-agent-runtime")
+
+
+def install_artifact(
+    artifact: RuntimeArtifact,
+    version_dir: pathlib.Path,
+    find: typing.Callable[[pathlib.Path], typing.Optional[pathlib.Path]],
+    name: str,
+) -> pathlib.Path:
+    """Download, sha256-verify, and atomically install `artifact` as `version_dir`; returns the executable `find` sees there."""
+    root = version_dir.parent
     root.mkdir(parents=True, exist_ok=True)
-    version_dir = root / version
 
     # Stage on the same filesystem as the final location so os.replace stays atomic.
     with tempfile.TemporaryDirectory(dir=root, prefix=".staging-") as staging_str:
         staging = pathlib.Path(staging_str)
         download_path = staging / "artifact"
-        actual_sha256 = _download_to(artifact.url, download_path)
+        actual_sha256 = _download_to(artifact.url, download_path, name)
         if actual_sha256 != artifact.sha256.lower():
             raise DownloadVerificationError(
-                f"hai-agent-runtime download failed sha256 verification: expected {artifact.sha256}, "
+                f"{name} download failed sha256 verification: expected {artifact.sha256}, "
                 f"got {actual_sha256} (url: {artifact.url})"
             )
 
@@ -121,36 +130,34 @@ def install_runtime(
         else:
             shutil.move(str(download_path), str(staged_version / BINARY_NAME))
 
-        binary = _find_binary(staged_version)
+        binary = find(staged_version)
         if binary is None:
-            raise LocalRuntimeError(
-                f"downloaded artifact contains no hai-agent-runtime executable (url: {artifact.url})"
-            )
+            raise LocalRuntimeError(f"downloaded artifact contains no {name} executable (url: {artifact.url})")
         binary.chmod(0o755)  # zipfile does not preserve the exec bit
 
         try:
             os.replace(staged_version, version_dir)
         except OSError:
             # Target occupied: a concurrent installer won the race, or a half-finished dir is in the way.
-            existing = installed_binary(version, cache_dir=cache_dir)
+            existing = find(version_dir)
             if existing is not None:
-                logger.info("hai-agent-runtime %s already installed by a concurrent run", version)
+                logger.info("%s already installed by a concurrent run", name)
                 return existing
             shutil.rmtree(version_dir, ignore_errors=True)
             os.replace(staged_version, version_dir)
 
-    installed = installed_binary(version, cache_dir=cache_dir)
+    installed = find(version_dir)
     assert installed is not None, "atomic rename just published the staged install"
-    logger.info("installed hai-agent-runtime %s at %s", version, installed)
+    logger.info("installed %s at %s", name, installed)
     return installed
 
 
-def _download_to(url: str, dest: pathlib.Path) -> str:
+def _download_to(url: str, dest: pathlib.Path, name: str) -> str:
     """Stream `url` into `dest`; returns the sha256 hex digest of the bytes written."""
     _require_secure_url(url)
     digest = hashlib.sha256()
     written = 0
-    logger.info("downloading hai-agent-runtime from %s", url)
+    logger.info("downloading %s from %s", name, url)
     try:
         with (
             httpx.Client(follow_redirects=True, timeout=_DOWNLOAD_TIMEOUT) as client,
@@ -158,22 +165,18 @@ def _download_to(url: str, dest: pathlib.Path) -> str:
         ):
             _require_secure_url(str(response.url))  # a redirect must not downgrade to plain http
             if response.status_code != 200:
-                raise LocalRuntimeError(f"hai-agent-runtime download failed: HTTP {response.status_code} from {url}")
+                raise LocalRuntimeError(f"{name} download failed: HTTP {response.status_code} from {url}")
             total = int(response.headers.get("Content-Length", "0")) or None
             if total is not None and total > MAX_DOWNLOAD_BYTES:
-                raise LocalRuntimeError(
-                    f"hai-agent-runtime download too large: {total} bytes exceeds {MAX_DOWNLOAD_BYTES}"
-                )
+                raise LocalRuntimeError(f"{name} download too large: {total} bytes exceeds {MAX_DOWNLOAD_BYTES}")
             with dest.open("wb") as fh:
                 for chunk in response.iter_bytes():
                     written += len(chunk)
                     if written > MAX_DOWNLOAD_BYTES:
-                        raise LocalRuntimeError(
-                            f"hai-agent-runtime download exceeded {MAX_DOWNLOAD_BYTES} bytes; aborting"
-                        )
+                        raise LocalRuntimeError(f"{name} download exceeded {MAX_DOWNLOAD_BYTES} bytes; aborting")
                     digest.update(chunk)
                     fh.write(chunk)
     except httpx.HTTPError as exc:
-        raise LocalRuntimeError(f"hai-agent-runtime download failed: {exc} (url: {url})") from exc
+        raise LocalRuntimeError(f"{name} download failed: {exc} (url: {url})") from exc
     logger.info("download complete (%d bytes)", written)
     return digest.hexdigest()

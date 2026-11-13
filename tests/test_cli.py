@@ -15,6 +15,7 @@ from typer.testing import CliRunner
 import hai_agents_cli.app as app_module
 from hai_agents.core.api_error import ApiError
 from hai_agents.polling import MAX_REQUEST_BYTES, SessionRunResult
+from hai_agents.types import ApprovalRequirement, ToolApprovalRequest, ToolRequest
 from hai_agents_cli import steer, ui
 from hai_agents_cli.app import app
 from hai_agents_common import credentials
@@ -100,6 +101,7 @@ def test_run_prints_json(monkeypatch) -> None:
         "error": None,
         "error_code": None,
         "agent_view_url": "https://platform.example.test/agent-view/sess_1",
+        "pending_approvals": [],
     }
 
 
@@ -183,6 +185,83 @@ def test_a_client_tool_wait_ends_the_session_and_the_next_message_starts_a_new_o
     assert client.sessions.created == 2
     assert client.sessions.sent == []
     assert ("cancel",) in client.sessions.calls
+
+
+def _held_then_done(reason: str = "not on this machine's allowlist", command: str = "rm -rf [build]"):
+    held = ToolApprovalRequest(
+        tool_req=ToolRequest(id="call_1", tool_name="shell", args={"command": command}),
+        requirements=[ApprovalRequirement(source="environment", reason=reason)],
+    )
+    return iter(
+        [
+            SessionRunResult(
+                id="sess_1", status="awaiting_tool_results", events=[], next_from_index=2, pending_approvals=[held]
+            ),
+            SessionRunResult(id="sess_1", status="idle", events=[], next_from_index=5, answer="ok"),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    "typed,sent",
+    [("y\n", ("approve", "call_1")), ("n\ntoo risky\n", ("deny", "call_1", "too risky"))],
+    ids=["approve", "deny"],
+)
+def test_a_held_call_asks_the_person_at_the_terminal_and_the_turn_goes_on(monkeypatch, typed, sent) -> None:
+    client, results, followed = _RunClient(), _held_then_done(command="rm -rf [build] \x1b[8m"), []
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
+    monkeypatch.setattr(app_module, "_follow", lambda *a, from_index, **k: followed.append(from_index))
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+    monkeypatch.setattr(app_module, "_read_message", lambda convo: None)
+
+    result = runner.invoke(app, ["run", "clean up", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"}, input=typed)
+
+    assert result.exit_code == 0, result.output
+    assert "run rm -rf [build] \\x1b[8m" in result.output and "not on this machine's allowlist" in result.output
+    assert client.sessions.calls == [sent]
+    assert followed == [0, 2]
+
+
+@pytest.mark.parametrize(
+    ("file", "held_here"),
+    [("allowed", True), ("hai/allowed-commands", True), ("allowed", False)],
+    ids=["held by this machine's list", "held for an agent that requires approval", "held elsewhere"],
+)
+def test_always_allowing_a_command_this_machine_held_adds_its_rule_to_the_allowlist(
+    monkeypatch, tmp_path, file, held_here
+) -> None:
+    allowlist = pytest.importorskip("hai_drivers.code_sandbox.local.allowlist").Allowlist(tmp_path / file)
+    reason = allowlist.hold("rm -rf [build]") if held_here else "held by another machine"
+    client, results = _RunClient(), _held_then_done(reason)
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
+    monkeypatch.setattr(app_module, "_follow", _no_events)
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+    monkeypatch.setattr(app_module, "_read_message", lambda convo: None)
+    machine = {"HAI_SHELL_POLICY": str(allowlist.path)} if file == "allowed" else {"XDG_CONFIG_HOME": str(tmp_path)}
+
+    result = runner.invoke(
+        app, ["run", "clean up", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test", **machine}, input="a\n\n"
+    )
+
+    assert result.exit_code == 0, result.output
+    assert ("always allow what starts with: rm -rf '[build]'" in result.output) == held_here
+    assert allowlist.path.exists() == held_here and bool(allowlist.hold("rm -rf [build]")) != held_here
+    assert client.sessions.calls == [("approve", "call_1") if held_here else ("deny", "call_1", None)]
+
+
+def test_a_held_call_ends_a_run_nobody_can_answer_and_names_the_wait(monkeypatch) -> None:
+    client, results = _RunClient(), _held_then_done()
+    monkeypatch.setattr(app_module, "_client", lambda state: client)
+    monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
+    monkeypatch.setattr(app_module, "_follow", _no_events)
+
+    result = runner.invoke(app, ["run", "clean up", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
+
+    assert result.exit_code == 1
+    assert "waiting on your approval" in result.output
+    assert client.sessions.calls == [("cancel",)]
 
 
 @pytest.mark.parametrize("earlier", [[], ["completed"]], ids=["first turn", "after a finished session"])
@@ -708,6 +787,13 @@ class _RunSessions:
 class _RunClient:
     def __init__(self, capture: dict | None = None) -> None:
         self.sessions = _RunSessions(capture)
+
+    def session(self, id):
+        calls = self.sessions.calls
+        return types.SimpleNamespace(
+            approve=lambda call_id: calls.append(("approve", call_id)),
+            deny=lambda call_id, message=None: calls.append(("deny", call_id, message)),
+        )
 
     def close(self) -> None:
         pass
