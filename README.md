@@ -387,7 +387,7 @@ or `session.deny(call_id, message)`.
 On macOS every command runs inside Anthropic's [sandbox-runtime](https://github.com/anthropics/sandbox-runtime),
 downloaded on the first session: it writes in the workspace only, reaches the Python and npm registries, and cannot
 read your credentials. On Linux and Windows the sandbox is off until you install it. The
-[guide](https://hub.hcompany.ai/agents-api/your-shell) covers both.
+[guide](https://hub.hcompany.ai/agents-api/your-desktop/shell-mode) covers both.
 
 ### Inspect and share sessions
 
