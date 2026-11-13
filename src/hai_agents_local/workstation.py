@@ -183,7 +183,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
 
             allowed = Path(self.policy).expanduser()
             if allowed.resolve().is_relative_to(self.workspace.resolve()):
-                raise ValueError(f"{allowed} is inside the workspace, where the agent writes")
+                raise ValueError(f"{allowed} is inside the workspace, where the agent writes: work in another folder")
             _starting_with(allowed, STARTER_ALLOWLIST)
             policy = Allowlist(allowed, also=self.allowed_commands)
             logger.info("commands outside %s wait for approval", allowed)
