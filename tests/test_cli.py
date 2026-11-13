@@ -66,7 +66,7 @@ def test_route_runs_bare_tasks_and_hoists_global_options() -> None:
     assert route() == ["chat"]
     assert route("--local") == ["chat", "--local"]
     assert route("-a", "h/web-surfer-pro") == ["chat", "-a", "h/web-surfer-pro"]
-    assert route("-w", ".", "-a", "h/holo-coder") == ["chat", "-w", ".", "-a", "h/holo-coder"]
+    assert route("-w", ".", "-a", "h/holo-code") == ["chat", "-w", ".", "-a", "h/holo-code"]
     assert route("--no-sandbox", "--model-url", "http://x/v1") == ["chat", "--no-sandbox", "--model-url", "http://x/v1"]
     assert route("--local", interactive=False) == ["run", "--local"]
     assert route(interactive=False) == []
