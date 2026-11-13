@@ -323,8 +323,8 @@ class TestAutoStart:
         sessions.create_session(agent=shell, messages="hi", workspace=str(tmp_path))
         assert started[0].workspace == tmp_path and "workspace" not in captured
 
-        with pytest.raises(ValueError, match="shell mode"):
-            sessions.create_session(agent="h/web-surfer-flash", messages="hi", workspace=str(tmp_path))
+        sessions.create_session(agent={"name": "x"}, messages="hi", workspace=str(tmp_path))
+        assert len(started) == 1 and "workspace" not in captured
 
     def test_named_agent_routes_its_user_device_env_through_an_override(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
@@ -1194,6 +1194,9 @@ class TestDriverInterfaces:
         rules.parent.mkdir()
         rules.write_text("{}")
         assert shell_sandbox() == str(rules)
+        monkeypatch.setenv("HAI_SHELL_SANDBOX", str(tmp_path / "other.json"))
+        with pytest.raises(ValueError, match="0 or 1"):
+            shell_sandbox()
 
     @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
     def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(
@@ -1275,7 +1278,6 @@ class TestDriverInterfaces:
         pytest.importorskip("hai_drivers.code_sandbox.local.sandbox_runtime")
         from hai_agents_local import workstation
 
-        monkeypatch.setenv("HAI_SHELL_SANDBOX", str(tmp_path / "none.json"))
         monkeypatch.setenv("SOME_API_KEY", "s")
         monkeypatch.setattr(workstation, "_host_cua", lambda environment: {})
         workspace = tmp_path / "workspace"
@@ -1289,7 +1291,7 @@ class TestDriverInterfaces:
             "secrets": "! ls ~/.ssh && ! head -c 1 ~/Library/Keychains/login.keychain-db",
             "elsewhere": f"! touch {tmp_path}/escaped && ! curl -sf -m 10 https://example.com",
         }
-        bridge = WorkstationBridge(api_key="k", workspace=str(workspace))
+        bridge = WorkstationBridge(api_key="k", workspace=str(workspace), sandbox=str(tmp_path / "none.json"))
         bridge._driver = bridge.create_driver()
         try:
             failed = {

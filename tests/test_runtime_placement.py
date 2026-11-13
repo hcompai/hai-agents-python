@@ -82,7 +82,6 @@ class _RuntimeHandler(BaseHTTPRequestHandler):
 @pytest.fixture
 def runtime_server(monkeypatch):
     monkeypatch.delenv("HAI_AGENT_RUNTIME_API_TOKEN", raising=False)
-    monkeypatch.delenv("HAI_AGENT_LOCAL_BASE_URL", raising=False)
     server = RuntimeServer("local-token")
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -279,13 +278,6 @@ async def test_bridge_never_serves_an_unproven_runtime(monkeypatch, runtime_serv
         await bridge.run()
 
 
-@pytest.mark.parametrize("url", ["https://remote.example", "http://user:pass@localhost:80"])
-def test_local_attach_rejects_remote_or_credential_urls(tmp_path, monkeypatch, url):
-    monkeypatch.setenv("HAI_AGENT_LOCAL_BASE_URL", url)
-    with pytest.raises(LocalRuntimeError, match="loopback"):
-        LocalRuntime.attach(cache_dir=tmp_path)
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize("asynchronous", [False, True])
 @pytest.mark.parametrize("runtime_use", ["borrowed", "idle", "shared"])
@@ -354,7 +346,6 @@ def test_binary_resolution_does_not_hold_the_port_startup_lock(tmp_path, monkeyp
     from hai_agents_local.runtime import BinaryNotFoundError
     from hai_agents_local.runtime import runtime as module
 
-    monkeypatch.delenv("HAI_AGENT_LOCAL_BASE_URL", raising=False)
     monkeypatch.setattr(LocalRuntime, "_attach", lambda **kwargs: None)
 
     def resolve(**kwargs):
