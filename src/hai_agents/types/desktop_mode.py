@@ -7,6 +7,8 @@ import typing
 import pydantic
 import typing_extensions
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .desktop_shell_mode_command_approval import DesktopShellModeCommandApproval
+from .desktop_shell_mode_sandbox import DesktopShellModeSandbox
 
 
 class DesktopMode_Shell(UniversalBaseModel):
@@ -15,6 +17,11 @@ class DesktopMode_Shell(UniversalBaseModel):
     """
 
     type: typing.Literal["shell"] = "shell"
+    command_approval: typing.Optional[DesktopShellModeCommandApproval] = None
+    allowed_commands: typing.Optional[typing.List[str]] = None
+    sandbox: typing.Optional[DesktopShellModeSandbox] = None
+    allowed_domains: typing.Optional[typing.List[str]] = None
+    writable_folders: typing.Optional[typing.List[str]] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

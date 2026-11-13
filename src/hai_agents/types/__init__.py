@@ -60,6 +60,8 @@ if typing.TYPE_CHECKING:
     from .desktop import Desktop
     from .desktop_mode import DesktopMode, DesktopMode_Shell, DesktopMode_Visual
     from .desktop_shell_mode import DesktopShellMode
+    from .desktop_shell_mode_command_approval import DesktopShellModeCommandApproval
+    from .desktop_shell_mode_sandbox import DesktopShellModeSandbox
     from .desktop_visual_mode import DesktopVisualMode
     from .detail_error_response import DetailErrorResponse
     from .environment import (
@@ -268,6 +270,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "DesktopMode_Shell": ".desktop_mode",
     "DesktopMode_Visual": ".desktop_mode",
     "DesktopShellMode": ".desktop_shell_mode",
+    "DesktopShellModeCommandApproval": ".desktop_shell_mode_command_approval",
+    "DesktopShellModeSandbox": ".desktop_shell_mode_sandbox",
     "DesktopVisualMode": ".desktop_visual_mode",
     "DetailErrorResponse": ".detail_error_response",
     "Environment": ".environment",
@@ -492,6 +496,8 @@ __all__ = [
     "DesktopMode_Shell",
     "DesktopMode_Visual",
     "DesktopShellMode",
+    "DesktopShellModeCommandApproval",
+    "DesktopShellModeSandbox",
     "DesktopVisualMode",
     "DetailErrorResponse",
     "Environment",

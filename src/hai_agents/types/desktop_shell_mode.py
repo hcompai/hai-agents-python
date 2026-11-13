@@ -4,11 +4,38 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .desktop_shell_mode_command_approval import DesktopShellModeCommandApproval
+from .desktop_shell_mode_sandbox import DesktopShellModeSandbox
 
 
 class DesktopShellMode(UniversalBaseModel):
     """
     Drive the machine from a shell: commands, files, and the screen and browser through CLIs.
+    """
+
+    command_approval: typing.Optional[DesktopShellModeCommandApproval] = pydantic.Field(default=None)
+    """
+    `required` holds each command until the user approves it, unless it starts with one of `allowed_commands`. A machine with an allowlist of its own asks by that one.
+    """
+
+    allowed_commands: typing.Optional[typing.List[str]] = pydantic.Field(default=None)
+    """
+    Commands that run without approval, each with any arguments after it, such as `git status`.
+    """
+
+    sandbox: typing.Optional[DesktopShellModeSandbox] = pydantic.Field(default=None)
+    """
+    `if_available` confines commands on a machine that has the sandbox, and runs them as the user on one that does not. `required` runs no command on a machine that cannot confine them.
+    """
+
+    allowed_domains: typing.Optional[typing.List[str]] = pydantic.Field(default=None)
+    """
+    Hosts the confined commands may reach besides the Python and npm registries, such as `github.com` or `*.example.com`. A machine with sandbox settings of its own reaches what those say.
+    """
+
+    writable_folders: typing.Optional[typing.List[str]] = pydantic.Field(default=None)
+    """
+    Folders the confined commands may write besides the session's own, absolute or under `~/`, such as `~/Projects/app`. A machine with sandbox settings of its own writes where those say.
     """
 
     if IS_PYDANTIC_V2:
