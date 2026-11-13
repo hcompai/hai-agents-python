@@ -7869,6 +7869,52 @@
             "const": "shell",
             "title": "Type",
             "default": "shell"
+          },
+          "command_approval": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "required"
+            ],
+            "title": "Command Approval",
+            "description": "`required` holds each command until the user approves it, unless it starts with one of `allowed_commands`. A machine with an allowlist of its own asks by that one.",
+            "default": "not_required"
+          },
+          "allowed_commands": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Commands",
+            "description": "Commands that run without approval, each with any arguments after it, such as `git status`."
+          },
+          "sandbox": {
+            "type": "string",
+            "enum": [
+              "if_available",
+              "required"
+            ],
+            "title": "Sandbox",
+            "description": "`if_available` confines commands on a machine that has the sandbox, and runs them as the user on one that does not. `required` runs no command on a machine that cannot confine them.",
+            "default": "if_available"
+          },
+          "allowed_domains": {
+            "items": {
+              "type": "string",
+              "pattern": "^(\\*\\.)?([A-Za-z0-9-]+\\.)+[A-Za-z0-9-]+$"
+            },
+            "type": "array",
+            "title": "Allowed Domains",
+            "description": "Hosts the confined commands may reach besides the Python and npm registries, such as `github.com` or `*.example.com`. A machine with sandbox settings of its own reaches what those say."
+          },
+          "writable_folders": {
+            "items": {
+              "type": "string",
+              "pattern": "^(~?/|[A-Za-z]:[/\\\\])[^/\\\\]"
+            },
+            "type": "array",
+            "title": "Writable Folders",
+            "description": "Folders the confined commands may write besides the session's own, absolute or under `~/`, such as `~/Projects/app`. A machine with sandbox settings of its own writes where those say."
           }
         },
         "type": "object",
