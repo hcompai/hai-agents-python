@@ -30,7 +30,7 @@ from hai_agents_local import (
     SeleniumBrowserBridge,
     WorkstationBridge,
 )
-from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR, SHELL_WORKSPACE_ENV_VAR, shell_sandbox
+from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR, shell_sandbox
 from hai_agents_local.errors import AuthError, RateLimitedError, SessionNotFoundError
 from hai_agents_local.routing import localize_agent
 from hai_agents_local.runtime.manifest import platform_key
@@ -94,17 +94,23 @@ class TestLocalizeAgent:
         _, [plain], _ = localize_agent(agent, api_key=API_KEY)
         assert plain.policy is None and not plain.require_sandbox and not plain.allowed_domains
 
-    def test_a_shell_desktop_works_in_the_folder_this_machine_names(self, monkeypatch, tmp_path):
+    def test_a_shell_desktop_works_in_the_current_folder_unless_it_is_home_or_one_is_named(self, monkeypatch, tmp_path):
         agent = {"name": "x", "environments": [{"kind": "desktop", "mode": {"type": "shell"}}]}
-        _, [own], _ = localize_agent(agent, api_key=API_KEY)
-        assert own.workspace == Path.home() / "hai" / own.session_id
+        home, project = tmp_path.resolve(), tmp_path.resolve() / "project"
+        project.mkdir()
+        monkeypatch.setattr(Path, "home", lambda: home)
 
-        monkeypatch.setenv(SHELL_WORKSPACE_ENV_VAR, str(tmp_path))
-        _, [named], _ = localize_agent(agent, api_key=API_KEY)
-        assert named.workspace == tmp_path
+        monkeypatch.chdir(project)
+        _, [here], _ = localize_agent(agent, api_key=API_KEY)
+        assert here.workspace == project
 
-        _, [asked], _ = localize_agent(agent, api_key=API_KEY, workspace=str(tmp_path / "app"))
-        assert asked.workspace == tmp_path / "app"
+        _, [asked], _ = localize_agent(agent, api_key=API_KEY, workspace=str(home / "app"))
+        assert asked.workspace == home / "app"
+
+        for above in (home, home.parent):
+            monkeypatch.chdir(above)
+            _, [own], _ = localize_agent(agent, api_key=API_KEY)
+            assert own.workspace == home / "hai" / own.session_id
 
     def test_second_unclaimed_env_of_same_kind_raises(self):
         agent = {
@@ -1051,6 +1057,7 @@ class TestDriverInterfaces:
     def test_workstation_serves_a_shell_in_its_session_folder_with_the_cli_commands(self, tmp_path, monkeypatch):
         pytest.importorskip("hai_drivers.code_sandbox.local.driver")
         monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.chdir(tmp_path)
         monkeypatch.delenv("CUA_CURSOR", raising=False)
         bridge = WorkstationBridge(
             api_key="k",

@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Literal
 from hai_agents.client import credentials_path
 
 from .bridge import LocalBridge, TokenSource
-from .config import SHELL_SANDBOX_ENV_VAR, agent_shell_policy, shell_policy, shell_sandbox, shell_workspace
+from .config import SHELL_SANDBOX_ENV_VAR, agent_shell_policy, shell_policy, shell_sandbox
 from .desktop import ensure_macos_input_permissions
 from .runtime.errors import LocalRuntimeError
 from .runtime.install import install_artifact
@@ -79,6 +79,13 @@ _SECRET_NAME = re.compile(r"API_?KEY|ACCESS_KEY|PRIVATE_KEY|TOKEN|SECRET|PASSWOR
 _SECRET_URL = re.compile(r"://[^/\s:@]+:[^/\s@]+@")
 
 
+def _workspace(session_id: str) -> Path:
+    """The current folder; a new one under ~/hai when that is the home folder or above it."""
+    here, home = Path.cwd().resolve(), Path.home()
+    above = here == Path(here.anchor) or home.resolve().is_relative_to(here)
+    return home / "hai" / session_id if above else here
+
+
 class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
     """Serves shell-mode desktops with a shell in the workspace, running as the current user."""
 
@@ -110,8 +117,8 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         serves no agent that requires a sandbox it turned off.
 
         Args:
-            workspace: The folder the shell starts in and the file tools act in; defaults to
-                ``HAI_SHELL_WORKSPACE``, else to ``~/hai/<session_id>``.
+            workspace: The folder the shell starts in and the file tools act in; defaults to the current one,
+                and from the home folder or above it to ``~/hai/<session_id>``.
             policy: This machine's allowlist file, one command prefix a line; defaults to ``HAI_SHELL_POLICY``.
                 With one, the shell runs the commands it covers and holds any other until the session's client
                 approves it. Without one, every command runs. A file that does not exist yet starts with ``cua``
@@ -136,8 +143,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         Under either, the agent's file tools stay inside the workspace.
         """
         super().__init__(environment_id, api_key=api_key, base_url=base_url, session_id=session_id)
-        workspace = workspace or shell_workspace()
-        self.workspace = Path(workspace).expanduser().absolute() if workspace else Path.home() / "hai" / self.session_id
+        self.workspace = Path(workspace).expanduser().absolute() if workspace else _workspace(self.session_id)
         self.environment_variables = dict(environment_variables or {})
         self.policy = policy or shell_policy()
         self.allowed_commands: list[str] = []
