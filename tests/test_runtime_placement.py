@@ -131,7 +131,7 @@ def _owned_runtime(server, cache_dir, monkeypatch, stopped):
 async def test_local_client_without_auto_bridges_leaves_execution_to_the_product(monkeypatch, asynchronous):
     from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
 
-    monkeypatch.setenv("HAI_AUTO_BRIDGE", "1")
+    monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
     served = []
     monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: served.extend(bridges) or [])
     requested = []
@@ -268,7 +268,6 @@ async def test_bridge_never_serves_an_unproven_runtime(monkeypatch, runtime_serv
 
     from hai_agents_local.sessions import _localize
 
-    monkeypatch.delenv("HAI_AUTO_BRIDGE", raising=False)
     runtime_server.proof_token = "squatter-token"
     runtime = SimpleNamespace(api_key="local-token", base_url=f"http://127.0.0.1:{runtime_server.port}")
     agent = {"environments": [{"id": "workstation", "kind": "workstation", "host": "user_device"}]}

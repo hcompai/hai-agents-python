@@ -84,7 +84,8 @@ class _LocalRuntimeAccess:
     """The runtime behind a local client, read through its hold so a re-acquired runtime shows up everywhere."""
 
     _hold: typing.Optional[RuntimeHold] = None
-    _auto_bridges = True
+    auto_bridges = True
+    """False starts no bridge for an agent's environments on this machine, and fetches no agent spec to look for one."""
 
     @property
     def local_runtime(self) -> typing.Optional[LocalRuntime]:
@@ -118,7 +119,9 @@ class Client(_LocalRuntimeAccess, BaseClient):
             if hold.owned:
                 hold.runtime.shutdown()
             raise
-        client._hold, client._auto_bridges = hold, auto_bridges
+        client._hold = hold
+        if not auto_bridges:
+            client.auto_bridges = False
         return client
 
     def close(self) -> None:
@@ -193,7 +196,7 @@ class Client(_LocalRuntimeAccess, BaseClient):
             from hai_agents_local.sessions import LocalSessionsClient
 
             self._sessions = LocalSessionsClient(
-                client_wrapper=self._client_wrapper, hold=self._hold, auto_bridges=self._auto_bridges
+                client_wrapper=self._client_wrapper, hold=self._hold, auto_bridges=lambda: self.auto_bridges
             )
         return self._sessions
 
@@ -223,7 +226,9 @@ class AsyncClient(_LocalRuntimeAccess, AsyncBaseClient):
             if hold.owned:
                 await asyncio.to_thread(hold.runtime.shutdown)
             raise
-        client._hold, client._auto_bridges = hold, auto_bridges
+        client._hold = hold
+        if not auto_bridges:
+            client.auto_bridges = False
         return client
 
     async def aclose(self) -> None:
@@ -300,6 +305,6 @@ class AsyncClient(_LocalRuntimeAccess, AsyncBaseClient):
             from hai_agents_local.sessions import LocalAsyncSessionsClient
 
             self._sessions = LocalAsyncSessionsClient(
-                client_wrapper=self._client_wrapper, hold=self._hold, auto_bridges=self._auto_bridges
+                client_wrapper=self._client_wrapper, hold=self._hold, auto_bridges=lambda: self.auto_bridges
             )
         return self._sessions

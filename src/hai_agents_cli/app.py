@@ -107,6 +107,9 @@ def login(
         help=f"Store an existing API key (from {credentials.API_KEYS_PAGE}) instead of signing in through the browser. "
         "Reads it from a hidden prompt, or from stdin when piped.",
     ),
+    portal: str | None = typer.Option(
+        None, "--portal", help="Portal that issues the keys of a platform given with --base-url."
+    ),
 ) -> None:
     """Sign in through the browser or with a pasted key, and store the key in ~/.config/hai/.env."""
     state = _state(ctx)
@@ -124,7 +127,7 @@ def login(
         return
     if not _interactive():
         _raise_cli_error(RuntimeError(f"login needs an interactive terminal. {auth.KEY_FALLBACK}"))
-    _sign_in(state.base_url)
+    _sign_in(state.base_url, portal)
 
 
 def _interactive() -> bool:
@@ -139,7 +142,7 @@ def _sign_in_if_needed(state: AppState) -> None:
     _sign_in(state.base_url)
 
 
-def _sign_in(base_url: str | None) -> None:
+def _sign_in(base_url: str | None, portal: str | None = None) -> None:
     console.print(
         "How do you want to sign in?\n"
         "  1. Google account, in your browser\n"
@@ -147,18 +150,18 @@ def _sign_in(base_url: str | None) -> None:
     )
     choice = typer.prompt("Choice", default="1").strip()
     if choice == "1":
-        _browser_sign_in(base_url)
+        _browser_sign_in(base_url, portal)
     elif choice == "2":
         _store_pasted_key(base_url)
     else:
         _raise_cli_error(RuntimeError(f"Choice must be 1 or 2, got {choice!r}."))
 
 
-def _browser_sign_in(base_url: str | None) -> None:
+def _browser_sign_in(base_url: str | None, portal: str | None = None) -> None:
     label = f"holo CLI ({socket.gethostname()})"
     try:
         minted = auth.login_and_mint(
-            credentials.portal_base(base_url),
+            portal or credentials.portal_base(base_url),
             label,
             lambda url: console.print(f"Opening your browser. If it does not open, visit:\n  {url}", style="dim"),
         )
@@ -277,9 +280,12 @@ def _parse_overrides(items: list[str]) -> dict[str, Any]:
 
 AGENT_HELP = f"Agent name. Default: {credentials.DEFAULT_AGENT}, or the one set with `holo agents use`."
 LOCAL_HELP = "Run the agent loop on this machine, through a local agent runtime."
+MODEL_URL_HELP = "With --local: your OpenAI-compatible model server, such as http://localhost:8000/v1."
+MODEL_HELP = "With --model-url: the model name sent to that server, such as holo4-35b-a3b."
 WORKSPACE_HELP = (
     "Folder an agent in shell mode works in. Default: the current folder; from your home folder, ~/hai/<session id>."
 )
+NO_SANDBOX_HELP = "Run an agent in shell mode's commands outside the sandbox, as you."
 COMMAND_NAMES = frozenset({"new", "clear", "agent", "live", "share", "help", "exit", "quit"})
 EXAMPLE_TASKS = {
     False: "Find the top 3 stories on Hacker News and their URLs",
@@ -293,7 +299,10 @@ def run(
     task: str = typer.Argument(..., help="Task to run."),
     agent: str | None = typer.Option(None, "--agent", "-a", help=AGENT_HELP),
     local: bool = typer.Option(False, "--local", help=LOCAL_HELP),
+    model_url: str | None = typer.Option(None, "--model-url", help=MODEL_URL_HELP),
+    model: str | None = typer.Option(None, "--model", help=MODEL_HELP),
     workspace: str | None = typer.Option(None, "--workspace", "-w", help=WORKSPACE_HELP),
+    no_sandbox: bool = typer.Option(False, "--no-sandbox", help=NO_SANDBOX_HELP),
     max_steps: int | None = typer.Option(
         None,
         "--max-steps",
@@ -328,7 +337,9 @@ def run(
         overrides=_parse_overrides(override or []),
         quiet=quiet,
         local=local,
+        inference=_inference(local, model_url, model),
         workspace=workspace,
+        no_sandbox=no_sandbox,
     )
     try:
         assert_request_under_limit(convo.params(task))
@@ -352,7 +363,10 @@ def chat(
     ctx: typer.Context,
     agent: str | None = typer.Option(None, "--agent", "-a", help=AGENT_HELP),
     local: bool = typer.Option(False, "--local", help=LOCAL_HELP),
+    model_url: str | None = typer.Option(None, "--model-url", help=MODEL_URL_HELP),
+    model: str | None = typer.Option(None, "--model", help=MODEL_HELP),
     workspace: str | None = typer.Option(None, "--workspace", "-w", help=WORKSPACE_HELP),
+    no_sandbox: bool = typer.Option(False, "--no-sandbox", help=NO_SANDBOX_HELP),
 ) -> None:
     """Start an interactive session; plain `holo` in a terminal opens this."""
     state = _state(ctx)
@@ -365,7 +379,9 @@ def chat(
         max_time_s=None,
         overrides={},
         local=local,
+        inference=_inference(local, model_url, model),
         workspace=workspace,
+        no_sandbox=no_sandbox,
     )
     convo.open()
     try:
@@ -386,7 +402,9 @@ class _Conversation:
     overrides: dict[str, Any]
     quiet: bool = False
     local: bool = False
+    inference: Any = None
     workspace: str | None = None
+    no_sandbox: bool = False
     client: Any = None
     cloud: Any = None
     session: Any = None
@@ -432,6 +450,8 @@ class _Conversation:
             params["idle_timeout_s"] = IDLE_TIMEOUT_S
         if self.workspace:
             params["workspace"] = self.workspace
+        if self.no_sandbox:
+            params["sandbox"] = False
         return params
 
     @property
@@ -460,7 +480,7 @@ class _Conversation:
     def open(self) -> None:
         """`client` runs sessions; `cloud` looks up agents and quota, which a local runtime does not serve."""
         self.cloud = _client(self.state)
-        self.client = _local_client(self.state) if self.local else self.cloud
+        self.client = _local_client(self.state, self.inference) if self.local else self.cloud
         self._arm_listener()
 
     def _arm_listener(self) -> None:
@@ -1019,9 +1039,9 @@ def _decide(client: Any, session_id: str, held: list[Any], feed: ui.StepFeed) ->
 
 def _standing_rules(request: dict[str, Any]) -> tuple[Any, list[str]]:
     """This machine's allowlist and the lines that would let the held command run from now on, when it is what holds it."""
-    from hai_agents_local.config import agent_shell_policy, shell_policy
+    from hai_agents_local.config import machine_allowlist
 
-    command, path = (request["tool_req"].get("args") or {}).get("command"), shell_policy() or agent_shell_policy()
+    command, path = (request["tool_req"].get("args") or {}).get("command"), machine_allowlist()
     try:
         from hai_drivers.code_sandbox.local.allowlist import Allowlist
     except ImportError:
@@ -1066,7 +1086,26 @@ def _custom_endpoint_host(state: AppState) -> str | None:
     return urlparse(base).netloc or base
 
 
-def _local_client(state: AppState) -> Any:
+def _inference(local: bool, model_url: str | None, model: str | None) -> Any:
+    """Where a local runtime sends its model calls: the server the two options name, else H's."""
+    if not (model_url or model):
+        return None
+    if not (local and model_url and model):
+        _raise_cli_error(
+            ValueError(
+                "--model-url and --model go together, with --local: your model server and the model name it serves. "
+                "-o agent.model=NAME sets the agent's own model."
+            )
+        )
+    from hai_agents_local.runtime import Inference
+
+    try:
+        return Inference.self_hosted(model_url, model=model)
+    except ValueError as exc:
+        _raise_cli_error(exc)
+
+
+def _local_client(state: AppState, inference: Any = None) -> Any:
     from hai_agents import Client
 
     _sign_in_if_needed(state)
@@ -1076,7 +1115,7 @@ def _local_client(state: AppState) -> Any:
         if value:
             os.environ[var] = value
     try:
-        return Client.local()
+        return Client.local(inference=inference)
     except (RuntimeError, ValueError, PermissionError) as exc:
         _raise_cli_error(exc)
 
@@ -1570,15 +1609,14 @@ def local_desktop(
         None,
         "--policy",
         help="With --shell, this machine's allowlist file, one command prefix a line: a command it does not "
-        "cover waits for approval. Created with `cua` allowed when missing. Defaults to $HAI_SHELL_POLICY; "
-        "without one every command runs.",
+        "cover waits for approval, whatever the agent asks. Created with `cua` allowed when missing.",
     ),
     sandbox: str | None = typer.Option(
         None,
         "--sandbox",
         help="With --shell, this machine's sandbox-runtime settings file: every command runs under srt by its "
-        "rules and writes in the workspace. Defaults to sandbox.json beside the stored credentials, on macOS, "
-        "where that file exists, or with HAI_SHELL_SANDBOX=1; where it does not exist, to the built-in rules.",
+        "rules and writes in the workspace. Defaults to sandbox.json beside the stored credentials; where it does "
+        "not exist, to the built-in rules.",
     ),
     no_sandbox: bool = typer.Option(False, "--no-sandbox", help="With --shell, run commands unconfined, as you."),
 ) -> None:
@@ -1692,8 +1730,8 @@ app.add_typer(local_app, name="local")
 _GLOBAL_FLAGS = ("--json",)
 _GLOBAL_OPTIONS = ("--api-key", "--base-url")
 _HELP_FLAGS = ("--help", "--install-completion", "--show-completion")
-_CHAT_FLAGS = ("--local",)
-_CHAT_OPTIONS = ("--agent", "-a", "--workspace", "-w")
+_CHAT_FLAGS = ("--local", "--no-sandbox")
+_CHAT_OPTIONS = ("--agent", "-a", "--workspace", "-w", "--model-url", "--model")
 
 
 def _only_chat_options(args: list[str]) -> bool:

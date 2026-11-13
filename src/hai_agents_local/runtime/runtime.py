@@ -56,7 +56,6 @@ from .state import (
 
 logger = logging.getLogger(__name__)
 
-BINARY_PATH_ENV = "HAI_AGENT_LOCAL_BINARY_PATH"
 PORT_ENV = "HAI_AGENT_RUNTIME_PORT"
 AUTH_TOKEN_ENV = "HAI_AGENT_RUNTIME_API_TOKEN"
 CLIENT_TIMEOUT_S = 60.0
@@ -360,12 +359,11 @@ class LocalRuntime:
         cache_dir: pathlib.Path,
         download: bool,
     ) -> typing.List[str]:
-        """Explicit path > HAI_AGENT_LOCAL_BINARY_PATH > PATH > managed install > verified download."""
-        explicit = str(binary_path) if binary_path is not None else os.environ.get(BINARY_PATH_ENV, "").strip()
-        if explicit:
-            candidate = pathlib.Path(explicit).expanduser()
+        """Explicit path > PATH > managed install > verified download."""
+        if binary_path is not None:
+            candidate = pathlib.Path(binary_path).expanduser()
             if not candidate.is_file():
-                raise BinaryNotFoundError(f"binary_path / {BINARY_PATH_ENV} points at a missing file: {candidate}")
+                raise BinaryNotFoundError(f"binary_path points at a missing file: {candidate}")
             return [str(candidate)]
         found = shutil.which("hai-agent-runtime")
         if found:
@@ -379,8 +377,7 @@ class LocalRuntime:
         if not download:
             raise BinaryNotFoundError(
                 "hai-agent-runtime not found: not on PATH, no managed install under "
-                f"{cache_dir / 'bin'}, and download=False. Pass binary_path=, set {BINARY_PATH_ENV}, "
-                "or allow download=True."
+                f"{cache_dir / 'bin'}, and download=False. Pass binary_path= or allow download=True."
             )
         if pinned != PINNED_RUNTIME_VERSION and not os.environ.get(DOWNLOAD_URL_ENV, "").strip():
             raise BinaryIncompatibleError(

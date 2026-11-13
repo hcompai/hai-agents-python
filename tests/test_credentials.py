@@ -23,7 +23,7 @@ runner = CliRunner()
 @pytest.fixture(autouse=True)
 def isolated_env(tmp_path, monkeypatch):
     """Point credential resolution at empty temp files and a clean environment."""
-    for var in (credentials.API_KEY_VAR, credentials.BASE_URL_VAR, credentials.PORTAL_URL_VAR):
+    for var in (credentials.API_KEY_VAR, credentials.BASE_URL_VAR):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
     monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", sdk_client.credentials_path())
@@ -130,11 +130,17 @@ def test_login_short_circuits_when_signed_in(monkeypatch, stored, says):
 def test_login_portal_follows_the_platform_region(monkeypatch):
     assert credentials.portal_base() == "https://portal.api.eu.hcompany.ai"
     assert credentials.portal_base("https://agp.hcompany.ai/") == "https://portal.production.hcompany.ai"
-    with pytest.raises(RuntimeError, match=credentials.PORTAL_URL_VAR):
+    with pytest.raises(RuntimeError, match="--portal"):
         credentials.portal_base("https://agp.example.test")
 
-    monkeypatch.setenv(credentials.PORTAL_URL_VAR, "https://portal.example.test")
-    assert credentials.portal_base("https://agp.example.test") == "https://portal.example.test"
+    asked = []
+    monkeypatch.setattr(app_module, "_interactive", lambda: True)
+    monkeypatch.setattr(auth, "login_and_mint", lambda portal, label, on_open: asked.append(portal) or "hk-minted")
+    args = ["--base-url", "https://agp.example.test", "login", "--portal", "https://portal.example.test"]
+    result = runner.invoke(app, args, input="1\n")
+    monkeypatch.delenv(credentials.API_KEY_VAR, raising=False)
+    assert result.exit_code == 0, _error_text(result)
+    assert asked == ["https://portal.example.test"] and "hk-minted" in credentials.GLOBAL_ENV_PATH.read_text()
 
 
 def test_portal_failure_shows_the_portal_reason():

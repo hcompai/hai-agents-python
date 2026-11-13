@@ -8,7 +8,6 @@ import pathlib
 import tempfile
 import typing
 
-CACHE_DIR_ENV = "HAI_AGENT_LOCAL_CACHE_DIR"
 DEFAULT_CACHE_DIR = pathlib.Path.home() / ".hai" / "agent-runtime"
 DEFAULT_PORT = 18795
 
@@ -16,13 +15,7 @@ _PathInput = typing.Union[str, "os.PathLike[str]"]
 
 
 def resolve_cache_dir(cache_dir: typing.Optional[_PathInput] = None) -> pathlib.Path:
-    """Explicit argument > HAI_AGENT_LOCAL_CACHE_DIR > ~/.hai/agent-runtime."""
-    if cache_dir is not None:
-        return pathlib.Path(cache_dir).expanduser()
-    override = os.environ.get(CACHE_DIR_ENV, "").strip()
-    if override:
-        return pathlib.Path(override).expanduser()
-    return DEFAULT_CACHE_DIR
+    return DEFAULT_CACHE_DIR if cache_dir is None else pathlib.Path(cache_dir).expanduser()
 
 
 def state_dir(cache_dir: typing.Optional[_PathInput] = None) -> pathlib.Path:
