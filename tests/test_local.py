@@ -30,7 +30,7 @@ from hai_agents_local import (
     SeleniumBrowserBridge,
     WorkstationBridge,
 )
-from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR, SHELL_WORKSPACE_ENV_VAR, shell_sandbox
+from hai_agents_local.config import shell_sandbox
 from hai_agents_local.errors import AuthError, RateLimitedError, SessionNotFoundError
 from hai_agents_local.routing import localize_agent
 from hai_agents_local.runtime.manifest import platform_key
@@ -94,14 +94,23 @@ class TestLocalizeAgent:
         _, [plain], _ = localize_agent(agent, api_key=API_KEY)
         assert plain.policy is None and not plain.require_sandbox and not plain.allowed_domains
 
-    def test_a_shell_desktop_works_in_the_folder_this_machine_names(self, monkeypatch, tmp_path):
+    def test_a_shell_desktop_works_in_the_current_folder_unless_it_is_home_or_one_is_named(self, monkeypatch, tmp_path):
         agent = {"name": "x", "environments": [{"kind": "desktop", "mode": {"type": "shell"}}]}
-        _, [own], _ = localize_agent(agent, api_key=API_KEY)
-        assert own.workspace == Path.home() / "hai" / own.session_id
+        home, project = tmp_path.resolve(), tmp_path.resolve() / "project"
+        project.mkdir()
+        monkeypatch.setattr(Path, "home", lambda: home)
 
-        monkeypatch.setenv(SHELL_WORKSPACE_ENV_VAR, str(tmp_path))
-        _, [named], _ = localize_agent(agent, api_key=API_KEY)
-        assert named.workspace == tmp_path
+        monkeypatch.chdir(project)
+        _, [here], _ = localize_agent(agent, api_key=API_KEY)
+        assert here.workspace == project
+
+        _, [asked], _ = localize_agent(agent, api_key=API_KEY, shell={"workspace": str(home / "app")})
+        assert asked.workspace == home / "app"
+
+        for above in (home, home.parent):
+            monkeypatch.chdir(above)
+            _, [own], _ = localize_agent(agent, api_key=API_KEY)
+            assert own.workspace == home / "hai" / own.session_id
 
     def test_second_unclaimed_env_of_same_kind_raises(self):
         agent = {
@@ -288,7 +297,7 @@ def _registry(monkeypatch, agents: dict | None = None, environments: dict | None
 
 class TestAutoStart:
     def test_create_session_starts_bridges_and_stamps_matching_session_ids(self, monkeypatch):
-        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
         started: list = []
         captured: dict = {}
         monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: started.extend(bridges) or [])
@@ -308,8 +317,27 @@ class TestAutoStart:
         assert captured["agent"]["environments"][0]["session_id"] == desktop.session_id
         assert captured["agent"]["subagents"][0]["environments"][0]["session_id"] == web.session_id
 
+    def test_what_the_caller_sets_for_a_shell_desktop_reaches_it_and_stays_on_this_machine(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
+        started: list = []
+        captured: dict = {}
+        monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: started.extend(bridges) or [])
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: captured.update(kw))
+        sessions = Client(api_key=API_KEY).sessions
+        shell = {"name": "x", "environments": [{"id": "box", "kind": "desktop", "mode": {"type": "shell"}}]}
+
+        sessions.create_session(agent=shell, messages="hi", workspace=str(tmp_path), sandbox=str(tmp_path / "rules"))
+        assert (started[0].workspace, started[0].sandbox) == (tmp_path, str(tmp_path / "rules"))
+        assert not {"workspace", "sandbox"} & set(captured)
+
+        sessions.create_session(agent=shell, messages="hi", sandbox=False)
+        assert started[1].sandbox is None
+
+        sessions.create_session(agent={"name": "x"}, messages="hi", workspace=str(tmp_path), sandbox=False)
+        assert len(started) == 2 and not {"workspace", "sandbox"} & set(captured)
+
     def test_named_agent_routes_its_user_device_env_through_an_override(self, monkeypatch):
-        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
         started: list = []
         captured: dict = {}
         fetched = _registry(
@@ -343,7 +371,7 @@ class TestAutoStart:
         from hai_agents.sessions.types import SendSessionMessagesRequestBody_UserMessage
         from hai_agents_local import sessions as sessions_module
 
-        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
         monkeypatch.setattr(sessions_module, "_exit_cancels", {})
         events: list = []
 
@@ -385,7 +413,7 @@ class TestAutoStart:
         assert list(sessions_module._exit_cancels) == ["sess-1"]
 
     def test_create_session_failure_stops_newly_started_bridges(self, monkeypatch):
-        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
         stopped: list = []
 
         def stop_stuck(ids):
@@ -406,7 +434,7 @@ class TestAutoStart:
 
     @staticmethod
     def _crash_wiring(monkeypatch, cancelled: list, stopped: list, bridges: list) -> None:
-        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
         monkeypatch.setattr("hai_agents_local.sessions.stop_bridges", stopped.extend)
         monkeypatch.setattr(SessionsClient, "cancel_session", lambda self, sid: cancelled.append(sid))
         monkeypatch.setattr(
@@ -498,7 +526,7 @@ class TestAutoStart:
     def test_local_sessions_get_default_runaway_budgets(self, monkeypatch):
         from hai_agents_local.sessions import DEFAULT_LOCAL_MAX_STEPS, DEFAULT_LOCAL_MAX_TIME_S
 
-        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
         captured: dict = {}
         monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: [])
         monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: captured.update(kw))
@@ -574,12 +602,14 @@ class TestAutoStart:
         assert cancelled == ["sess-mid"]
 
     def test_no_bridges_and_no_stamping_when_disabled(self, monkeypatch):
-        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "0")
+        monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
         started: list = []
         captured: dict = {}
         monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: started.extend(bridges) or [])
         monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: captured.update(kw))
-        Client(api_key=API_KEY).sessions.create_session(
+        client = Client(api_key=API_KEY)
+        client.auto_bridges = False
+        client.sessions.create_session(
             agent={"name": "x", "environments": [{"id": "box", "kind": "desktop", "host": "user_device"}]},
             messages="hi",
         )
@@ -796,7 +826,7 @@ class TestMacosPermissionPreflight:
         from hai_agents import AsyncClient
         from hai_agents.sessions.client import AsyncSessionsClient
 
-        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
         monkeypatch.setattr(sys, "platform", "darwin")
         calls = self._fake_frameworks(monkeypatch, ax=granted, screen=granted)
         requested = []
@@ -1033,6 +1063,7 @@ class TestDriverInterfaces:
     def test_workstation_serves_a_shell_in_its_session_folder_with_the_cli_commands(self, tmp_path, monkeypatch):
         pytest.importorskip("hai_drivers.code_sandbox.local.driver")
         monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.chdir(tmp_path)
         monkeypatch.delenv("CUA_CURSOR", raising=False)
         bridge = WorkstationBridge(
             api_key="k",
@@ -1058,8 +1089,7 @@ class TestDriverInterfaces:
         pytest.importorskip("hai_drivers.code_sandbox.local.allowlist")
         allowed = tmp_path / "allowed"
         allowed.write_text("echo\n")
-        monkeypatch.setenv("HAI_SHELL_POLICY", str(allowed))
-        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"))
+        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), policy=str(allowed))
         bridge._driver = bridge.create_driver()
         try:
             result, error = bridge._dispatch("execute", {"command": "echo hi"})
@@ -1106,7 +1136,7 @@ class TestDriverInterfaces:
 
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
-        monkeypatch.delenv("HAI_SHELL_SANDBOX")
+        monkeypatch.setattr(workstation, "shell_sandbox", shell_sandbox)
         monkeypatch.setattr(workstation, "_host_cua", lambda environment: {})
         srt = tmp_path / "bin" / "srt"
         srt.parent.mkdir()
@@ -1154,9 +1184,8 @@ class TestDriverInterfaces:
         )
         assert "decide alone" in caplog.text
 
-        monkeypatch.setenv("HAI_SHELL_SANDBOX", "0")
         with pytest.raises(RuntimeError, match="requires the sandbox"):
-            served()
+            served(sandbox=False)
 
     def test_cua_runs_outside_the_sandbox_where_the_sandbox_cannot_open_its_daemon_alone(self, monkeypatch):
         from hai_agents_local import workstation
@@ -1165,17 +1194,11 @@ class TestDriverInterfaces:
         environment: dict[str, str] = {}
         assert workstation._host_cua(environment) == {"outside": ["cua"]} and not environment
 
-    def test_sandbox_rules_of_the_machine_s_own_confine_commands_where_confinement_is_not_the_default(
-        self, tmp_path, monkeypatch
-    ):
-        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-        monkeypatch.delenv("HAI_SHELL_SANDBOX")
-        monkeypatch.setattr(sys, "platform", "linux")
-        assert shell_sandbox() is None
-        rules = tmp_path / "hai" / "sandbox.json"
-        rules.parent.mkdir()
-        rules.write_text("{}")
-        assert shell_sandbox() == str(rules)
+    @pytest.mark.parametrize("name", ["HAI_SHELL_POLICY", "HAI_SHELL_SANDBOX"])
+    def test_a_machine_set_up_with_a_variable_the_shell_does_not_read_serves_no_session(self, monkeypatch, name):
+        monkeypatch.setenv(name, "1")
+        with pytest.raises(ValueError, match=f"{name} is not read"):
+            WorkstationBridge(api_key="k")
 
     @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
     def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(
@@ -1186,17 +1209,16 @@ class TestDriverInterfaces:
 
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
-        monkeypatch.delenv("HAI_SHELL_SANDBOX")
+        monkeypatch.setattr(workstation, "shell_sandbox", shell_sandbox)
         monkeypatch.setattr(workstation, "_host_cua", lambda environment: {"sockets": ["/tmp/cua.sock"]})
         settings = tmp_path / ".config" / "hai" / "sandbox.json"
-        assert WorkstationBridge(api_key="k").sandbox == (str(settings) if sys.platform == "darwin" else None)
         assert WorkstationBridge(api_key="k", sandbox=False).sandbox is None
         passed = {"PASSED_TOKEN": "p"}
         default = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"))
-        default.sandbox = str(settings)
-        monkeypatch.setenv("HAI_SHELL_SANDBOX", "1")
-        assert WorkstationBridge(api_key="k").sandbox == str(settings)
-        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), environment_variables=passed)
+        assert default.sandbox == str(settings)
+        bridge = WorkstationBridge(
+            api_key="k", workspace=str(tmp_path / "workspace"), environment_variables=passed, require_sandbox=True
+        )
 
         published = tmp_path / "cdn" / "9.9.9" / f"srt-{platform_key()}.zip"
         published.parent.mkdir(parents=True)
@@ -1257,7 +1279,6 @@ class TestDriverInterfaces:
         pytest.importorskip("hai_drivers.code_sandbox.local.sandbox_runtime")
         from hai_agents_local import workstation
 
-        monkeypatch.setenv("HAI_SHELL_SANDBOX", str(tmp_path / "none.json"))
         monkeypatch.setenv("SOME_API_KEY", "s")
         monkeypatch.setattr(workstation, "_host_cua", lambda environment: {})
         workspace = tmp_path / "workspace"
@@ -1271,7 +1292,7 @@ class TestDriverInterfaces:
             "secrets": "! ls ~/.ssh && ! head -c 1 ~/Library/Keychains/login.keychain-db",
             "elsewhere": f"! touch {tmp_path}/escaped && ! curl -sf -m 10 https://example.com",
         }
-        bridge = WorkstationBridge(api_key="k", workspace=str(workspace))
+        bridge = WorkstationBridge(api_key="k", workspace=str(workspace), sandbox=str(tmp_path / "none.json"))
         bridge._driver = bridge.create_driver()
         try:
             failed = {

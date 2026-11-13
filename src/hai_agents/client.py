@@ -84,7 +84,8 @@ class _LocalRuntimeAccess:
     """The runtime behind a local client, read through its hold so a re-acquired runtime shows up everywhere."""
 
     _hold: typing.Optional[RuntimeHold] = None
-    _auto_bridges = True
+    auto_bridges = True
+    """False starts no bridge for an agent's environments on this machine, and fetches no agent spec to look for one."""
 
     @property
     def local_runtime(self) -> typing.Optional[LocalRuntime]:
@@ -105,7 +106,7 @@ class Client(_LocalRuntimeAccess, BaseClient):
         runtime: typing.Optional[LocalRuntime] = None,
         inference: typing.Optional[Inference] = None,
         local_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
-        auto_bridges: bool = True,
+        auto_bridges: typing.Optional[bool] = None,
         timeout: typing.Optional[float] = None,
     ) -> Client:
         """A client on a local agent runtime: ``runtime`` if given, else one this client starts and owns."""
@@ -118,7 +119,9 @@ class Client(_LocalRuntimeAccess, BaseClient):
             if hold.owned:
                 hold.runtime.shutdown()
             raise
-        client._hold, client._auto_bridges = hold, auto_bridges
+        client._hold = hold
+        if auto_bridges is not None:
+            client.auto_bridges = auto_bridges
         return client
 
     def close(self) -> None:
@@ -193,7 +196,7 @@ class Client(_LocalRuntimeAccess, BaseClient):
             from hai_agents_local.sessions import LocalSessionsClient
 
             self._sessions = LocalSessionsClient(
-                client_wrapper=self._client_wrapper, hold=self._hold, auto_bridges=self._auto_bridges
+                client_wrapper=self._client_wrapper, hold=self._hold, auto_bridges=lambda: self.auto_bridges
             )
         return self._sessions
 
@@ -208,7 +211,7 @@ class AsyncClient(_LocalRuntimeAccess, AsyncBaseClient):
         runtime: typing.Optional[LocalRuntime] = None,
         inference: typing.Optional[Inference] = None,
         local_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
-        auto_bridges: bool = True,
+        auto_bridges: typing.Optional[bool] = None,
         timeout: typing.Optional[float] = None,
     ) -> AsyncClient:
         """A client on a local agent runtime: ``runtime`` if given, else one this client starts and owns."""
@@ -223,7 +226,9 @@ class AsyncClient(_LocalRuntimeAccess, AsyncBaseClient):
             if hold.owned:
                 await asyncio.to_thread(hold.runtime.shutdown)
             raise
-        client._hold, client._auto_bridges = hold, auto_bridges
+        client._hold = hold
+        if auto_bridges is not None:
+            client.auto_bridges = auto_bridges
         return client
 
     async def aclose(self) -> None:
@@ -300,6 +305,6 @@ class AsyncClient(_LocalRuntimeAccess, AsyncBaseClient):
             from hai_agents_local.sessions import LocalAsyncSessionsClient
 
             self._sessions = LocalAsyncSessionsClient(
-                client_wrapper=self._client_wrapper, hold=self._hold, auto_bridges=self._auto_bridges
+                client_wrapper=self._client_wrapper, hold=self._hold, auto_bridges=lambda: self.auto_bridges
             )
         return self._sessions

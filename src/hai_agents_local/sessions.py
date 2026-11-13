@@ -28,7 +28,6 @@ from hai_agents.sessions.types.send_session_messages_request_body import SendSes
 from hai_agents.types.session_status import SessionStatus
 
 from .bridge import LocalBridge, TokenSource
-from .config import auto_bridges_enabled
 from .killswitch import StopWatcher
 from .manager import ensure_bridges, serving_bridges, stop_bridges
 from .routing import Reference, local_bridge_types, localize_agent, references, split_revision
@@ -97,7 +96,15 @@ def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) 
 
 
 def _wants_bridges(auto_bridges: bool, kwargs: typing.Dict[str, typing.Any]) -> bool:
-    return auto_bridges and kwargs.get("agent") is not None and auto_bridges_enabled()
+    return auto_bridges and kwargs.get("agent") is not None
+
+
+SHELL_OPTIONS = ("workspace", "sandbox")
+
+
+def _pop_shell_options(kwargs: typing.Dict[str, typing.Any]) -> typing.Dict[str, typing.Any]:
+    """What the caller sets for a shell on this machine; the platform is sent none of it."""
+    return {name: kwargs.pop(name) for name in SHELL_OPTIONS if name in kwargs}
 
 
 _LOOKUP_ERRORS = (ApiError, ParsingError, httpx.HTTPError)
@@ -162,6 +169,7 @@ def _localize(
     runtime: typing.Optional[LocalRuntime],
     kwargs: typing.Dict[str, typing.Any],
     resolved: typing.Mapping[Reference, typing.Any],
+    shell: typing.Optional[typing.Mapping[str, typing.Any]] = None,
 ) -> typing.List[LocalBridge]:
     """Spawn bridges for unclaimed user_device environments and route each one to its bridge; caller overrides win."""
     _warn_if_overrides_target_user_device(kwargs)
@@ -178,6 +186,7 @@ def _localize(
         resolved=resolved,
         claimed=overrides,
         seed=None if idempotency_key is None else f"{_caller(api_key, base_url)}:{idempotency_key}",
+        shell=shell,
     )
     kwargs["agent"] = localized.agent
     if localized.overrides:
@@ -345,7 +354,11 @@ class _LocalSessionsState:
     """Bridge and session bookkeeping shared by the sync and async local sessions clients."""
 
     def __init__(
-        self, *, client_wrapper: typing.Any, hold: typing.Optional[RuntimeHold] = None, auto_bridges: bool = True
+        self,
+        *,
+        client_wrapper: typing.Any,
+        hold: typing.Optional[RuntimeHold] = None,
+        auto_bridges: typing.Callable[[], bool] = lambda: True,
     ) -> None:
         super().__init__(client_wrapper=client_wrapper)
         self._hold = hold
@@ -476,9 +489,11 @@ class LocalSessionsClient(_LocalSessionsState, SessionsClient):
         if self._hold is not None:
             self._hold.reacquire()
         bridges: typing.List[LocalBridge] = []
-        if _wants_bridges(self._auto_bridges, kwargs):
+        shell = _pop_shell_options(kwargs)
+        if _wants_bridges(self._auto_bridges(), kwargs):
             wrapper = self._raw_client._client_wrapper
-            bridges = _localize(wrapper, self._runtime, kwargs, _resolve_references(wrapper, kwargs["agent"]))
+            resolved = _resolve_references(wrapper, kwargs["agent"])
+            bridges = _localize(wrapper, self._runtime, kwargs, resolved, shell)
         if bridges:
             _apply_runaway_budgets(kwargs)
         stop_watcher = _ensure_stop_watcher() if bridges else None
@@ -550,10 +565,11 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
         if self._hold is not None:
             await self._hold.reacquire_async()
         bridges: typing.List[LocalBridge] = []
-        if _wants_bridges(self._auto_bridges, kwargs):
+        shell = _pop_shell_options(kwargs)
+        if _wants_bridges(self._auto_bridges(), kwargs):
             wrapper = self._raw_client._client_wrapper
             resolved = await _resolve_references_async(wrapper, kwargs["agent"])
-            bridges = _localize(wrapper, self._runtime, kwargs, resolved)
+            bridges = _localize(wrapper, self._runtime, kwargs, resolved, shell)
         if bridges:
             _apply_runaway_budgets(kwargs)
         # Native permission prompts must run before bridge startup moves to a worker.

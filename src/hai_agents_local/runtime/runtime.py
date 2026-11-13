@@ -56,9 +56,6 @@ from .state import (
 
 logger = logging.getLogger(__name__)
 
-BINARY_PATH_ENV = "HAI_AGENT_LOCAL_BINARY_PATH"
-BINARY_VERSION_ENV = "HAI_AGENT_LOCAL_BINARY_VERSION"
-BASE_URL_ENV = "HAI_AGENT_LOCAL_BASE_URL"
 PORT_ENV = "HAI_AGENT_RUNTIME_PORT"
 AUTH_TOKEN_ENV = "HAI_AGENT_RUNTIME_API_TOKEN"
 CLIENT_TIMEOUT_S = 60.0
@@ -168,15 +165,6 @@ class LocalRuntime:
         """Return a reachable LocalRuntime, attaching to an existing one or spawning the binary."""
         resolved_cache = resolve_cache_dir(cache_dir)
         served = served_inference(cls._child_env(port=0, token="", spawn_env=spawn_env, inherit_env=inherit_env))
-        base_override = os.environ.get(BASE_URL_ENV, "").strip()
-        if base_override:
-            attached = cls._attach(base_url=base_override.rstrip("/"), cache_dir=resolved_cache)
-            if attached is None:
-                raise RuntimeUnhealthyError(
-                    f"{BASE_URL_ENV} is set to {base_override} but /health is not answering there"
-                )
-            return attached._verified(required_recipe, served)
-
         resolved_port = port if port is not None else int(os.environ.get(PORT_ENV, "").strip() or default_port(served))
         base_url = f"http://{LOOPBACK_HOST}:{resolved_port}"
         lock_wait_s = timeout_s + STARTUP_LOCK_GRACE_S
@@ -307,17 +295,11 @@ class LocalRuntime:
     ) -> typing.Optional["LocalRuntime"]:
         """A LocalRuntime for an already-running local runtime, or None when nothing answers /health."""
         resolved_cache = resolve_cache_dir(cache_dir)
-        base_override = os.environ.get(BASE_URL_ENV, "").strip()
-        if base_override:
-            return cls._attach(base_url=base_override.rstrip("/"), cache_dir=resolved_cache)
         resolved_port = port if port is not None else int(os.environ.get(PORT_ENV, "").strip() or DEFAULT_PORT)
         return cls._attach(base_url=f"http://{LOOPBACK_HOST}:{resolved_port}", cache_dir=resolved_cache)
 
     @classmethod
     def _attach(cls, *, base_url: str, cache_dir: pathlib.Path) -> typing.Optional["LocalRuntime"]:
-        parsed = urlsplit(base_url)
-        if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"} or parsed.username:
-            raise LocalRuntimeError("local runtime attachment requires a loopback HTTP URL")
         port = _port_of(base_url)
         token = os.environ.get(AUTH_TOKEN_ENV, "").strip() or read_state_file(
             token_file_path(port, cache_dir=cache_dir)
@@ -377,18 +359,17 @@ class LocalRuntime:
         cache_dir: pathlib.Path,
         download: bool,
     ) -> typing.List[str]:
-        """Explicit path > HAI_AGENT_LOCAL_BINARY_PATH > PATH > managed install > verified download."""
-        explicit = str(binary_path) if binary_path is not None else os.environ.get(BINARY_PATH_ENV, "").strip()
-        if explicit:
-            candidate = pathlib.Path(explicit).expanduser()
+        """Explicit path > PATH > managed install > verified download."""
+        if binary_path is not None:
+            candidate = pathlib.Path(binary_path).expanduser()
             if not candidate.is_file():
-                raise BinaryNotFoundError(f"binary_path / {BINARY_PATH_ENV} points at a missing file: {candidate}")
+                raise BinaryNotFoundError(f"binary_path points at a missing file: {candidate}")
             return [str(candidate)]
         found = shutil.which("hai-agent-runtime")
         if found:
             logger.info("resolved hai-agent-runtime from PATH: %s", found)
             return [found]
-        pinned = version or os.environ.get(BINARY_VERSION_ENV, "").strip() or PINNED_RUNTIME_VERSION
+        pinned = version or PINNED_RUNTIME_VERSION
         managed = installed_binary(pinned, cache_dir=cache_dir)
         if managed is not None:
             logger.info("resolved hai-agent-runtime from managed install v%s: %s", pinned, managed)
@@ -396,8 +377,7 @@ class LocalRuntime:
         if not download:
             raise BinaryNotFoundError(
                 "hai-agent-runtime not found: not on PATH, no managed install under "
-                f"{cache_dir / 'bin'}, and download=False. Pass binary_path=, set {BINARY_PATH_ENV}, "
-                "or allow download=True."
+                f"{cache_dir / 'bin'}, and download=False. Pass binary_path= or allow download=True."
             )
         if pinned != PINNED_RUNTIME_VERSION and not os.environ.get(DOWNLOAD_URL_ENV, "").strip():
             raise BinaryIncompatibleError(

@@ -17,7 +17,6 @@ from hai_agents.environment import HaiAgentsEnvironment
 ApiKey = str | Callable[[], str]
 
 BASE_URL_VAR = "HAI_API_BASE_URL"
-PORTAL_URL_VAR = "HAI_PORTAL_URL"
 AGENT_VAR = "HAI_AGENT"
 DEFAULT_AGENT = "h/web-surfer-flash"
 
@@ -31,13 +30,11 @@ GLOBAL_ENV_PATH = credentials_path()
 
 
 def portal_base(base_url: str | None = None) -> str:
-    """Portal origin used by `holo login`: `HAI_PORTAL_URL`, else the portal of the platform's region."""
-    if os.environ.get(PORTAL_URL_VAR):
-        return os.environ[PORTAL_URL_VAR]
+    """Portal origin used by `holo login`: the portal of the platform's region."""
     platform = (resolve_base_url(base_url) or HaiAgentsEnvironment.EU.value).rstrip("/")
     if platform not in PORTALS:
         raise RuntimeError(
-            f"No portal is known for {platform}; set {PORTAL_URL_VAR} to the portal that issues its keys."
+            f"No portal is known for {platform}; pass `holo login --portal <url>`, the portal that issues its keys."
         )
     return PORTALS[platform]
 
