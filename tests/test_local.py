@@ -28,6 +28,7 @@ from hai_agents_local.routing import localize_agent
 from hai_agents_local.transport import Command, CommandExchange, deserialize_args, serialize_result
 
 API_KEY = "test-key"
+SESSION = "6f1c2f0e-4b4e-4a0e-9a54-0d3a5f6c7a11"
 
 
 class TestLocalizeAgent:
@@ -546,6 +547,152 @@ class TestAutoStart:
         )
         assert started == []
         assert "session_id" not in captured["agent"]["environments"][0]
+
+
+class FakeRegistration:
+    instances: list["FakeRegistration"] = []
+    fail_start = False
+    start_result: bool | None = True
+    start_gate: "threading.Event | None" = None
+    close_gate: "threading.Event | None" = None
+
+    def __init__(self, session: str, app: str, key: str) -> None:
+        self.args = (session, app, key)
+        self.calls: list[str] = []
+        FakeRegistration.instances.append(self)
+
+    def start(self) -> bool | None:
+        self.calls.append("start")
+        if FakeRegistration.start_gate is not None:
+            FakeRegistration.start_gate.wait(5)
+        if FakeRegistration.fail_start:
+            raise RuntimeError("daemon down")
+        return FakeRegistration.start_result
+
+    def close(self) -> None:
+        self.calls.append("close")
+        if FakeRegistration.close_gate is not None:
+            FakeRegistration.close_gate.wait(5)
+
+
+class TestWorkstationHolotabRegistration:
+    @pytest.fixture(autouse=True)
+    def served(self, monkeypatch):
+        FakeRegistration.instances = []
+        FakeRegistration.fail_start = False
+        FakeRegistration.start_result = True
+        FakeRegistration.start_gate = None
+        FakeRegistration.close_gate = None
+        self.events: list[str] = []
+        self.fail_serve = False
+
+        async def serve(bridge) -> None:
+            self.events.append("serve")
+            assert not FakeRegistration.instances or FakeRegistration.instances[0].calls == ["start"]
+            if self.fail_serve:
+                raise RuntimeError("serve failed")
+
+        monkeypatch.setattr(LocalBridge, "_serve", serve)
+        self.module = types.SimpleNamespace(APP_NAME="H agent", Registration=FakeRegistration)
+        monkeypatch.setitem(sys.modules, "hai_drivers.web.holotab.daemon", self.module)
+        self.monkeypatch = monkeypatch
+
+    async def test_registers_the_session_while_serving_and_closes_after(self):
+        bridge = WorkstationBridge(api_key="hk-abc", session_id=SESSION)
+        await bridge._serve()
+        (reg,) = FakeRegistration.instances
+        assert reg.args == (SESSION, "H agent", "hk-abc")
+        assert reg.calls == ["start", "close"]
+        assert self.events == ["serve"]
+
+    async def test_closes_when_serving_raises(self):
+        self.fail_serve = True
+        with pytest.raises(RuntimeError, match="serve failed"):
+            await WorkstationBridge(api_key="hk-abc", holotab_app="Mine")._serve()
+        (reg,) = FakeRegistration.instances
+        assert reg.args[1] == "Mine"
+        assert reg.calls == ["start", "close"]
+
+    async def test_explicit_key_wins_over_api_key(self):
+        await WorkstationBridge(api_key="hk-abc", holotab_key="other")._serve()
+        assert FakeRegistration.instances[0].args[2] == "other"
+
+    async def test_explicit_key_registers_even_when_api_key_is_not_an_hk_key(self):
+        await WorkstationBridge(api_key="plain", holotab_key="hk-x")._serve()
+        assert FakeRegistration.instances[0].args[2] == "hk-x"
+
+    async def test_callable_api_key_is_resolved(self):
+        await WorkstationBridge(api_key=lambda: "hk-live")._serve()
+        assert FakeRegistration.instances[0].args[2] == "hk-live"
+
+    async def test_an_empty_explicit_key_registers_nothing_even_with_an_hk_api_key(self):
+        await WorkstationBridge(api_key="hk-abc", holotab_key="")._serve()
+        assert FakeRegistration.instances == []
+        assert self.events == ["serve"]
+
+    async def test_a_hung_unregister_does_not_hold_the_bridge(self):
+        self.monkeypatch.setattr("hai_agents_local.workstation.HOLOTAB_STOP_S", 0.2)
+        FakeRegistration.close_gate = threading.Event()
+        try:
+            await asyncio.wait_for(WorkstationBridge(api_key="hk-abc")._serve(), 2)
+        finally:
+            FakeRegistration.close_gate.set()
+        assert FakeRegistration.instances[0].calls == ["start", "close"]
+
+    async def test_non_hk_api_key_without_explicit_key_is_not_registered(self):
+        await WorkstationBridge(api_key="plain")._serve()
+        assert FakeRegistration.instances == []
+        assert self.events == ["serve"]
+
+    async def test_missing_module_serves_without_registration(self):
+        self.monkeypatch.setitem(sys.modules, "hai_drivers.web.holotab.daemon", None)
+        await WorkstationBridge(api_key="hk-abc")._serve()
+        assert FakeRegistration.instances == []
+        assert self.events == ["serve"]
+
+    async def test_failed_start_serves_closes_and_logs_no_key(self, caplog):
+        FakeRegistration.fail_start = True
+        with caplog.at_level(logging.WARNING):
+            await WorkstationBridge(api_key="hk-secret")._serve()
+        assert self.events == ["serve"]
+        assert FakeRegistration.instances[0].calls == ["start", "close"]
+        assert "holotab registration failed" in caplog.text
+        assert "hk-secret" not in caplog.text
+
+    async def test_start_returning_false_serves_and_closes(self, caplog):
+        FakeRegistration.start_result = False
+        with caplog.at_level(logging.WARNING):
+            await WorkstationBridge(api_key="hk-secret")._serve()
+        assert self.events == ["serve"]
+        assert FakeRegistration.instances[0].calls == ["start", "close"]
+        assert "holotab registration failed" in caplog.text
+        assert "hk-secret" not in caplog.text
+
+    async def test_cancellation_during_start_still_closes(self):
+        FakeRegistration.start_gate = threading.Event()
+        task = asyncio.create_task(WorkstationBridge(api_key="hk-abc")._serve())
+        while not FakeRegistration.instances or "start" not in FakeRegistration.instances[0].calls:
+            await asyncio.sleep(0.01)
+        task.cancel()
+        await asyncio.sleep(0.05)
+        FakeRegistration.start_gate.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        await asyncio.sleep(0.1)
+        assert self.events == []
+        assert FakeRegistration.instances[0].calls == ["start", "close"]
+
+    async def test_token_resolution_failure_serves_without_registration(self, caplog):
+        def boom(source):
+            raise RuntimeError("token hk-secret broke")
+
+        self.monkeypatch.setattr("hai_agents_local.sessions._resolve_token", boom)
+        with caplog.at_level(logging.WARNING):
+            await WorkstationBridge(api_key=lambda: "hk-secret")._serve()
+        assert FakeRegistration.instances == []
+        assert self.events == ["serve"]
+        assert "key resolution failed (RuntimeError)" in caplog.text
+        assert "hk-secret" not in caplog.text
 
 
 class FakeDriver:
