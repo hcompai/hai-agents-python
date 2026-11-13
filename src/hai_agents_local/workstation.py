@@ -249,6 +249,11 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
 
         return ManagedCodeSandboxInterface
 
+    def _is_expected(self, exc: Exception) -> bool:
+        from hai_drivers.common.exceptions import CommandApprovalRequired
+
+        return isinstance(exc, CommandApprovalRequired)
+
 
 def _starting_with(rules: Path, starter: str) -> None:
     """Write the machine's rules file with `starter` when it does not exist yet."""

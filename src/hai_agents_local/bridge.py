@@ -322,13 +322,18 @@ class LocalBridge(ABC, Generic[DriverT]):
         except NotImplementedError:
             return None, f"command {name!r} is not supported by this driver"
         except Exception as exc:
-            logger.warning("command %s raised: %s", name, exc)
+            level = logging.INFO if self._is_expected(exc) else logging.WARNING
+            logger.log(level, "command %s raised: %s", name, exc)
             return None, str(exc)
         try:
             return serialize_result(result), None
         except Exception as exc:
             logger.warning("command %s returned a result JSON can't encode: %s", name, exc)
             return None, f"result of {name!r} is not JSON-serializable: {exc}"
+
+    def _is_expected(self, exc: Exception) -> bool:
+        """An error the driver raises as its answer, such as a command held for approval."""
+        return False
 
     @staticmethod
     def _call_driver_method(method: Callable[..., Any], args: dict[str, Any]) -> Any:

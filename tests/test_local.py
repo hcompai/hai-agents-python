@@ -1054,7 +1054,7 @@ class TestDriverInterfaces:
         finally:
             bridge._driver.close()
 
-    def test_workstation_holds_a_command_its_machine_does_not_allow_until_approved(self, tmp_path, monkeypatch):
+    def test_workstation_holds_a_command_its_machine_does_not_allow_until_approved(self, tmp_path, monkeypatch, caplog):
         pytest.importorskip("hai_drivers.code_sandbox.local.allowlist")
         allowed = tmp_path / "allowed"
         allowed.write_text("echo\n")
@@ -1065,9 +1065,11 @@ class TestDriverInterfaces:
             result, error = bridge._dispatch("execute", {"command": "echo hi"})
             assert error is None and result["stdout"].strip() == "hi"
 
-            result, error = bridge._dispatch("execute", {"command": "touch made"})
+            with caplog.at_level(logging.WARNING):
+                result, error = bridge._dispatch("execute", {"command": "touch made"})
             assert result is None and error.startswith("approval required: ")
             assert not (tmp_path / "workspace" / "made").exists()
+            assert "raised" not in caplog.text
 
             assert bridge._dispatch("approve_command", {"command": "touch made"}) == (None, None)
             result, error = bridge._dispatch("execute", {"command": "touch made"})
