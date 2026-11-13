@@ -379,9 +379,8 @@ cd ~/Projects/app
 holo -a laptop-coder "Run the tests and fix the one that fails"
 ```
 
-`holo` works in the folder you start it from, or in the one `-w` names. Started from your home folder, and from
-code, the agent works in a folder of its own, `~/hai/<session id>`, unless `workspace=` names one in `run_session` or
-`start_session`. With
+The agent works in the folder you start `holo` or your script from. `-w`, or `workspace=` in `run_session` and
+`start_session`, names another. Started from your home folder, it gets a folder of its own, `~/hai/<session id>`. With
 `command_approval: "required"`, `holo` asks before each command your allowlist does not cover: `y` runs it, `a` runs it
 and always allows it, `n` refuses. From code, read `result.pending_approvals` and answer with `session.approve(call_id)`
 or `session.deny(call_id, message)`.

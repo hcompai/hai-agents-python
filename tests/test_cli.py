@@ -75,29 +75,6 @@ def test_route_runs_bare_tasks_and_hoists_global_options() -> None:
     assert route("--help") == ["--help"]
 
 
-def test_a_shell_agent_works_in_the_folder_holo_starts_in(monkeypatch, tmp_path) -> None:
-    def folder(asked: str | None = None) -> str | None:
-        state = app_module.AppState(api_key=None, base_url=None, json_output=False)
-        convo = app_module._Conversation(state, "h/x", max_steps=None, max_time_s=None, overrides={}, workspace=asked)
-        return convo.params("hi").get("workspace")
-
-    project = tmp_path / "project"
-    project.mkdir()
-    monkeypatch.delenv("HAI_SHELL_WORKSPACE", raising=False)
-    monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    monkeypatch.chdir(project)
-    assert folder() == str(project.resolve())
-    assert folder("elsewhere") == "elsewhere"
-
-    monkeypatch.setenv("HAI_SHELL_WORKSPACE", "named")
-    assert folder() is None, "the bridge reads the machine's own folder"
-
-    monkeypatch.delenv("HAI_SHELL_WORKSPACE")
-    monkeypatch.chdir(tmp_path)
-    assert folder() is None, "the home folder is not handed to an agent unasked"
-
-
 def test_missing_api_key_is_clear(monkeypatch, tmp_path) -> None:
     monkeypatch.delenv("HAI_API_KEY", raising=False)
     monkeypatch.setattr(credentials, "GLOBAL_ENV_PATH", tmp_path / "global.env")

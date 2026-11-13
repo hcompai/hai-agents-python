@@ -16,7 +16,6 @@ import threading
 import time
 import webbrowser
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
@@ -279,8 +278,7 @@ def _parse_overrides(items: list[str]) -> dict[str, Any]:
 AGENT_HELP = f"Agent name. Default: {credentials.DEFAULT_AGENT}, or the one set with `holo agents use`."
 LOCAL_HELP = "Run the agent loop on this machine, through a local agent runtime."
 WORKSPACE_HELP = (
-    "Folder an agent in shell mode works in. Default: $HAI_SHELL_WORKSPACE, else the current folder; from your home "
-    "folder or above it, ~/hai/<session id>."
+    "Folder an agent in shell mode works in. Default: the current folder; from your home folder, ~/hai/<session id>."
 )
 COMMAND_NAMES = frozenset({"new", "clear", "agent", "live", "share", "help", "exit", "quit"})
 EXAMPLE_TASKS = {
@@ -432,8 +430,8 @@ class _Conversation:
             params["overrides"] = self.overrides
         if self.followups:
             params["idle_timeout_s"] = IDLE_TIMEOUT_S
-        if workspace := self.workspace or _launch_folder():
-            params["workspace"] = workspace
+        if self.workspace:
+            params["workspace"] = self.workspace
         return params
 
     @property
@@ -1567,12 +1565,7 @@ def local_desktop(
         help="Serve a shell-mode desktop: a shell on this machine, running as you, that drives its "
         "screen and a Chrome.",
     ),
-    workspace: str | None = typer.Option(
-        None,
-        "--workspace",
-        help="With --shell, the folder the shell starts in. Defaults to $HAI_SHELL_WORKSPACE, else to "
-        "~/hai/<session id>.",
-    ),
+    workspace: str | None = typer.Option(None, "--workspace", "-w", help="With --shell: " + WORKSPACE_HELP),
     policy: str | None = typer.Option(
         None,
         "--policy",
@@ -1810,16 +1803,6 @@ def _pick_session(recent: list[Any], arg: str) -> Any:
         ui.error(err_console, f"no single recent session matches {arg!r}", fix="/resume lists them")
         raise typer.Exit(1)
     return matches[0]
-
-
-def _launch_folder() -> str | None:
-    """The folder `holo` starts in, for a shell-mode agent to work in; None leaves the choice to the bridge."""
-    from hai_agents_local.config import shell_workspace
-
-    here = Path.cwd().resolve()
-    if shell_workspace() or here == Path(here.anchor) or Path.home().resolve().is_relative_to(here):
-        return None
-    return str(here)
 
 
 def _local_kinds(client: Any, agent: Any) -> list[str]:
