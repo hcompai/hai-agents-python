@@ -361,7 +361,7 @@ A desktop in `shell` mode gives the agent a shell on this machine. It runs comma
 folder, and drives the screen from the same shell when a result only shows in a window.
 
 ```bash
-pip install "hai-agents[cli,workstation]"
+pip install "hai-agents[cli,shell]"
 ```
 
 ```python
@@ -375,11 +375,11 @@ Client().agents.create_agent(
 ```
 
 ```bash
-cd ~/Projects/app
-HAI_SHELL_WORKSPACE=. holo -a laptop-coder "Run the tests and fix the one that fails"
+holo -a laptop-coder -w ~/Projects/app "Run the tests and fix the one that fails"
 ```
 
-Without `HAI_SHELL_WORKSPACE` the agent works in a folder of its own, `~/hai/<session id>`. With
+`-w` is the folder the agent works in, and `workspace=` does the same in `run_session` and `start_session`. Without
+it the agent works in a folder of its own, `~/hai/<session id>`. With
 `command_approval: "required"`, `holo` asks before each command your allowlist does not cover: `y` runs it, `a` runs it
 and always allows it, `n` refuses. From code, read `result.pending_approvals` and answer with `session.approve(call_id)`
 or `session.deny(call_id, message)`.

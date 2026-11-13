@@ -16,7 +16,7 @@ SCRIPTS = os.pathsep.join([sysconfig.get_path("scripts"), os.environ.get("PATH",
 
 def cli(name: str) -> str:
     found = shutil.which(name, path=SCRIPTS)
-    assert found, f"{name} is not installed next to the interpreter; pip install 'hai-agents[workstation]'"
+    assert found, f"{name} is not installed next to the interpreter; pip install 'hai-agents[shell]'"
     return found
 
 

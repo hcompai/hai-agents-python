@@ -103,6 +103,9 @@ class TestLocalizeAgent:
         _, [named], _ = localize_agent(agent, api_key=API_KEY)
         assert named.workspace == tmp_path
 
+        _, [asked], _ = localize_agent(agent, api_key=API_KEY, workspace=str(tmp_path / "app"))
+        assert asked.workspace == tmp_path / "app"
+
     def test_second_unclaimed_env_of_same_kind_raises(self):
         agent = {
             "name": "orchestrator",
@@ -307,6 +310,21 @@ class TestAutoStart:
         assert isinstance(desktop, PyautoguiDesktopBridge) and isinstance(web, SeleniumBrowserBridge)
         assert captured["agent"]["environments"][0]["session_id"] == desktop.session_id
         assert captured["agent"]["subagents"][0]["environments"][0]["session_id"] == web.session_id
+
+    def test_workspace_names_the_shell_desktop_folder_and_stays_on_this_machine(self, monkeypatch, tmp_path):
+        monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
+        started: list = []
+        captured: dict = {}
+        monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: started.extend(bridges) or [])
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: captured.update(kw))
+        sessions = Client(api_key=API_KEY).sessions
+        shell = {"name": "x", "environments": [{"id": "box", "kind": "desktop", "mode": {"type": "shell"}}]}
+
+        sessions.create_session(agent=shell, messages="hi", workspace=str(tmp_path))
+        assert started[0].workspace == tmp_path and "workspace" not in captured
+
+        with pytest.raises(ValueError, match="shell mode"):
+            sessions.create_session(agent="h/web-surfer-flash", messages="hi", workspace=str(tmp_path))
 
     def test_named_agent_routes_its_user_device_env_through_an_override(self, monkeypatch):
         monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "1")
