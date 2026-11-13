@@ -41,14 +41,14 @@ def agent_shell_policy() -> str:
 
 def shell_sandbox(required: bool = False) -> str | None:
     """This machine's sandbox-runtime settings file for shell desktops; None runs their commands unconfined."""
-    value = os.getenv(SHELL_SANDBOX_ENV_VAR, "").strip()
-    if value.lower() in _FLAG_FALSE:
+    value = os.getenv(SHELL_SANDBOX_ENV_VAR, "").strip().lower()
+    rules = credentials_path().with_name("sandbox.json")
+    if value in _FLAG_FALSE:
         return None
-    if value and value.lower() not in _FLAG_TRUE:
-        return value
+    if value and value not in _FLAG_TRUE:
+        raise ValueError(f"{SHELL_SANDBOX_ENV_VAR} is 0 or 1, not {value!r}; the machine's own rules go in {rules}")
     # Confinement is the default where the SDK installs it by itself: macOS. Elsewhere it takes the variable, the
     # machine's own rules, or an agent's requirement.
-    rules = credentials_path().with_name("sandbox.json")
     return str(rules) if value or required or sys.platform == "darwin" or rules.exists() else None
 
 

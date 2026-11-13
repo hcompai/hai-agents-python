@@ -16,6 +16,7 @@ import threading
 import time
 import webbrowser
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
@@ -277,7 +278,10 @@ def _parse_overrides(items: list[str]) -> dict[str, Any]:
 
 AGENT_HELP = f"Agent name. Default: {credentials.DEFAULT_AGENT}, or the one set with `holo agents use`."
 LOCAL_HELP = "Run the agent loop on this machine, through a local agent runtime."
-WORKSPACE_HELP = "Folder an agent in shell mode works in. Default: $HAI_SHELL_WORKSPACE, else ~/hai/<session id>."
+WORKSPACE_HELP = (
+    "Folder an agent in shell mode works in. Default: $HAI_SHELL_WORKSPACE, else the current folder; from your home "
+    "folder or above it, ~/hai/<session id>."
+)
 COMMAND_NAMES = frozenset({"new", "clear", "agent", "live", "share", "help", "exit", "quit"})
 EXAMPLE_TASKS = {
     False: "Find the top 3 stories on Hacker News and their URLs",
@@ -428,8 +432,8 @@ class _Conversation:
             params["overrides"] = self.overrides
         if self.followups:
             params["idle_timeout_s"] = IDLE_TIMEOUT_S
-        if self.workspace:
-            params["workspace"] = self.workspace
+        if workspace := self.workspace or _launch_folder():
+            params["workspace"] = workspace
         return params
 
     @property
@@ -1580,8 +1584,8 @@ def local_desktop(
         None,
         "--sandbox",
         help="With --shell, this machine's sandbox-runtime settings file: every command runs under srt by its "
-        "rules and writes in the workspace. Defaults to $HAI_SHELL_SANDBOX, else on macOS to sandbox.json beside "
-        "the stored credentials; where that file does not exist, to the built-in rules.",
+        "rules and writes in the workspace. Defaults to sandbox.json beside the stored credentials, on macOS, "
+        "where that file exists, or with HAI_SHELL_SANDBOX=1; where it does not exist, to the built-in rules.",
     ),
     no_sandbox: bool = typer.Option(False, "--no-sandbox", help="With --shell, run commands unconfined, as you."),
 ) -> None:
@@ -1806,6 +1810,16 @@ def _pick_session(recent: list[Any], arg: str) -> Any:
         ui.error(err_console, f"no single recent session matches {arg!r}", fix="/resume lists them")
         raise typer.Exit(1)
     return matches[0]
+
+
+def _launch_folder() -> str | None:
+    """The folder `holo` starts in, for a shell-mode agent to work in; None leaves the choice to the bridge."""
+    from hai_agents_local.config import shell_workspace
+
+    here = Path.cwd().resolve()
+    if shell_workspace() or here == Path(here.anchor) or Path.home().resolve().is_relative_to(here):
+        return None
+    return str(here)
 
 
 def _local_kinds(client: Any, agent: Any) -> list[str]:

@@ -118,8 +118,9 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
                 allowed.
             sandbox: This machine's sandbox-runtime settings file. Every command runs under ``srt`` by its rules:
                 it writes in the workspace and reaches the ``cua`` daemon, which this bridge starts outside the
-                sandbox. Defaults to ``HAI_SHELL_SANDBOX``, else on macOS to ``sandbox.json`` beside the stored
-                credentials. Where that file does not exist, the rules are the built-in ones: the package
+                sandbox. Defaults to ``sandbox.json`` beside the stored credentials, on macOS, where that file
+                exists, or with ``HAI_SHELL_SANDBOX=1``; ``HAI_SHELL_SANDBOX=0`` runs commands unconfined.
+                Where that file does not exist, the rules are the built-in ones: the package
                 registries reachable, the usual credential files unreadable, the environment's tokens unset.
                 ``False`` runs commands unconfined. A Mac without ``srt`` downloads it under ``~/.hai`` on its
                 first session. Where there is none and none to download, the default sandbox gives way with a
