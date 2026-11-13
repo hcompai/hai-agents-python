@@ -367,15 +367,15 @@ folder, and drives the screen from the same shell when a result only shows in a 
 ```bash
 pip install "hai-agents[all]"
 cd ~/Projects/app
-holo -a h/holo-coder "Run the tests and fix the one that fails"
+holo -a h/holo-code "Run the tests and fix the one that fails"
 ```
 
-`h/holo-coder` is ready-made. An agent of your own takes a `desktop` environment with `"mode": {"type": "shell"}`.
+`h/holo-code` is ready-made. An agent of your own takes a `desktop` environment with `"mode": {"type": "shell"}`.
 
 The agent works in the folder you start `holo` or your script from. `-w`, or `workspace=` in `run_session` and
 `start_session`, names another. Started from your home folder, it gets a folder of its own, `~/hai/<session id>`.
 
-`h/holo-coder` asks before each command, as does any agent with `command_approval: "required"`: `y` runs it, `a` runs
+`h/holo-code` asks before each command, as does any agent with `command_approval: "required"`: `y` runs it, `a` runs
 it and adds it to `~/.config/hai/allowed-commands`, `n` refuses. From code, read `result.pending_approvals` and answer
 with `session.approve(call_id)` or `session.deny(call_id, message)`.
 
