@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-INSTALL_HINT = "A desktop with a shell requires extra deps. Install with: pip install 'hai-agents[workstation]'"
+INSTALL_HINT = "A desktop with a shell requires extra deps. Install with: pip install 'hai-agents[shell]'"
 SANDBOX_HINT = (
     "Anthropic's sandbox-runtime confines shell commands to the workspace. macOS downloads it on the first session; "
     "elsewhere: npm install -g --omit=optional @anthropic-ai/sandbox-runtime (needs Node 22.12 or later), "

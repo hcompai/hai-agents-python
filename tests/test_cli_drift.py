@@ -42,7 +42,7 @@ def test_session_method_contracts_still_match() -> None:
 def test_create_session_params_mirror_create_session() -> None:
     create = Client(api_key="hk-test", base_url="https://example.test").sessions.create_session
 
-    assert set(CreateSessionParams.__annotations__) == _params(create) - {"self", "request_options"}
+    assert set(CreateSessionParams.__annotations__) - {"workspace"} == _params(create) - {"self", "request_options"}
 
 
 def test_message_request_body_still_has_message_field() -> None:

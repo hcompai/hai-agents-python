@@ -32,6 +32,7 @@ from .config import auto_bridges_enabled
 from .killswitch import StopWatcher
 from .manager import ensure_bridges, serving_bridges, stop_bridges
 from .routing import Reference, local_bridge_types, localize_agent, references, split_revision
+from .workstation import WorkstationBridge
 
 if typing.TYPE_CHECKING:
     from .runtime import LocalRuntime
@@ -162,6 +163,7 @@ def _localize(
     runtime: typing.Optional[LocalRuntime],
     kwargs: typing.Dict[str, typing.Any],
     resolved: typing.Mapping[Reference, typing.Any],
+    workspace: typing.Optional[str] = None,
 ) -> typing.List[LocalBridge]:
     """Spawn bridges for unclaimed user_device environments and route each one to its bridge; caller overrides win."""
     _warn_if_overrides_target_user_device(kwargs)
@@ -178,6 +180,7 @@ def _localize(
         resolved=resolved,
         claimed=overrides,
         seed=None if idempotency_key is None else f"{_caller(api_key, base_url)}:{idempotency_key}",
+        workspace=workspace,
     )
     kwargs["agent"] = localized.agent
     if localized.overrides:
@@ -185,6 +188,13 @@ def _localize(
     for bridge in localized.bridges:
         bridge.verify_runtime = runtime is not None
     return localized.bridges
+
+
+def _require_shell_for(workspace: typing.Optional[str], bridges: typing.Sequence[LocalBridge]) -> None:
+    if workspace is not None and not any(isinstance(bridge, WorkstationBridge) for bridge in bridges):
+        raise ValueError(
+            "workspace is the folder of a desktop in shell mode on this machine, and this session starts none"
+        )
 
 
 class _LossWatcher:
@@ -476,9 +486,12 @@ class LocalSessionsClient(_LocalSessionsState, SessionsClient):
         if self._hold is not None:
             self._hold.reacquire()
         bridges: typing.List[LocalBridge] = []
+        workspace = kwargs.pop("workspace", None)
         if _wants_bridges(self._auto_bridges, kwargs):
             wrapper = self._raw_client._client_wrapper
-            bridges = _localize(wrapper, self._runtime, kwargs, _resolve_references(wrapper, kwargs["agent"]))
+            resolved = _resolve_references(wrapper, kwargs["agent"])
+            bridges = _localize(wrapper, self._runtime, kwargs, resolved, workspace)
+        _require_shell_for(workspace, bridges)
         if bridges:
             _apply_runaway_budgets(kwargs)
         stop_watcher = _ensure_stop_watcher() if bridges else None
@@ -550,10 +563,12 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
         if self._hold is not None:
             await self._hold.reacquire_async()
         bridges: typing.List[LocalBridge] = []
+        workspace = kwargs.pop("workspace", None)
         if _wants_bridges(self._auto_bridges, kwargs):
             wrapper = self._raw_client._client_wrapper
             resolved = await _resolve_references_async(wrapper, kwargs["agent"])
-            bridges = _localize(wrapper, self._runtime, kwargs, resolved)
+            bridges = _localize(wrapper, self._runtime, kwargs, resolved, workspace)
+        _require_shell_for(workspace, bridges)
         if bridges:
             _apply_runaway_budgets(kwargs)
         # Native permission prompts must run before bridge startup moves to a worker.

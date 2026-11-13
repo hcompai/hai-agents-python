@@ -277,6 +277,7 @@ def _parse_overrides(items: list[str]) -> dict[str, Any]:
 
 AGENT_HELP = f"Agent name. Default: {credentials.DEFAULT_AGENT}, or the one set with `holo agents use`."
 LOCAL_HELP = "Run the agent loop on this machine, through a local agent runtime."
+WORKSPACE_HELP = "Folder an agent in shell mode works in. Default: $HAI_SHELL_WORKSPACE, else ~/hai/<session id>."
 COMMAND_NAMES = frozenset({"new", "clear", "agent", "live", "share", "help", "exit", "quit"})
 EXAMPLE_TASKS = {
     False: "Find the top 3 stories on Hacker News and their URLs",
@@ -290,6 +291,7 @@ def run(
     task: str = typer.Argument(..., help="Task to run."),
     agent: str | None = typer.Option(None, "--agent", "-a", help=AGENT_HELP),
     local: bool = typer.Option(False, "--local", help=LOCAL_HELP),
+    workspace: str | None = typer.Option(None, "--workspace", "-w", help=WORKSPACE_HELP),
     max_steps: int | None = typer.Option(
         None,
         "--max-steps",
@@ -324,6 +326,7 @@ def run(
         overrides=_parse_overrides(override or []),
         quiet=quiet,
         local=local,
+        workspace=workspace,
     )
     try:
         assert_request_under_limit(convo.params(task))
@@ -347,13 +350,20 @@ def chat(
     ctx: typer.Context,
     agent: str | None = typer.Option(None, "--agent", "-a", help=AGENT_HELP),
     local: bool = typer.Option(False, "--local", help=LOCAL_HELP),
+    workspace: str | None = typer.Option(None, "--workspace", "-w", help=WORKSPACE_HELP),
 ) -> None:
     """Start an interactive session; plain `holo` in a terminal opens this."""
     state = _state(ctx)
     if not _interactive() or state.json_output:
         _raise_cli_error(RuntimeError('chat needs an interactive terminal; run one task with `holo "<task>"`'))
     convo = _Conversation(
-        state, agent or credentials.default_agent(), max_steps=None, max_time_s=None, overrides={}, local=local
+        state,
+        agent or credentials.default_agent(),
+        max_steps=None,
+        max_time_s=None,
+        overrides={},
+        local=local,
+        workspace=workspace,
     )
     convo.open()
     try:
@@ -374,6 +384,7 @@ class _Conversation:
     overrides: dict[str, Any]
     quiet: bool = False
     local: bool = False
+    workspace: str | None = None
     client: Any = None
     cloud: Any = None
     session: Any = None
@@ -417,6 +428,8 @@ class _Conversation:
             params["overrides"] = self.overrides
         if self.followups:
             params["idle_timeout_s"] = IDLE_TIMEOUT_S
+        if self.workspace:
+            params["workspace"] = self.workspace
         return params
 
     @property
@@ -1683,7 +1696,7 @@ _GLOBAL_FLAGS = ("--json",)
 _GLOBAL_OPTIONS = ("--api-key", "--base-url")
 _HELP_FLAGS = ("--help", "--install-completion", "--show-completion")
 _CHAT_FLAGS = ("--local",)
-_CHAT_OPTIONS = ("--agent", "-a")
+_CHAT_OPTIONS = ("--agent", "-a", "--workspace", "-w")
 
 
 def _only_chat_options(args: list[str]) -> bool:
