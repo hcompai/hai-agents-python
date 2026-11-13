@@ -106,7 +106,7 @@ class Client(_LocalRuntimeAccess, BaseClient):
         runtime: typing.Optional[LocalRuntime] = None,
         inference: typing.Optional[Inference] = None,
         local_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
-        auto_bridges: bool = True,
+        auto_bridges: typing.Optional[bool] = None,
         timeout: typing.Optional[float] = None,
     ) -> Client:
         """A client on a local agent runtime: ``runtime`` if given, else one this client starts and owns."""
@@ -120,8 +120,8 @@ class Client(_LocalRuntimeAccess, BaseClient):
                 hold.runtime.shutdown()
             raise
         client._hold = hold
-        if not auto_bridges:
-            client.auto_bridges = False
+        if auto_bridges is not None:
+            client.auto_bridges = auto_bridges
         return client
 
     def close(self) -> None:
@@ -211,7 +211,7 @@ class AsyncClient(_LocalRuntimeAccess, AsyncBaseClient):
         runtime: typing.Optional[LocalRuntime] = None,
         inference: typing.Optional[Inference] = None,
         local_options: typing.Optional[typing.Dict[str, typing.Any]] = None,
-        auto_bridges: bool = True,
+        auto_bridges: typing.Optional[bool] = None,
         timeout: typing.Optional[float] = None,
     ) -> AsyncClient:
         """A client on a local agent runtime: ``runtime`` if given, else one this client starts and owns."""
@@ -227,8 +227,8 @@ class AsyncClient(_LocalRuntimeAccess, AsyncBaseClient):
                 await asyncio.to_thread(hold.runtime.shutdown)
             raise
         client._hold = hold
-        if not auto_bridges:
-            client.auto_bridges = False
+        if auto_bridges is not None:
+            client.auto_bridges = auto_bridges
         return client
 
     async def aclose(self) -> None:
