@@ -54,7 +54,8 @@ MAX_REQUEST_BYTES = 10_000_000
 class CreateSessionParams(typing_extensions.TypedDict, total=False):
     """Typed ``create_session`` kwargs; mirror new ``SessionRequest`` fields here to keep autocomplete.
 
-    ``workspace`` stays on this machine: the folder its shell-mode desktop works in.
+    ``workspace`` and ``sandbox`` stay on this machine, for its shell-mode desktop: the folder it works in, and
+    ``False`` to run its commands outside the sandbox.
     """
 
     agent: typing_extensions.Required[SessionRequestAgent]
@@ -71,6 +72,7 @@ class CreateSessionParams(typing_extensions.TypedDict, total=False):
     delete_screenshot_after_min: typing.Optional[int]
     queue: typing.Optional[bool]
     workspace: typing.Optional[str]
+    sandbox: typing.Union[str, typing.Literal[False], None]
 
 
 AnswerT = typing_extensions.TypeVar("AnswerT", default=SessionChangesAnswer)

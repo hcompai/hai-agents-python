@@ -1,18 +1,18 @@
 import pytest
 
+from hai_agents.client import _LocalRuntimeAccess
 from hai_agents_cli import holo_dir, welcome
-from hai_agents_local import desktop_lock
-from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR, SHELL_SANDBOX_ENV_VAR
+from hai_agents_local import desktop_lock, workstation
 
 
 @pytest.fixture(autouse=True)
 def _no_auto_bridges(monkeypatch):
-    monkeypatch.setenv(AUTO_BRIDGE_ENV_VAR, "0")
+    monkeypatch.setattr(_LocalRuntimeAccess, "auto_bridges", False)
 
 
 @pytest.fixture(autouse=True)
 def _no_shell_sandbox(monkeypatch):
-    monkeypatch.setenv(SHELL_SANDBOX_ENV_VAR, "0")
+    monkeypatch.setattr(workstation, "shell_sandbox", lambda: None)
 
 
 @pytest.fixture(autouse=True)
