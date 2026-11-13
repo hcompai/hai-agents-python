@@ -12,6 +12,7 @@ BASE_URL_ENV_VAR = "HAI_API_BASE_URL"
 AUTO_BRIDGE_ENV_VAR = "HAI_AUTO_BRIDGE"
 SHELL_POLICY_ENV_VAR = "HAI_SHELL_POLICY"
 SHELL_SANDBOX_ENV_VAR = "HAI_SHELL_SANDBOX"
+SHELL_WORKSPACE_ENV_VAR = "HAI_SHELL_WORKSPACE"
 
 DEFAULT_BASE_URL = HaiAgentsEnvironment.EU.value
 
@@ -21,6 +22,11 @@ _FLAG_TRUE = {"1", "true", "yes"}
 
 def default_base_url() -> str:
     return os.getenv(BASE_URL_ENV_VAR, "").strip() or DEFAULT_BASE_URL
+
+
+def shell_workspace() -> str | None:
+    """The folder this machine's shell desktops work in, when it names one."""
+    return os.getenv(SHELL_WORKSPACE_ENV_VAR, "").strip() or None
 
 
 def shell_policy() -> str | None:

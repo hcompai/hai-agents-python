@@ -1547,20 +1547,18 @@ def local_desktop(
     shell: bool = typer.Option(
         False,
         "--shell",
-        hidden=True,
         help="Serve a shell-mode desktop: a shell on this machine, running as you, that drives its "
         "screen and a Chrome.",
     ),
     workspace: str | None = typer.Option(
         None,
         "--workspace",
-        hidden=True,
-        help="With --shell, the folder the shell starts in. Defaults to ~/hai/<session id>.",
+        help="With --shell, the folder the shell starts in. Defaults to $HAI_SHELL_WORKSPACE, else to "
+        "~/hai/<session id>.",
     ),
     policy: str | None = typer.Option(
         None,
         "--policy",
-        hidden=True,
         help="With --shell, this machine's allowlist file, one command prefix a line: a command it does not "
         "cover waits for approval. Created with `cua` allowed when missing. Defaults to $HAI_SHELL_POLICY; "
         "without one every command runs.",
@@ -1568,14 +1566,11 @@ def local_desktop(
     sandbox: str | None = typer.Option(
         None,
         "--sandbox",
-        hidden=True,
         help="With --shell, this machine's sandbox-runtime settings file: every command runs under srt by its "
         "rules and writes in the workspace. Defaults to $HAI_SHELL_SANDBOX, else on macOS to sandbox.json beside "
         "the stored credentials; where that file does not exist, to the built-in rules.",
     ),
-    no_sandbox: bool = typer.Option(
-        False, "--no-sandbox", hidden=True, help="With --shell, run commands unconfined, as you."
-    ),
+    no_sandbox: bool = typer.Option(False, "--no-sandbox", help="With --shell, run commands unconfined, as you."),
 ) -> None:
     """Serve desktop commands on this machine's mouse, keyboard, and screen."""
     from hai_agents_local import PyautoguiDesktopBridge, WorkstationBridge

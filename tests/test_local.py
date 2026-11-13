@@ -30,7 +30,7 @@ from hai_agents_local import (
     SeleniumBrowserBridge,
     WorkstationBridge,
 )
-from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR, shell_sandbox
+from hai_agents_local.config import AUTO_BRIDGE_ENV_VAR, SHELL_WORKSPACE_ENV_VAR, shell_sandbox
 from hai_agents_local.errors import AuthError, RateLimitedError, SessionNotFoundError
 from hai_agents_local.routing import localize_agent
 from hai_agents_local.runtime.manifest import platform_key
@@ -93,6 +93,15 @@ class TestLocalizeAgent:
         agent["environments"][0]["mode"] = {"type": "shell"}
         _, [plain], _ = localize_agent(agent, api_key=API_KEY)
         assert plain.policy is None and not plain.require_sandbox and not plain.allowed_domains
+
+    def test_a_shell_desktop_works_in_the_folder_this_machine_names(self, monkeypatch, tmp_path):
+        agent = {"name": "x", "environments": [{"kind": "desktop", "mode": {"type": "shell"}}]}
+        _, [own], _ = localize_agent(agent, api_key=API_KEY)
+        assert own.workspace == Path.home() / "hai" / own.session_id
+
+        monkeypatch.setenv(SHELL_WORKSPACE_ENV_VAR, str(tmp_path))
+        _, [named], _ = localize_agent(agent, api_key=API_KEY)
+        assert named.workspace == tmp_path
 
     def test_second_unclaimed_env_of_same_kind_raises(self):
         agent = {

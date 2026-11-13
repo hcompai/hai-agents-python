@@ -355,6 +355,40 @@ One agent drives this machine's desktop at a time: a second process asking for a
 sharing the mouse. `holo local stop` stops every local turn on the machine; so does a double Esc
 once `hai_agents_local.killswitch.arm_esc_listener()` is armed (macOS, Windows, and X11 Linux).
 
+### Code on this machine
+
+A desktop in `shell` mode gives the agent a shell on this machine. It runs commands, edits files and writes code in a
+folder, and drives the screen from the same shell when a result only shows in a window.
+
+```bash
+pip install "hai-agents[cli,workstation]"
+```
+
+```python
+from hai_agents import Client
+
+Client().agents.create_agent(
+    name="laptop-coder",
+    description="Runs commands and edits files on my machine.",
+    environments=[{"id": "my-laptop", "kind": "desktop", "mode": {"type": "shell", "command_approval": "required"}}],
+)
+```
+
+```bash
+cd ~/Projects/app
+HAI_SHELL_WORKSPACE=. holo -a laptop-coder "Run the tests and fix the one that fails"
+```
+
+Without `HAI_SHELL_WORKSPACE` the agent works in a folder of its own, `~/hai/<session id>`. With
+`command_approval: "required"`, `holo` asks before each command your allowlist does not cover: `y` runs it, `a` runs it
+and always allows it, `n` refuses. From code, read `result.pending_approvals` and answer with `session.approve(call_id)`
+or `session.deny(call_id, message)`.
+
+On macOS every command runs inside Anthropic's [sandbox-runtime](https://github.com/anthropics/sandbox-runtime),
+downloaded on the first session: it writes in the workspace only, reaches the Python and npm registries, and cannot
+read your credentials. On Linux and Windows the sandbox is off until you install it. The
+[guide](https://hub.hcompany.ai/agents-api/your-shell) covers both.
+
 ### Inspect and share sessions
 
 List past sessions and create a public replay link:
