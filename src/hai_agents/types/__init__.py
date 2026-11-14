@@ -132,6 +132,7 @@ if typing.TYPE_CHECKING:
     from .runner_session_event import RunnerSessionEvent
     from .schedule_record import ScheduleRecord
     from .schedule_run_record import ScheduleRunRecord
+    from .schedule_run_record_probe_outcome import ScheduleRunRecordProbeOutcome
     from .schedule_run_record_status import ScheduleRunRecordStatus
     from .session import Session
     from .session_changes import SessionChanges
@@ -340,6 +341,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "RunnerSessionEvent": ".runner_session_event",
     "ScheduleRecord": ".schedule_record",
     "ScheduleRunRecord": ".schedule_run_record",
+    "ScheduleRunRecordProbeOutcome": ".schedule_run_record_probe_outcome",
     "ScheduleRunRecordStatus": ".schedule_run_record_status",
     "Session": ".session",
     "SessionChanges": ".session_changes",
@@ -566,6 +568,7 @@ __all__ = [
     "RunnerSessionEvent",
     "ScheduleRecord",
     "ScheduleRunRecord",
+    "ScheduleRunRecordProbeOutcome",
     "ScheduleRunRecordStatus",
     "Session",
     "SessionChanges",

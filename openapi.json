@@ -7690,6 +7690,21 @@
             ],
             "title": "Repeats",
             "description": "How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted."
+          },
+          "probe": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe",
+            "description": "Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules."
           }
         },
         "type": "object",
@@ -9951,6 +9966,21 @@
             "title": "Sessions Created",
             "description": "Automatic fires that created a session. Skipped fires, errors, and manual triggers are not counted. When this reaches repeats, the schedule is paused."
           },
+          "probe": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe",
+            "description": "Completion probe each run's browser end state is checked against."
+          },
           "next_run_times": {
             "items": {
               "type": "string",
@@ -9994,6 +10024,7 @@
           "pause_note",
           "repeats",
           "sessions_created",
+          "probe",
           "next_run_times",
           "last_run_at",
           "created_at",
@@ -10056,6 +10087,23 @@
             "type": "boolean",
             "title": "Triggered Manually"
           },
+          "probe_outcome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pass",
+                  "fail",
+                  "unjudged"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe Outcome",
+            "description": "What the schedule's probe said of the session's browser end state; `unjudged` when it could not tell. Null until the session finished and its end state was checked (`unjudged` if that takes over 24 hours), or when the run is over a day older than the schedule's probe."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -10071,6 +10119,7 @@
           "session_id",
           "error",
           "triggered_manually",
+          "probe_outcome",
           "created_at"
         ],
         "title": "ScheduleRunRecord",
@@ -11403,6 +11452,21 @@
             ],
             "title": "Repeats",
             "description": "How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted."
+          },
+          "probe": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe",
+            "description": "Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules."
           }
         },
         "type": "object",

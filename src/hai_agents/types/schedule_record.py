@@ -8,6 +8,7 @@ import typing
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel, update_forward_refs
 from .cron_timing import CronTiming
+from .json_value import JsonValue
 from .session_request import SessionRequest
 
 
@@ -31,6 +32,11 @@ class ScheduleRecord(UniversalBaseModel):
     sessions_created: int = pydantic.Field()
     """
     Automatic fires that created a session. Skipped fires, errors, and manual triggers are not counted. When this reaches repeats, the schedule is paused.
+    """
+
+    probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = pydantic.Field(default=None)
+    """
+    Completion probe each run's browser end state is checked against.
     """
 
     next_run_times: typing.List[dt.datetime] = pydantic.Field()

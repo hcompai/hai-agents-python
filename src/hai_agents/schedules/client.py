@@ -5,6 +5,7 @@ import typing
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
 from ..types.cron_timing import CronTiming
+from ..types.json_value import JsonValue
 from ..types.page_schedule_record import PageScheduleRecord
 from ..types.page_schedule_run_record import PageScheduleRunRecord
 from ..types.pause_schedule import PauseSchedule
@@ -86,6 +87,7 @@ class SchedulesClient:
         session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ScheduleRecord:
         """
@@ -104,6 +106,9 @@ class SchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -137,6 +142,7 @@ class SchedulesClient:
             session_request=session_request,
             description=description,
             repeats=repeats,
+            probe=probe,
             request_options=request_options,
         )
         return _response.data
@@ -211,6 +217,7 @@ class SchedulesClient:
         timing: typing.Optional[CronTiming] = OMIT,
         session_request: typing.Optional[SessionRequest] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ScheduleRecord:
         """
@@ -231,6 +238,9 @@ class SchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -258,6 +268,7 @@ class SchedulesClient:
             timing=timing,
             session_request=session_request,
             repeats=repeats,
+            probe=probe,
             request_options=request_options,
         )
         return _response.data
@@ -494,6 +505,7 @@ class AsyncSchedulesClient:
         session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ScheduleRecord:
         """
@@ -512,6 +524,9 @@ class AsyncSchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -553,6 +568,7 @@ class AsyncSchedulesClient:
             session_request=session_request,
             description=description,
             repeats=repeats,
+            probe=probe,
             request_options=request_options,
         )
         return _response.data
@@ -645,6 +661,7 @@ class AsyncSchedulesClient:
         timing: typing.Optional[CronTiming] = OMIT,
         session_request: typing.Optional[SessionRequest] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ScheduleRecord:
         """
@@ -665,6 +682,9 @@ class AsyncSchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -700,6 +720,7 @@ class AsyncSchedulesClient:
             timing=timing,
             session_request=session_request,
             repeats=repeats,
+            probe=probe,
             request_options=request_options,
         )
         return _response.data
