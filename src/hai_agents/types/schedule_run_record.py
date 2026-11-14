@@ -5,6 +5,7 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .schedule_run_record_probe_outcome import ScheduleRunRecordProbeOutcome
 from .schedule_run_record_status import ScheduleRunRecordStatus
 
 
@@ -20,6 +21,11 @@ class ScheduleRunRecord(UniversalBaseModel):
     session_id: typing.Optional[str] = None
     error: typing.Optional[str] = None
     triggered_manually: bool
+    probe_outcome: typing.Optional[ScheduleRunRecordProbeOutcome] = pydantic.Field(default=None)
+    """
+    What the schedule's probe said of the session's browser end state; `unjudged` when it could not tell. Null until the session finished and its end state was checked (`unjudged` if that takes over 24 hours), or when the run is over a day older than the schedule's probe.
+    """
+
     created_at: dt.datetime
 
     if IS_PYDANTIC_V2:

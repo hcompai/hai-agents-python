@@ -14,6 +14,7 @@ from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.cron_timing import CronTiming
 from ..types.error_response import ErrorResponse
+from ..types.json_value import JsonValue
 from ..types.page_schedule_record import PageScheduleRecord
 from ..types.page_schedule_run_record import PageScheduleRunRecord
 from ..types.pause_schedule import PauseSchedule
@@ -112,6 +113,7 @@ class RawSchedulesClient:
         session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[ScheduleRecord]:
         """
@@ -130,6 +132,9 @@ class RawSchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -152,6 +157,7 @@ class RawSchedulesClient:
                     object_=session_request, annotation=SessionRequest, direction="write"
                 ),
                 "repeats": repeats,
+                "probe": probe,
             },
             headers={
                 "content-type": "application/json",
@@ -296,6 +302,7 @@ class RawSchedulesClient:
         timing: typing.Optional[CronTiming] = OMIT,
         session_request: typing.Optional[SessionRequest] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[ScheduleRecord]:
         """
@@ -316,6 +323,9 @@ class RawSchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -338,6 +348,7 @@ class RawSchedulesClient:
                     object_=session_request, annotation=SessionRequest, direction="write"
                 ),
                 "repeats": repeats,
+                "probe": probe,
             },
             headers={
                 "content-type": "application/json",
@@ -707,6 +718,7 @@ class AsyncRawSchedulesClient:
         session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[ScheduleRecord]:
         """
@@ -725,6 +737,9 @@ class AsyncRawSchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -747,6 +762,7 @@ class AsyncRawSchedulesClient:
                     object_=session_request, annotation=SessionRequest, direction="write"
                 ),
                 "repeats": repeats,
+                "probe": probe,
             },
             headers={
                 "content-type": "application/json",
@@ -891,6 +907,7 @@ class AsyncRawSchedulesClient:
         timing: typing.Optional[CronTiming] = OMIT,
         session_request: typing.Optional[SessionRequest] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[ScheduleRecord]:
         """
@@ -911,6 +928,9 @@ class AsyncRawSchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -933,6 +953,7 @@ class AsyncRawSchedulesClient:
                     object_=session_request, annotation=SessionRequest, direction="write"
                 ),
                 "repeats": repeats,
+                "probe": probe,
             },
             headers={
                 "content-type": "application/json",
