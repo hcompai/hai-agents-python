@@ -16,6 +16,7 @@ DEFAULT_BASE_URL = HaiAgentsEnvironment.EU.value
 _UNREAD = {
     "HAI_SHELL_POLICY": "an agent asks with `command_approval: required`, and WorkstationBridge takes `policy=`",
     "HAI_SHELL_SANDBOX": "the sandbox is on where srt runs, and `--no-sandbox` or `sandbox=False` turns it off",
+    "HAI_SHELL_WORKSPACE": "the agent works in the folder it is started from, and `-w` or `workspace=` names another",
 }
 
 
