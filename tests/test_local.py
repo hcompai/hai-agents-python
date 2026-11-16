@@ -1200,11 +1200,18 @@ class TestDriverInterfaces:
         with pytest.raises(ValueError, match=f"{name} is not read"):
             WorkstationBridge(api_key="k")
 
-    def test_a_workspace_that_holds_what_runs_the_session_is_refused_before_anything_runs(self, monkeypatch):
+    def test_a_workspace_that_holds_what_runs_the_session_is_refused_before_anything_runs(self, tmp_path, monkeypatch):
         monkeypatch.setattr(subprocess, "run", lambda *_, **__: pytest.fail("ran a program the agent could rewrite"))
-        project = Path(sys.prefix).parent
-        with pytest.raises(ValueError, match="runs this session and is inside the workspace"):
-            WorkstationBridge(api_key="k", workspace=str(project)).create_driver()
+        refused = pytest.raises(ValueError, match="runs this session and is inside the workspace")
+        with refused:
+            WorkstationBridge(api_key="k", workspace=str(Path(sys.prefix).parent)).create_driver()
+        srt = tmp_path / "node_modules" / ".bin" / "srt"
+        srt.parent.mkdir(parents=True)
+        srt.write_text("#!/bin/sh\n")
+        srt.chmod(0o755)
+        monkeypatch.setenv("PATH", str(srt.parent), prepend=os.pathsep)
+        with refused:
+            WorkstationBridge(api_key="k", workspace=str(tmp_path), sandbox=str(tmp_path / "none.json")).preflight()
 
     @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
     def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(
