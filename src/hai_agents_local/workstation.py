@@ -239,7 +239,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
                 raise RuntimeError("The agent requires the sandbox, and this session turns it off.")
             return None
         try:
-            return _sandbox_runtime()
+            return _sandbox_runtime(self.workspace)
         except RuntimeError:
             if self._sandbox_asked or Path(self.sandbox).expanduser().exists():
                 raise
@@ -282,7 +282,7 @@ def _starting_with(rules: Path, starter: str) -> None:
         logger.info("wrote starter rules: %s", rules)
 
 
-def _sandbox_runtime() -> str:
+def _sandbox_runtime(workspace: Path) -> str:
     """This machine's `srt`: its own on PATH, else the pinned build, downloaded on its first use."""
     srt = shutil.which("srt") or _pinned_sandbox_runtime()
     if srt is None:
@@ -291,7 +291,9 @@ def _sandbox_runtime() -> str:
         from hai_drivers.code_sandbox.local.sandbox_runtime import launch
     except ImportError as exc:
         raise ImportError(INSTALL_HINT) from exc
-    started = subprocess.run([*launch(srt), "--version"], capture_output=True, text=True)
+    command = launch(srt)
+    _refuse_what_runs_the_session(workspace, command)
+    started = subprocess.run([*command, "--version"], capture_output=True, text=True)
     if started.returncode:
         raise RuntimeError(f"{srt} did not start: {started.stderr.strip()[-300:]} {SANDBOX_HINT}")
     return str(srt)
