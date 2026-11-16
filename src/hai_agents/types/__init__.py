@@ -116,6 +116,7 @@ if typing.TYPE_CHECKING:
     from .patch_environment_mode_visual import PatchEnvironmentModeVisual
     from .pause_schedule import PauseSchedule
     from .policy_event import PolicyEvent
+    from .probe_draft import ProbeDraft
     from .proxy_pool import ProxyPool
     from .quota_error import QuotaError
     from .quota_error_response import QuotaErrorResponse
@@ -132,6 +133,7 @@ if typing.TYPE_CHECKING:
     from .runner_session_event import RunnerSessionEvent
     from .schedule_record import ScheduleRecord
     from .schedule_run_record import ScheduleRunRecord
+    from .schedule_run_record_probe_outcome import ScheduleRunRecordProbeOutcome
     from .schedule_run_record_status import ScheduleRunRecordStatus
     from .session import Session
     from .session_changes import SessionChanges
@@ -324,6 +326,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "PatchEnvironmentModeVisual": ".patch_environment_mode_visual",
     "PauseSchedule": ".pause_schedule",
     "PolicyEvent": ".policy_event",
+    "ProbeDraft": ".probe_draft",
     "ProxyPool": ".proxy_pool",
     "QuotaError": ".quota_error",
     "QuotaErrorResponse": ".quota_error_response",
@@ -340,6 +343,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "RunnerSessionEvent": ".runner_session_event",
     "ScheduleRecord": ".schedule_record",
     "ScheduleRunRecord": ".schedule_run_record",
+    "ScheduleRunRecordProbeOutcome": ".schedule_run_record_probe_outcome",
     "ScheduleRunRecordStatus": ".schedule_run_record_status",
     "Session": ".session",
     "SessionChanges": ".session_changes",
@@ -550,6 +554,7 @@ __all__ = [
     "PatchEnvironmentModeVisual",
     "PauseSchedule",
     "PolicyEvent",
+    "ProbeDraft",
     "ProxyPool",
     "QuotaError",
     "QuotaErrorResponse",
@@ -566,6 +571,7 @@ __all__ = [
     "RunnerSessionEvent",
     "ScheduleRecord",
     "ScheduleRunRecord",
+    "ScheduleRunRecordProbeOutcome",
     "ScheduleRunRecordStatus",
     "Session",
     "SessionChanges",

@@ -14,9 +14,11 @@ from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
 from ..types.cron_timing import CronTiming
 from ..types.error_response import ErrorResponse
+from ..types.json_value import JsonValue
 from ..types.page_schedule_record import PageScheduleRecord
 from ..types.page_schedule_run_record import PageScheduleRunRecord
 from ..types.pause_schedule import PauseSchedule
+from ..types.probe_draft import ProbeDraft
 from ..types.schedule_record import ScheduleRecord
 from ..types.schedule_run_record import ScheduleRunRecord
 from ..types.session_request import SessionRequest
@@ -112,6 +114,8 @@ class RawSchedulesClient:
         session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
+        capture_end_state: typing.Optional[bool] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[ScheduleRecord]:
         """
@@ -130,6 +134,12 @@ class RawSchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
+
+        capture_end_state : typing.Optional[bool]
+            Record each run's browser end state when its session closes, as a probe does, so that a probe can be drafted from the runs before the schedule has one.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -152,6 +162,8 @@ class RawSchedulesClient:
                     object_=session_request, annotation=SessionRequest, direction="write"
                 ),
                 "repeats": repeats,
+                "probe": probe,
+                "capture_end_state": capture_end_state,
             },
             headers={
                 "content-type": "application/json",
@@ -296,6 +308,8 @@ class RawSchedulesClient:
         timing: typing.Optional[CronTiming] = OMIT,
         session_request: typing.Optional[SessionRequest] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
+        capture_end_state: typing.Optional[bool] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[ScheduleRecord]:
         """
@@ -316,6 +330,12 @@ class RawSchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
+
+        capture_end_state : typing.Optional[bool]
+            Record each run's browser end state when its session closes, as a probe does, so that a probe can be drafted from the runs before the schedule has one.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -338,6 +358,8 @@ class RawSchedulesClient:
                     object_=session_request, annotation=SessionRequest, direction="write"
                 ),
                 "repeats": repeats,
+                "probe": probe,
+                "capture_end_state": capture_end_state,
             },
             headers={
                 "content-type": "application/json",
@@ -622,6 +644,59 @@ class RawSchedulesClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
+    def draft_schedule_probe(
+        self, schedule_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[ProbeDraft]:
+        """
+        Draft a completion probe from the schedule's runs marked as passing or failing; nothing is stored.
+
+        Parameters
+        ----------
+        schedule_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[ProbeDraft]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/schedules/{encode_path_param(schedule_id)}/probe/draft",
+            method="POST",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    ProbeDraft,
+                    parse_obj_as(
+                        type_=ProbeDraft,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
 
 class AsyncRawSchedulesClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
@@ -707,6 +782,8 @@ class AsyncRawSchedulesClient:
         session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
+        capture_end_state: typing.Optional[bool] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[ScheduleRecord]:
         """
@@ -725,6 +802,12 @@ class AsyncRawSchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
+
+        capture_end_state : typing.Optional[bool]
+            Record each run's browser end state when its session closes, as a probe does, so that a probe can be drafted from the runs before the schedule has one.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -747,6 +830,8 @@ class AsyncRawSchedulesClient:
                     object_=session_request, annotation=SessionRequest, direction="write"
                 ),
                 "repeats": repeats,
+                "probe": probe,
+                "capture_end_state": capture_end_state,
             },
             headers={
                 "content-type": "application/json",
@@ -891,6 +976,8 @@ class AsyncRawSchedulesClient:
         timing: typing.Optional[CronTiming] = OMIT,
         session_request: typing.Optional[SessionRequest] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
+        capture_end_state: typing.Optional[bool] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[ScheduleRecord]:
         """
@@ -911,6 +998,12 @@ class AsyncRawSchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
+
+        capture_end_state : typing.Optional[bool]
+            Record each run's browser end state when its session closes, as a probe does, so that a probe can be drafted from the runs before the schedule has one.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -933,6 +1026,8 @@ class AsyncRawSchedulesClient:
                     object_=session_request, annotation=SessionRequest, direction="write"
                 ),
                 "repeats": repeats,
+                "probe": probe,
+                "capture_end_state": capture_end_state,
             },
             headers={
                 "content-type": "application/json",
@@ -1193,6 +1288,59 @@ class AsyncRawSchedulesClient:
                     PageScheduleRunRecord,
                     parse_obj_as(
                         type_=PageScheduleRunRecord,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def draft_schedule_probe(
+        self, schedule_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[ProbeDraft]:
+        """
+        Draft a completion probe from the schedule's runs marked as passing or failing; nothing is stored.
+
+        Parameters
+        ----------
+        schedule_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[ProbeDraft]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/schedules/{encode_path_param(schedule_id)}/probe/draft",
+            method="POST",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    ProbeDraft,
+                    parse_obj_as(
+                        type_=ProbeDraft,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
