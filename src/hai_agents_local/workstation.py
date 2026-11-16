@@ -168,6 +168,8 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         desk = shutil.which("desk", path=os.pathsep.join([sysconfig.get_path("scripts"), path]))
         if desk is None:
             raise ImportError(INSTALL_HINT)
+        tools = os.pathsep.join([os.path.dirname(desk), path])
+        _refuse_what_runs_the_session(self.workspace, [desk, shutil.which("cua", path=tools)])
         subprocess.run([desk, "aliases"], check=True, capture_output=True)
         logger.info("workstation workspace: %s", self.workspace)
         environment = {
@@ -175,7 +177,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             "COORDINATE_SYSTEM": "0-1000",
             "CUA_CURSOR": os.environ.get("CUA_CURSOR", "off"),
             "CUA_SESSION": self.session_id,
-            "PATH": os.pathsep.join([os.path.dirname(desk), path]),
+            "PATH": tools,
         }
         policy = sandbox = None
         if self.policy:
@@ -257,6 +259,19 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         from hai_drivers.common.exceptions import CommandApprovalRequired
 
         return isinstance(exc, CommandApprovalRequired)
+
+
+def _refuse_what_runs_the_session(workspace: Path, programs: Sequence[str | None]) -> None:
+    """A workspace holds none of what runs the session outside its guards: a command there could rewrite it."""
+    root = workspace.resolve()
+    for program in filter(None, [sys.prefix, sys.base_prefix, __file__, *programs]):
+        path = Path(program)
+        # The file and the link to it: either could be where the agent writes.
+        if any(place.is_relative_to(root) for place in (path.resolve(), path.parent.resolve() / path.name)):
+            raise ValueError(
+                f"{path} runs this session and is inside the workspace {workspace}, where the agent writes: "
+                "work in a folder that does not hold it, or install hai-agents outside this one"
+            )
 
 
 def _starting_with(rules: Path, starter: str) -> None:

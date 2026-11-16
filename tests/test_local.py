@@ -1194,11 +1194,17 @@ class TestDriverInterfaces:
         environment: dict[str, str] = {}
         assert workstation._host_cua(environment) == {"outside": ["cua"]} and not environment
 
-    @pytest.mark.parametrize("name", ["HAI_SHELL_POLICY", "HAI_SHELL_SANDBOX"])
+    @pytest.mark.parametrize("name", ["HAI_SHELL_POLICY", "HAI_SHELL_SANDBOX", "HAI_SHELL_WORKSPACE"])
     def test_a_machine_set_up_with_a_variable_the_shell_does_not_read_serves_no_session(self, monkeypatch, name):
         monkeypatch.setenv(name, "1")
         with pytest.raises(ValueError, match=f"{name} is not read"):
             WorkstationBridge(api_key="k")
+
+    def test_a_workspace_that_holds_what_runs_the_session_is_refused_before_anything_runs(self, monkeypatch):
+        monkeypatch.setattr(subprocess, "run", lambda *_, **__: pytest.fail("ran a program the agent could rewrite"))
+        project = Path(sys.prefix).parent
+        with pytest.raises(ValueError, match="runs this session and is inside the workspace"):
+            WorkstationBridge(api_key="k", workspace=str(project)).create_driver()
 
     @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
     def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(
