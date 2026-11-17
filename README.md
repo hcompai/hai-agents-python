@@ -376,6 +376,8 @@ The agent works in the folder you start `holo` or your script from. `-w`, or `wo
 `start_session`, names another. Started from your home folder, it gets a folder of its own, `~/hai/<session id>`.
 A folder that holds the Python environment `hai-agents` runs from is refused, since the agent could rewrite it:
 install `hai-agents` outside the project, with `uv tool install` or `pipx`, or name a folder that does not hold it.
+A folder on `PATH` that is in the workspace, such as an activated `.venv/bin`, is taken off `PATH` for the process
+and the agent's commands, with a warning: the agent calls a program there by its path, as in `.venv/bin/pytest`.
 
 `h/holo-code` asks before each command, as does any agent with `command_approval: "required"`: `y` runs it, `a` runs
 it and adds it to `~/.config/hai/allowed-commands`, `n` refuses. From code, read `result.pending_approvals` and answer

@@ -155,6 +155,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         self._starter: tempfile.TemporaryDirectory[str] | None = None
 
     def preflight(self) -> None:
+        _keep_off_path(self.workspace)
         self._sandbox_runtime()
         if sys.platform == "darwin":
             ensure_macos_input_permissions(prompt=True)
@@ -164,6 +165,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             from hai_drivers.code_sandbox.local.driver import LocalCodeSandbox
         except ImportError as exc:
             raise ImportError(INSTALL_HINT) from exc
+        _keep_off_path(self.workspace)
         path = os.environ.get("PATH", os.defpath)
         desk = shutil.which("desk", path=os.pathsep.join([sysconfig.get_path("scripts"), path]))
         if desk is None:
@@ -184,8 +186,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             from hai_drivers.code_sandbox.local.allowlist import Allowlist
 
             allowed = Path(self.policy).expanduser()
-            if allowed.resolve().is_relative_to(self.workspace.resolve()):
-                raise ValueError(f"{allowed} is inside the workspace, where the agent writes: work in another folder")
+            _refuse_a_guard_in(self.workspace, allowed)
             _starting_with(allowed, STARTER_ALLOWLIST)
             policy = Allowlist(allowed, also=self.allowed_commands)
             logger.info("commands outside %s wait for approval", allowed)
@@ -217,6 +218,8 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
                 *filter(Path.exists, [SRT_HOME]),
                 *([policy.path] if policy else []),
             ]
+            for guard in (settings, *protected):
+                _refuse_a_guard_in(self.workspace, guard)
             sandbox = SandboxRuntime(settings, protected=protected, program=srt, **host)
             # A warning, so that it shows where nothing sets logging up: `holo`, `holo mcp`, a script.
             logger.warning("shell commands are confined to %s by %s", self.workspace, rules)
@@ -263,15 +266,39 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
 
 def _refuse_what_runs_the_session(workspace: Path, programs: Sequence[str | None]) -> None:
     """A workspace holds none of what runs the session outside its guards: a command there could rewrite it."""
-    root = workspace.resolve()
     for program in filter(None, [sys.prefix, sys.base_prefix, __file__, *programs]):
-        path = Path(program)
-        # The file and the link to it: either could be where the agent writes.
-        if any(place.is_relative_to(root) for place in (path.resolve(), path.parent.resolve() / path.name)):
+        if _holds(workspace, Path(program)):
             raise ValueError(
-                f"{path} runs this session and is inside the workspace {workspace}, where the agent writes: "
+                f"{program} runs this session and is inside the workspace {workspace}, where the agent writes: "
                 "work in a folder that does not hold it, or install hai-agents outside this one"
             )
+
+
+def _refuse_a_guard_in(workspace: Path, guard: Path) -> None:
+    if _holds(workspace, guard):
+        raise ValueError(f"{guard} is inside the workspace, where the agent writes: work in another folder")
+
+
+def _keep_off_path(workspace: Path) -> None:
+    """Take off this process's PATH each folder that is relative or in the workspace: the agent could write there."""
+    folders = os.environ.get("PATH", os.defpath).split(os.pathsep)
+    kept = [folder for folder in folders if os.path.isabs(folder) and not _holds(workspace, Path(folder))]
+    if kept != folders:
+        os.environ["PATH"] = os.pathsep.join(kept)
+    if named := [folder for folder in folders if folder and folder not in kept]:
+        # A warning, so that it shows where nothing sets logging up: `holo`, `holo mcp`, a script.
+        logger.warning("programs are no longer looked up in %s, where the agent could write one", ", ".join(named))
+
+
+def _holds(folder: Path, path: Path) -> bool:
+    """Whether `path`, or the file it links to, is in `folder`, under any name the disk opens that folder by."""
+    names = {folder.absolute(), folder.resolve()}
+    ends = {path.absolute(), path.resolve()}
+    on_the_way = {place for end in ends for place in (end, *end.parents)}
+    there = os.path.exists(folder)
+    return any(
+        place in names or (there and os.path.exists(place) and os.path.samefile(place, folder)) for place in on_the_way
+    )
 
 
 def _starting_with(rules: Path, starter: str) -> None:
