@@ -163,6 +163,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
     def create_driver(self) -> ManagedCodeSandboxInterface:
         try:
             from hai_drivers.code_sandbox.local.driver import LocalCodeSandbox
+            from hai_drivers.code_sandbox.server.engine import bash
         except ImportError as exc:
             raise ImportError(INSTALL_HINT) from exc
         _keep_off_path(self.workspace, ["srt"] if self.sandbox else [])
@@ -171,7 +172,9 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         if desk is None:
             raise ImportError(INSTALL_HINT)
         tools = os.pathsep.join([os.path.dirname(desk), path])
-        _refuse_what_runs_the_session(self.workspace, [desk, shutil.which("cua", path=tools)])
+        # A path on Windows only: the bash beside `git`, which is looked up there in the current folder first.
+        shell = [bash()] if os.path.isabs(bash()) else []
+        _refuse_what_runs_the_session(self.workspace, [desk, shutil.which("cua", path=tools), *shell])
         subprocess.run([desk, "aliases"], check=True, capture_output=True)
         logger.info("workstation workspace: %s", self.workspace)
         environment = {

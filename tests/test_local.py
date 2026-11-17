@@ -1230,6 +1230,23 @@ class TestDriverInterfaces:
             with refused:
                 WorkstationBridge(api_key="k", workspace=str(tmp_path / "project"), sandbox=sandbox).preflight()
 
+    def test_a_workspace_that_holds_the_bash_windows_would_run_commands_in_is_refused(self, tmp_path, monkeypatch):
+        engine = pytest.importorskip("hai_drivers.code_sandbox.server.engine")
+        git = tmp_path / "git.exe"
+        for planted in (git, tmp_path / "bin" / "bash.exe"):
+            planted.parent.mkdir(exist_ok=True)
+            planted.write_text("")
+        which = shutil.which
+        monkeypatch.setattr(engine, "WINDOWS", True)
+        monkeypatch.setattr(shutil, "which", lambda name, *a, **k: str(git) if name == "git" else which(name, *a, **k))
+        monkeypatch.setattr(subprocess, "run", lambda *_, **__: pytest.fail("ran a program the agent could rewrite"))
+        engine.bash.cache_clear()
+        try:
+            with pytest.raises(ValueError, match="bash.exe runs this session and is in"):
+                WorkstationBridge(api_key="k", workspace=str(tmp_path)).create_driver()
+        finally:
+            engine.bash.cache_clear()
+
     @pytest.mark.skipif(os.name == "nt", reason="a link needs a privilege there")
     def test_a_session_looks_no_program_up_in_a_folder_the_agent_writes(self, tmp_path, monkeypatch):
         venv = tmp_path / "project" / ".venv" / "bin"
