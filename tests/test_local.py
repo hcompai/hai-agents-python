@@ -1226,7 +1226,7 @@ class TestDriverInterfaces:
         (tmp_path / "bin" / "srt").symlink_to(srt)
         sandbox = str(tmp_path / "none.json")
         for folder in (srt.parent, tmp_path / "bin"):
-            monkeypatch.setenv("PATH", str(folder))
+            monkeypatch.setenv("PATH", os.pathsep.join([str(folder), os.defpath]))
             with refused:
                 WorkstationBridge(api_key="k", workspace=str(tmp_path / "project"), sandbox=sandbox).preflight()
 
