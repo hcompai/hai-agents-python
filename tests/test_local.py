@@ -1200,18 +1200,39 @@ class TestDriverInterfaces:
         with pytest.raises(ValueError, match=f"{name} is not read"):
             WorkstationBridge(api_key="k")
 
+    @pytest.mark.skipif(os.name == "nt", reason="a link needs a privilege there")
     def test_a_workspace_that_holds_what_runs_the_session_is_refused_before_anything_runs(self, tmp_path, monkeypatch):
         monkeypatch.setattr(subprocess, "run", lambda *_, **__: pytest.fail("ran a program the agent could rewrite"))
         refused = pytest.raises(ValueError, match="runs this session and is inside the workspace")
-        with refused:
-            WorkstationBridge(api_key="k", workspace=str(Path(sys.prefix).parent)).create_driver()
-        srt = tmp_path / "node_modules" / ".bin" / "srt"
+        project = Path(sys.prefix).parent
+        # The second spelling opens the same folder on a disk that ignores letter case.
+        for spelled in filter(os.path.exists, [str(project), str(project).swapcase()]):
+            with refused:
+                WorkstationBridge(api_key="k", workspace=spelled).create_driver()
+        srt = tmp_path / "project" / "node_modules" / ".bin" / "srt"
         srt.parent.mkdir(parents=True)
         srt.write_text("#!/bin/sh\n")
         srt.chmod(0o755)
-        monkeypatch.setenv("PATH", str(srt.parent), prepend=os.pathsep)
+        (tmp_path / "bin").mkdir()
+        (tmp_path / "bin" / "srt").symlink_to(srt)
+        monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+        sandbox = str(tmp_path / "none.json")
         with refused:
-            WorkstationBridge(api_key="k", workspace=str(tmp_path), sandbox=str(tmp_path / "none.json")).preflight()
+            WorkstationBridge(api_key="k", workspace=str(tmp_path / "project"), sandbox=sandbox).preflight()
+
+    @pytest.mark.skipif(os.name == "nt", reason="a link needs a privilege there")
+    def test_a_session_looks_no_program_up_in_a_folder_the_agent_writes(self, tmp_path, monkeypatch):
+        venv = tmp_path / "project" / ".venv" / "bin"
+        venv.mkdir(parents=True)
+        (tmp_path / "linked").symlink_to(venv, target_is_directory=True)
+        safe = [folder for folder in os.defpath.split(os.pathsep) if os.path.isabs(folder)]
+        monkeypatch.setenv("PATH", os.pathsep.join([str(venv), "", ".", "bin", str(tmp_path / "linked"), *safe]))
+        driver = WorkstationBridge(api_key="k", workspace=str(tmp_path / "project")).create_driver()
+        try:
+            assert os.environ["PATH"].split(os.pathsep) == safe
+            assert driver.execute("echo $PATH").stdout.strip().split(os.pathsep)[1:] == safe
+        finally:
+            driver.close()
 
     @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
     def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(

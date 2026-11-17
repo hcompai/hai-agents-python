@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from hai_agents.client import _LocalRuntimeAccess
@@ -8,6 +10,11 @@ from hai_agents_local import desktop_lock, workstation
 @pytest.fixture(autouse=True)
 def _no_auto_bridges(monkeypatch):
     monkeypatch.setattr(_LocalRuntimeAccess, "auto_bridges", False)
+
+
+@pytest.fixture(autouse=True)
+def _own_path(monkeypatch):
+    monkeypatch.setenv("PATH", os.environ.get("PATH", os.defpath))
 
 
 @pytest.fixture(autouse=True)
