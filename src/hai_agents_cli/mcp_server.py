@@ -85,15 +85,23 @@ async def _start(client: AsyncClient, params: dict[str, Any]) -> Any:
 
 @server.tool()
 async def run_agent(
-    task: str, ctx: Context, agent: str | None = None, local: bool = False, model: str | None = None
+    task: str,
+    ctx: Context,
+    agent: str | None = None,
+    local: bool = False,
+    model: str | None = None,
+    workspace: str | None = None,
 ) -> str:
     """Run `task` and return the answer; blocks until the agent finishes.
 
     `agent` is a name from list_agents, by default the user's default agent. `local` runs the agent loop on
     this machine rather than in the cloud. `model` replaces the agent's model, such as `holo4-35b-a3b`.
+    `workspace` is the folder an agent with a shell on this machine works in, such as the user's project.
     """
     cloud, agent = await _client(ctx), agent or credentials.default_agent()
     params: dict[str, Any] = {"agent": agent, "messages": task}
+    if workspace:
+        params["workspace"] = workspace
     overrides: dict[str, Any] = {"agent.model": model} if model else {}
     if local or holo_dir.customized():
         name, revision = split_revision(agent)

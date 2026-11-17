@@ -66,6 +66,8 @@ def test_route_runs_bare_tasks_and_hoists_global_options() -> None:
     assert route() == ["chat"]
     assert route("--local") == ["chat", "--local"]
     assert route("-a", "h/web-surfer-pro") == ["chat", "-a", "h/web-surfer-pro"]
+    assert route("-w", ".", "-a", "h/holo-code") == ["chat", "-w", ".", "-a", "h/holo-code"]
+    assert route("--no-sandbox", "--model-url", "http://x/v1") == ["chat", "--no-sandbox", "--model-url", "http://x/v1"]
     assert route("--local", interactive=False) == ["run", "--local"]
     assert route(interactive=False) == []
     assert route("sesions") == ["sesions"]
@@ -223,15 +225,13 @@ def test_a_held_call_asks_the_person_at_the_terminal_and_the_turn_goes_on(monkey
     assert followed == [0, 2]
 
 
-@pytest.mark.parametrize(
-    ("file", "held_here"),
-    [("allowed", True), ("hai/allowed-commands", True), ("allowed", False)],
-    ids=["held by this machine's list", "held for an agent that requires approval", "held elsewhere"],
-)
+@pytest.mark.parametrize("held_here", [True, False], ids=["held by this machine's list", "held elsewhere"])
 def test_always_allowing_a_command_this_machine_held_adds_its_rule_to_the_allowlist(
-    monkeypatch, tmp_path, file, held_here
+    monkeypatch, tmp_path, held_here
 ) -> None:
-    allowlist = pytest.importorskip("hai_drivers.code_sandbox.local.allowlist").Allowlist(tmp_path / file)
+    allowlist = pytest.importorskip("hai_drivers.code_sandbox.local.allowlist").Allowlist(
+        tmp_path / "hai" / "allowed-commands"
+    )
     reason = allowlist.hold("rm -rf [build]") if held_here else "held by another machine"
     client, results = _RunClient(), _held_then_done(reason)
     monkeypatch.setattr(app_module, "_client", lambda state: client)
@@ -239,11 +239,9 @@ def test_always_allowing_a_command_this_machine_held_adds_its_rule_to_the_allowl
     monkeypatch.setattr(app_module, "_follow", _no_events)
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: None)
-    machine = {"HAI_SHELL_POLICY": str(allowlist.path)} if file == "allowed" else {"XDG_CONFIG_HOME": str(tmp_path)}
+    machine = {"HAI_API_KEY": "hk-test", "XDG_CONFIG_HOME": str(tmp_path)}
 
-    result = runner.invoke(
-        app, ["run", "clean up", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test", **machine}, input="a\n\n"
-    )
+    result = runner.invoke(app, ["run", "clean up", "-a", "h/test-agent"], env=machine, input="a\n\n")
 
     assert result.exit_code == 0, result.output
     assert ("always allow what starts with: rm -rf '[build]'" in result.output) == held_here
@@ -391,16 +389,26 @@ def test_local_runs_any_agent_inline_on_the_local_runtime(monkeypatch) -> None:
     spec = types.SimpleNamespace(model_dump=lambda **_: {"name": "h/web-surfer-pro", "instructions": "Browse."})
     cloud.agents = types.SimpleNamespace(get_agent=lambda *a, **kw: fetched.append((a, kw)) or spec)
     monkeypatch.setattr(app_module, "_client", lambda state: cloud)
-    monkeypatch.setattr(app_module, "_local_client", lambda state: runtime)
+    monkeypatch.setattr(app_module, "_local_client", lambda state, inference: captured.update(on=inference) or runtime)
     monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
     monkeypatch.setattr(app_module, "_follow", _no_events)
+    server = ["--model-url", "http://localhost:8000/v1", "--model", "served"]
 
     result = runner.invoke(app, ["run", "x", "--local", "-a", "h/web-surfer-pro"], env={"HAI_API_KEY": "hk-t"})
 
     assert result.exit_code == 0, result.output
     assert fetched == [(("h/web-surfer-pro",), {"revision": None, "resolve": True})]
-    assert captured["agent"] == {"name": "h/web-surfer-pro", "instructions": "Browse."}
-    assert cloud.sessions.created == 0
+    assert captured["agent"] == {"name": "h/web-surfer-pro", "instructions": "Browse."} and captured["on"] is None
+    assert cloud.sessions.created == 0 and "sandbox" not in captured
+
+    result = runner.invoke(app, ["run", "x", "--local", "--no-sandbox", *server], env={"HAI_API_KEY": "hk-t"})
+    assert result.exit_code == 0, result.output
+    assert (captured["on"].base_url, captured["on"].model) == ("http://localhost:8000/v1", "served")
+    assert captured["sandbox"] is False
+
+    for partial in (server, ["--local", *server[:2]]):
+        result = runner.invoke(app, ["run", "x", *partial], env={"HAI_API_KEY": "hk-t"})
+        assert result.exit_code == 1 and "go together, with --local" in result.output
 
 
 def test_new_releases_the_idle_session_before_starting_another(monkeypatch) -> None:
