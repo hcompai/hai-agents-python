@@ -155,7 +155,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         self._starter: tempfile.TemporaryDirectory[str] | None = None
 
     def preflight(self) -> None:
-        _keep_off_path(self.workspace)
+        _keep_off_path(self.workspace, ["srt"] if self.sandbox else [])
         self._sandbox_runtime()
         if sys.platform == "darwin":
             ensure_macos_input_permissions(prompt=True)
@@ -165,7 +165,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             from hai_drivers.code_sandbox.local.driver import LocalCodeSandbox
         except ImportError as exc:
             raise ImportError(INSTALL_HINT) from exc
-        _keep_off_path(self.workspace)
+        _keep_off_path(self.workspace, ["srt"] if self.sandbox else [])
         path = os.environ.get("PATH", os.defpath)
         desk = shutil.which("desk", path=os.pathsep.join([sysconfig.get_path("scripts"), path]))
         if desk is None:
@@ -279,10 +279,17 @@ def _refuse_a_guard_in(workspace: Path, guard: Path) -> None:
         raise ValueError(f"{guard} is inside the workspace, where the agent writes: work in another folder")
 
 
-def _keep_off_path(workspace: Path) -> None:
+def _keep_off_path(workspace: Path, needed: Sequence[str]) -> None:
     """Take off this process's PATH each folder that is relative or in the workspace: the agent could write there."""
     folders = os.environ.get("PATH", os.defpath).split(os.pathsep)
     kept = [folder for folder in folders if os.path.isabs(folder) and not _holds(workspace, Path(folder))]
+    for program in needed:
+        found = shutil.which(program)
+        if found and found != shutil.which(program, path=os.pathsep.join(kept)):
+            raise ValueError(
+                f"{found} runs this session and is in a folder the agent could write: install it outside the "
+                "workspace, or take its folder off PATH"
+            )
     if kept != folders:
         os.environ["PATH"] = os.pathsep.join(kept)
     if named := [folder for folder in folders if folder and folder not in kept]:

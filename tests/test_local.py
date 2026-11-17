@@ -1212,7 +1212,7 @@ class TestDriverInterfaces:
     @pytest.mark.skipif(os.name == "nt", reason="a link needs a privilege there")
     def test_a_workspace_that_holds_what_runs_the_session_is_refused_before_anything_runs(self, tmp_path, monkeypatch):
         monkeypatch.setattr(subprocess, "run", lambda *_, **__: pytest.fail("ran a program the agent could rewrite"))
-        refused = pytest.raises(ValueError, match="runs this session and is inside the workspace")
+        refused = pytest.raises(ValueError, match="runs this session and is in")
         project = Path(sys.prefix).parent
         # The second spelling opens the same folder on a disk that ignores letter case.
         for spelled in filter(os.path.exists, [str(project), str(project).swapcase()]):
@@ -1224,10 +1224,11 @@ class TestDriverInterfaces:
         srt.chmod(0o755)
         (tmp_path / "bin").mkdir()
         (tmp_path / "bin" / "srt").symlink_to(srt)
-        monkeypatch.setenv("PATH", str(tmp_path / "bin"))
         sandbox = str(tmp_path / "none.json")
-        with refused:
-            WorkstationBridge(api_key="k", workspace=str(tmp_path / "project"), sandbox=sandbox).preflight()
+        for folder in (srt.parent, tmp_path / "bin"):
+            monkeypatch.setenv("PATH", str(folder))
+            with refused:
+                WorkstationBridge(api_key="k", workspace=str(tmp_path / "project"), sandbox=sandbox).preflight()
 
     @pytest.mark.skipif(os.name == "nt", reason="a link needs a privilege there")
     def test_a_session_looks_no_program_up_in_a_folder_the_agent_writes(self, tmp_path, monkeypatch):
