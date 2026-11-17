@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import types
 import zipfile
@@ -1336,6 +1337,26 @@ class TestDriverInterfaces:
         settings.write_text(json.dumps({**own, "filesystem": {"denyRead": [], "allowWrite": [], "denyWrite": []}}))
         theirs = applied()
         assert theirs["network"]["allowedDomains"] == ["example.com"] and "credentials" not in theirs
+
+    @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
+    def test_workstation_in_the_temporary_folder_keeps_its_built_in_rules_out_of_it(self, tmp_path, monkeypatch):
+        pytest.importorskip("hai_drivers.code_sandbox.local.sandbox_runtime")
+        from hai_agents_local import workstation
+
+        srt, workspace = tmp_path / "bin" / "srt", tmp_path / "tmp"
+        for folder in (srt.parent, workspace):
+            folder.mkdir()
+        srt.write_text('#!/bin/sh\nSRT_SETTINGS="$2" exec bash -c "$4"\n')
+        srt.chmod(0o755)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setenv("PATH", os.pathsep.join([str(srt.parent), os.defpath]))
+        monkeypatch.setattr(workstation, "shell_sandbox", shell_sandbox)
+        monkeypatch.setattr(workstation, "_host_cua", lambda environment: {})
+        monkeypatch.setattr(tempfile, "tempdir", str(workspace))
+        with WorkstationBridge(api_key="k", workspace=str(workspace)).create_driver() as driver:
+            rules = Path(driver.execute('echo "$SRT_SETTINGS"').stdout.strip())
+        assert str(tmp_path / ".config" / "hai") in json.loads(rules.read_text())["filesystem"]["denyWrite"]
 
     @pytest.mark.skipif(
         shutil.which("srt") is None, reason="needs Anthropic's sandbox-runtime on PATH, and the network"
