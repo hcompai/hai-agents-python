@@ -29,9 +29,9 @@ class BaseClientWrapper:
         import platform
 
         headers: typing.Dict[str, str] = {
-            "User-Agent": "hai_agents/1.5.2",
+            "User-Agent": "hai_agents/1.5.3",
             "X-HCompany-Client-Name": "hai_agents",
-            "X-HCompany-Client-Version": "1.5.2",
+            "X-HCompany-Client-Version": "1.5.3",
             "X-HCompany-Client-Type": "sdk",
             "X-HCompany-Language": "Python",
             "X-HCompany-Runtime": f"python/{platform.python_version()}",
