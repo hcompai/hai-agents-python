@@ -28,6 +28,7 @@ from hai_agents.sessions.types.send_session_messages_request_body import SendSes
 from hai_agents.types.session_status import SessionStatus
 
 from .bridge import LocalBridge, TokenSource
+from .config import refuse_unread_settings
 from .killswitch import StopWatcher
 from .manager import ensure_bridges, serving_bridges, stop_bridges
 from .routing import Reference, local_bridge_types, localize_agent, references, split_revision
@@ -96,7 +97,10 @@ def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) 
 
 
 def _wants_bridges(auto_bridges: bool, kwargs: typing.Dict[str, typing.Any]) -> bool:
-    return auto_bridges and kwargs.get("agent") is not None
+    wanted = auto_bridges and kwargs.get("agent") is not None
+    if wanted:
+        refuse_unread_settings()
+    return wanted
 
 
 SHELL_OPTIONS = ("workspace", "sandbox")

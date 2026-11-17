@@ -353,7 +353,8 @@ Inference stays hosted (`HAI_API_KEY`) unless you pass `inference=Inference.self
 (`from hai_agents_local.runtime import Inference`), or `--model-url` and `--model` to `holo --local`.
 
 A client starts a bridge for each of its agent's environments on this machine, after fetching the spec of an agent
-given by name. `client.auto_bridges = False` leaves both out, for a worker that only runs cloud agents.
+given by name. `client.auto_bridges = False` leaves both out, for a worker that only runs cloud agents. `HAI_AUTO_BRIDGE` is no
+longer read, and a session fails while it is set.
 
 One agent drives this machine's desktop at a time: a second process asking for a desktop bridge fails fast instead of
 sharing the mouse. `holo local stop` stops every local turn on the machine; so does a double Esc

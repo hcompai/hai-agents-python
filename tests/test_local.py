@@ -616,6 +616,13 @@ class TestAutoStart:
         assert started == []
         assert "session_id" not in captured["agent"]["environments"][0]
 
+    def test_a_worker_told_by_a_variable_to_start_no_bridge_gets_no_session(self, monkeypatch):
+        monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
+        monkeypatch.setenv("HAI_AUTO_BRIDGE", "0")
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: pytest.fail("created a session"))
+        with pytest.raises(ValueError, match="HAI_AUTO_BRIDGE is not read"):
+            Client(api_key=API_KEY).sessions.create_session(agent={"name": "x", "environments": []}, messages="hi")
+
 
 class FakeDriver:
     def __init__(self) -> None:
@@ -1194,7 +1201,9 @@ class TestDriverInterfaces:
         environment: dict[str, str] = {}
         assert workstation._host_cua(environment) == {"outside": ["cua"]} and not environment
 
-    @pytest.mark.parametrize("name", ["HAI_SHELL_POLICY", "HAI_SHELL_SANDBOX", "HAI_SHELL_WORKSPACE"])
+    @pytest.mark.parametrize(
+        "name", ["HAI_AUTO_BRIDGE", "HAI_SHELL_POLICY", "HAI_SHELL_SANDBOX", "HAI_SHELL_WORKSPACE"]
+    )
     def test_a_machine_set_up_with_a_variable_the_shell_does_not_read_serves_no_session(self, monkeypatch, name):
         monkeypatch.setenv(name, "1")
         with pytest.raises(ValueError, match=f"{name} is not read"):

@@ -11,9 +11,10 @@ BASE_URL_ENV_VAR = "HAI_API_BASE_URL"
 
 DEFAULT_BASE_URL = HaiAgentsEnvironment.EU.value
 
-# A machine set up with one of these expects held or confined commands: set, it fails the session, so that no
-# command runs with less than the machine asked for.
+# A machine set up with one of these expects no bridge of its own, or held or confined commands: set, it fails the
+# session, so that nothing runs with less than the machine asked for.
 _UNREAD = {
+    "HAI_AUTO_BRIDGE": "`client.auto_bridges = False` starts no bridge on this machine",
     "HAI_SHELL_POLICY": "an agent asks with `command_approval: required`, and WorkstationBridge takes `policy=`",
     "HAI_SHELL_SANDBOX": "the sandbox is on where srt runs, and `--no-sandbox` or `sandbox=False` turns it off",
     "HAI_SHELL_WORKSPACE": "the agent works in the folder it is started from, and `-w` or `workspace=` names another",
