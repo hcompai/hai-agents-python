@@ -76,9 +76,13 @@ def localize_agent(
     resolved: Mapping[Reference, Any] | None = None,
     claimed: Collection[str] = (),
     seed: str | None = None,
+    shell: Mapping[str, Any] | None = None,
 ) -> Localized:
-    """Bridges for unclaimed user_device envs; a ``seed`` makes their session ids reproducible across retries."""
-    walk = _Walk(api_key, base_url, resolved or {}, frozenset(claimed), seed)
+    """Bridges for unclaimed user_device envs; a ``seed`` makes their session ids reproducible across retries.
+
+    ``shell`` holds what the caller sets for a shell on this machine: its ``workspace``, its ``sandbox``.
+    """
+    walk = _Walk(api_key, base_url, resolved or {}, frozenset(claimed), seed, shell or {})
     return Localized(walk.agent(agent, "agent", by_name=False), walk.bridges, walk.overrides)
 
 
@@ -90,8 +94,10 @@ class _Walk:
         resolved: Mapping[Reference, Any],
         claimed: frozenset[str],
         seed: str | None,
+        shell: Mapping[str, Any],
     ) -> None:
         self.api_key, self.base_url, self.resolved, self.claimed, self.seed = api_key, base_url, resolved, claimed, seed
+        self.shell = shell
         self.bridges: list[LocalBridge] = []
         self.overrides: dict[str, str] = {}
 
@@ -163,6 +169,7 @@ class _Walk:
         if bridge_type is WorkstationBridge and width:
             options["environment_variables"] = {"WEB_MAX_IMAGE_WIDTH": str(width), "DESK_MAX_IMAGE_WIDTH": str(width)}
         if bridge_type is WorkstationBridge:
+            options.update(self.shell)
             mode = _read(env, "mode")
             options["require_approval"] = _read(mode, "command_approval") == "required"
             options["require_sandbox"] = _read(mode, "sandbox") == "required"

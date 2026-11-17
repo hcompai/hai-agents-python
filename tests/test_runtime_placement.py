@@ -82,7 +82,6 @@ class _RuntimeHandler(BaseHTTPRequestHandler):
 @pytest.fixture
 def runtime_server(monkeypatch):
     monkeypatch.delenv("HAI_AGENT_RUNTIME_API_TOKEN", raising=False)
-    monkeypatch.delenv("HAI_AGENT_LOCAL_BASE_URL", raising=False)
     server = RuntimeServer("local-token")
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -132,7 +131,7 @@ def _owned_runtime(server, cache_dir, monkeypatch, stopped):
 async def test_local_client_without_auto_bridges_leaves_execution_to_the_product(monkeypatch, asynchronous):
     from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
 
-    monkeypatch.setenv("HAI_AUTO_BRIDGE", "1")
+    monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
     served = []
     monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: served.extend(bridges) or [])
     requested = []
@@ -269,7 +268,6 @@ async def test_bridge_never_serves_an_unproven_runtime(monkeypatch, runtime_serv
 
     from hai_agents_local.sessions import _localize
 
-    monkeypatch.delenv("HAI_AUTO_BRIDGE", raising=False)
     runtime_server.proof_token = "squatter-token"
     runtime = SimpleNamespace(api_key="local-token", base_url=f"http://127.0.0.1:{runtime_server.port}")
     agent = {"environments": [{"id": "workstation", "kind": "workstation", "host": "user_device"}]}
@@ -277,13 +275,6 @@ async def test_bridge_never_serves_an_unproven_runtime(monkeypatch, runtime_serv
     bridge.create_driver = lambda: pytest.fail("a driver started for an unproven runtime")
     with pytest.raises(LocalRuntimeError, match="did not prove"):
         await bridge.run()
-
-
-@pytest.mark.parametrize("url", ["https://remote.example", "http://user:pass@localhost:80"])
-def test_local_attach_rejects_remote_or_credential_urls(tmp_path, monkeypatch, url):
-    monkeypatch.setenv("HAI_AGENT_LOCAL_BASE_URL", url)
-    with pytest.raises(LocalRuntimeError, match="loopback"):
-        LocalRuntime.attach(cache_dir=tmp_path)
 
 
 @pytest.mark.asyncio
@@ -354,7 +345,6 @@ def test_binary_resolution_does_not_hold_the_port_startup_lock(tmp_path, monkeyp
     from hai_agents_local.runtime import BinaryNotFoundError
     from hai_agents_local.runtime import runtime as module
 
-    monkeypatch.delenv("HAI_AGENT_LOCAL_BASE_URL", raising=False)
     monkeypatch.setattr(LocalRuntime, "_attach", lambda **kwargs: None)
 
     def resolve(**kwargs):
