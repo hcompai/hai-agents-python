@@ -1243,6 +1243,9 @@ class TestDriverInterfaces:
             assert driver.execute("echo $PATH").stdout.strip().split(os.pathsep)[1:] == safe
         finally:
             driver.close()
+        monkeypatch.setenv("PATH", os.pathsep.join([str(venv), "."]))
+        with pytest.raises(ValueError, match="PATH holds only folders the agent could write"):
+            WorkstationBridge(api_key="k", workspace=str(tmp_path / "project")).create_driver()
 
     @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
     def test_workstation_confines_commands_with_srt_unless_the_machine_turns_it_off(

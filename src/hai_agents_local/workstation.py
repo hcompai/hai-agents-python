@@ -283,6 +283,9 @@ def _keep_off_path(workspace: Path, needed: Sequence[str]) -> None:
     """Take off this process's PATH each folder that is relative or in the workspace: the agent could write there."""
     folders = os.environ.get("PATH", os.defpath).split(os.pathsep)
     kept = [folder for folder in folders if os.path.isabs(folder) and not _holds(workspace, Path(folder))]
+    if not kept:
+        # An empty PATH is the current folder, which is the workspace.
+        raise ValueError(f"PATH holds only folders the agent could write: {os.pathsep.join(folders)!r}")
     for program in needed:
         found = shutil.which(program)
         if found and found != shutil.which(program, path=os.pathsep.join(kept)):
