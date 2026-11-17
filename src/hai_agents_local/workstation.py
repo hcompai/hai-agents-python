@@ -172,8 +172,8 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         if desk is None:
             raise ImportError(INSTALL_HINT)
         tools = os.pathsep.join([os.path.dirname(desk), path])
-        # A path on Windows only: the bash beside `git`, which is looked up there in the current folder first.
-        shell = [bash()] if os.path.isabs(bash()) else []
+        # A file on Windows only: the bash beside `git`, which is looked up there in the current folder first.
+        shell = [bash()] if os.path.dirname(bash()) else []
         _refuse_what_runs_the_session(self.workspace, [desk, shutil.which("cua", path=tools), *shell])
         subprocess.run([desk, "aliases"], check=True, capture_output=True)
         logger.info("workstation workspace: %s", self.workspace)
