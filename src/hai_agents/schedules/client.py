@@ -5,9 +5,11 @@ import typing
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
 from ..types.cron_timing import CronTiming
+from ..types.json_value import JsonValue
 from ..types.page_schedule_record import PageScheduleRecord
 from ..types.page_schedule_run_record import PageScheduleRunRecord
 from ..types.pause_schedule import PauseSchedule
+from ..types.probe_draft import ProbeDraft
 from ..types.schedule_record import ScheduleRecord
 from ..types.schedule_run_record import ScheduleRunRecord
 from ..types.session_request import SessionRequest
@@ -86,6 +88,8 @@ class SchedulesClient:
         session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
+        capture_end_state: typing.Optional[bool] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ScheduleRecord:
         """
@@ -104,6 +108,12 @@ class SchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
+
+        capture_end_state : typing.Optional[bool]
+            Record each run's browser end state when its session closes, as a probe does, so that a probe can be drafted from the runs before the schedule has one.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -137,6 +147,8 @@ class SchedulesClient:
             session_request=session_request,
             description=description,
             repeats=repeats,
+            probe=probe,
+            capture_end_state=capture_end_state,
             request_options=request_options,
         )
         return _response.data
@@ -211,6 +223,8 @@ class SchedulesClient:
         timing: typing.Optional[CronTiming] = OMIT,
         session_request: typing.Optional[SessionRequest] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
+        capture_end_state: typing.Optional[bool] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ScheduleRecord:
         """
@@ -231,6 +245,12 @@ class SchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
+
+        capture_end_state : typing.Optional[bool]
+            Record each run's browser end state when its session closes, as a probe does, so that a probe can be drafted from the runs before the schedule has one.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -258,6 +278,8 @@ class SchedulesClient:
             timing=timing,
             session_request=session_request,
             repeats=repeats,
+            probe=probe,
+            capture_end_state=capture_end_state,
             request_options=request_options,
         )
         return _response.data
@@ -416,6 +438,38 @@ class SchedulesClient:
         )
         return _response.data
 
+    def draft_schedule_probe(
+        self, schedule_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> ProbeDraft:
+        """
+        Draft a completion probe from the schedule's runs marked as passing or failing; nothing is stored.
+
+        Parameters
+        ----------
+        schedule_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        ProbeDraft
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.schedules.draft_schedule_probe(
+            schedule_id="schedule_id",
+        )
+        """
+        _response = self._raw_client.draft_schedule_probe(schedule_id, request_options=request_options)
+        return _response.data
+
 
 class AsyncSchedulesClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
@@ -494,6 +548,8 @@ class AsyncSchedulesClient:
         session_request: SessionRequest,
         description: typing.Optional[str] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
+        capture_end_state: typing.Optional[bool] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ScheduleRecord:
         """
@@ -512,6 +568,12 @@ class AsyncSchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
+
+        capture_end_state : typing.Optional[bool]
+            Record each run's browser end state when its session closes, as a probe does, so that a probe can be drafted from the runs before the schedule has one.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -553,6 +615,8 @@ class AsyncSchedulesClient:
             session_request=session_request,
             description=description,
             repeats=repeats,
+            probe=probe,
+            capture_end_state=capture_end_state,
             request_options=request_options,
         )
         return _response.data
@@ -645,6 +709,8 @@ class AsyncSchedulesClient:
         timing: typing.Optional[CronTiming] = OMIT,
         session_request: typing.Optional[SessionRequest] = OMIT,
         repeats: typing.Optional[int] = OMIT,
+        probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = OMIT,
+        capture_end_state: typing.Optional[bool] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ScheduleRecord:
         """
@@ -665,6 +731,12 @@ class AsyncSchedulesClient:
 
         repeats : typing.Optional[int]
             How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted.
+
+        probe : typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]]
+            Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules.
+
+        capture_end_state : typing.Optional[bool]
+            Record each run's browser end state when its session closes, as a probe does, so that a probe can be drafted from the runs before the schedule has one.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -700,6 +772,8 @@ class AsyncSchedulesClient:
             timing=timing,
             session_request=session_request,
             repeats=repeats,
+            probe=probe,
+            capture_end_state=capture_end_state,
             request_options=request_options,
         )
         return _response.data
@@ -888,4 +962,44 @@ class AsyncSchedulesClient:
         _response = await self._raw_client.list_schedule_runs(
             schedule_id, page=page, size=size, sort=sort, request_options=request_options
         )
+        return _response.data
+
+    async def draft_schedule_probe(
+        self, schedule_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> ProbeDraft:
+        """
+        Draft a completion probe from the schedule's runs marked as passing or failing; nothing is stored.
+
+        Parameters
+        ----------
+        schedule_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        ProbeDraft
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.schedules.draft_schedule_probe(
+                schedule_id="schedule_id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.draft_schedule_probe(schedule_id, request_options=request_options)
         return _response.data

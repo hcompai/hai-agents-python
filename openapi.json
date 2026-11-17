@@ -4866,6 +4866,55 @@
         }
       }
     },
+    "/api/v2/schedules/{schedule_id}/probe/draft": {
+      "post": {
+        "tags": [
+          "Schedules"
+        ],
+        "summary": "Draft Schedule Probe",
+        "description": "Draft a completion probe from the schedule's runs marked as passing or failing; nothing is stored.",
+        "operationId": "draft_schedule_probe_api_v2_schedules__schedule_id__probe_draft_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProbeDraft"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/browser-profiles": {
       "get": {
         "tags": [
@@ -7690,6 +7739,27 @@
             ],
             "title": "Repeats",
             "description": "How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted."
+          },
+          "probe": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe",
+            "description": "Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules."
+          },
+          "capture_end_state": {
+            "type": "boolean",
+            "title": "Capture End State",
+            "description": "Record each run's browser end state when its session closes, as a probe does, so that a probe can be drafted from the runs before the schedule has one.",
+            "default": false
           }
         },
         "type": "object",
@@ -9624,6 +9694,68 @@
         "title": "PolicyEvent",
         "description": "One policy (LLM) step: the model output plus the tool requests extracted from it."
       },
+      "ProbeDraft": {
+        "properties": {
+          "probe": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe",
+            "description": "Probe that passes the end state of every passing run and of no failing or reference run. Null when none could be drafted."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why no probe could be drafted; null with a probe."
+          },
+          "passing_runs": {
+            "type": "integer",
+            "title": "Passing Runs",
+            "description": "End states the draft was computed from, of the schedule's sessions a person marked as passing: by an `outcome` score of `success`, else a thumbs up."
+          },
+          "failing_runs": {
+            "type": "integer",
+            "title": "Failing Runs",
+            "description": "End states the draft was computed from, of the schedule's sessions a person marked as failing: by any other `outcome` score, else a thumbs down."
+          },
+          "reference_runs": {
+            "type": "integer",
+            "title": "Reference Runs",
+            "description": "End states the draft was computed from, of sessions of the organization's other schedules a person marked as passing; the probe must fail them."
+          },
+          "unrecorded_runs": {
+            "type": "integer",
+            "title": "Unrecorded Runs",
+            "description": "Labelled sessions left out because their browser recorded no end state, or one the probe could have no verdict on. Many of them next to few runs counted means capture was off when they ran."
+          }
+        },
+        "type": "object",
+        "required": [
+          "probe",
+          "reason",
+          "passing_runs",
+          "failing_runs",
+          "reference_runs",
+          "unrecorded_runs"
+        ],
+        "title": "ProbeDraft",
+        "description": "A completion probe drafted from a schedule's labelled runs, to review and set as the schedule's `probe`."
+      },
       "ProxyPool": {
         "type": "string",
         "enum": [
@@ -9951,6 +10083,26 @@
             "title": "Sessions Created",
             "description": "Automatic fires that created a session. Skipped fires, errors, and manual triggers are not counted. When this reaches repeats, the schedule is paused."
           },
+          "probe": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe",
+            "description": "Completion probe each run's browser end state is checked against."
+          },
+          "capture_end_state": {
+            "type": "boolean",
+            "title": "Capture End State",
+            "description": "Whether each run's browser end state is recorded even while the schedule has no probe."
+          },
           "next_run_times": {
             "items": {
               "type": "string",
@@ -9994,6 +10146,8 @@
           "pause_note",
           "repeats",
           "sessions_created",
+          "probe",
+          "capture_end_state",
           "next_run_times",
           "last_run_at",
           "created_at",
@@ -10056,6 +10210,23 @@
             "type": "boolean",
             "title": "Triggered Manually"
           },
+          "probe_outcome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pass",
+                  "fail",
+                  "unjudged"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe Outcome",
+            "description": "What the schedule's probe said of the session's browser end state; `unjudged` when it could not tell. Null until the session finished and its end state was checked (`unjudged` if that takes over 24 hours), or when the run is over a day older than the schedule's probe."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -10071,6 +10242,7 @@
           "session_id",
           "error",
           "triggered_manually",
+          "probe_outcome",
           "created_at"
         ],
         "title": "ScheduleRunRecord",
@@ -11403,6 +11575,26 @@
             ],
             "title": "Repeats",
             "description": "How many sessions to create before the schedule becomes inactive. Omit to run until paused or deleted."
+          },
+          "probe": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe",
+            "description": "Completion probe each run's browser end state is checked against once its session finished; the verdict is written as a `probe` score on the session and as the run's `probe_outcome`. Null leaves runs to judge rules."
+          },
+          "capture_end_state": {
+            "type": "boolean",
+            "title": "Capture End State",
+            "description": "Record each run's browser end state when its session closes, as a probe does, so that a probe can be drafted from the runs before the schedule has one."
           }
         },
         "type": "object",
