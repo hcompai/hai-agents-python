@@ -197,7 +197,14 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         if srt:
             from hai_drivers.code_sandbox.local.sandbox_runtime import SandboxRuntime
 
-            settings = Path(self.sandbox).expanduser()
+            settings, config = Path(self.sandbox).expanduser(), credentials_path().parent
+            protected = [
+                config,
+                *filter(Path.exists, [SRT_HOME]),
+                *([policy.path] if policy else []),
+            ]
+            for guard in protected:
+                _refuse_a_guard_in(self.workspace, guard)
             host = _host_cua(environment)
             asked = [
                 f"{does} {', '.join(what)}"
@@ -210,19 +217,17 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             else:
                 rules = "the built-in rules" + f", and may {' and '.join(asked)} as the agent asks" * bool(asked)
                 rules += f"; a {settings} replaces them"
-                # A folder: Windows opens a temporary file a second time for nobody while it is open.
-                self._starter = tempfile.TemporaryDirectory(prefix="hai-sandbox-")
+                # A folder: Windows opens a temporary file a second time for nobody while it is open. Beside the stored
+                # credentials where the system's temporary folder is in the workspace, and a command could write it.
+                elsewhere = config if _holds(self.workspace, Path(tempfile.gettempdir())) else None
+                if elsewhere:
+                    elsewhere.mkdir(parents=True, exist_ok=True, mode=0o700)
+                self._starter = tempfile.TemporaryDirectory(prefix="hai-sandbox-", dir=elsewhere)
                 settings = Path(self._starter.name) / "sandbox.json"
                 built_in = _starter_sandbox(self.environment_variables, self.allowed_domains)
                 settings.write_text(json.dumps(built_in), encoding="utf-8")
                 host["writable"] = [*host.get("writable", []), *map(Path, self.writable_folders)]
-            protected = [
-                credentials_path().parent,
-                *filter(Path.exists, [SRT_HOME]),
-                *([policy.path] if policy else []),
-            ]
-            for guard in (settings, *protected):
-                _refuse_a_guard_in(self.workspace, guard)
+            _refuse_a_guard_in(self.workspace, settings)
             sandbox = SandboxRuntime(settings, protected=protected, program=srt, **host)
             # A warning, so that it shows where nothing sets logging up: `holo`, `holo mcp`, a script.
             logger.warning("shell commands are confined to %s by %s", self.workspace, rules)
