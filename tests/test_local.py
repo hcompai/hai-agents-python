@@ -1082,14 +1082,14 @@ class TestDriverInterfaces:
             result, error = bridge._dispatch(
                 "execute",
                 {
-                    "command": "pwd -P; echo $COORDINATE_SYSTEM $CUA_SESSION $CUA_CURSOR $RUN_CONFIG;"
+                    "command": "pwd -P; echo $COORDINATE_SYSTEM $CUA_SESSION $WEB_SESSION $CUA_CURSOR $RUN_CONFIG;"
                     " command -v desk web cua click"
                 },
             )
             assert error is None and result["exit_code"] == 0
             out = result["stdout"].split()
             assert out[0] == str((tmp_path / "hai" / bridge.session_id).resolve())
-            assert out[1:5] == ["0-1000", bridge.session_id, "off", "/run/config.json"] and len(out) == 9
+            assert out[1:6] == ["0-1000", *[bridge.session_id] * 2, "off", "/run/config.json"] and len(out) == 10
         finally:
             bridge._driver.close()
 
@@ -1357,6 +1357,25 @@ class TestDriverInterfaces:
         with WorkstationBridge(api_key="k", workspace=str(workspace)).create_driver() as driver:
             rules = Path(driver.execute('echo "$SRT_SETTINGS"').stdout.strip())
         assert str(tmp_path / ".config" / "hai") in json.loads(rules.read_text())["filesystem"]["denyWrite"]
+
+    @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
+    def test_workstation_runs_a_command_made_only_of_web_outside_the_sandbox(self, tmp_path, monkeypatch):
+        pytest.importorskip("hai_drivers.code_sandbox.local.sandbox_runtime")
+        from hai_agents_local import workstation
+
+        srt, confined = tmp_path / "bin" / "srt", tmp_path / "confined"
+        srt.parent.mkdir()
+        srt.write_text(f'#!/bin/sh\ncat "$SANDBOX_COMMAND_FILE" >> {confined} 2> /dev/null\nexec bash -c "$4"\n')
+        srt.chmod(0o755)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setenv("PATH", os.pathsep.join([str(srt.parent), os.defpath]))
+        monkeypatch.setattr(workstation, "shell_sandbox", shell_sandbox)
+        monkeypatch.setattr(workstation, "_host_cua", lambda environment: {})
+        with WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace")).create_driver() as driver:
+            assert driver.execute("web --version && web --help").success
+            assert driver.execute("web --version | cat").success
+        assert "web --version | cat" in (ran := confined.read_text()) and "web --help" not in ran
 
     @pytest.mark.skipif(
         shutil.which("srt") is None, reason="needs Anthropic's sandbox-runtime on PATH, and the network"

@@ -174,7 +174,9 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         tools = os.pathsep.join([os.path.dirname(desk), path])
         # A file on Windows only: the bash beside `git`, which is looked up there in the current folder first.
         shell = [bash()] if os.path.dirname(bash()) else []
-        _refuse_what_runs_the_session(self.workspace, [desk, shutil.which("cua", path=tools), *shell])
+        _refuse_what_runs_the_session(
+            self.workspace, [desk, *(shutil.which(cli, path=tools) for cli in ("cua", "web")), *shell]
+        )
         subprocess.run([desk, "aliases"], check=True, capture_output=True)
         logger.info("workstation workspace: %s", self.workspace)
         environment = {
@@ -182,6 +184,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             "COORDINATE_SYSTEM": "0-1000",
             "CUA_CURSOR": os.environ.get("CUA_CURSOR", "off"),
             "CUA_SESSION": self.session_id,
+            "WEB_SESSION": self.session_id,
             "PATH": tools,
         }
         policy = sandbox = None
@@ -206,6 +209,8 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             for guard in protected:
                 _refuse_a_guard_in(self.workspace, guard)
             host = _host_cua(environment)
+            # `web` keeps its daemon's socket in /tmp and reads Chrome's profile, and the sandbox's rules close both.
+            host["outside"] = [*host.get("outside", []), "web"]
             asked = [
                 f"{does} {', '.join(what)}"
                 for does, what in (("reach", self.allowed_domains), ("write", self.writable_folders))
