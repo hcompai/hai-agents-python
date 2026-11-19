@@ -7268,9 +7268,16 @@
             "default": "cloud"
           },
           "start_url": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Start Url",
-            "description": "Initial URL to open.",
+            "description": "Initial URL to open. An absolute http or https URL.",
             "default": "https://www.bing.com"
           },
           "headless": {
@@ -9373,9 +9380,16 @@
             "description": "Where the browser runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine."
           },
           "start_url": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Start Url",
-            "description": "Initial URL to open."
+            "description": "Initial URL to open. An absolute http or https URL."
           },
           "headless": {
             "type": "boolean",
