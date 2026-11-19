@@ -414,7 +414,7 @@ class EnvironmentsClient:
             Where the browser runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.
 
         start_url : typing.Optional[str]
-            Initial URL to open.
+            Initial URL to open. An absolute http or https URL.
 
         headless : typing.Optional[bool]
             Run the browser without a visible window.
@@ -943,7 +943,7 @@ class AsyncEnvironmentsClient:
             Where the browser runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.
 
         start_url : typing.Optional[str]
-            Initial URL to open.
+            Initial URL to open. An absolute http or https URL.
 
         headless : typing.Optional[bool]
             Run the browser without a visible window.
