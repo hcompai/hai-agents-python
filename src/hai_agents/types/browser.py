@@ -26,7 +26,7 @@ class Browser(UniversalBaseModel):
 
     start_url: typing.Optional[str] = pydantic.Field(default=None)
     """
-    Initial URL to open.
+    Initial URL to open. An absolute http or https URL.
     """
 
     headless: typing.Optional[bool] = pydantic.Field(default=None)
