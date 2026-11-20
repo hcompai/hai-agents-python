@@ -44,10 +44,11 @@ def test_idle_without_answer_returns_none_despite_schema():
 
 
 class _Held:
-    """Holds call_1 until the agent picks up its decision, then holds call_2."""
+    """Holds call_1 at step 0 until the agent picks up its decision, then a later step holds the same id."""
 
     def __init__(self):
-        self._held = [["call_1"], ["call_2"]]
+        self._steps = [0, 0, 1]
+        self.read = []
 
     def request(self, path, **_):
         return SimpleNamespace(status_code=202)
@@ -56,13 +57,13 @@ class _Held:
         return None
 
     def get_session_status(self, id):
-        held = [
-            ToolApprovalRequest(tool_req=ToolRequest(id=i, tool_name="shell"), requirements=[])
-            for i in self._held.pop(0)
-        ]
+        self.read.append(self._steps.pop(0))
         return SimpleNamespace(
             status="awaiting_tool_results",
-            pending_approvals=held,
+            steps=self.read[-1],
+            pending_approvals=[
+                ToolApprovalRequest(tool_req=ToolRequest(id="call_1", tool_name="shell"), requirements=[])
+            ],
             pending_tool_calls=[],
             outcome=None,
             error=None,
@@ -85,12 +86,15 @@ def _client(fake):
     return SimpleNamespace(sessions=fake, _client_wrapper=SimpleNamespace(httpx_client=fake))
 
 
-async def test_a_wait_after_a_decision_skips_the_decided_hold():
-    handle = SessionHandle(_client(_Held()), "sess_1")
-    handle.approve("call_1")
-    assert [r.tool_req.id for r in handle.wait_for_completion(wait_for_seconds=0).pending_approvals] == ["call_2"]
+async def test_a_wait_after_a_decision_skips_the_decided_hold_only():
+    held, async_held = _Held(), _AsyncHeld()
+    handle, async_handle = SessionHandle(_client(held), "sess_1"), AsyncSessionHandle(_client(async_held), "sess_1")
 
-    async_handle = AsyncSessionHandle(_client(_AsyncHeld()), "sess_1")
+    handle.wait_for_completion(wait_for_seconds=0)
+    handle.approve("call_1")
+    handle.wait_for_completion(wait_for_seconds=0)
+    await async_handle.wait_for_completion(wait_for_seconds=0)
     await async_handle.deny("call_1")
-    result = await async_handle.wait_for_completion(wait_for_seconds=0)
-    assert [r.tool_req.id for r in result.pending_approvals] == ["call_2"]
+    await async_handle.wait_for_completion(wait_for_seconds=0)
+
+    assert held.read == async_held.read == [0, 0, 1]

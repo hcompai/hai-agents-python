@@ -369,11 +369,29 @@ def _holds_for_approval(status: typing.Any) -> bool:
     )
 
 
-def _undecided_approvals(status: typing.Any, decided: typing.Set[str]) -> typing.List[ToolApprovalRequest]:
-    """Held calls not yet approved or denied; forgets the decided ids the status no longer lists."""
-    held = list(getattr(status, "pending_approvals", None) or [])
-    decided.intersection_update(request.tool_req.id for request in held)
-    return [request for request in held if request.tool_req.id not in decided]
+class _Decisions:
+    """Held calls a handle approved or denied, each tied to the step count it was held at."""
+
+    def __init__(self) -> None:
+        self._held: typing.Dict[typing.Optional[str], typing.Optional[int]] = {}
+        self._decided: typing.Dict[str, typing.Optional[int]] = {}
+
+    def add(self, call_id: str) -> None:
+        self._decided[call_id] = self._held.get(call_id)
+
+    def undecided(self, status: typing.Any) -> typing.List[ToolApprovalRequest]:
+        """Held calls not yet decided; a decision lapses once its call leaves the list or a later step holds it."""
+        held = list(getattr(status, "pending_approvals", None) or [])
+        steps = getattr(status, "steps", None)
+        listed = {request.tool_req.id for request in held}
+        self._decided = {
+            call_id: at
+            for call_id, at in self._decided.items()
+            if call_id in listed and (at is None or steps is None or at == steps)
+        }
+        undecided = [request for request in held if request.tool_req.id not in self._decided]
+        self._held = {request.tool_req.id: steps for request in undecided}
+        return undecided
 
 
 def _ends_wait(
@@ -597,7 +615,7 @@ def wait_for_session(
     return _wait(
         client,
         id,
-        set(),
+        _Decisions(),
         from_index=from_index,
         wait_for_seconds=wait_for_seconds,
         limit=limit,
@@ -613,7 +631,7 @@ def wait_for_session(
 def _wait(
     client: Client,
     id: str,
-    decided: typing.Set[str],
+    decisions: _Decisions,
     *,
     from_index: int = 0,
     wait_for_seconds: int = 20,
@@ -625,7 +643,7 @@ def _wait(
     answer_schema: typing.Optional[typing.Type[AnswerT]] = None,
     tools: typing.Optional[typing.Sequence[ToolInput]] = None,
 ) -> SessionRunResult[AnswerT]:
-    """``wait_for_session``, which a hold on ``decided`` calls alone does not stop."""
+    """``wait_for_session``, which a hold on calls in ``decisions`` alone does not stop."""
     dispatch = _tool_dispatch(tools)
     advertised = _Advertised(anchored=from_index == 0)
     if dispatch is not None and not include_events:
@@ -660,7 +678,7 @@ def _wait(
         caught_up = _caught_up(batch, limit)
 
         status = client.sessions.get_session_status(id)
-        undecided = _undecided_approvals(status, decided)
+        undecided = decisions.undecided(status)
         if _ends_wait(status, dispatch, undecided):
             if include_events:
                 while True:
@@ -775,7 +793,7 @@ async def async_wait_for_session(
     return await _async_wait(
         client,
         id,
-        set(),
+        _Decisions(),
         from_index=from_index,
         wait_for_seconds=wait_for_seconds,
         limit=limit,
@@ -791,7 +809,7 @@ async def async_wait_for_session(
 async def _async_wait(
     client: AsyncClient,
     id: str,
-    decided: typing.Set[str],
+    decisions: _Decisions,
     *,
     from_index: int = 0,
     wait_for_seconds: int = 20,
@@ -838,7 +856,7 @@ async def _async_wait(
         caught_up = _caught_up(batch, limit)
 
         status = await client.sessions.get_session_status(id)
-        undecided = _undecided_approvals(status, decided)
+        undecided = decisions.undecided(status)
         if _ends_wait(status, dispatch, undecided):
             if include_events:
                 while True:
@@ -1076,7 +1094,7 @@ class SessionHandle(typing.Generic[AnswerT]):
         self._client = client
         self._answer_schema = answer_schema
         self._tools = _ToolDispatch(tools) if tools else None
-        self._decided: typing.Set[str] = set()
+        self._decisions = _Decisions()
         self.id = id
 
     def get(self) -> Session:
@@ -1109,18 +1127,18 @@ class SessionHandle(typing.Generic[AnswerT]):
     def approve(self, call_id: str) -> None:
         """Run a call listed in ``pending_approvals``."""
         _post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "approve", None))
-        self._decided.add(call_id)
+        self._decisions.add(call_id)
 
     def deny(self, call_id: str, message: typing.Optional[str] = None) -> None:
         """Refuse a call listed in ``pending_approvals``; the model reads ``message``."""
         _post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "deny", message))
-        self._decided.add(call_id)
+        self._decisions.add(call_id)
 
     def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
         """Block until the session settles (terminal or idle); holds on calls this handle decided do not end it."""
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
-        return _wait(self._client, self.id, self._decided, **kwargs)
+        return _wait(self._client, self.id, self._decisions, **kwargs)
 
     def stream(
         self,
@@ -1158,7 +1176,7 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
         self._client = client
         self._answer_schema = answer_schema
         self._tools = _ToolDispatch(tools) if tools else None
-        self._decided: typing.Set[str] = set()
+        self._decisions = _Decisions()
         self.id = id
 
     async def get(self) -> Session:
@@ -1191,18 +1209,18 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
     async def approve(self, call_id: str) -> None:
         """Run a call listed in ``pending_approvals``."""
         await _async_post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "approve", None))
-        self._decided.add(call_id)
+        self._decisions.add(call_id)
 
     async def deny(self, call_id: str, message: typing.Optional[str] = None) -> None:
         """Refuse a call listed in ``pending_approvals``; the model reads ``message``."""
         await _async_post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "deny", message))
-        self._decided.add(call_id)
+        self._decisions.add(call_id)
 
     async def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
         """Block until the session settles (terminal or idle); holds on calls this handle decided do not end it."""
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
-        return await _async_wait(self._client, self.id, self._decided, **kwargs)
+        return await _async_wait(self._client, self.id, self._decisions, **kwargs)
 
     def stream(
         self,
