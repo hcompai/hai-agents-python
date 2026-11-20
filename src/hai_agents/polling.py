@@ -973,6 +973,31 @@ def stream_session(
     Raises:
         TimeoutError: If ``timeout_seconds`` elapses before the session stops.
     """
+    for _, event in _indexed_stream(
+        client,
+        id,
+        from_index=from_index,
+        wait_for_seconds=wait_for_seconds,
+        limit=limit,
+        until=until,
+        timeout_seconds=timeout_seconds,
+        tools=tools,
+    ):
+        yield event
+
+
+def _indexed_stream(
+    client: Client,
+    id: str,
+    *,
+    from_index: int,
+    wait_for_seconds: int,
+    limit: typing.Optional[int],
+    until: typing_extensions.Literal["settled", "terminal"],
+    timeout_seconds: typing.Optional[float],
+    tools: typing.Optional[typing.Sequence[ToolInput]],
+) -> typing.Iterator[typing.Tuple[int, SessionEvent]]:
+    """``stream_session``, pairing each event with its index in the session's event log."""
     should_stop = is_terminal_session_status if until == "terminal" else is_settled_session_status
     dispatch = _tool_dispatch(tools)
     advertised = _Advertised(anchored=from_index == 0)
@@ -994,8 +1019,8 @@ def stream_session(
         )
         if changes is not None:
             batch = changes.new_events or []
-            yield from batch
             next_from_index = _cursor_after(next_from_index, changes)
+            yield from enumerate(batch, start=next_from_index - len(batch))
             advertised.read(batch, next_from_index)
         caught_up = _caught_up(batch, limit)
 
@@ -1013,8 +1038,8 @@ def stream_session(
                 batch = tail.new_events or [] if tail is not None else []
                 if not batch:
                     return
-                yield from batch
                 next_from_index = _cursor_after(next_from_index, tail)
+                yield from enumerate(batch, start=next_from_index - len(batch))
 
         if dispatch is not None:
             _answer_tool_calls(client, id, dispatch, advertised, status, caught_up)
@@ -1032,6 +1057,31 @@ async def async_stream_session(
     tools: typing.Optional[typing.Sequence[ToolInput]] = None,
 ) -> typing.AsyncIterator[SessionEvent]:
     """Async version of ``stream_session``."""
+    async for _, event in _async_indexed_stream(
+        client,
+        id,
+        from_index=from_index,
+        wait_for_seconds=wait_for_seconds,
+        limit=limit,
+        until=until,
+        timeout_seconds=timeout_seconds,
+        tools=tools,
+    ):
+        yield event
+
+
+async def _async_indexed_stream(
+    client: AsyncClient,
+    id: str,
+    *,
+    from_index: int,
+    wait_for_seconds: int,
+    limit: typing.Optional[int],
+    until: typing_extensions.Literal["settled", "terminal"],
+    timeout_seconds: typing.Optional[float],
+    tools: typing.Optional[typing.Sequence[ToolInput]],
+) -> typing.AsyncIterator[typing.Tuple[int, SessionEvent]]:
+    """Async version of ``_indexed_stream``."""
     should_stop = is_terminal_session_status if until == "terminal" else is_settled_session_status
     dispatch = _tool_dispatch(tools)
     advertised = _Advertised(anchored=from_index == 0)
@@ -1053,9 +1103,9 @@ async def async_stream_session(
         )
         if changes is not None:
             batch = changes.new_events or []
-            for event in batch:
-                yield event
             next_from_index = _cursor_after(next_from_index, changes)
+            for indexed in enumerate(batch, start=next_from_index - len(batch)):
+                yield indexed
             advertised.read(batch, next_from_index)
         caught_up = _caught_up(batch, limit)
 
@@ -1073,9 +1123,9 @@ async def async_stream_session(
                 batch = tail.new_events or [] if tail is not None else []
                 if not batch:
                     return
-                for event in batch:
-                    yield event
                 next_from_index = _cursor_after(next_from_index, tail)
+                for indexed in enumerate(batch, start=next_from_index - len(batch)):
+                    yield indexed
 
         if dispatch is not None:
             await _async_answer_tool_calls(client, id, dispatch, advertised, status, caught_up)
@@ -1095,6 +1145,7 @@ class SessionHandle(typing.Generic[AnswerT]):
         self._answer_schema = answer_schema
         self._tools = _ToolDispatch(tools) if tools else None
         self._decisions = _Decisions()
+        self._next_from_index = 0
         self.id = id
 
     def get(self) -> Session:
@@ -1135,32 +1186,37 @@ class SessionHandle(typing.Generic[AnswerT]):
         self._decisions.add(call_id)
 
     def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
-        """Block until the session settles (terminal or idle); holds on calls this handle decided do not end it."""
+        """Block until settled (terminal or idle), reading past the cursor; holds this handle decided do not end it."""
+        kwargs.setdefault("from_index", self._next_from_index)
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
-        return _wait(self._client, self.id, self._decisions, **kwargs)
+        result = _wait(self._client, self.id, self._decisions, **kwargs)
+        self._next_from_index = max(self._next_from_index, result.next_from_index)
+        return result
 
     def stream(
         self,
         *,
-        from_index: int = 0,
+        from_index: typing.Optional[int] = None,
         wait_for_seconds: int = 20,
         limit: typing.Optional[int] = None,
         until: typing_extensions.Literal["settled", "terminal"] = "settled",
         timeout_seconds: typing.Optional[float] = None,
         tools: typing.Optional[typing.Sequence[ToolInput]] = None,
     ) -> typing.Iterator[SessionEvent]:
-        """Yield events until settled, running ``tools`` (default: the handle's); each call runs once per handle."""
-        return stream_session(
+        """Yield events from the cursor until settled; each ``tools`` call (default: the handle's) runs once."""
+        for index, event in _indexed_stream(
             self._client,
             self.id,
-            from_index=from_index,
+            from_index=self._next_from_index if from_index is None else from_index,
             wait_for_seconds=wait_for_seconds,
             limit=limit,
             until=until,
             timeout_seconds=timeout_seconds,
             tools=self._tools if tools is None else tools,
-        )
+        ):
+            self._next_from_index = max(self._next_from_index, index + 1)
+            yield event
 
 
 class AsyncSessionHandle(typing.Generic[AnswerT]):
@@ -1177,6 +1233,7 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
         self._answer_schema = answer_schema
         self._tools = _ToolDispatch(tools) if tools else None
         self._decisions = _Decisions()
+        self._next_from_index = 0
         self.id = id
 
     async def get(self) -> Session:
@@ -1217,29 +1274,34 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
         self._decisions.add(call_id)
 
     async def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
-        """Block until the session settles (terminal or idle); holds on calls this handle decided do not end it."""
+        """Block until settled (terminal or idle), reading past the cursor; holds this handle decided do not end it."""
+        kwargs.setdefault("from_index", self._next_from_index)
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
-        return await _async_wait(self._client, self.id, self._decisions, **kwargs)
+        result = await _async_wait(self._client, self.id, self._decisions, **kwargs)
+        self._next_from_index = max(self._next_from_index, result.next_from_index)
+        return result
 
-    def stream(
+    async def stream(
         self,
         *,
-        from_index: int = 0,
+        from_index: typing.Optional[int] = None,
         wait_for_seconds: int = 20,
         limit: typing.Optional[int] = None,
         until: typing_extensions.Literal["settled", "terminal"] = "settled",
         timeout_seconds: typing.Optional[float] = None,
         tools: typing.Optional[typing.Sequence[ToolInput]] = None,
     ) -> typing.AsyncIterator[SessionEvent]:
-        """Yield events until settled, running ``tools`` (default: the handle's); each call runs once per handle."""
-        return async_stream_session(
+        """Yield events from the cursor until settled; each ``tools`` call (default: the handle's) runs once."""
+        async for index, event in _async_indexed_stream(
             self._client,
             self.id,
-            from_index=from_index,
+            from_index=self._next_from_index if from_index is None else from_index,
             wait_for_seconds=wait_for_seconds,
             limit=limit,
             until=until,
             timeout_seconds=timeout_seconds,
             tools=self._tools if tools is None else tools,
-        )
+        ):
+            self._next_from_index = max(self._next_from_index, index + 1)
+            yield event
