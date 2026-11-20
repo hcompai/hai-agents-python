@@ -1201,7 +1201,11 @@ class SessionHandle(typing.Generic[AnswerT]):
         kwargs.setdefault("from_index", self._next_from_index)
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
-        result = _wait(self._client, self.id, self._decisions, **kwargs)
+        try:
+            result = _wait(self._client, self.id, self._decisions, **kwargs)
+        except SessionTimeoutError as error:
+            self._next_from_index = max(self._next_from_index, error.next_from_index)
+            raise
         self._next_from_index = max(self._next_from_index, result.next_from_index)
         return result
 
@@ -1289,7 +1293,11 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
         kwargs.setdefault("from_index", self._next_from_index)
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
-        result = await _async_wait(self._client, self.id, self._decisions, **kwargs)
+        try:
+            result = await _async_wait(self._client, self.id, self._decisions, **kwargs)
+        except SessionTimeoutError as error:
+            self._next_from_index = max(self._next_from_index, error.next_from_index)
+            raise
         self._next_from_index = max(self._next_from_index, result.next_from_index)
         return result
 
