@@ -86,6 +86,15 @@ class AnswerValidationError(ValueError):
         super().__init__(f"Final answer does not match {model.__name__}: {error}")
 
 
+class SessionTimeoutError(TimeoutError):
+    """The wait ran out before the session settled; the session may still be running."""
+
+    def __init__(self, session_id: str, next_from_index: int, budget: str) -> None:
+        self.session_id = session_id
+        self.next_from_index = next_from_index
+        super().__init__(f"Session {session_id} did not settle {budget}")
+
+
 @dataclass(frozen=True)
 class SessionRunResult(typing.Generic[AnswerT]):
     """Result returned by ``run_session`` and ``wait_for_session``.
@@ -659,7 +668,7 @@ def _wait(
     while max_polls is None or polls < max_polls:
         polls += 1
         if deadline is not None and time.monotonic() >= deadline:
-            raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+            raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
 
         batch: typing.List[SessionEvent] = []
         if include_events:
@@ -684,7 +693,7 @@ def _wait(
             if include_events:
                 while True:
                     if deadline is not None and time.monotonic() >= deadline:
-                        raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+                        raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
                     tail = client.sessions.get_session_changes(
                         id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
                     )
@@ -719,7 +728,7 @@ def _wait(
         elif poll_backoff_seconds > 0:
             time.sleep(poll_backoff_seconds)
 
-    raise TimeoutError(f"Session {id} did not settle before max_polls={max_polls}")
+    raise SessionTimeoutError(id, next_from_index, f"before max_polls={max_polls}")
 
 
 def run_session(
@@ -837,7 +846,7 @@ async def _async_wait(
     while max_polls is None or polls < max_polls:
         polls += 1
         if deadline is not None and time.monotonic() >= deadline:
-            raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+            raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
 
         batch: typing.List[SessionEvent] = []
         if include_events:
@@ -862,7 +871,7 @@ async def _async_wait(
             if include_events:
                 while True:
                     if deadline is not None and time.monotonic() >= deadline:
-                        raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+                        raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
                     tail = await client.sessions.get_session_changes(
                         id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
                     )
@@ -896,7 +905,7 @@ async def _async_wait(
         elif poll_backoff_seconds > 0:
             await asyncio.sleep(poll_backoff_seconds)
 
-    raise TimeoutError(f"Session {id} did not settle before max_polls={max_polls}")
+    raise SessionTimeoutError(id, next_from_index, f"before max_polls={max_polls}")
 
 
 async def async_run_session(
@@ -972,7 +981,7 @@ def stream_session(
         Each new ``SessionEvent`` in order.
 
     Raises:
-        TimeoutError: If ``timeout_seconds`` elapses before the session stops.
+        SessionTimeoutError: If ``timeout_seconds`` elapses before the session stops.
     """
     for _, event in _indexed_stream(
         client,
@@ -1009,7 +1018,7 @@ def _indexed_stream(
 
     while True:
         if deadline is not None and time.monotonic() >= deadline:
-            raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+            raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
 
         batch: typing.List[SessionEvent] = []
         changes = client.sessions.get_session_changes(
@@ -1033,7 +1042,7 @@ def _indexed_stream(
             # ``timeout_seconds``.
             while True:
                 if deadline is not None and time.monotonic() >= deadline:
-                    raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+                    raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
                 tail = client.sessions.get_session_changes(
                     id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
                 )
@@ -1093,7 +1102,7 @@ async def _async_indexed_stream(
 
     while True:
         if deadline is not None and time.monotonic() >= deadline:
-            raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+            raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
 
         batch: typing.List[SessionEvent] = []
         changes = await client.sessions.get_session_changes(
@@ -1118,7 +1127,7 @@ async def _async_indexed_stream(
             # ``timeout_seconds``.
             while True:
                 if deadline is not None and time.monotonic() >= deadline:
-                    raise TimeoutError(f"Session {id} did not settle within {timeout_seconds}s")
+                    raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
                 tail = await client.sessions.get_session_changes(
                     id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
                 )
