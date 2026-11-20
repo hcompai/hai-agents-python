@@ -88,7 +88,6 @@ def test_missing_api_key_is_clear(monkeypatch, tmp_path) -> None:
 
 def test_run_prints_json(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
-    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
     monkeypatch.setattr(app_module, "_follow", _no_events)
 
     result = runner.invoke(app, ["--json", "run", "hello", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
@@ -118,7 +117,7 @@ def test_run_failure_exits_nonzero_with_error_and_structured_answer(monkeypatch)
         error_code="env_error",
     )
     monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
-    monkeypatch.setattr(app_module, "wait_for_session", lambda client, id, **_: failed)
+    monkeypatch.setattr(_RunClient, "wait", staticmethod(lambda client, id, **_: failed))
     monkeypatch.setattr(app_module, "_follow", _no_events)
 
     result = runner.invoke(app, ["run", "hello", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
@@ -130,7 +129,6 @@ def test_run_failure_exits_nonzero_with_error_and_structured_answer(monkeypatch)
 
 def test_run_prints_live_view_link(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "_client", lambda state: _RunClient())
-    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
     monkeypatch.setattr(app_module, "_follow", _no_events)
 
     result = runner.invoke(app, ["run", "hello", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
@@ -154,7 +152,7 @@ def test_kill_switch_stops_that_turn_and_the_next_message_starts_a_new_session(m
     replies = iter(["open it again", None])
     monkeypatch.setattr(app_module, "_client", lambda state: client)
     monkeypatch.setattr(app_module, "_local_kinds", lambda client_, agent: ["desktop"])
-    monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
+    monkeypatch.setattr(_RunClient, "wait", staticmethod(lambda client_, id, **_: next(results)))
     monkeypatch.setattr(app_module, "_follow", lambda *a, **k: next(follows)())
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
@@ -176,7 +174,7 @@ def test_a_client_tool_wait_ends_the_session_and_the_next_message_starts_a_new_o
     )
     replies = iter(["try again", None])
     monkeypatch.setattr(app_module, "_client", lambda state: client)
-    monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
+    monkeypatch.setattr(_RunClient, "wait", staticmethod(lambda client_, id, **_: next(results)))
     monkeypatch.setattr(app_module, "_follow", _no_events)
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
@@ -212,7 +210,7 @@ def _held_then_done(reason: str = "not on this machine's allowlist", command: st
 def test_a_held_call_asks_the_person_at_the_terminal_and_the_turn_goes_on(monkeypatch, typed, sent) -> None:
     client, results, followed = _RunClient(), _held_then_done(command="rm -rf [build] \x1b[8m"), []
     monkeypatch.setattr(app_module, "_client", lambda state: client)
-    monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
+    monkeypatch.setattr(_RunClient, "wait", staticmethod(lambda client_, id, **_: next(results)))
     monkeypatch.setattr(app_module, "_follow", lambda *a, from_index, **k: followed.append(from_index))
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: None)
@@ -235,7 +233,7 @@ def test_always_allowing_a_command_this_machine_held_adds_its_rule_to_the_allowl
     reason = allowlist.hold("rm -rf [build]") if held_here else "held by another machine"
     client, results = _RunClient(), _held_then_done(reason)
     monkeypatch.setattr(app_module, "_client", lambda state: client)
-    monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
+    monkeypatch.setattr(_RunClient, "wait", staticmethod(lambda client_, id, **_: next(results)))
     monkeypatch.setattr(app_module, "_follow", _no_events)
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: None)
@@ -252,7 +250,7 @@ def test_always_allowing_a_command_this_machine_held_adds_its_rule_to_the_allowl
 def test_a_held_call_ends_a_run_nobody_can_answer_and_names_the_wait(monkeypatch) -> None:
     client, results = _RunClient(), _held_then_done()
     monkeypatch.setattr(app_module, "_client", lambda state: client)
-    monkeypatch.setattr(app_module, "wait_for_session", lambda client_, id, **_: next(results))
+    monkeypatch.setattr(_RunClient, "wait", staticmethod(lambda client_, id, **_: next(results)))
     monkeypatch.setattr(app_module, "_follow", _no_events)
 
     result = runner.invoke(app, ["run", "clean up", "-a", "h/test-agent"], env={"HAI_API_KEY": "hk-test"})
@@ -284,7 +282,7 @@ def test_a_lost_stream_keeps_the_session_for_the_next_message(monkeypatch, earli
             feed.handle({"type": "AgentEvent", "data": {"kind": "message_event", "caller_id": "agent", "content": []}})
 
     monkeypatch.setattr(app_module, "_client", lambda state: client)
-    monkeypatch.setattr(app_module, "wait_for_session", wait)
+    monkeypatch.setattr(_RunClient, "wait", staticmethod(wait))
     monkeypatch.setattr(app_module, "_follow", follow)
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
@@ -304,7 +302,7 @@ def test_retry_runs_the_first_task_again_in_a_new_session(monkeypatch) -> None:
     idle = SessionRunResult(id="sess_1", status="idle", events=[], next_from_index=1)
     replies = iter(["only direct ones", "/retry", None])
     monkeypatch.setattr(app_module, "_client", lambda state: client)
-    monkeypatch.setattr(app_module, "wait_for_session", lambda *a, **k: idle)
+    monkeypatch.setattr(_RunClient, "wait", staticmethod(lambda *a, **k: idle))
     monkeypatch.setattr(app_module, "_follow", _no_events)
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
@@ -371,7 +369,7 @@ def test_a_follow_up_after_a_failed_turn_starts_a_new_session(monkeypatch) -> No
     failed = SessionRunResult(id="sess_1", status="failed", events=[], next_from_index=1)
     replies = iter(["try again", None])
     monkeypatch.setattr(app_module, "_client", lambda state: client)
-    monkeypatch.setattr(app_module, "wait_for_session", lambda *a, **k: failed)
+    monkeypatch.setattr(_RunClient, "wait", staticmethod(lambda *a, **k: failed))
     monkeypatch.setattr(app_module, "_follow", _no_events)
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
@@ -390,7 +388,6 @@ def test_local_runs_any_agent_inline_on_the_local_runtime(monkeypatch) -> None:
     cloud.agents = types.SimpleNamespace(get_agent=lambda *a, **kw: fetched.append((a, kw)) or spec)
     monkeypatch.setattr(app_module, "_client", lambda state: cloud)
     monkeypatch.setattr(app_module, "_local_client", lambda state, inference: captured.update(on=inference) or runtime)
-    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
     monkeypatch.setattr(app_module, "_follow", _no_events)
     server = ["--model-url", "http://localhost:8000/v1", "--model", "served"]
 
@@ -416,7 +413,7 @@ def test_new_releases_the_idle_session_before_starting_another(monkeypatch) -> N
     idle = SessionRunResult(id="sess_1", status="idle", events=[], next_from_index=1, answer="ok")
     replies = iter(["/new", "second task", None])
     monkeypatch.setattr(app_module, "_client", lambda state: client)
-    monkeypatch.setattr(app_module, "wait_for_session", lambda *a, **k: idle)
+    monkeypatch.setattr(_RunClient, "wait", staticmethod(lambda *a, **k: idle))
     monkeypatch.setattr(app_module, "_follow", _no_events)
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
@@ -434,7 +431,6 @@ def test_run_without_options_uses_the_default_agent_uncapped(monkeypatch, tmp_pa
     monkeypatch.delenv(credentials.AGENT_VAR)
     captured: dict = {}
     monkeypatch.setattr(app_module, "_client", lambda state: _RunClient(capture=captured))
-    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
     monkeypatch.setattr(app_module, "_follow", _no_events)
 
     result = runner.invoke(app, ["run", "hello"], env={"HAI_API_KEY": "hk-test"})
@@ -461,7 +457,6 @@ def test_every_run_adds_the_users_holo_dir_to_its_agent(monkeypatch, holo_home) 
         get_agent=lambda name, revision, resolve: fetched.append((name, revision)) or spec
     )
     monkeypatch.setattr(app_module, "_client", lambda state: client)
-    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
     monkeypatch.setattr(app_module, "_follow", _no_events)
 
     result = runner.invoke(app, ["run", "hi", "-a", "me/helper:3"], env={"HAI_API_KEY": "hk-test"})
@@ -488,7 +483,7 @@ def test_follow_up_continues_the_same_session_from_the_last_event(monkeypatch) -
 
     replies = iter(["and the second one?", None])
     monkeypatch.setattr(app_module, "_client", lambda state: client)
-    monkeypatch.setattr(app_module, "wait_for_session", wait)
+    monkeypatch.setattr(_RunClient, "wait", staticmethod(wait))
     monkeypatch.setattr(app_module, "_follow", _no_events)
     monkeypatch.setattr(app_module, "_interactive", lambda: True)
     monkeypatch.setattr(app_module, "_read_message", lambda convo: next(replies))
@@ -712,7 +707,6 @@ def test_run_parses_overrides(monkeypatch) -> None:
     client = _RunClient(capture=captured)
 
     monkeypatch.setattr(app_module, "_client", lambda state: client)
-    monkeypatch.setattr(app_module, "wait_for_session", _fake_wait_for_session)
     monkeypatch.setattr(app_module, "_follow", _no_events)
 
     result = runner.invoke(
@@ -793,6 +787,8 @@ class _RunSessions:
 
 
 class _RunClient:
+    wait = staticmethod(_fake_wait_for_session)
+
     def __init__(self, capture: dict | None = None) -> None:
         self.sessions = _RunSessions(capture)
 
@@ -801,6 +797,7 @@ class _RunClient:
         return types.SimpleNamespace(
             approve=lambda call_id: calls.append(("approve", call_id)),
             deny=lambda call_id, message=None: calls.append(("deny", call_id, message)),
+            wait_for_completion=lambda **kwargs: self.wait(self, id, **kwargs),
         )
 
     def close(self) -> None:

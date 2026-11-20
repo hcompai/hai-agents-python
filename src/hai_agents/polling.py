@@ -369,6 +369,22 @@ def _holds_for_approval(status: typing.Any) -> bool:
     )
 
 
+def _undecided_approvals(status: typing.Any, decided: typing.Set[str]) -> typing.List[ToolApprovalRequest]:
+    """Held calls not yet approved or denied; forgets the decided ids the status no longer lists."""
+    held = list(getattr(status, "pending_approvals", None) or [])
+    decided.intersection_update(request.tool_req.id for request in held)
+    return [request for request in held if request.tool_req.id not in decided]
+
+
+def _ends_wait(
+    status: SessionStatus, dispatch: typing.Optional[_ToolDispatch], undecided: typing.Sequence[ToolApprovalRequest]
+) -> bool:
+    """Whether a wait stops on ``status``; a hold on decided calls lasts until the agent picks the decisions up."""
+    if _holds_for_approval(status):
+        return bool(undecided)
+    return is_settled_session_status(status.status) or (status.status == "awaiting_tool_results" and dispatch is None)
+
+
 def _raise_unless_posted(response: typing.Any) -> None:
     """409 means the session finished and settled the calls itself; the status poll will exit the loop."""
     if 200 <= response.status_code < 300 or response.status_code == 409:
@@ -578,6 +594,38 @@ def wait_for_session(
     events and the final answer, since it 204s whenever no new events exist past
     ``from_index`` -- even after the session has finished.
     """
+    return _wait(
+        client,
+        id,
+        set(),
+        from_index=from_index,
+        wait_for_seconds=wait_for_seconds,
+        limit=limit,
+        include_events=include_events,
+        timeout_seconds=timeout_seconds,
+        poll_backoff_seconds=poll_backoff_seconds,
+        max_polls=max_polls,
+        answer_schema=answer_schema,
+        tools=tools,
+    )
+
+
+def _wait(
+    client: Client,
+    id: str,
+    decided: typing.Set[str],
+    *,
+    from_index: int = 0,
+    wait_for_seconds: int = 20,
+    limit: typing.Optional[int] = None,
+    include_events: bool = True,
+    timeout_seconds: typing.Optional[float] = None,
+    poll_backoff_seconds: float = 0.0,
+    max_polls: typing.Optional[int] = None,
+    answer_schema: typing.Optional[typing.Type[AnswerT]] = None,
+    tools: typing.Optional[typing.Sequence[ToolInput]] = None,
+) -> SessionRunResult[AnswerT]:
+    """``wait_for_session``, which a hold on ``decided`` calls alone does not stop."""
     dispatch = _tool_dispatch(tools)
     advertised = _Advertised(anchored=from_index == 0)
     if dispatch is not None and not include_events:
@@ -612,11 +660,8 @@ def wait_for_session(
         caught_up = _caught_up(batch, limit)
 
         status = client.sessions.get_session_status(id)
-        if (
-            is_settled_session_status(status.status)
-            or (status.status == "awaiting_tool_results" and dispatch is None)
-            or _holds_for_approval(status)
-        ):
+        undecided = _undecided_approvals(status, decided)
+        if _ends_wait(status, dispatch, undecided):
             if include_events:
                 while True:
                     if deadline is not None and time.monotonic() >= deadline:
@@ -643,7 +688,7 @@ def wait_for_session(
                 outcome=status.outcome,
                 error=status.error,
                 error_code=status.error_code,
-                pending_approvals=list(getattr(status, "pending_approvals", None) or []),
+                pending_approvals=undecided,
             )
 
         if dispatch is not None:
@@ -727,6 +772,38 @@ async def async_wait_for_session(
     tools: typing.Optional[typing.Sequence[ToolInput]] = None,
 ) -> SessionRunResult[AnswerT]:
     """Async version of ``wait_for_session``."""
+    return await _async_wait(
+        client,
+        id,
+        set(),
+        from_index=from_index,
+        wait_for_seconds=wait_for_seconds,
+        limit=limit,
+        include_events=include_events,
+        timeout_seconds=timeout_seconds,
+        poll_backoff_seconds=poll_backoff_seconds,
+        max_polls=max_polls,
+        answer_schema=answer_schema,
+        tools=tools,
+    )
+
+
+async def _async_wait(
+    client: AsyncClient,
+    id: str,
+    decided: typing.Set[str],
+    *,
+    from_index: int = 0,
+    wait_for_seconds: int = 20,
+    limit: typing.Optional[int] = None,
+    include_events: bool = True,
+    timeout_seconds: typing.Optional[float] = None,
+    poll_backoff_seconds: float = 0.0,
+    max_polls: typing.Optional[int] = None,
+    answer_schema: typing.Optional[typing.Type[AnswerT]] = None,
+    tools: typing.Optional[typing.Sequence[ToolInput]] = None,
+) -> SessionRunResult[AnswerT]:
+    """Async version of ``_wait``."""
     dispatch = _tool_dispatch(tools)
     advertised = _Advertised(anchored=from_index == 0)
     if dispatch is not None and not include_events:
@@ -761,11 +838,8 @@ async def async_wait_for_session(
         caught_up = _caught_up(batch, limit)
 
         status = await client.sessions.get_session_status(id)
-        if (
-            is_settled_session_status(status.status)
-            or (status.status == "awaiting_tool_results" and dispatch is None)
-            or _holds_for_approval(status)
-        ):
+        undecided = _undecided_approvals(status, decided)
+        if _ends_wait(status, dispatch, undecided):
             if include_events:
                 while True:
                     if deadline is not None and time.monotonic() >= deadline:
@@ -792,7 +866,7 @@ async def async_wait_for_session(
                 outcome=status.outcome,
                 error=status.error,
                 error_code=status.error_code,
-                pending_approvals=list(getattr(status, "pending_approvals", None) or []),
+                pending_approvals=undecided,
             )
 
         if dispatch is not None:
@@ -1002,6 +1076,7 @@ class SessionHandle(typing.Generic[AnswerT]):
         self._client = client
         self._answer_schema = answer_schema
         self._tools = _ToolDispatch(tools) if tools else None
+        self._decided: typing.Set[str] = set()
         self.id = id
 
     def get(self) -> Session:
@@ -1034,16 +1109,18 @@ class SessionHandle(typing.Generic[AnswerT]):
     def approve(self, call_id: str) -> None:
         """Run a call listed in ``pending_approvals``."""
         _post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "approve", None))
+        self._decided.add(call_id)
 
     def deny(self, call_id: str, message: typing.Optional[str] = None) -> None:
         """Refuse a call listed in ``pending_approvals``; the model reads ``message``."""
         _post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "deny", message))
+        self._decided.add(call_id)
 
     def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
-        """Block until the session settles (terminal or idle); returns the result and final answer."""
+        """Block until the session settles (terminal or idle); holds on calls this handle decided do not end it."""
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
-        return wait_for_session(self._client, self.id, **kwargs)
+        return _wait(self._client, self.id, self._decided, **kwargs)
 
     def stream(
         self,
@@ -1081,6 +1158,7 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
         self._client = client
         self._answer_schema = answer_schema
         self._tools = _ToolDispatch(tools) if tools else None
+        self._decided: typing.Set[str] = set()
         self.id = id
 
     async def get(self) -> Session:
@@ -1113,16 +1191,18 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
     async def approve(self, call_id: str) -> None:
         """Run a call listed in ``pending_approvals``."""
         await _async_post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "approve", None))
+        self._decided.add(call_id)
 
     async def deny(self, call_id: str, message: typing.Optional[str] = None) -> None:
         """Refuse a call listed in ``pending_approvals``; the model reads ``message``."""
         await _async_post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "deny", message))
+        self._decided.add(call_id)
 
     async def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
-        """Block until the session settles (terminal or idle); returns the result and final answer."""
+        """Block until the session settles (terminal or idle); holds on calls this handle decided do not end it."""
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
-        return await async_wait_for_session(self._client, self.id, **kwargs)
+        return await _async_wait(self._client, self.id, self._decided, **kwargs)
 
     def stream(
         self,
