@@ -109,6 +109,7 @@ class _Log:
 
     def get_session_changes(self, id, *, from_index, limit, include_events, wait_for_seconds):
         if from_index >= len(self.events):
+            assert wait_for_seconds == 0, "long-polled past the end of a settled session"
             return None
         return SimpleNamespace(new_events=self.events[from_index:], first_index=from_index, answer=None)
 
@@ -124,12 +125,13 @@ def test_handle_resumes_each_turn_from_its_cursor():
         return [event.data["name"] for event in events]
 
     log.append("turn1-a", "turn1-b")
-    assert names(handle.wait_for_completion(wait_for_seconds=0).events) == ["turn1-a", "turn1-b"]
+    assert names(handle.wait_for_completion().events) == ["turn1-a", "turn1-b"]
     log.append("turn2")
-    assert names(handle.stream(wait_for_seconds=0)) == ["turn2"]
+    assert names(handle.stream()) == ["turn2"]
+    assert handle.wait_for_completion().events == []
     log.append("turn3")
-    assert names(handle.wait_for_completion(wait_for_seconds=0).events) == ["turn3"]
-    assert names(handle.wait_for_completion(wait_for_seconds=0, from_index=0).events) == [
+    assert names(handle.wait_for_completion().events) == ["turn3"]
+    assert names(handle.wait_for_completion(from_index=0).events) == [
         "turn1-a",
         "turn1-b",
         "turn2",

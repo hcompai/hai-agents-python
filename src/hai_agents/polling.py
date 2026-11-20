@@ -652,7 +652,8 @@ def _wait(
     next_from_index = from_index
     last_changes: typing.Optional[SessionChanges] = None
     polls = 0
-    caught_up = True
+    # The first poll never blocks: past the last event of a settled session, it would wait out the long-poll.
+    caught_up = False
     deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
 
     while max_polls is None or polls < max_polls:
@@ -830,7 +831,7 @@ async def _async_wait(
     next_from_index = from_index
     last_changes: typing.Optional[SessionChanges] = None
     polls = 0
-    caught_up = True
+    caught_up = False
     deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
 
     while max_polls is None or polls < max_polls:
@@ -1002,7 +1003,8 @@ def _indexed_stream(
     dispatch = _tool_dispatch(tools)
     advertised = _Advertised(anchored=from_index == 0)
     next_from_index = from_index
-    caught_up = True
+    # The first poll never blocks: past the last event of a settled session, it would wait out the long-poll.
+    caught_up = False
     deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
 
     while True:
@@ -1086,7 +1088,7 @@ async def _async_indexed_stream(
     dispatch = _tool_dispatch(tools)
     advertised = _Advertised(anchored=from_index == 0)
     next_from_index = from_index
-    caught_up = True
+    caught_up = False
     deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
 
     while True:
