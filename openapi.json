@@ -4719,7 +4719,7 @@
           "Schedules"
         ],
         "summary": "Trigger Schedule",
-        "description": "Fire the schedule once now (works while paused); the regular cadence is unaffected.",
+        "description": "Fire the schedule once now (works while paused).\n\nOn an active schedule, a run that creates a session takes the place of the next scheduled run:\nthe next run moves one occurrence later and the run counts toward repeats. A skipped or failed\nrun, or a run of a paused schedule, leaves the schedule's timing and repeats unchanged.",
         "operationId": "trigger_schedule_api_v2_schedules__schedule_id__trigger_post",
         "security": [
           {
@@ -10095,7 +10095,7 @@
           "sessions_created": {
             "type": "integer",
             "title": "Sessions Created",
-            "description": "Automatic fires that created a session. Skipped fires, errors, and manual triggers are not counted. When this reaches repeats, the schedule is paused."
+            "description": "Fires that created a session: automatic fires, and manual triggers of an active schedule, which replace its next occurrence. Skipped fires, errors, and manual triggers of a paused schedule are not counted. When this reaches repeats, the schedule is paused."
           },
           "probe": {
             "anyOf": [

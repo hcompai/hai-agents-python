@@ -31,7 +31,7 @@ class ScheduleRecord(UniversalBaseModel):
 
     sessions_created: int = pydantic.Field()
     """
-    Automatic fires that created a session. Skipped fires, errors, and manual triggers are not counted. When this reaches repeats, the schedule is paused.
+    Fires that created a session: automatic fires, and manual triggers of an active schedule, which replace its next occurrence. Skipped fires, errors, and manual triggers of a paused schedule are not counted. When this reaches repeats, the schedule is paused.
     """
 
     probe: typing.Optional[typing.Dict[str, typing.Optional[JsonValue]]] = pydantic.Field(default=None)
