@@ -11,6 +11,7 @@ import tempfile
 import threading
 import types
 import zipfile
+from datetime import datetime, timedelta, timezone
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -910,6 +911,18 @@ class TestBridgeProtocol:
         await bridge._process_commands(exchange, [cmd.model_copy(update={"id": "c1-retry"})])
         assert driver.clicks == 1
         assert [p["command_uid"] for p in exchange.posts] == ["u1", "u1"]
+
+    async def test_expired_command_is_reported_without_executing(self):
+        driver = FakeDriver()
+        bridge = _bridge(driver)
+        exchange = FakeExchange()
+        now = datetime.now(timezone.utc)
+        stale = Command.model_validate({**_click("stale"), "expires_at": (now - timedelta(seconds=1)).isoformat()})
+        fresh = Command.model_validate({**_click("fresh"), "expires_at": (now + timedelta(minutes=1)).isoformat()})
+        await bridge._process_commands(exchange, [stale, fresh])
+        assert driver.clicks == 1
+        assert [(p["command_uid"], p["result"]) for p in exchange.posts] == [("stale", None), ("fresh", None)]
+        assert "expired" in exchange.posts[0]["error"] and exchange.posts[1]["error"] is None
 
     async def test_undeliverable_result_raises_after_retries(self, monkeypatch):
         import hai_agents_local.bridge as bridge_module

@@ -6,9 +6,10 @@ import base64
 import logging
 import math
 import typing
+from datetime import datetime, timezone
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -29,6 +30,13 @@ class Command(BaseModel):
     command_uid: str
     name: str
     args: dict[str, Any] = Field(default_factory=dict)
+    expires_at: Optional[datetime] = None
+
+    def expired(self) -> bool:
+        if self.expires_at is None:
+            return False
+        expires_at = self.expires_at if self.expires_at.tzinfo else self.expires_at.replace(tzinfo=timezone.utc)
+        return expires_at <= datetime.now(timezone.utc)
 
 
 TRANSIENT_STATUS_CODES = frozenset({502, 503, 504})
