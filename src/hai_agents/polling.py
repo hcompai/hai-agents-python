@@ -376,8 +376,12 @@ class _Decisions:
         self._held: typing.Dict[typing.Optional[str], typing.Optional[int]] = {}
         self._decided: typing.Dict[str, typing.Optional[int]] = {}
 
-    def add(self, call_id: str) -> None:
-        self._decided[call_id] = self._held.get(call_id)
+    def add(self, call_id: str, status: typing.Any) -> None:
+        """Tie a decision to the step ``status``, read after it, holds the call at; a call no longer held needs none."""
+        if status is not None:
+            self.undecided(status)
+        if call_id in self._held:
+            self._decided[call_id] = self._held[call_id]
 
     def undecided(self, status: typing.Any) -> typing.List[ToolApprovalRequest]:
         """Held calls not yet decided; a decision lapses once its call leaves the list or a later step holds it."""
@@ -1127,12 +1131,19 @@ class SessionHandle(typing.Generic[AnswerT]):
     def approve(self, call_id: str) -> None:
         """Run a call listed in ``pending_approvals``."""
         _post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "approve", None))
-        self._decisions.add(call_id)
+        self._decisions.add(call_id, self._status_after_decision())
 
     def deny(self, call_id: str, message: typing.Optional[str] = None) -> None:
         """Refuse a call listed in ``pending_approvals``; the model reads ``message``."""
         _post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "deny", message))
-        self._decisions.add(call_id)
+        self._decisions.add(call_id, self._status_after_decision())
+
+    def _status_after_decision(self) -> typing.Optional[SessionStatus]:
+        try:
+            return self.status()
+        except Exception as exc:
+            _logger.debug("status read after a decision on %s failed: %s", self.id, exc)
+            return None
 
     def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
         """Block until the session settles (terminal or idle); holds on calls this handle decided do not end it."""
@@ -1209,12 +1220,19 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
     async def approve(self, call_id: str) -> None:
         """Run a call listed in ``pending_approvals``."""
         await _async_post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "approve", None))
-        self._decisions.add(call_id)
+        self._decisions.add(call_id, await self._status_after_decision())
 
     async def deny(self, call_id: str, message: typing.Optional[str] = None) -> None:
         """Refuse a call listed in ``pending_approvals``; the model reads ``message``."""
         await _async_post_settlement(self._client, self.id, "tool_approvals", _approval_body(call_id, "deny", message))
-        self._decisions.add(call_id)
+        self._decisions.add(call_id, await self._status_after_decision())
+
+    async def _status_after_decision(self) -> typing.Optional[SessionStatus]:
+        try:
+            return await self.status()
+        except Exception as exc:
+            _logger.debug("status read after a decision on %s failed: %s", self.id, exc)
+            return None
 
     async def wait_for_completion(self, **kwargs: typing.Any) -> SessionRunResult[AnswerT]:
         """Block until the session settles (terminal or idle); holds on calls this handle decided do not end it."""
