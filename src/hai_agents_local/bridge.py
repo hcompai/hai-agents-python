@@ -289,6 +289,9 @@ class LocalBridge(ABC, Generic[DriverT]):
                 # Redelivered command: repost the cached result instead of re-executing.
                 self._results.move_to_end(cmd.command_uid)
                 result, error = self._results[cmd.command_uid]
+            elif cmd.expired():
+                logger.warning("command %s expired at %s; skipping it", cmd.name, cmd.expires_at)
+                result, error = None, f"command {cmd.name!r} expired before it could run"
             else:
                 dispatch = asyncio.create_task(asyncio.to_thread(self._dispatch, cmd.name, cmd.args))
                 stopped = asyncio.create_task(self._stop_event.wait())
