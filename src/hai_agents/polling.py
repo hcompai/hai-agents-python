@@ -89,10 +89,13 @@ class AnswerValidationError(ValueError):
 class SessionTimeoutError(TimeoutError):
     """The wait ran out before the session settled; the session may still be running."""
 
-    def __init__(self, session_id: str, next_from_index: int, budget: str) -> None:
+    def __init__(self, session_id: str, budget: str) -> None:
         self.session_id = session_id
-        self.next_from_index = next_from_index
+        self.budget = budget
         super().__init__(f"Session {session_id} did not settle {budget}")
+
+    def __reduce__(self) -> typing.Tuple[typing.Any, ...]:
+        return type(self), (self.session_id, self.budget)
 
 
 @dataclass(frozen=True)
@@ -672,7 +675,7 @@ def _wait(
     while max_polls is None or polls < max_polls:
         polls += 1
         if deadline is not None and time.monotonic() >= deadline:
-            raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
+            raise SessionTimeoutError(id, f"within {timeout_seconds}s")
 
         batch: typing.List[SessionEvent] = []
         if include_events:
@@ -697,7 +700,7 @@ def _wait(
             if include_events:
                 while True:
                     if deadline is not None and time.monotonic() >= deadline:
-                        raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
+                        raise SessionTimeoutError(id, f"within {timeout_seconds}s")
                     tail = client.sessions.get_session_changes(
                         id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
                     )
@@ -732,7 +735,7 @@ def _wait(
         elif poll_backoff_seconds > 0:
             time.sleep(poll_backoff_seconds)
 
-    raise SessionTimeoutError(id, next_from_index, f"before max_polls={max_polls}")
+    raise SessionTimeoutError(id, f"before max_polls={max_polls}")
 
 
 def run_session(
@@ -850,7 +853,7 @@ async def _async_wait(
     while max_polls is None or polls < max_polls:
         polls += 1
         if deadline is not None and time.monotonic() >= deadline:
-            raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
+            raise SessionTimeoutError(id, f"within {timeout_seconds}s")
 
         batch: typing.List[SessionEvent] = []
         if include_events:
@@ -875,7 +878,7 @@ async def _async_wait(
             if include_events:
                 while True:
                     if deadline is not None and time.monotonic() >= deadline:
-                        raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
+                        raise SessionTimeoutError(id, f"within {timeout_seconds}s")
                     tail = await client.sessions.get_session_changes(
                         id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
                     )
@@ -909,7 +912,7 @@ async def _async_wait(
         elif poll_backoff_seconds > 0:
             await asyncio.sleep(poll_backoff_seconds)
 
-    raise SessionTimeoutError(id, next_from_index, f"before max_polls={max_polls}")
+    raise SessionTimeoutError(id, f"before max_polls={max_polls}")
 
 
 async def async_run_session(
@@ -1022,7 +1025,7 @@ def _indexed_stream(
 
     while True:
         if deadline is not None and time.monotonic() >= deadline:
-            raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
+            raise SessionTimeoutError(id, f"within {timeout_seconds}s")
 
         batch: typing.List[SessionEvent] = []
         changes = client.sessions.get_session_changes(
@@ -1046,7 +1049,7 @@ def _indexed_stream(
             # ``timeout_seconds``.
             while True:
                 if deadline is not None and time.monotonic() >= deadline:
-                    raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
+                    raise SessionTimeoutError(id, f"within {timeout_seconds}s")
                 tail = client.sessions.get_session_changes(
                     id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
                 )
@@ -1106,7 +1109,7 @@ async def _async_indexed_stream(
 
     while True:
         if deadline is not None and time.monotonic() >= deadline:
-            raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
+            raise SessionTimeoutError(id, f"within {timeout_seconds}s")
 
         batch: typing.List[SessionEvent] = []
         changes = await client.sessions.get_session_changes(
@@ -1131,7 +1134,7 @@ async def _async_indexed_stream(
             # ``timeout_seconds``.
             while True:
                 if deadline is not None and time.monotonic() >= deadline:
-                    raise SessionTimeoutError(id, next_from_index, f"within {timeout_seconds}s")
+                    raise SessionTimeoutError(id, f"within {timeout_seconds}s")
                 tail = await client.sessions.get_session_changes(
                     id, from_index=next_from_index, limit=limit, include_events=True, wait_for_seconds=0
                 )
@@ -1212,11 +1215,7 @@ class SessionHandle(typing.Generic[AnswerT]):
         kwargs.setdefault("from_index", self._next_from_index)
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
-        try:
-            result = _wait(self._client, self.id, self._decisions, **kwargs)
-        except SessionTimeoutError as error:
-            self._next_from_index = max(self._next_from_index, error.next_from_index)
-            raise
+        result = _wait(self._client, self.id, self._decisions, **kwargs)
         self._next_from_index = max(self._next_from_index, result.next_from_index)
         return result
 
@@ -1311,11 +1310,7 @@ class AsyncSessionHandle(typing.Generic[AnswerT]):
         kwargs.setdefault("from_index", self._next_from_index)
         kwargs.setdefault("answer_schema", self._answer_schema)
         kwargs.setdefault("tools", self._tools)
-        try:
-            result = await _async_wait(self._client, self.id, self._decisions, **kwargs)
-        except SessionTimeoutError as error:
-            self._next_from_index = max(self._next_from_index, error.next_from_index)
-            raise
+        result = await _async_wait(self._client, self.id, self._decisions, **kwargs)
         self._next_from_index = max(self._next_from_index, result.next_from_index)
         return result
 

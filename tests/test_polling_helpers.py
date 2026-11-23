@@ -7,6 +7,7 @@ tests lock the remaining public helpers without changing the implementation.
 from __future__ import annotations
 
 import json
+import pickle
 from types import SimpleNamespace
 
 import pydantic
@@ -101,7 +102,7 @@ def test_run_session_timeout_names_the_running_session() -> None:
     with pytest.raises(SessionTimeoutError) as caught:
         run_session(client, agent="h/web-surfer-pro", messages="hi", wait_for_seconds=0, timeout_seconds=0)
     assert caught.value.session_id == "sess_1"
-    assert caught.value.next_from_index == 0
+    assert str(pickle.loads(pickle.dumps(caught.value))) == str(caught.value)
 
 
 def test_wait_returns_if_session_settles_before_max_polls() -> None:

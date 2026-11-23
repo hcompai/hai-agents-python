@@ -153,7 +153,7 @@ def test_handle_resumes_each_turn_from_its_cursor():
     ]
 
 
-def test_handle_resumes_after_a_timed_out_wait():
+def test_a_retry_after_a_timed_out_wait_returns_the_events_it_read():
     log = _Log()
     handle = SessionHandle(SimpleNamespace(sessions=log), "sess_1")
     log.append("read-before-timeout")
@@ -162,4 +162,7 @@ def test_handle_resumes_after_a_timed_out_wait():
         handle.wait_for_completion(max_polls=1)
     log.append("after-timeout")
     log.status = "idle"
-    assert [event.data["name"] for event in handle.wait_for_completion().events] == ["after-timeout"]
+    assert [event.data["name"] for event in handle.wait_for_completion().events] == [
+        "read-before-timeout",
+        "after-timeout",
+    ]
