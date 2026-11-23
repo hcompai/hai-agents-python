@@ -30,7 +30,6 @@ from hai_agents import (
     is_settled_session_status,
     is_terminal_session_status,
     stream_session,
-    wait_for_session,
 )
 from hai_agents.core.api_error import ApiError
 from hai_agents.environment import HaiAgentsEnvironment
@@ -634,15 +633,16 @@ class _Conversation:
                 starting=self.next_index == 0,
             )
         timeout = self.max_time_s + _TURN_GRACE_S if self.max_time_s else None
+        handle = self.client.session(self.session.id)
         index, shown = self.next_index, 0
         try:
             while True:
                 if feed is not None:
                     self._show(feed, index, timeout)
-                result = wait_for_session(self.client, self.session.id, from_index=index, timeout_seconds=timeout)
+                result = handle.wait_for_completion(from_index=index, timeout_seconds=timeout)
                 if feed is None or not self.followups or not result.pending_approvals:
                     break
-                _decide(self.client, self.session.id, result.pending_approvals, feed)
+                _decide(handle, result.pending_approvals, feed)
                 index, shown = result.next_from_index, feed.handled
         except (KeyboardInterrupt, typer.Abort):
             self._cancel_turn(feed)
@@ -1008,9 +1008,8 @@ def _follow(
         stop.set()
 
 
-def _decide(client: Any, session_id: str, held: list[Any], feed: ui.StepFeed) -> None:
+def _decide(session: Any, held: list[Any], feed: ui.StepFeed) -> None:
     """Ask the person at the terminal about each call held for approval, and send each answer."""
-    session = client.session(session_id)
     ui.notify(err_console, "holo: the agent needs your approval")
     with feed.prompting():
         for request in to_jsonable(held):
