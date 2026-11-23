@@ -100,6 +100,18 @@ async def test_a_wait_after_a_decision_skips_the_decided_hold_only():
     assert held.read == async_held.read == [0, 0, 1]
 
 
+async def test_a_decision_before_any_wait_lapses_once_a_later_step_holds_the_call():
+    held, async_held = _Held(), _AsyncHeld()
+    handle, async_handle = SessionHandle(_client(held), "sess_1"), AsyncSessionHandle(_client(async_held), "sess_1")
+
+    handle.approve("call_1")
+    handle.wait_for_completion(wait_for_seconds=0)
+    await async_handle.deny("call_1")
+    await async_handle.wait_for_completion(wait_for_seconds=0)
+
+    assert held.read == async_held.read == [0, 0, 1]
+
+
 class _Log:
     def __init__(self):
         self.events = []
