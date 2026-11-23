@@ -110,3 +110,42 @@ async def test_a_decision_before_any_wait_lapses_once_a_later_step_holds_the_cal
     await async_handle.wait_for_completion(wait_for_seconds=0)
 
     assert held.read == async_held.read == [0, 0, 1]
+
+
+class _Log:
+    def __init__(self):
+        self.events = []
+
+    def append(self, *names):
+        self.events.extend(SimpleNamespace(type="MessageEvent", data={"name": name}) for name in names)
+
+    def get_session_changes(self, id, *, from_index, limit, include_events, wait_for_seconds):
+        if from_index >= len(self.events):
+            assert wait_for_seconds == 0, "long-polled past the end of a settled session"
+            return None
+        return SimpleNamespace(new_events=self.events[from_index:], first_index=from_index, answer=None)
+
+    def get_session_status(self, id):
+        return SimpleNamespace(status="idle", outcome=None, error=None, error_code=None)
+
+
+def test_handle_resumes_each_turn_from_its_cursor():
+    log = _Log()
+    handle = SessionHandle(SimpleNamespace(sessions=log), "sess_1")
+
+    def names(events):
+        return [event.data["name"] for event in events]
+
+    log.append("turn1-a", "turn1-b")
+    assert names(handle.wait_for_completion().events) == ["turn1-a", "turn1-b"]
+    log.append("turn2")
+    assert names(handle.stream()) == ["turn2"]
+    assert handle.wait_for_completion().events == []
+    log.append("turn3")
+    assert names(handle.wait_for_completion().events) == ["turn3"]
+    assert names(handle.wait_for_completion(from_index=0).events) == [
+        "turn1-a",
+        "turn1-b",
+        "turn2",
+        "turn3",
+    ]
