@@ -3,8 +3,9 @@
 from types import SimpleNamespace
 
 import pydantic
+import pytest
 
-from hai_agents.polling import AsyncSessionHandle, SessionHandle, wait_for_session
+from hai_agents.polling import AsyncSessionHandle, SessionHandle, SessionTimeoutError, wait_for_session
 from hai_agents.types import ToolApprovalRequest, ToolRequest
 
 
@@ -115,6 +116,7 @@ async def test_a_decision_before_any_wait_lapses_once_a_later_step_holds_the_cal
 class _Log:
     def __init__(self):
         self.events = []
+        self.status = "idle"
 
     def append(self, *names):
         self.events.extend(SimpleNamespace(type="MessageEvent", data={"name": name}) for name in names)
@@ -126,7 +128,7 @@ class _Log:
         return SimpleNamespace(new_events=self.events[from_index:], first_index=from_index, answer=None)
 
     def get_session_status(self, id):
-        return SimpleNamespace(status="idle", outcome=None, error=None, error_code=None)
+        return SimpleNamespace(status=self.status, outcome=None, error=None, error_code=None)
 
 
 def test_handle_resumes_each_turn_from_its_cursor():
@@ -148,4 +150,19 @@ def test_handle_resumes_each_turn_from_its_cursor():
         "turn1-b",
         "turn2",
         "turn3",
+    ]
+
+
+def test_a_retry_after_a_timed_out_wait_returns_the_events_it_read():
+    log = _Log()
+    handle = SessionHandle(SimpleNamespace(sessions=log), "sess_1")
+    log.append("read-before-timeout")
+    log.status = "running"
+    with pytest.raises(SessionTimeoutError):
+        handle.wait_for_completion(max_polls=1)
+    log.append("after-timeout")
+    log.status = "idle"
+    assert [event.data["name"] for event in handle.wait_for_completion().events] == [
+        "read-before-timeout",
+        "after-timeout",
     ]

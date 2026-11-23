@@ -7,15 +7,18 @@ tests lock the remaining public helpers without changing the implementation.
 from __future__ import annotations
 
 import json
+import pickle
 from types import SimpleNamespace
 
 import pydantic
 import pytest
 
+from hai_agents import SessionTimeoutError
 from hai_agents.polling import (
     assert_request_under_limit,
     is_settled_session_status,
     is_terminal_session_status,
+    run_session,
     wait_for_session,
 )
 
@@ -24,6 +27,9 @@ IN_FLIGHT = ("queued", "pending", "running", "paused", "awaiting_tool_results")
 
 
 class _AlwaysRunning:
+    def create_session(self, **params):
+        return SimpleNamespace(id="sess_1")
+
     def get_session_changes(self, id, *, from_index, limit, include_events, wait_for_seconds):
         return SimpleNamespace(new_events=[], answer=None)
 
@@ -89,6 +95,14 @@ def test_wait_times_out_when_max_polls_exhausted() -> None:
     client = SimpleNamespace(sessions=_AlwaysRunning())
     with pytest.raises(TimeoutError, match="max_polls=2"):
         wait_for_session(client, "sess_1", wait_for_seconds=0, max_polls=2)
+
+
+def test_run_session_timeout_names_the_running_session() -> None:
+    client = SimpleNamespace(sessions=_AlwaysRunning())
+    with pytest.raises(SessionTimeoutError) as caught:
+        run_session(client, agent="h/web-surfer-pro", messages="hi", wait_for_seconds=0, timeout_seconds=0)
+    assert caught.value.session_id == "sess_1"
+    assert str(pickle.loads(pickle.dumps(caught.value))) == str(caught.value)
 
 
 def test_wait_returns_if_session_settles_before_max_polls() -> None:
