@@ -5,14 +5,16 @@ from __future__ import annotations
 import base64
 import logging
 import math
+import time
 import typing
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationError
 
 from .errors import AuthError, ChannelClosedError, RateLimitedError, SessionNotFoundError
 
@@ -31,12 +33,32 @@ class Command(BaseModel):
     name: str
     args: dict[str, Any] = Field(default_factory=dict)
     expires_at: Optional[datetime] = None
+    _deadline: Optional[float] = PrivateAttr(default=None)
+
+    def start_clock(self, platform_now: Optional[datetime]) -> None:
+        """Count the remaining lifetime from the platform's clock, so a skewed local clock doesn't shift it."""
+        if self.expires_at is None:
+            return
+        remaining = _utc(self.expires_at) - (platform_now or datetime.now(timezone.utc))
+        self._deadline = time.monotonic() + remaining.total_seconds()
 
     def expired(self) -> bool:
         if self.expires_at is None:
             return False
-        expires_at = self.expires_at if self.expires_at.tzinfo else self.expires_at.replace(tzinfo=timezone.utc)
-        return expires_at <= datetime.now(timezone.utc)
+        if self._deadline is None:
+            return _utc(self.expires_at) <= datetime.now(timezone.utc)
+        return time.monotonic() >= self._deadline
+
+
+def _utc(moment: datetime) -> datetime:
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def _platform_now(resp: httpx.Response) -> Optional[datetime]:
+    try:
+        return _utc(parsedate_to_datetime(resp.headers["Date"]))
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 TRANSIENT_STATUS_CODES = frozenset({502, 503, 504})
@@ -212,10 +234,14 @@ def _parse_commands(resp: httpx.Response) -> list[Command] | None:
         return None
     if not isinstance(data, list):
         return None
+    platform_now = _platform_now(resp)
     commands: list[Command] = []
     for item in data:
         try:
-            commands.append(Command.model_validate(item))
+            command = Command.model_validate(item)
         except ValidationError:
             logger.warning("skipping malformed command: %s", item)
+            continue
+        command.start_clock(platform_now)
+        commands.append(command)
     return commands

@@ -12,6 +12,7 @@ import threading
 import types
 import zipfile
 from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -36,7 +37,13 @@ from hai_agents_local.config import shell_sandbox
 from hai_agents_local.errors import AuthError, RateLimitedError, SessionNotFoundError
 from hai_agents_local.routing import localize_agent
 from hai_agents_local.runtime.manifest import platform_key
-from hai_agents_local.transport import Command, CommandExchange, deserialize_args, serialize_result
+from hai_agents_local.transport import (
+    Command,
+    CommandExchange,
+    _parse_commands,
+    deserialize_args,
+    serialize_result,
+)
 
 API_KEY = "test-key"
 
@@ -916,10 +923,16 @@ class TestBridgeProtocol:
         driver = FakeDriver()
         bridge = _bridge(driver)
         exchange = FakeExchange()
-        now = datetime.now(timezone.utc)
-        stale = Command.model_validate({**_click("stale"), "expires_at": (now - timedelta(seconds=1)).isoformat()})
-        fresh = Command.model_validate({**_click("fresh"), "expires_at": (now + timedelta(minutes=1)).isoformat()})
-        await bridge._process_commands(exchange, [stale, fresh])
+        platform_now = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(minutes=10)
+        batch = httpx.Response(
+            200,
+            headers={"Date": format_datetime(platform_now, usegmt=True)},
+            json=[
+                {**_click("stale"), "expires_at": (platform_now - timedelta(seconds=1)).isoformat()},
+                {**_click("fresh"), "expires_at": (platform_now + timedelta(minutes=1)).isoformat()},
+            ],
+        )
+        await bridge._process_commands(exchange, _parse_commands(batch))
         assert driver.clicks == 1
         assert [(p["command_uid"], p["result"]) for p in exchange.posts] == [("stale", None), ("fresh", None)]
         assert "expired" in exchange.posts[0]["error"] and exchange.posts[1]["error"] is None
