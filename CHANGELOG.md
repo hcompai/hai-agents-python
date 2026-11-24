@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- The local browser bridge: the `browser` extra, `holo local browser`, `hai_agents_local.SeleniumBrowserBridge`, and the browser check of `holo doctor`. A `web` environment with `host="user_device"` now fails at session start; to drive this machine's Chrome, give the agent a `desktop` environment in `shell` mode (`pip install "hai-agents[shell]"`).
+
 ### Fixed
 
 - A local bridge that stops while a command runs now answers that command with an error. The platform applies a session's cancel only once its in-flight command has an answer, so an unanswered one held the cancel, and dropped every message sent to the session, until the command's own timeout.

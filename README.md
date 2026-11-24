@@ -128,7 +128,7 @@ An agent that drives this desktop, like `h/holo-desktop`, uses your mouse and ke
 | `holo agents` | `list` agents, `get` one, `use` one as the default |
 | `holo skills` | browse available skills |
 | `holo mcp install` | let Cursor, Claude Code, Codex, and other MCP clients run agents through `holo mcp`; `--remote` adds the hosted server instead |
-| `holo local` | serve a browser or desktop on this machine for a session started elsewhere |
+| `holo local` | serve a desktop on this machine for a session started elsewhere |
 | `holo login`, `logout`, `whoami`, `doctor` | manage and check your credentials and setup |
 
 ### Scripts and CI
@@ -326,8 +326,8 @@ asyncio.run(main())
 ### Local agents
 
 `Client.local()` and `await AsyncClient.local()` run the agent on this machine through a local agent runtime,
-started on demand or passed in with `runtime=...`. A desktop is this machine; a browser picks `host="user_device"` or
-`host="cloud"`.
+started on demand or passed in with `runtime=...`. A desktop is this machine; a browser runs in the cloud. To drive
+this machine's Chrome, give the agent a desktop in `shell` mode (see [Code on this machine](#code-on-this-machine)).
 `Client()` keeps using the hosted Agents API. Closing the client stops a runtime it started, unless other clients still
 have active sessions there.
 
@@ -363,7 +363,7 @@ once `hai_agents_local.killswitch.arm_esc_listener()` is armed (macOS, Windows, 
 ### Code on this machine
 
 A desktop in `shell` mode gives the agent a shell on this machine. It runs commands, edits files and writes code in a
-folder, and drives the screen from the same shell when a result only shows in a window.
+folder, and drives the screen and Chrome from the same shell when a result only shows in a window.
 
 ```bash
 pip install "hai-agents[all]"

@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, Collection, Literal, Mapping, NamedTuple,
 from pydantic import BaseModel
 
 from .bridge import LocalBridge, TokenSource
-from .browser import SeleniumBrowserBridge
 from .desktop import PyautoguiDesktopBridge
 from .workstation import WorkstationBridge
 
@@ -21,7 +20,6 @@ EnvironmentLike = Union[str, BaseModel, Mapping[str, Any]]
 Reference = tuple[Literal["agent", "environment"], str]
 
 BRIDGE_TYPES: dict[str, type[LocalBridge]] = {
-    SeleniumBrowserBridge.environment_kind: SeleniumBrowserBridge,
     PyautoguiDesktopBridge.environment_kind: PyautoguiDesktopBridge,
     WorkstationBridge.environment_kind: WorkstationBridge,
 }
@@ -185,7 +183,6 @@ class _Walk:
 
 
 SERVE_COMMANDS = {
-    SeleniumBrowserBridge.environment_kind: "holo local browser",
     PyautoguiDesktopBridge.environment_kind: "holo local desktop",
     WorkstationBridge.environment_kind: "holo local desktop --shell",
 }
@@ -204,12 +201,17 @@ def _kind(env: Any) -> str | None:
 
 
 def _local_kind(env: EnvironmentLike) -> str | None:
-    """The kind of ``env`` when this machine serves it: a desktop always, a browser or workstation on user_device."""
+    """The kind of ``env`` when this machine serves it: a desktop always, a workstation on user_device."""
     kind = _kind(env)
     if kind == "desktop":
         return kind
     if _read(env, "host") != "user_device":
         return None
+    if kind == "web":
+        raise ValueError(
+            f"user_device browser {_read(env, 'id')!r} cannot be served from this machine; to drive this machine's "
+            "Chrome, use a desktop environment in shell mode: {'kind': 'desktop', 'mode': {'type': 'shell'}}"
+        )
     if kind not in BRIDGE_TYPES:
         raise ValueError(
             f"user_device environment {_read(env, 'id')!r} has kind {kind!r}, which cannot be served by a "
