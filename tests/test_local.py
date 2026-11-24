@@ -1742,17 +1742,20 @@ class TestDoctor:
         assert {"browser", "desktop"} <= set(by_name)
 
 
-async def test_stopping_workstation_interrupts_running_command_and_skips_queue(tmp_path):
+async def test_stopping_workstation_interrupts_running_command_answers_it_with_an_error_and_skips_queue(tmp_path):
     import asyncio
 
     from hai_drivers.code_sandbox.local.driver import LocalCodeSandbox
 
+    from hai_agents_local.bridge import INTERRUPTED_ERROR
+
     bridge = WorkstationBridge(api_key="test", workspace=str(tmp_path))
     bridge._driver = LocalCodeSandbox(str(tmp_path))
+    posted: list[tuple[str, Any, str | None]] = []
 
     class Exchange:
-        async def post_result(self, *args, **kwargs):
-            pytest.fail("A stopped execution must not report a successful tool result")
+        async def post_result(self, command_id, *, command_uid, result, error, timeout):
+            posted.append((command_id, result, error))
 
     commands = [
         Command(id="one", command_uid="one", name="execute", args={"command": "echo $$ > pid; sleep 60"}),
@@ -1766,6 +1769,7 @@ async def test_stopping_workstation_interrupts_running_command_and_skips_queue(t
         bridge.request_stop()
         await asyncio.wait_for(dispatch, 5)
         assert not (tmp_path / "queued").exists()
+        assert posted == [("one", None, INTERRUPTED_ERROR)], "the platform waits for an answer before a cancel lands"
     finally:
         await asyncio.to_thread(bridge._driver.close)
         await dispatch

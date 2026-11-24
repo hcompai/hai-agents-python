@@ -31,6 +31,9 @@ LONG_POLL_READ_TIMEOUT_S = 21.0
 MIN_POLL_INTERVAL_S = 1.0
 POST_RESULT_TIMEOUT_S = 10.0
 POST_RESULT_RETRIES = 2
+# A stop is joined within seconds (manager.STOP_JOIN_TIMEOUT_S), so its one answer gets a shorter post than a normal one.
+STOP_POST_RESULT_TIMEOUT_S = 3.0
+INTERRUPTED_ERROR = "Interrupted: the local bridge stopped before this command finished."
 FETCH_TRANSIENT_RETRIES = 2
 CHANNEL_SETUP_ATTEMPTS = 5
 # Must stay under the manager's READY_TIMEOUT_S so setup gives up with the real
@@ -300,6 +303,9 @@ class LocalBridge(ABC, Generic[DriverT]):
                     if self._stop_event.is_set():
                         await self.interrupt_driver()
                         await dispatch
+                        await self._deliver(
+                            exchange, cmd.id, cmd.command_uid, None, INTERRUPTED_ERROR, STOP_POST_RESULT_TIMEOUT_S
+                        )
                         return
                     result, error = await dispatch
                 finally:
@@ -354,14 +360,20 @@ class LocalBridge(ABC, Generic[DriverT]):
         return method(*leading, *variadic, **kwargs)
 
     async def _deliver(
-        self, exchange: CommandExchange, command_id: str, command_uid: str, result: Json, error: str | None
+        self,
+        exchange: CommandExchange,
+        command_id: str,
+        command_uid: str,
+        result: Json,
+        error: str | None,
+        timeout: float = POST_RESULT_TIMEOUT_S,
     ) -> None:
         """Post the result, retrying rate limits and transient failures; raises when delivery keeps failing
         so the poll loop backs off and the redelivered command reposts from the result cache."""
         for attempt in range(POST_RESULT_RETRIES + 1):
             try:
                 await exchange.post_result(
-                    command_id, command_uid=command_uid, result=result, error=error, timeout=POST_RESULT_TIMEOUT_S
+                    command_id, command_uid=command_uid, result=result, error=error, timeout=timeout
                 )
                 return
             except RateLimitedError as exc:
