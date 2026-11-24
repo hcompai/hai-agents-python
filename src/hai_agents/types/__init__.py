@@ -129,6 +129,7 @@ if typing.TYPE_CHECKING:
     from .request_start_dispatched_data import RequestStartDispatchedData
     from .request_start_dispatched_event import RequestStartDispatchedEvent
     from .request_start_event import RequestStartEvent
+    from .runner import Runner
     from .runner_session_data import RunnerSessionData
     from .runner_session_event import RunnerSessionEvent
     from .schedule_record import ScheduleRecord
@@ -158,11 +159,13 @@ if typing.TYPE_CHECKING:
         SessionEventZero_ToolApprovalDecidedEvent,
         SessionEventZero_ToolApprovalRequestedEvent,
     )
+    from .session_flag import SessionFlag
     from .session_request import SessionRequest
     from .session_request_agent import SessionRequestAgent
     from .session_request_messages import SessionRequestMessages
     from .session_status import SessionStatus
     from .session_summary import SessionSummary
+    from .session_visibility import SessionVisibility
     from .share_link import ShareLink
     from .skill import Skill
     from .skill_revision_record import SkillRevisionRecord
@@ -339,6 +342,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "RequestStartDispatchedData": ".request_start_dispatched_data",
     "RequestStartDispatchedEvent": ".request_start_dispatched_event",
     "RequestStartEvent": ".request_start_event",
+    "Runner": ".runner",
     "RunnerSessionData": ".runner_session_data",
     "RunnerSessionEvent": ".runner_session_event",
     "ScheduleRecord": ".schedule_record",
@@ -366,11 +370,13 @@ _dynamic_imports: typing.Dict[str, str] = {
     "SessionEventZero_RunnerSessionEvent": ".session_event_zero",
     "SessionEventZero_ToolApprovalDecidedEvent": ".session_event_zero",
     "SessionEventZero_ToolApprovalRequestedEvent": ".session_event_zero",
+    "SessionFlag": ".session_flag",
     "SessionRequest": ".session_request",
     "SessionRequestAgent": ".session_request_agent",
     "SessionRequestMessages": ".session_request_messages",
     "SessionStatus": ".session_status",
     "SessionSummary": ".session_summary",
+    "SessionVisibility": ".session_visibility",
     "ShareLink": ".share_link",
     "Skill": ".skill",
     "SkillRevisionRecord": ".skill_revision_record",
@@ -567,6 +573,7 @@ __all__ = [
     "RequestStartDispatchedData",
     "RequestStartDispatchedEvent",
     "RequestStartEvent",
+    "Runner",
     "RunnerSessionData",
     "RunnerSessionEvent",
     "ScheduleRecord",
@@ -594,11 +601,13 @@ __all__ = [
     "SessionEventZero_RunnerSessionEvent",
     "SessionEventZero_ToolApprovalDecidedEvent",
     "SessionEventZero_ToolApprovalRequestedEvent",
+    "SessionFlag",
     "SessionRequest",
     "SessionRequestAgent",
     "SessionRequestMessages",
     "SessionStatus",
     "SessionSummary",
+    "SessionVisibility",
     "ShareLink",
     "Skill",
     "SkillRevisionRecord",

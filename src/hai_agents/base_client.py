@@ -22,6 +22,7 @@ if typing.TYPE_CHECKING:
     from .skills.client import AsyncSkillsClient, SkillsClient
     from .vaults.client import AsyncVaultsClient, VaultsClient
     from .webhooks.client import AsyncWebhooksClient, WebhooksClient
+    from .workflows.client import AsyncWorkflowsClient, WorkflowsClient
 
 
 class BaseClient:
@@ -111,6 +112,7 @@ class BaseClient:
         self._agents: typing.Optional[AgentsClient] = None
         self._webhooks: typing.Optional[WebhooksClient] = None
         self._schedules: typing.Optional[SchedulesClient] = None
+        self._workflows: typing.Optional[WorkflowsClient] = None
         self._browser_profiles: typing.Optional[BrowserProfilesClient] = None
         self._vaults: typing.Optional[VaultsClient] = None
         self._quota: typing.Optional[QuotaClient] = None
@@ -170,6 +172,14 @@ class BaseClient:
 
             self._schedules = SchedulesClient(client_wrapper=self._client_wrapper)
         return self._schedules
+
+    @property
+    def workflows(self):
+        if self._workflows is None:
+            from .workflows.client import WorkflowsClient  # noqa: E402
+
+            self._workflows = WorkflowsClient(client_wrapper=self._client_wrapper)
+        return self._workflows
 
     @property
     def browser_profiles(self):
@@ -304,6 +314,7 @@ class AsyncBaseClient:
         self._agents: typing.Optional[AsyncAgentsClient] = None
         self._webhooks: typing.Optional[AsyncWebhooksClient] = None
         self._schedules: typing.Optional[AsyncSchedulesClient] = None
+        self._workflows: typing.Optional[AsyncWorkflowsClient] = None
         self._browser_profiles: typing.Optional[AsyncBrowserProfilesClient] = None
         self._vaults: typing.Optional[AsyncVaultsClient] = None
         self._quota: typing.Optional[AsyncQuotaClient] = None
@@ -363,6 +374,14 @@ class AsyncBaseClient:
 
             self._schedules = AsyncSchedulesClient(client_wrapper=self._client_wrapper)
         return self._schedules
+
+    @property
+    def workflows(self):
+        if self._workflows is None:
+            from .workflows.client import AsyncWorkflowsClient  # noqa: E402
+
+            self._workflows = AsyncWorkflowsClient(client_wrapper=self._client_wrapper)
+        return self._workflows
 
     @property
     def browser_profiles(self):

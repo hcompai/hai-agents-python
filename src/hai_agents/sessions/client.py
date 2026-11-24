@@ -10,9 +10,11 @@ from ..types.page_session_summary import PageSessionSummary
 from ..types.quota_status import QuotaStatus
 from ..types.session import Session
 from ..types.session_changes import SessionChanges
+from ..types.session_flag import SessionFlag
 from ..types.session_request_agent import SessionRequestAgent
 from ..types.session_request_messages import SessionRequestMessages
 from ..types.session_status import SessionStatus
+from ..types.session_visibility import SessionVisibility
 from ..types.share_link import ShareLink
 from ..types.trajectory_status import TrajectoryStatus
 from .raw_client import AsyncRawSessionsClient, RawSessionsClient
@@ -56,6 +58,8 @@ class SessionsClient:
         created_after: typing.Optional[dt.datetime] = None,
         finished_before: typing.Optional[dt.datetime] = None,
         finished_after: typing.Optional[dt.datetime] = None,
+        flagged: typing.Optional[bool] = None,
+        flagged_after: typing.Optional[dt.datetime] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
         sort: typing.Optional[
@@ -91,6 +95,12 @@ class SessionsClient:
         finished_before : typing.Optional[dt.datetime]
 
         finished_after : typing.Optional[dt.datetime]
+
+        flagged : typing.Optional[bool]
+            true: only flagged sessions. false: only sessions that are not flagged.
+
+        flagged_after : typing.Optional[dt.datetime]
+            Only sessions flagged after this time.
 
         page : typing.Optional[int]
             Page number (1-based)
@@ -130,6 +140,8 @@ class SessionsClient:
             created_after=created_after,
             finished_before=finished_before,
             finished_after=finished_after,
+            flagged=flagged,
+            flagged_after=flagged_after,
             page=page,
             size=size,
             sort=sort,
@@ -259,6 +271,96 @@ class SessionsClient:
         client.sessions.get_session_quota()
         """
         _response = self._raw_client.get_session_quota(request_options=request_options)
+        return _response.data
+
+    def get_session_visibility(self, *, request_options: typing.Optional[RequestOptions] = None) -> SessionVisibility:
+        """
+        Whether the caller's session lists include other members' sessions, and whether they administer the org.
+
+        Parameters
+        ----------
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        SessionVisibility
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.sessions.get_session_visibility()
+        """
+        _response = self._raw_client.get_session_visibility(request_options=request_options)
+        return _response.data
+
+    def flag_session(
+        self, id: str, *, note: typing.Optional[str] = OMIT, request_options: typing.Optional[RequestOptions] = None
+    ) -> SessionFlag:
+        """
+        Flag the session for attention, or replace the note on its flag; the first flag's time is kept.
+
+        Parameters
+        ----------
+        id : str
+
+        note : typing.Optional[str]
+            Why the session needs attention.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        SessionFlag
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.sessions.flag_session(
+            id="id",
+        )
+        """
+        _response = self._raw_client.flag_session(id, note=note, request_options=request_options)
+        return _response.data
+
+    def unflag_session(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
+        """
+        Clear the session's flag. Clearing a session that is not flagged succeeds.
+
+        Parameters
+        ----------
+        id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.sessions.unflag_session(
+            id="id",
+        )
+        """
+        _response = self._raw_client.unflag_session(id, request_options=request_options)
         return _response.data
 
     def get_session(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Session:
@@ -891,6 +993,8 @@ class AsyncSessionsClient:
         created_after: typing.Optional[dt.datetime] = None,
         finished_before: typing.Optional[dt.datetime] = None,
         finished_after: typing.Optional[dt.datetime] = None,
+        flagged: typing.Optional[bool] = None,
+        flagged_after: typing.Optional[dt.datetime] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
         sort: typing.Optional[
@@ -926,6 +1030,12 @@ class AsyncSessionsClient:
         finished_before : typing.Optional[dt.datetime]
 
         finished_after : typing.Optional[dt.datetime]
+
+        flagged : typing.Optional[bool]
+            true: only flagged sessions. false: only sessions that are not flagged.
+
+        flagged_after : typing.Optional[dt.datetime]
+            Only sessions flagged after this time.
 
         page : typing.Optional[int]
             Page number (1-based)
@@ -973,6 +1083,8 @@ class AsyncSessionsClient:
             created_after=created_after,
             finished_before=finished_before,
             finished_after=finished_after,
+            flagged=flagged,
+            flagged_after=flagged_after,
             page=page,
             size=size,
             sort=sort,
@@ -1118,6 +1230,122 @@ class AsyncSessionsClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.get_session_quota(request_options=request_options)
+        return _response.data
+
+    async def get_session_visibility(
+        self, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> SessionVisibility:
+        """
+        Whether the caller's session lists include other members' sessions, and whether they administer the org.
+
+        Parameters
+        ----------
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        SessionVisibility
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.sessions.get_session_visibility()
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.get_session_visibility(request_options=request_options)
+        return _response.data
+
+    async def flag_session(
+        self, id: str, *, note: typing.Optional[str] = OMIT, request_options: typing.Optional[RequestOptions] = None
+    ) -> SessionFlag:
+        """
+        Flag the session for attention, or replace the note on its flag; the first flag's time is kept.
+
+        Parameters
+        ----------
+        id : str
+
+        note : typing.Optional[str]
+            Why the session needs attention.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        SessionFlag
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.sessions.flag_session(
+                id="id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.flag_session(id, note=note, request_options=request_options)
+        return _response.data
+
+    async def unflag_session(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
+        """
+        Clear the session's flag. Clearing a session that is not flagged succeeds.
+
+        Parameters
+        ----------
+        id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.sessions.unflag_session(
+                id="id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.unflag_session(id, request_options=request_options)
         return _response.data
 
     async def get_session(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> Session:

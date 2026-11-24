@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import concurrent.futures
+import enum
 import inspect
 import json
 import logging
@@ -41,11 +42,34 @@ if typing.TYPE_CHECKING:
 
 _logger = logging.getLogger(__name__)
 
-TERMINAL_SESSION_STATUSES = frozenset({"completed", "failed", "timed_out", "interrupted"})
+
+class SessionState(str, enum.Enum):
+    """A session's status, the values `TrajectoryStatus` names; each equals its string, so it compares with raw ones.
+
+    Not `SessionStatus`, the model of a session's status response: this is just the status value."""
+
+    QUEUED = "queued"
+    PENDING = "pending"
+    RUNNING = "running"
+    PAUSED = "paused"
+    IDLE = "idle"
+    AWAITING_TOOL_RESULTS = "awaiting_tool_results"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    TIMED_OUT = "timed_out"
+    INTERRUPTED = "interrupted"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+TERMINAL_SESSION_STATUSES = frozenset(
+    {SessionState.COMPLETED, SessionState.FAILED, SessionState.TIMED_OUT, SessionState.INTERRUPTED}
+)
 
 # Polling also stops on "idle": the agent finished its turn and is waiting for the next
 # user message, which a one-shot wait will never send.
-SETTLED_SESSION_STATUSES = TERMINAL_SESSION_STATUSES | {"idle"}
+SETTLED_SESSION_STATUSES = TERMINAL_SESSION_STATUSES | {SessionState.IDLE}
 
 # Largest request body the SDK sends, enforced client-side for a clear early error.
 MAX_REQUEST_BYTES = 10_000_000
@@ -168,9 +192,9 @@ def _parse_answer(
     An idle session may legitimately have no answer yet, so ``None`` passes through;
     a completed session without a valid answer raises.
     """
-    if model is None or status not in ("completed", "idle"):
+    if model is None or status not in (SessionState.COMPLETED, SessionState.IDLE):
         return raw
-    if status == "idle" and raw is None:
+    if status == SessionState.IDLE and raw is None:
         return None
     try:
         if isinstance(raw, str):
@@ -260,7 +284,7 @@ class _Advertised:
                 data = data.model_dump()
             if not isinstance(data, dict):
                 data = {}
-            if data.get("state") == "awaiting_tool_results":
+            if data.get("state") == SessionState.AWAITING_TOOL_RESULTS:
                 if self.stretch is None:
                     self.stretch = index
                 pending = data.get("pending_tool_calls") or []
@@ -375,7 +399,7 @@ def _approval_body(call_id: str, action: str, message: typing.Optional[str]) -> 
 def _holds_for_approval(status: typing.Any) -> bool:
     """Only held calls block the session: nothing a tool loop runs will settle them."""
     return (
-        status.status == "awaiting_tool_results"
+        status.status == SessionState.AWAITING_TOOL_RESULTS
         and bool(getattr(status, "pending_approvals", None))
         and not getattr(status, "pending_tool_calls", None)
     )
@@ -416,7 +440,9 @@ def _ends_wait(
     """Whether a wait stops on ``status``; a hold on decided calls lasts until the agent picks the decisions up."""
     if _holds_for_approval(status):
         return bool(undecided)
-    return is_settled_session_status(status.status) or (status.status == "awaiting_tool_results" and dispatch is None)
+    return is_settled_session_status(status.status) or (
+        status.status == SessionState.AWAITING_TOOL_RESULTS and dispatch is None
+    )
 
 
 def _raise_unless_posted(response: typing.Any) -> None:
@@ -534,7 +560,7 @@ def _answer_tool_calls(
 ) -> None:
     """Run and post the calls the session awaits, each once per step."""
     # The live status describes the tip: a lagging cursor's advertised calls may already be answered.
-    if not caught_up or status.status != "awaiting_tool_results" or _holds_for_approval(status):
+    if not caught_up or status.status != SessionState.AWAITING_TOOL_RESULTS or _holds_for_approval(status):
         return
     if not advertised.anchored or not advertised.calls:
         advertised.adopt(_recover_pending_tool_calls(client, id))
@@ -556,7 +582,7 @@ async def _async_answer_tool_calls(
     caught_up: bool,
 ) -> None:
     """Async version of ``_answer_tool_calls``."""
-    if not caught_up or status.status != "awaiting_tool_results" or _holds_for_approval(status):
+    if not caught_up or status.status != SessionState.AWAITING_TOOL_RESULTS or _holds_for_approval(status):
         return
     if not advertised.anchored or not advertised.calls:
         advertised.adopt(await _async_recover_pending_tool_calls(client, id))
@@ -583,7 +609,7 @@ def _cursor_after(cursor: int, changes: typing.Optional[SessionChanges]) -> int:
 
 
 def _settled_cleanly(status: TrajectoryStatus) -> bool:
-    return status in ("completed", "idle")
+    return status in (SessionState.COMPLETED, SessionState.IDLE)
 
 
 def _final_changes(
