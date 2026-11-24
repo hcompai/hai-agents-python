@@ -65,6 +65,24 @@ def test_in_flight_statuses_are_neither_settled_nor_terminal(status: str) -> Non
     assert is_settled_session_status(status) is False
 
 
+def test_session_state_lists_exactly_the_statuses_the_api_names() -> None:
+    import typing
+
+    from hai_agents import SessionState, TrajectoryStatus
+
+    named = typing.get_args(typing.get_args(TrajectoryStatus)[0])
+    assert sorted(state.value for state in SessionState) == sorted(named), "regenerated API: update SessionState"
+
+
+def test_a_session_state_stands_in_for_its_raw_status() -> None:
+    from hai_agents import TERMINAL_SESSION_STATUSES, SessionState
+
+    assert SessionState("interrupted") is SessionState.INTERRUPTED
+    assert SessionState.IDLE == "idle" and f"{SessionState.IDLE}" == "idle"
+    assert is_settled_session_status(SessionState.IDLE) and not is_terminal_session_status(SessionState.IDLE)
+    assert {"interrupted", SessionState.FAILED} <= set(TERMINAL_SESSION_STATUSES)
+
+
 def test_payload_under_limit_is_accepted() -> None:
     payload = {"agent": "h/web-surfer-pro", "messages": "hello"}
     assert_request_under_limit(payload)
