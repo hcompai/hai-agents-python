@@ -31,6 +31,7 @@ LONG_POLL_READ_TIMEOUT_S = 21.0
 MIN_POLL_INTERVAL_S = 1.0
 POST_RESULT_TIMEOUT_S = 10.0
 POST_RESULT_RETRIES = 2
+INTERRUPTED_ERROR = "Interrupted: the local bridge stopped before this command finished."
 FETCH_TRANSIENT_RETRIES = 2
 CHANNEL_SETUP_ATTEMPTS = 5
 # Must stay under the manager's READY_TIMEOUT_S so setup gives up with the real
@@ -300,6 +301,7 @@ class LocalBridge(ABC, Generic[DriverT]):
                     if self._stop_event.is_set():
                         await self.interrupt_driver()
                         await dispatch
+                        await self._deliver(exchange, cmd.id, cmd.command_uid, None, INTERRUPTED_ERROR)
                         return
                     result, error = await dispatch
                 finally:

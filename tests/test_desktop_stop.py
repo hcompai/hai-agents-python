@@ -17,6 +17,7 @@ except ImportError:
 
 from hai_drivers.desktop.scaled import ScaledDesktopDriver
 
+from hai_agents_local.bridge import INTERRUPTED_ERROR
 from hai_agents_local.desktop import PyautoguiDesktopBridge
 from hai_agents_local.transport import Command
 
@@ -50,9 +51,11 @@ async def test_desktop_stop_kills_owned_command_tree_and_rejects_queued_work(tmp
         ),
     ]
 
+    posted = []
+
     class Exchange:
-        async def post_result(self, *args, **kwargs):
-            pytest.fail("Stopped work must not report a successful result")
+        async def post_result(self, command_id, *, command_uid, result, error, timeout):
+            posted.append((command_id, result, error))
 
     observer = subprocess.Popen([sys.executable, "-c", "import time;time.sleep(60)"])
     dispatch = asyncio.create_task(bridge._process_commands(Exchange(), commands))
@@ -65,6 +68,7 @@ async def test_desktop_stop_kills_owned_command_tree_and_rejects_queued_work(tmp
         await asyncio.wait_for(dispatch, 5)
         assert observer.poll() is None
         assert not queued.exists()
+        assert posted == [("one", None, INTERRUPTED_ERROR)], "stopped work is answered with an error, never a success"
         for pid in owned:
             async with asyncio.timeout(5):
                 while True:
