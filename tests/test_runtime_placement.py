@@ -12,8 +12,7 @@ import pytest
 
 from hai_agents import AsyncClient, Client
 from hai_agents_local.runtime import BinaryIncompatibleError, Inference, LocalRuntime, LocalRuntimeError
-from hai_agents_local.runtime.inference import served_inference
-from hai_agents_local.runtime.runtime import default_port
+from hai_agents_local.runtime.runtime import default_port, served_by
 from hai_agents_local.runtime.state import DEFAULT_PORT, inference_file_path, token_file_path, write_owner_only
 
 
@@ -191,16 +190,38 @@ def test_spawned_runtime_infers_with_the_key_hai_login_stored(tmp_path, monkeypa
     assert launches[0]["spawn_env"].get("HAI_API_KEY") == forwarded
 
 
-def test_runtimes_for_different_inference_never_share(tmp_path, runtime_server):
+@pytest.mark.parametrize(
+    ("base_url", "environments"),
+    [(None, "https://agent-envs.eu.hcompany.ai"), ("https://agp.hcompany.ai", "https://agent-envs.hcompany.ai")],
+)
+def test_spawned_runtime_runs_cloud_environments_in_the_clients_region(monkeypatch, base_url, environments):
+    monkeypatch.delenv("ENVIRONMENT_MANAGER_URL", raising=False)
+    if base_url:
+        monkeypatch.setenv("HAI_API_BASE_URL", base_url)
+    else:
+        monkeypatch.delenv("HAI_API_BASE_URL", raising=False)
+    launches = []
+    monkeypatch.setattr(LocalRuntime, "ensure_started", lambda **options: launches.append(options) or FakeRuntime())
+    Client.local(auto_bridges=False)
+    assert launches[0]["spawn_env"]["ENVIRONMENT_MANAGER_URL"] == environments
+
+
+def test_runtimes_for_different_placements_never_share(tmp_path, runtime_server, monkeypatch):
+    monkeypatch.delenv("ENVIRONMENT_MANAGER_URL", raising=False)
     self_hosted_env = Inference.self_hosted("http://127.0.0.1:8000/v1", model="my-model").runtime_env()
-    hosted, self_hosted = served_inference({}), served_inference(self_hosted_env)
-    assert default_port(hosted) == DEFAULT_PORT != default_port(self_hosted)
+    hosted, self_hosted = served_by({}), served_by(self_hosted_env)
+    eu = served_by({"ENVIRONMENT_MANAGER_URL": "https://agent-envs.eu.hcompany.ai"})
+    us = served_by({"ENVIRONMENT_MANAGER_URL": "https://agent-envs.hcompany.ai"})
+    assert default_port(hosted) == default_port(eu) == DEFAULT_PORT
+    assert len({DEFAULT_PORT, default_port(us), default_port(self_hosted)}) == 3
 
     write_owner_only(token_file_path(runtime_server.port, cache_dir=tmp_path), "local-token")
     write_owner_only(inference_file_path(runtime_server.port, cache_dir=tmp_path), f"{hosted}\n123")
     start = {"cache_dir": tmp_path, "port": runtime_server.port, "inherit_env": False}
-    with pytest.raises(LocalRuntimeError, match="infers against hosted"):
+    with pytest.raises(LocalRuntimeError, match="serves hosted"):
         LocalRuntime.ensure_started(spawn_env=self_hosted_env, **start)
+    with pytest.raises(LocalRuntimeError, match="serves hosted"):
+        LocalRuntime.ensure_started(spawn_env={"ENVIRONMENT_MANAGER_URL": "https://agent-envs.hcompany.ai"}, **start)
     assert LocalRuntime.ensure_started(spawn_env={}, **start).serves == hosted
 
 

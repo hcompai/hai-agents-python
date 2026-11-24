@@ -419,6 +419,8 @@ client = Client(environment=HaiAgentsEnvironment.US)
 client = Client(base_url="https://agp.hcompany.ai", api_key="hk-...")
 ```
 
+`Client.local` and `holo --local` run a session's cloud browsers in the region of `HAI_API_BASE_URL`, EU by default; pass `--base-url https://agp.hcompany.ai` to `holo` for the US.
+
 ### Errors
 
 ```python

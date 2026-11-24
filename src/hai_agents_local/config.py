@@ -11,6 +11,13 @@ BASE_URL_ENV_VAR = "HAI_API_BASE_URL"
 
 DEFAULT_BASE_URL = HaiAgentsEnvironment.EU.value
 
+ENVIRONMENTS_HOST_VAR = "ENVIRONMENT_MANAGER_URL"
+ENVIRONMENTS_HOSTS = {
+    HaiAgentsEnvironment.EU.value: "https://agent-envs.eu.hcompany.ai",
+    HaiAgentsEnvironment.US.value: "https://agent-envs.hcompany.ai",
+}
+"""Where each region's cloud environments run; a local runtime places its sessions' cloud browsers there."""
+
 # A machine set up with one of these expects no bridge of its own, or held or confined commands: set, it fails the
 # session, so that nothing runs with less than the machine asked for.
 _UNREAD = {
@@ -23,6 +30,11 @@ _UNREAD = {
 
 def default_base_url() -> str:
     return os.getenv(BASE_URL_ENV_VAR, "").strip() or DEFAULT_BASE_URL
+
+
+def environments_host() -> str | None:
+    """The cloud environments host of this machine's region; None for a platform outside the known regions."""
+    return ENVIRONMENTS_HOSTS.get(default_base_url().rstrip("/"))
 
 
 def refuse_unread_settings() -> None:

@@ -20,6 +20,7 @@ import httpx
 
 from hai_agents.base_client import BaseClient
 
+from ..config import DEFAULT_BASE_URL, ENVIRONMENTS_HOST_VAR, ENVIRONMENTS_HOSTS
 from . import identity
 from .errors import (
     BinaryIncompatibleError,
@@ -65,6 +66,7 @@ INFERENCE_PORTS = 1000
 STARTUP_LOCK_GRACE_S = TERM_GRACE_S + KILL_WAIT_S + 5.0
 
 _PathInput = typing.Union[str, "os.PathLike[str]"]
+_DEFAULT_SERVED = f"{HOSTED} {ENVIRONMENTS_HOSTS[DEFAULT_BASE_URL]}"
 
 
 def _warn_on_version_skew(version: typing.Optional[str]) -> None:
@@ -91,9 +93,14 @@ def _served_from_record(record: typing.Optional[str]) -> typing.Optional[str]:
     return record.splitlines()[0] if record else None
 
 
+def served_by(env: typing.Mapping[str, str]) -> str:
+    """What a runtime started with ``env`` serves: its inference, then the host its cloud environments run on."""
+    return " ".join(part for part in (served_inference(env), env.get(ENVIRONMENTS_HOST_VAR, "").strip()) if part)
+
+
 def default_port(served: str) -> int:
-    """Hosted inference on ``DEFAULT_PORT``; any other inference on its own stable port, so both run side by side."""
-    if served == HOSTED:
+    """Hosted inference in the default region on ``DEFAULT_PORT``; anything else on its own stable port, side by side."""
+    if served in (HOSTED, _DEFAULT_SERVED):
         return DEFAULT_PORT
     return DEFAULT_PORT + 1 + int(hashlib.sha256(served.encode()).hexdigest(), 16) % INFERENCE_PORTS
 
@@ -164,7 +171,7 @@ class LocalRuntime:
     ) -> "LocalRuntime":
         """Return a reachable LocalRuntime, attaching to an existing one or spawning the binary."""
         resolved_cache = resolve_cache_dir(cache_dir)
-        served = served_inference(cls._child_env(port=0, token="", spawn_env=spawn_env, inherit_env=inherit_env))
+        served = served_by(cls._child_env(port=0, token="", spawn_env=spawn_env, inherit_env=inherit_env))
         resolved_port = port if port is not None else int(os.environ.get(PORT_ENV, "").strip() or default_port(served))
         base_url = f"http://{LOOPBACK_HOST}:{resolved_port}"
         lock_wait_s = timeout_s + STARTUP_LOCK_GRACE_S
@@ -280,12 +287,11 @@ class LocalRuntime:
             )
 
     def _verified(self, recipe: typing.Optional[str], served: str) -> "LocalRuntime":
-        """This runtime, once it supports ``recipe`` and was not started for another inference than ``served``."""
+        """This runtime, once it supports ``recipe`` and serves what ``served`` names."""
         self.require_recipe(recipe)
         if self.serves is not None and self.serves != served:
             raise LocalRuntimeError(
-                f"the runtime at {self.base_url} infers against {self.serves}, not {served}; "
-                f"set {PORT_ENV} to run another one"
+                f"the runtime at {self.base_url} serves {self.serves}, not {served}; set {PORT_ENV} to run another one"
             )
         return self
 

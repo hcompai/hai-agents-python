@@ -11,6 +11,7 @@ import httpx
 
 from hai_agents.client import API_KEY_VAR, default_api_key
 
+from ..config import ENVIRONMENTS_HOST_VAR, environments_host
 from . import identity
 from .errors import LocalRuntimeError
 from .inference import Inference
@@ -167,8 +168,11 @@ def _launch_options(
     api_key = default_api_key()
     if api_key is not None:
         options["spawn_env"].setdefault(API_KEY_VAR, api_key)
+    inherited = os.environ if options.get("inherit_env", True) else {}
+    host = environments_host()
+    if host is not None and ENVIRONMENTS_HOST_VAR not in {**inherited, **options["spawn_env"]}:
+        options["spawn_env"][ENVIRONMENTS_HOST_VAR] = host
     if inference is None:
-        inherited = os.environ if options.get("inherit_env", True) else {}
         inference = Inference.from_env({**inherited, **options["spawn_env"]})
     if inference is not None:
         options["spawn_env"] = inference.runtime_env(options["spawn_env"])
