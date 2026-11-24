@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `SessionState`, an enum of the session statuses `TrajectoryStatus` names (`from hai_agents import SessionState`). Each member equals its string, so it compares with the raw statuses the API returns, and `TERMINAL_SESSION_STATUSES` and `SETTLED_SESSION_STATUSES` now hold its members. A test fails when a regenerated API names a status the enum lacks.
+
 ## [0.1.12]
 
 Baseline public release of the Agents API SDK and `hai` CLI. Earlier
