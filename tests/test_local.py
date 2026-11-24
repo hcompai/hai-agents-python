@@ -929,6 +929,36 @@ class TestBridgeProtocol:
             {"id": dead.session_id, "command_uid": "u1", "result": None, "error": INTERRUPTED_ERROR}
         ]
 
+    async def test_a_failed_answer_to_a_stopped_command_keeps_its_record_for_the_next_bridge(self):
+        class DownExchange:
+            async def post_result(self, *args, **kwargs):
+                raise httpx.ConnectError("down")
+
+        bridge = _bridge(FakeDriver())
+        bridge._note_running(Command(id="c1", command_uid="u1", name="click", args={}))
+        bridge._stop_event.set()
+        assert await bridge._deliver(DownExchange(), "c1", "u1", None, "interrupted") is False
+        assert bridge._running_file().exists()
+
+    async def test_a_left_command_stays_on_record_after_a_transient_failure_and_goes_after_a_4xx(self, monkeypatch):
+        def failing(status: int):
+            class Exchange:
+                async def post_result(self, *args, **kwargs):
+                    request = httpx.Request("POST", "http://x")
+                    raise httpx.HTTPStatusError(
+                        "fail", request=request, response=httpx.Response(status, request=request)
+                    )
+
+            return Exchange()
+
+        bridge = _bridge(FakeDriver())
+        bridge._note_running(Command(id=bridge.session_id, command_uid="u1", name="poll_execution", args={}))
+        monkeypatch.setattr("hai_agents_local.bridge.POST_RESULT_RETRIES", 0)
+        await bridge._answer_left(failing(503))
+        assert bridge._running_file().exists()
+        await bridge._answer_left(failing(404))
+        assert not bridge._running_file().exists()
+
     async def test_a_bridge_on_another_channel_leaves_a_left_command_alone(self):
         dead = _bridge(FakeDriver())
         dead._note_running(Command(id=dead.session_id, command_uid="u1", name="poll_execution", args={}))

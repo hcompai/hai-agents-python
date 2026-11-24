@@ -33,6 +33,10 @@ LONG_POLL_READ_TIMEOUT_S = 21.0
 MIN_POLL_INTERVAL_S = 1.0
 POST_RESULT_TIMEOUT_S = 10.0
 POST_RESULT_RETRIES = 2
+# A stop is joined within seconds (manager.STOP_JOIN_TIMEOUT_S), so its one answer gets a shorter post than a normal one.
+STOP_POST_RESULT_TIMEOUT_S = 3.0
+# Answering a command a dead bridge left must not hold the bridge's own startup (manager.READY_TIMEOUT_S).
+ANSWER_LEFT_TIMEOUT_S = 10.0
 COMMANDS_DIR = Path.home() / ".hai" / "bridge-commands"
 INTERRUPTED_ERROR = "Interrupted: the local bridge stopped before this command finished."
 FETCH_TRANSIENT_RETRIES = 2
@@ -153,7 +157,10 @@ class LocalBridge(ABC, Generic[DriverT]):
                 exchange = CommandExchange(client, self.base_url)
                 if not await self._open_channel(exchange):
                     return
-                await self._answer_left(exchange)
+                try:
+                    await asyncio.wait_for(self._answer_left(exchange), ANSWER_LEFT_TIMEOUT_S)
+                except (TimeoutError, asyncio.TimeoutError):
+                    logger.warning("timed out answering a command left by an earlier bridge; its record is kept")
                 if self._driver is None:
                     self._driver = await asyncio.to_thread(self.create_driver)
                 self.ready.set()
@@ -306,8 +313,11 @@ class LocalBridge(ABC, Generic[DriverT]):
                     if self._stop_event.is_set():
                         await self.interrupt_driver()
                         await dispatch
-                        await self._deliver(exchange, cmd.id, cmd.command_uid, None, INTERRUPTED_ERROR)
-                        self._forget_running()
+                        answered = await self._deliver(
+                            exchange, cmd.id, cmd.command_uid, None, INTERRUPTED_ERROR, STOP_POST_RESULT_TIMEOUT_S
+                        )
+                        if answered:
+                            self._forget_running()
                         return
                     result, error = await dispatch
                 finally:
@@ -317,8 +327,8 @@ class LocalBridge(ABC, Generic[DriverT]):
                 self._results[cmd.command_uid] = (result, error)
                 while len(self._results) > RESULT_CACHE_SIZE:
                     self._results.popitem(last=False)
-            await self._deliver(exchange, cmd.id, cmd.command_uid, result, error)
-            self._forget_running()
+            if await self._deliver(exchange, cmd.id, cmd.command_uid, result, error):
+                self._forget_running()
 
     def _running_file(self) -> Path:
         return COMMANDS_DIR / f"{self.session_id}.json"
@@ -350,10 +360,16 @@ class LocalBridge(ABC, Generic[DriverT]):
             self._forget_running()
             return
         try:
-            await self._deliver(exchange, command_id, command_uid, None, INTERRUPTED_ERROR)
-        except Exception:
+            answered = await self._deliver(exchange, command_id, command_uid, None, INTERRUPTED_ERROR)
+        except httpx.HTTPStatusError as exc:
+            # A 4xx will not heal (the command is already answered or gone); anything else is tried again next start.
+            answered = exc.response.status_code < 500
             logger.warning("could not answer command %s left by an earlier bridge", command_uid, exc_info=True)
-        self._forget_running()
+        except Exception:
+            answered = False
+            logger.warning("could not answer command %s left by an earlier bridge", command_uid, exc_info=True)
+        if answered:
+            self._forget_running()
 
     def _dispatch(self, name: str, args: dict[str, Any]) -> tuple[Json, str | None]:
         if name not in self.commands:
@@ -398,16 +414,24 @@ class LocalBridge(ABC, Generic[DriverT]):
         return method(*leading, *variadic, **kwargs)
 
     async def _deliver(
-        self, exchange: CommandExchange, command_id: str, command_uid: str, result: Json, error: str | None
-    ) -> None:
+        self,
+        exchange: CommandExchange,
+        command_id: str,
+        command_uid: str,
+        result: Json,
+        error: str | None,
+        timeout: float = POST_RESULT_TIMEOUT_S,
+    ) -> bool:
         """Post the result, retrying rate limits and transient failures; raises when delivery keeps failing
-        so the poll loop backs off and the redelivered command reposts from the result cache."""
+        so the poll loop backs off and the redelivered command reposts from the result cache.
+
+        False means a stop cut the retries short and the result was not posted; True means it was."""
         for attempt in range(POST_RESULT_RETRIES + 1):
             try:
                 await exchange.post_result(
-                    command_id, command_uid=command_uid, result=result, error=error, timeout=POST_RESULT_TIMEOUT_S
+                    command_id, command_uid=command_uid, result=result, error=error, timeout=timeout
                 )
-                return
+                return True
             except RateLimitedError as exc:
                 if attempt == POST_RESULT_RETRIES:
                     raise
@@ -419,7 +443,8 @@ class LocalBridge(ABC, Generic[DriverT]):
                 delay = 0.5 * (attempt + 1)
                 logger.warning("post result for %s failed (attempt %d): %s", command_id, attempt + 1, exc)
             if await self._interruptible_sleep(delay):
-                return
+                return False
+        return False
 
     async def _interruptible_sleep(self, seconds: float) -> bool:
         """Sleep up to ``seconds``; True when woken by a stop request."""
