@@ -10,8 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A local bridge that stops while a command runs now answers that command with an error. The platform applies a session's cancel only once its in-flight command has an answer, so an unanswered one held the cancel, and dropped every message sent to the session, until the command's own timeout.
-- A bridge whose process died mid-command (crash, force quit) left that command unanswered for good: the platform does not send it to a new bridge. A bridge now records the command it runs under `~/.hai/bridge-commands/`, and the next bridge on the same channel answers a left one with the same error when it starts.
-  The record is kept when the answer could not be posted (a network error, a 5xx, or a stop mid-post) and dropped on success or a 4xx, and a stopping bridge posts its one answer with a 3 s timeout.
 
 ## [0.1.12]
 
