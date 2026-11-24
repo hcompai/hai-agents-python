@@ -8,6 +8,7 @@ import typing
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel, update_forward_refs
 from .dependency_revisions import DependencyRevisions
+from .runner import Runner
 from .session_request import SessionRequest
 from .session_status import SessionStatus
 
@@ -42,6 +43,11 @@ class Session(UniversalBaseModel):
     latest_answer: typing.Optional[typing.Any] = pydantic.Field(default=None)
     """
     The agent's most recent final answer: free-form text, or structured data when the agent runs with a custom answer format. Null until the agent first answers. Mirrors the answer streamed from the changes endpoint, surfaced here for non-interactive runs.
+    """
+
+    runner: typing.Optional[Runner] = pydantic.Field(default=None)
+    """
+    The agent-envs session hosting the agent's environment, as the environment last reported it. Null until the environment starts (a lazy one at the agent's first call to it). Shown to the session's owner and organization only.
     """
 
     created_at: dt.datetime

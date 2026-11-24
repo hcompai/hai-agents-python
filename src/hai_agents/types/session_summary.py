@@ -5,6 +5,7 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .session_flag import SessionFlag
 from .trajectory_status import TrajectoryStatus
 from .user_message_event import UserMessageEvent
 
@@ -15,6 +16,11 @@ class SessionSummary(UniversalBaseModel):
     """
 
     id: str
+    owner_id: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    The user who created the session; API keys create sessions as their owner. Null from hosts that do not record owners, such as a local runtime.
+    """
+
     agent: typing.Optional[str] = None
     agent_revision: typing.Optional[int] = pydantic.Field(default=None)
     """
@@ -39,6 +45,11 @@ class SessionSummary(UniversalBaseModel):
     anonymized_at: typing.Optional[dt.datetime] = pydantic.Field(default=None)
     """
     When the session's PII text and screenshots were irreversibly anonymized. Null if not anonymized.
+    """
+
+    flag: typing.Optional[SessionFlag] = pydantic.Field(default=None)
+    """
+    Set while the session is flagged for attention.
     """
 
     if IS_PYDANTIC_V2:

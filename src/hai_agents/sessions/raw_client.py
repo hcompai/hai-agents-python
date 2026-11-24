@@ -25,9 +25,11 @@ from ..types.quota_error_response import QuotaErrorResponse
 from ..types.quota_status import QuotaStatus
 from ..types.session import Session
 from ..types.session_changes import SessionChanges
+from ..types.session_flag import SessionFlag
 from ..types.session_request_agent import SessionRequestAgent
 from ..types.session_request_messages import SessionRequestMessages
 from ..types.session_status import SessionStatus
+from ..types.session_visibility import SessionVisibility
 from ..types.share_link import ShareLink
 from ..types.trajectory_status import TrajectoryStatus
 from .types.list_session_events_request_sort_item import ListSessionEventsRequestSortItem
@@ -60,6 +62,8 @@ class RawSessionsClient:
         created_after: typing.Optional[dt.datetime] = None,
         finished_before: typing.Optional[dt.datetime] = None,
         finished_after: typing.Optional[dt.datetime] = None,
+        flagged: typing.Optional[bool] = None,
+        flagged_after: typing.Optional[dt.datetime] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
         sort: typing.Optional[
@@ -96,6 +100,12 @@ class RawSessionsClient:
 
         finished_after : typing.Optional[dt.datetime]
 
+        flagged : typing.Optional[bool]
+            true: only flagged sessions. false: only sessions that are not flagged.
+
+        flagged_after : typing.Optional[dt.datetime]
+            Only sessions flagged after this time.
+
         page : typing.Optional[int]
             Page number (1-based)
 
@@ -128,6 +138,8 @@ class RawSessionsClient:
                 "created_after": serialize_datetime(created_after) if created_after is not None else None,
                 "finished_before": serialize_datetime(finished_before) if finished_before is not None else None,
                 "finished_after": serialize_datetime(finished_after) if finished_after is not None else None,
+                "flagged": flagged,
+                "flagged_after": serialize_datetime(flagged_after) if flagged_after is not None else None,
                 "page": page,
                 "size": size,
                 "sort": sort,
@@ -344,6 +356,185 @@ class RawSessionsClient:
                     ),
                 )
                 return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def get_session_visibility(
+        self, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[SessionVisibility]:
+        """
+        Whether the caller's session lists include other members' sessions, and whether they administer the org.
+
+        Parameters
+        ----------
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[SessionVisibility]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            "api/v2/sessions/visibility",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    SessionVisibility,
+                    parse_obj_as(
+                        type_=SessionVisibility,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def flag_session(
+        self, id: str, *, note: typing.Optional[str] = OMIT, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[SessionFlag]:
+        """
+        Flag the session for attention, or replace the note on its flag; the first flag's time is kept.
+
+        Parameters
+        ----------
+        id : str
+
+        note : typing.Optional[str]
+            Why the session needs attention.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[SessionFlag]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{encode_path_param(id)}/flag",
+            method="PUT",
+            json={
+                "note": note,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    SessionFlag,
+                    parse_obj_as(
+                        type_=SessionFlag,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def unflag_session(self, id: str, *, request_options: typing.Optional[RequestOptions] = None) -> HttpResponse[None]:
+        """
+        Clear the session's flag. Clearing a session that is not flagged succeeds.
+
+        Parameters
+        ----------
+        id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[None]
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{encode_path_param(id)}/flag",
+            method="DELETE",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return HttpResponse(response=_response, data=None)
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -1289,6 +1480,8 @@ class AsyncRawSessionsClient:
         created_after: typing.Optional[dt.datetime] = None,
         finished_before: typing.Optional[dt.datetime] = None,
         finished_after: typing.Optional[dt.datetime] = None,
+        flagged: typing.Optional[bool] = None,
+        flagged_after: typing.Optional[dt.datetime] = None,
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
         sort: typing.Optional[
@@ -1325,6 +1518,12 @@ class AsyncRawSessionsClient:
 
         finished_after : typing.Optional[dt.datetime]
 
+        flagged : typing.Optional[bool]
+            true: only flagged sessions. false: only sessions that are not flagged.
+
+        flagged_after : typing.Optional[dt.datetime]
+            Only sessions flagged after this time.
+
         page : typing.Optional[int]
             Page number (1-based)
 
@@ -1357,6 +1556,8 @@ class AsyncRawSessionsClient:
                 "created_after": serialize_datetime(created_after) if created_after is not None else None,
                 "finished_before": serialize_datetime(finished_before) if finished_before is not None else None,
                 "finished_after": serialize_datetime(finished_after) if finished_after is not None else None,
+                "flagged": flagged,
+                "flagged_after": serialize_datetime(flagged_after) if flagged_after is not None else None,
                 "page": page,
                 "size": size,
                 "sort": sort,
@@ -1573,6 +1774,187 @@ class AsyncRawSessionsClient:
                     ),
                 )
                 return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def get_session_visibility(
+        self, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[SessionVisibility]:
+        """
+        Whether the caller's session lists include other members' sessions, and whether they administer the org.
+
+        Parameters
+        ----------
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[SessionVisibility]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            "api/v2/sessions/visibility",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    SessionVisibility,
+                    parse_obj_as(
+                        type_=SessionVisibility,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def flag_session(
+        self, id: str, *, note: typing.Optional[str] = OMIT, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[SessionFlag]:
+        """
+        Flag the session for attention, or replace the note on its flag; the first flag's time is kept.
+
+        Parameters
+        ----------
+        id : str
+
+        note : typing.Optional[str]
+            Why the session needs attention.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[SessionFlag]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{encode_path_param(id)}/flag",
+            method="PUT",
+            json={
+                "note": note,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    SessionFlag,
+                    parse_obj_as(
+                        type_=SessionFlag,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def unflag_session(
+        self, id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[None]:
+        """
+        Clear the session's flag. Clearing a session that is not flagged succeeds.
+
+        Parameters
+        ----------
+        id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[None]
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{encode_path_param(id)}/flag",
+            method="DELETE",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),

@@ -301,6 +301,43 @@
             }
           },
           {
+            "name": "flagged",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true: only flagged sessions. false: only sessions that are not flagged.",
+              "title": "Flagged"
+            },
+            "description": "true: only flagged sessions. false: only sessions that are not flagged."
+          },
+          {
+            "name": "flagged_after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only sessions flagged after this time.",
+              "title": "Flagged After"
+            },
+            "description": "Only sessions flagged after this time."
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -415,6 +452,148 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v2/sessions/visibility": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Get Session Visibility",
+        "description": "Whether the caller's session lists include other members' sessions, and whether they administer the org.",
+        "operationId": "get_session_visibility_api_v2_sessions_visibility_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionVisibility"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v2/sessions/{id}/flag": {
+      "put": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Flag Session",
+        "description": "Flag the session for attention, or replace the note on its flag; the first flag's time is kept.",
+        "operationId": "flag_session_api_v2_sessions__id__flag_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSessionFlag"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFlag"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Unflag Session",
+        "description": "Clear the session's flag. Clearing a session that is not flagged succeeds.",
+        "operationId": "unflag_session_api_v2_sessions__id__flag_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Session not found."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v2/sessions/{id}": {
@@ -4889,6 +5068,57 @@
               "format": "uuid",
               "title": "Schedule Id"
             }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProbeDraft"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/workflows/{workflow_type}/probe/draft": {
+      "post": {
+        "tags": [
+          "Workflows"
+        ],
+        "summary": "Draft Workflow Probe",
+        "description": "Draft a completion probe from the workflow type's runs marked as passing or failing; nothing is stored.",
+        "operationId": "draft_workflow_probe_api_v2_workflows__workflow_type__probe_draft_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workflow_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.-]{1,200}$",
+              "description": "The Temporal workflow type, as the `workflow_type` metadata of the sessions its runs create.",
+              "title": "Workflow Type"
+            },
+            "description": "The Temporal workflow type, as the `workflow_type` metadata of the sessions its runs create."
           }
         ],
         "responses": {
@@ -9987,6 +10217,27 @@
         "title": "RequestStartEvent",
         "description": "The platform requested the agent to start."
       },
+      "Runner": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Agent-envs id of the runner session: the id its connect URLs (noVNC included) address. It changes when the agent moves to a new runner."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EnvironmentKind",
+            "description": "Kind of the environment it hosts. With a browser and a workstation, the browser's."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind"
+        ],
+        "title": "Runner",
+        "description": "The agent-envs session hosting a session's environment."
+      },
       "RunnerSessionData": {
         "properties": {
           "runner_session_id": {
@@ -10315,6 +10566,17 @@
             "title": "Latest Answer",
             "description": "The agent's most recent final answer: free-form text, or structured data when the agent runs with a custom answer format. Null until the agent first answers. Mirrors the answer streamed from the changes endpoint, surfaced here for non-interactive runs."
           },
+          "runner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Runner"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The agent-envs session hosting the agent's environment, as the environment last reported it. Null until the environment starts (a lazy one at the agent's first call to it). Shown to the session's owner and organization only."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -10565,6 +10827,48 @@
             "$ref": "#/components/schemas/TrajectoryEvent"
           }
         ]
+      },
+      "SessionFlag": {
+        "properties": {
+          "flagged_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Flagged At",
+            "description": "When the session was flagged. Editing the note keeps it."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Why the session needs attention."
+          },
+          "flagged_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flagged By",
+            "description": "The user who flagged the session."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "flagged_at"
+        ],
+        "title": "SessionFlag",
+        "description": "A shared \"needs attention\" marker on a session; anyone who can see the session can raise or clear it."
       },
       "SessionRequest": {
         "properties": {
@@ -10818,6 +11122,19 @@
             "format": "uuid",
             "title": "Id"
           },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id",
+            "description": "The user who created the session; API keys create sessions as their owner. Null from hosts that do not record owners, such as a local runtime."
+          },
           "agent": {
             "anyOf": [
               {
@@ -10920,6 +11237,17 @@
             ],
             "title": "Anonymized At",
             "description": "When the session's PII text and screenshots were irreversibly anonymized. Null if not anonymized."
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionFlag"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set while the session is flagged for attention."
           }
         },
         "additionalProperties": false,
@@ -10931,6 +11259,49 @@
         ],
         "title": "SessionSummary",
         "description": "Flat projection for session listings, including child rosters via ``?parent_session_id=``."
+      },
+      "SessionVisibility": {
+        "properties": {
+          "organization_runs": {
+            "type": "boolean",
+            "title": "Organization Runs",
+            "description": "Whether session lists can include other members' sessions. False when the organization lets members see only their own: an ``owner=organization`` list then returns the caller's sessions."
+          },
+          "is_org_admin": {
+            "type": "boolean",
+            "title": "Is Org Admin",
+            "description": "Whether the caller administers the organization: an owner, or a platform administrator."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "organization_runs",
+          "is_org_admin"
+        ],
+        "title": "SessionVisibility",
+        "description": "How much of the organization's sessions the caller sees."
+      },
+      "SetSessionFlag": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Why the session needs attention."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SetSessionFlag",
+        "description": "Flag a session, or replace the note on its flag."
       },
       "ShareLink": {
         "properties": {
