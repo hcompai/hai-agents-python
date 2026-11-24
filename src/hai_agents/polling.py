@@ -44,7 +44,9 @@ _logger = logging.getLogger(__name__)
 
 
 class SessionState(str, enum.Enum):
-    """A session's status, the values `TrajectoryStatus` names; each equals its string, so it compares with raw ones."""
+    """A session's status, the values `TrajectoryStatus` names; each equals its string, so it compares with raw ones.
+
+    Not `SessionStatus`, the model of a session's status response: this is just the status value."""
 
     QUEUED = "queued"
     PENDING = "pending"
