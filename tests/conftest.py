@@ -4,7 +4,12 @@ import pytest
 
 from hai_agents.client import _LocalRuntimeAccess
 from hai_agents_cli import holo_dir, welcome
-from hai_agents_local import desktop_lock, workstation
+from hai_agents_local import bridge, desktop_lock, workstation
+
+
+@pytest.fixture(autouse=True)
+def _isolated_running_commands(monkeypatch, tmp_path):
+    monkeypatch.setattr(bridge, "COMMANDS_DIR", tmp_path / "bridge-commands")
 
 
 @pytest.fixture(autouse=True)

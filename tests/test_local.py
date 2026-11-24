@@ -909,6 +909,34 @@ class TestBridgeProtocol:
         assert driver.clicks == 2
         assert [p["command_uid"] for p in exchange.posts] == ["u1", "u2"]
 
+    async def test_a_finished_command_leaves_no_record_of_running(self):
+        bridge = _bridge(FakeDriver())
+        await bridge._process_commands(
+            FakeExchange(), [Command(id="c1", command_uid="u1", name="click", args={"x": 0, "y": 0})]
+        )
+        assert not bridge._running_file().exists()
+
+    async def test_a_new_bridge_answers_once_the_command_a_dead_one_left_running(self):
+        from hai_agents_local.bridge import INTERRUPTED_ERROR
+
+        dead = _bridge(FakeDriver())
+        dead._note_running(Command(id=dead.session_id, command_uid="u1", name="poll_execution", args={}))
+        fresh = FakeBridge(api_key="k", session_id=dead.session_id)
+        exchange = FakeExchange()
+        await fresh._answer_left(exchange)
+        await fresh._answer_left(exchange)
+        assert exchange.posts == [
+            {"id": dead.session_id, "command_uid": "u1", "result": None, "error": INTERRUPTED_ERROR}
+        ]
+
+    async def test_a_bridge_on_another_channel_leaves_a_left_command_alone(self):
+        dead = _bridge(FakeDriver())
+        dead._note_running(Command(id=dead.session_id, command_uid="u1", name="poll_execution", args={}))
+        other = _bridge(FakeDriver())
+        exchange = FakeExchange()
+        await other._answer_left(exchange)
+        assert exchange.posts == [] and dead._running_file().exists()
+
     async def test_redelivered_uid_reposts_cached_result_without_reexecuting(self):
         driver = FakeDriver()
         bridge = _bridge(driver)

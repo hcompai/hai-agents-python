@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import functools
 import inspect
+import json
 import logging
 import random
 import threading
@@ -12,6 +13,7 @@ import uuid
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import Any, AsyncIterator, ClassVar, Generic, TypeVar, Union
 
 import httpx
@@ -31,6 +33,7 @@ LONG_POLL_READ_TIMEOUT_S = 21.0
 MIN_POLL_INTERVAL_S = 1.0
 POST_RESULT_TIMEOUT_S = 10.0
 POST_RESULT_RETRIES = 2
+COMMANDS_DIR = Path.home() / ".hai" / "bridge-commands"
 INTERRUPTED_ERROR = "Interrupted: the local bridge stopped before this command finished."
 FETCH_TRANSIENT_RETRIES = 2
 CHANNEL_SETUP_ATTEMPTS = 5
@@ -150,6 +153,7 @@ class LocalBridge(ABC, Generic[DriverT]):
                 exchange = CommandExchange(client, self.base_url)
                 if not await self._open_channel(exchange):
                     return
+                await self._answer_left(exchange)
                 if self._driver is None:
                     self._driver = await asyncio.to_thread(self.create_driver)
                 self.ready.set()
@@ -294,6 +298,7 @@ class LocalBridge(ABC, Generic[DriverT]):
                 logger.warning("command %s expired at %s; skipping it", cmd.name, cmd.expires_at)
                 result, error = None, f"command {cmd.name!r} expired before it could run"
             else:
+                self._note_running(cmd)
                 dispatch = asyncio.create_task(asyncio.to_thread(self._dispatch, cmd.name, cmd.args))
                 stopped = asyncio.create_task(self._stop_event.wait())
                 try:
@@ -302,6 +307,7 @@ class LocalBridge(ABC, Generic[DriverT]):
                         await self.interrupt_driver()
                         await dispatch
                         await self._deliver(exchange, cmd.id, cmd.command_uid, None, INTERRUPTED_ERROR)
+                        self._forget_running()
                         return
                     result, error = await dispatch
                 finally:
@@ -312,6 +318,42 @@ class LocalBridge(ABC, Generic[DriverT]):
                 while len(self._results) > RESULT_CACHE_SIZE:
                     self._results.popitem(last=False)
             await self._deliver(exchange, cmd.id, cmd.command_uid, result, error)
+            self._forget_running()
+
+    def _running_file(self) -> Path:
+        return COMMANDS_DIR / f"{self.session_id}.json"
+
+    def _note_running(self, cmd: Command) -> None:
+        """Records the command before it runs, so a bridge started after this process dies can answer it."""
+        path = self._running_file()
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            staged = path.with_suffix(".tmp")
+            staged.write_text(json.dumps({"id": cmd.id, "command_uid": cmd.command_uid}))
+            staged.replace(path)
+        except OSError:
+            logger.warning("could not record running command %s", cmd.command_uid, exc_info=True)
+
+    def _forget_running(self) -> None:
+        with contextlib.suppress(OSError):
+            self._running_file().unlink(missing_ok=True)
+
+    async def _answer_left(self, exchange: CommandExchange) -> None:
+        """Answers the command an earlier bridge on this channel was running when its process died: the platform
+        never sends it again, and holds the session's cancel and messages until it has an answer."""
+        try:
+            left = json.loads(self._running_file().read_text())
+            command_id, command_uid = str(left["id"]), str(left["command_uid"])
+        except FileNotFoundError:
+            return
+        except (OSError, ValueError, KeyError, TypeError):
+            self._forget_running()
+            return
+        try:
+            await self._deliver(exchange, command_id, command_uid, None, INTERRUPTED_ERROR)
+        except Exception:
+            logger.warning("could not answer command %s left by an earlier bridge", command_uid, exc_info=True)
+        self._forget_running()
 
     def _dispatch(self, name: str, args: dict[str, Any]) -> tuple[Json, str | None]:
         if name not in self.commands:
