@@ -329,11 +329,7 @@ class TestAutoStart:
         assert model_env.mode.type == "shell" and model_env.mode.allowed_commands == ["web"]
         assert all(isinstance(bridge, WorkstationBridge) and bridge.only == ("web",) for bridge in started)
 
-        served = {"id": "laptop", "kind": "web", "host": "user_device", "session_id": "mine"}
-        sessions.create_session(agent={"name": "x", "environments": [served]}, messages="hi")
-        assert captured[-1]["agent"]["environments"][0]["session_id"] == "mine" and len(started) == 2
-
-    def test_a_named_or_overridden_user_device_browser_fails_the_session_before_any_bridge_or_request(
+    def test_a_named_served_or_overridden_user_device_browser_fails_the_session_before_any_bridge_or_request(
         self, monkeypatch
     ):
         monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
@@ -345,8 +341,10 @@ class TestAutoStart:
         sessions = Client(api_key=API_KEY).sessions
         with pytest.raises(ValueError, match="pass it inline"):
             sessions.create_session(agent="named", messages="hi")
+        with pytest.raises(ValueError, match="drop its session_id"):
+            sessions.create_session(agent={"name": "x", "environments": [served]}, messages="hi")
         inline = {"name": "x", "environments": [{"kind": "web", "host": "user_device"}]}
-        with pytest.raises(ValueError, match="set session_id on the environment"):
+        with pytest.raises(ValueError, match="drop its session_id and any override"):
             sessions.create_session(
                 agent=inline, messages="hi", overrides={"agent.environments[kind=web].session_id": "mine"}
             )

@@ -156,19 +156,16 @@ class _Walk:
         return env
 
     def web(self, env: EnvironmentLike, path: str, *, by_name: bool, claimed: bool) -> EnvironmentLike:
-        """A browser on this machine, as the shell desktop that runs only `web`, on its own session id if it has one."""
+        """A browser on this machine, as the shell desktop that runs only `web`, served by this client."""
         becomes = f"the browser on this machine at {path} runs as a desktop in shell mode that runs only `web`"
         if by_name:
             raise ValueError(
                 f"{becomes}, which only an inline environment can become: pass it inline, or store it as "
                 "{'kind': 'desktop', 'mode': {'type': 'shell'}}"
             )
-        if claimed:
-            raise ValueError(f"{becomes}, which no override to kind=web reaches: set session_id on the environment")
-        session_id = _read(env, "session_id")
-        if session_id:
-            logger.warning("serve %r with `holo local desktop --shell --session-id %s`", _read(env, "id"), session_id)
-        return _web_desktop(env, session_id or self.bridge(env, "web").session_id)
+        if claimed or _read(env, "session_id"):
+            raise ValueError(f"{becomes}, which only this client serves: drop its session_id and any override of it")
+        return _web_desktop(env, self.bridge(env, "web").session_id)
 
     def lookup(self, env: EnvironmentLike) -> Any:
         return self.resolved.get(("environment", env), env) if isinstance(env, str) else env
@@ -251,7 +248,7 @@ def _bridge_type(env: EnvironmentLike, kind: str) -> type[LocalBridge]:
 def _web_desktop(env: EnvironmentLike, session_id: str) -> EnvironmentLike:
     """``env``, a browser on this machine, as the shell desktop whose agent drives this machine's Chrome with `web`."""
     given = env.model_fields_set if isinstance(env, BaseModel) else set(env)
-    if dropped := sorted(given - {*_WEB_DESKTOP_KEEPS, "kind", "host", "session_id"}):
+    if dropped := sorted(given - {*_WEB_DESKTOP_KEEPS, "kind", "host"}):
         logger.warning(
             "browser %r on this machine runs as a desktop in shell mode driving Chrome with `web`, which ignores %s",
             _read(env, "id"),
