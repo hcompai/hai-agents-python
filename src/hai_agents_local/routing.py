@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from typing import TYPE_CHECKING, Any, Collection, Literal, Mapping, NamedTuple, Sequence, Union
@@ -9,19 +10,19 @@ from typing import TYPE_CHECKING, Any, Collection, Literal, Mapping, NamedTuple,
 from pydantic import BaseModel
 
 from .bridge import LocalBridge, TokenSource
-from .browser import SeleniumBrowserBridge
 from .desktop import PyautoguiDesktopBridge
 from .workstation import WorkstationBridge
 
 if TYPE_CHECKING:
     from hai_agents.types.agent import Agent
 
+logger = logging.getLogger(__name__)
+
 AgentLike = Union[str, "Agent", Mapping[str, Any]]
 EnvironmentLike = Union[str, BaseModel, Mapping[str, Any]]
 Reference = tuple[Literal["agent", "environment"], str]
 
 BRIDGE_TYPES: dict[str, type[LocalBridge]] = {
-    SeleniumBrowserBridge.environment_kind: SeleniumBrowserBridge,
     PyautoguiDesktopBridge.environment_kind: PyautoguiDesktopBridge,
     WorkstationBridge.environment_kind: WorkstationBridge,
 }
@@ -129,10 +130,13 @@ class _Walk:
                 self.environment(spec, path, [self.lookup(sibling) for sibling in siblings], by_name=True)
             return env
         kind = _local_kind(env)
-        if kind is None or _read(env, "session_id"):
+        if kind is None:
             return env
         key = f"{path}.environments[kind={kind}].session_id"
-        if any(key == claim or key.startswith(f"{claim}.") for claim in self.claimed):
+        if kind == "web":
+            claimed = self.overridden(path, "web") or self.overridden(path, "desktop")
+            return self.web(env, path, siblings, by_name=by_name, claimed=claimed)
+        if self.claims(path, kind) or _read(env, "session_id"):
             return env
         serve = SERVE_COMMANDS[_bridge_type(env, kind).environment_kind]
         if not by_name:
@@ -151,11 +155,46 @@ class _Walk:
         self.overrides[key] = self.bridge(env, kind).session_id
         return env
 
+    def web(
+        self, env: EnvironmentLike, path: str, siblings: Sequence[Any], *, by_name: bool, claimed: bool
+    ) -> EnvironmentLike:
+        """A browser on this machine, as the shell desktop that runs only `web`, served by this client."""
+        becomes = f"the browser on this machine at {path} runs as a desktop in shell mode that runs only `web`"
+        if by_name:
+            raise ValueError(
+                f"{becomes}, which only an inline environment can become: pass it inline, or store a desktop "
+                "in shell mode, whose shell runs any command"
+            )
+        if claimed or _read(env, "session_id"):
+            raise ValueError(
+                f"{becomes}, which only this client serves: drop its session_id, and any override of "
+                f"{path}.environments[kind=web] or [kind=desktop]"
+            )
+        if any(_kind(self.lookup(sibling)) == "desktop" for sibling in siblings):
+            raise ValueError(
+                f"{becomes}, but {path} already has a desktop, and an agent holds only one: drop the browser"
+            )
+        return _web_desktop(env, self.bridge(env, "web").session_id)
+
+    def claims(self, path: str, kind: str) -> bool:
+        key = f"{path}.environments[kind={kind}].session_id"
+        return any(key == claim or key.startswith(f"{claim}.") for claim in self.claimed)
+
+    def overridden(self, path: str, kind: str) -> bool:
+        key = f"{path}.environments[kind={kind}]"
+        return self.claims(path, kind) or any(claim.startswith(f"{key}.") for claim in self.claimed)
+
     def lookup(self, env: EnvironmentLike) -> Any:
         return self.resolved.get(("environment", env), env) if isinstance(env, str) else env
 
     def bridge(self, env: EnvironmentLike, kind: str) -> LocalBridge:
         bridge_type = _bridge_type(env, kind)
+        shells = [bridge for bridge in self.bridges if isinstance(bridge, WorkstationBridge)]
+        if bridge_type is WorkstationBridge and shells and (kind == "web" or shells[0].only):
+            raise ValueError(
+                "the agent tree has a browser on this machine beside another one or a shell desktop, but this "
+                "machine serves one shell: keep a single desktop in shell mode, whose agent drives Chrome with `web`"
+            )
         if any(type(bridge) is bridge_type for bridge in self.bridges):
             raise ValueError(
                 f"the agent tree has multiple local {kind} environments that this machine would serve the same "
@@ -168,7 +207,9 @@ class _Walk:
         width = _read(env, "screenshot_max_width")
         if bridge_type is WorkstationBridge and width:
             options["environment_variables"] = {"WEB_MAX_IMAGE_WIDTH": str(width), "DESK_MAX_IMAGE_WIDTH": str(width)}
-        if bridge_type is WorkstationBridge:
+        if kind == "web":
+            options.update(self.shell, only=WEB_ONLY)
+        elif bridge_type is WorkstationBridge:
             options.update(self.shell)
             mode = _read(env, "mode")
             options["require_approval"] = _read(mode, "command_approval") == "required"
@@ -185,10 +226,11 @@ class _Walk:
 
 
 SERVE_COMMANDS = {
-    SeleniumBrowserBridge.environment_kind: "holo local browser",
     PyautoguiDesktopBridge.environment_kind: "holo local desktop",
     WorkstationBridge.environment_kind: "holo local desktop --shell",
 }
+WEB_ONLY = ("web",)
+_WEB_DESKTOP_KEEPS = ("id", "lazy")
 _SEGMENT = re.compile(r"^[A-Za-z_]\w*(?:\[[^\[\]]+\])?$")
 
 
@@ -210,6 +252,8 @@ def _local_kind(env: EnvironmentLike) -> str | None:
         return kind
     if _read(env, "host") != "user_device":
         return None
+    if kind == "web":
+        return kind
     if kind not in BRIDGE_TYPES:
         raise ValueError(
             f"user_device environment {_read(env, 'id')!r} has kind {kind!r}, which cannot be served by a "
@@ -219,9 +263,33 @@ def _local_kind(env: EnvironmentLike) -> str | None:
 
 
 def _bridge_type(env: EnvironmentLike, kind: str) -> type[LocalBridge]:
-    if kind == "desktop" and _read(_read(env, "mode"), "type") == "shell":
+    if kind == "web" or (kind == "desktop" and _read(_read(env, "mode"), "type") == "shell"):
         return WorkstationBridge
     return BRIDGE_TYPES[kind]
+
+
+def _web_desktop(env: EnvironmentLike, session_id: str) -> EnvironmentLike:
+    """``env``, a browser on this machine, as the shell desktop whose agent drives this machine's Chrome with `web`."""
+    given = env.model_fields_set if isinstance(env, BaseModel) else set(env)
+    if dropped := sorted(given - {*_WEB_DESKTOP_KEEPS, "kind", "host"}):
+        logger.warning(
+            "browser %r on this machine runs as a desktop in shell mode driving Chrome with `web`, which ignores %s",
+            _read(env, "id"),
+            ", ".join(dropped),
+        )
+    kept = {field: value for field in _WEB_DESKTOP_KEEPS if (value := _read(env, field)) is not None}
+    if isinstance(env, BaseModel):
+        from hai_agents.types import DesktopMode_Shell, Environment_Desktop
+
+        return Environment_Desktop(
+            **kept, mode=DesktopMode_Shell(allowed_commands=list(WEB_ONLY)), session_id=session_id
+        )
+    return {
+        **kept,
+        "kind": "desktop",
+        "mode": {"type": "shell", "allowed_commands": list(WEB_ONLY)},
+        "session_id": session_id,
+    }
 
 
 def _model_kind(env: EnvironmentLike) -> str | None:

@@ -12,9 +12,9 @@ import subprocess
 import sys
 import sysconfig
 import tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from hai_agents.client import credentials_path
 
@@ -24,14 +24,16 @@ from .desktop import ensure_macos_input_permissions
 from .runtime.errors import LocalRuntimeError
 from .runtime.install import install_artifact
 from .runtime.manifest import RuntimeArtifact, platform_key
+from .transport import Json, serialize_result
 
 if TYPE_CHECKING:
     from cua_cli.config import Config
-    from hai_drivers.code_sandbox.interface import ManagedCodeSandboxInterface
+    from hai_drivers.code_sandbox.interface import CommandPolicy, ManagedCodeSandboxInterface
 
 logger = logging.getLogger(__name__)
 
 INSTALL_HINT = "A desktop with a shell requires extra deps. Install with: pip install 'hai-agents[shell]'"
+COMMAND_REFUSED = "command_refused"
 SANDBOX_HINT = (
     "Anthropic's sandbox-runtime confines shell commands to the workspace. macOS downloads it on the first session; "
     "elsewhere: npm install -g --omit=optional @anthropic-ai/sandbox-runtime (needs Node 22.12 or later), "
@@ -109,6 +111,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         require_sandbox: bool = False,
         allowed_domains: Sequence[str] = (),
         writable_folders: Sequence[str] = (),
+        only: Sequence[str] = (),
     ) -> None:
         """Build the bridge.
 
@@ -118,7 +121,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
 
         Args:
             workspace: The folder the shell starts in and the file tools act in; defaults to the current one,
-                and from the home folder or above it to ``~/hai/<session_id>``.
+                and from the home folder or above it to ``~/hai/<session_id>``. With ``only``, always the latter.
             policy: This machine's allowlist file, one command prefix a line. With one, the shell runs the
                 commands it covers and holds any other until the session's client approves it, whatever the agent
                 asks. Without one, commands wait only for an agent that requires approval. A file that does not
@@ -137,11 +140,23 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             require_sandbox: Serve no session whose commands would run unconfined.
             allowed_domains: Hosts the built-in rules let commands reach besides the registries.
             writable_folders: Folders the built-in rules let commands write besides the workspace.
+            only: Programs the shell runs, refusing every other command with no approval to wait for; the
+                allowlists and the sandbox then do not apply, and the bridge leaves the screen to other agents.
 
         Under either, the agent's file tools stay inside the workspace.
         """
         super().__init__(environment_id, api_key=api_key, base_url=base_url, session_id=session_id)
-        self.workspace = Path(workspace).expanduser().absolute() if workspace else _workspace(self.session_id)
+        self.only = tuple(only)
+        self.drives_desktop = not self.only
+        if self.only:
+            # `web` reaches Chrome over its debugging socket, outside any sandbox and without the screen.
+            sandbox, require_sandbox = False, False
+        if self.only:
+            self.workspace = Path.home() / "hai" / self.session_id
+        elif workspace:
+            self.workspace = Path(workspace).expanduser().absolute()
+        else:
+            self.workspace = _workspace(self.session_id)
         self.environment_variables = dict(environment_variables or {})
         refuse_unread_settings()
         self.policy = policy
@@ -157,7 +172,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
     def preflight(self) -> None:
         _keep_off_path(self.workspace, ["srt"] if self.sandbox else [])
         self._sandbox_runtime()
-        if sys.platform == "darwin":
+        if sys.platform == "darwin" and not self.only:
             ensure_macos_input_permissions(prompt=True)
 
     def create_driver(self) -> ManagedCodeSandboxInterface:
@@ -187,8 +202,13 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             "WEB_SESSION": self.session_id,
             "PATH": tools,
         }
-        policy = sandbox = None
-        if self.policy:
+        policy: CommandPolicy | None = None
+        allowed: Path | None = None
+        sandbox = None
+        if self.only:
+            policy = _Only(self.only)
+            logger.info("the shell runs only %s", ", ".join(self.only))
+        elif self.policy:
             from hai_drivers.code_sandbox.local.allowlist import Allowlist
 
             allowed = Path(self.policy).expanduser()
@@ -204,7 +224,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             protected = [
                 config,
                 *filter(Path.exists, [SRT_HOME]),
-                *([policy.path] if policy else []),
+                *([allowed] if allowed else []),
             ]
             for guard in protected:
                 _refuse_a_guard_in(self.workspace, guard)
@@ -238,7 +258,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             logger.warning("shell commands are confined to %s by %s", self.workspace, rules)
         elif self.sandbox:
             logger.warning("shell commands run unconfined, as you. %s", SANDBOX_HINT)
-        else:
+        elif not self.only:
             logger.warning("commands run unconfined, as you: no sandbox is on")
         return LocalCodeSandbox(
             str(self.workspace),
@@ -271,10 +291,47 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
 
         return ManagedCodeSandboxInterface
 
+    def _dispatch(self, name: str, args: dict[str, Any]) -> tuple[Json, str | None]:
+        if self.only and name == "approve_command":
+            return None, f"this machine approves no command: it runs only {_named(self.only)}"
+        if self.only and name == "execute" and (refused := _Only(self.only).refusal(args.get("command", ""))):
+            from hai_drivers.code_sandbox.interface import ShellResult
+
+            # Exit 126 as a shell answers a program it cannot run: an error would end the session's startup probe.
+            return serialize_result(ShellResult(stderr=refused, exit_code=126, execution_time=0.0)), None
+        return super()._dispatch(name, args)
+
     def _is_expected(self, exc: Exception) -> bool:
+        from hai_drivers.code_sandbox.interface import CodeSandboxRequestError
         from hai_drivers.common.exceptions import CommandApprovalRequired
 
-        return isinstance(exc, CommandApprovalRequired)
+        refused = isinstance(exc, CodeSandboxRequestError) and exc.code == COMMAND_REFUSED
+        return refused or isinstance(exc, CommandApprovalRequired)
+
+
+class _Only:
+    """Runs a command made only of calls to ``programs``, and refuses any other."""
+
+    def __init__(self, programs: Sequence[str]) -> None:
+        self.programs = frozenset(programs)
+
+    def refusal(self, command: str) -> str | None:
+        from hai_drivers.code_sandbox.local.allowlist import only_runs
+
+        if only_runs(command, self.programs):
+            return None
+        return f"this machine runs only {_named(self.programs)} for this agent, each called by its bare name"
+
+    def hold(self, command: str) -> str | None:
+        from hai_drivers.code_sandbox.interface import CodeSandboxRequestError
+
+        if refused := self.refusal(command):
+            raise CodeSandboxRequestError(COMMAND_REFUSED, {"message": refused})
+        return None
+
+
+def _named(programs: Iterable[str]) -> str:
+    return " and ".join(f"`{program}`" for program in sorted(programs))
 
 
 def _refuse_what_runs_the_session(workspace: Path, programs: Sequence[str | None]) -> None:

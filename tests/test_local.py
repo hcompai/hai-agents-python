@@ -24,15 +24,9 @@ import pytest
 from hai_agents import Client
 from hai_agents.core.api_error import ApiError
 from hai_agents.sessions.client import SessionsClient
-from hai_agents.types import Agent, Desktop, Workstation
+from hai_agents.types import Agent, Desktop, Environment_Web, Workstation
 from hai_agents.types.browser import Browser
-from hai_agents_local import (
-    BridgeManager,
-    LocalBridge,
-    PyautoguiDesktopBridge,
-    SeleniumBrowserBridge,
-    WorkstationBridge,
-)
+from hai_agents_local import BridgeManager, LocalBridge, PyautoguiDesktopBridge, WorkstationBridge
 from hai_agents_local.config import shell_sandbox
 from hai_agents_local.errors import AuthError, RateLimitedError, SessionNotFoundError
 from hai_agents_local.routing import localize_agent
@@ -53,16 +47,15 @@ class TestLocalizeAgent:
         agent = {
             "name": "x",
             "environments": [
-                {"host": "user_device"},
+                {"id": "vm", "kind": "workstation", "host": "user_device"},
                 {"id": "box", "kind": "desktop", "host": "user_device"},
             ],
         }
         localized, bridges, _ = localize_agent(agent, api_key=API_KEY)
         envs = localized["environments"]
-        assert [type(b) for b in bridges] == [SeleniumBrowserBridge, PyautoguiDesktopBridge]
+        assert [type(b) for b in bridges] == [WorkstationBridge, PyautoguiDesktopBridge]
         assert [e["session_id"] for e in envs] == [b.session_id for b in bridges]
         assert len({b.session_id for b in bridges}) == 2
-        assert envs[0]["kind"] == "web"
         assert "session_id" not in agent["environments"][0]
 
     @pytest.mark.parametrize(
@@ -124,20 +117,18 @@ class TestLocalizeAgent:
     def test_second_unclaimed_env_of_same_kind_raises(self):
         agent = {
             "name": "orchestrator",
-            "environments": [{"id": "laptop", "kind": "web", "host": "user_device"}],
-            "subagents": [
-                {"name": "child", "environments": [{"id": "laptop-2", "kind": "web", "host": "user_device"}]}
-            ],
+            "environments": [{"id": "laptop", "kind": "desktop"}],
+            "subagents": [{"name": "child", "environments": [{"id": "laptop-2", "kind": "desktop"}]}],
         }
-        with pytest.raises(ValueError, match="multiple local web"):
+        with pytest.raises(ValueError, match="multiple local desktop"):
             localize_agent(agent, api_key=API_KEY)
 
     def test_claimed_env_does_not_count_against_the_kind(self):
         agent = {
             "name": "x",
             "environments": [
-                {"id": "pinned", "kind": "web", "host": "user_device", "session_id": "served-elsewhere"},
-                {"id": "laptop", "kind": "web", "host": "user_device"},
+                {"id": "pinned", "kind": "desktop", "session_id": "served-elsewhere"},
+                {"id": "laptop", "kind": "desktop"},
             ],
         }
         localized, bridges, _ = localize_agent(agent, api_key=API_KEY)
@@ -149,7 +140,7 @@ class TestLocalizeAgent:
             "name": "x",
             "environments": [
                 {"id": "remote", "kind": "web"},
-                {"id": "pinned", "kind": "web", "host": "user_device", "session_id": "keep"},
+                {"id": "pinned", "kind": "desktop", "session_id": "keep"},
             ],
             "subagents": ["registered-agent"],
         }
@@ -160,24 +151,24 @@ class TestLocalizeAgent:
 
     def test_named_leaves_are_routed_by_override_unless_claimed(self):
         resolved = {
-            ("environment", "my-laptop"): Browser(id="my-laptop", host="user_device"),
+            ("environment", "my-laptop"): Desktop(id="my-laptop"),
             ("agent", "helper"): {"name": "helper", "environments": [{"kind": "desktop", "mode": {"type": "shell"}}]},
-            ("agent", "claimed"): {"name": "claimed", "environments": [{"kind": "web", "host": "user_device"}]},
+            ("agent", "claimed"): {"name": "claimed", "environments": [{"kind": "workstation", "host": "user_device"}]},
         }
         agent = {
             "name": "x",
             "environments": ["my-laptop", "cloud-browser", {"id": "vm", "kind": "workstation"}],
             "subagents": ["helper", "claimed"],
         }
-        claimed = {"agent.subagents[name=claimed].environments[kind=web]": {"kind": "web", "host": "cloud"}}
-        localized, [web, desktop], overrides = localize_agent(
+        claimed = {"agent.subagents[name=claimed].environments[kind=workstation].session_id": "elsewhere"}
+        localized, [desktop, shell], overrides = localize_agent(
             agent, api_key=API_KEY, resolved=resolved, claimed=claimed
         )
         assert localized == agent
-        assert isinstance(desktop, WorkstationBridge)
+        assert isinstance(desktop, PyautoguiDesktopBridge) and isinstance(shell, WorkstationBridge)
         assert overrides == {
-            "agent.environments[kind=web].session_id": web.session_id,
-            "agent.subagents[name=helper].environments[kind=desktop].session_id": desktop.session_id,
+            "agent.environments[kind=desktop].session_id": desktop.session_id,
+            "agent.subagents[name=helper].environments[kind=desktop].session_id": shell.session_id,
         }
 
     def test_seed_makes_bridge_ids_reproducible_for_idempotent_retries(self):
@@ -201,7 +192,7 @@ class TestLocalizeAgent:
         assert session_id("hk-org-a") == session_id("hk-org-a") != session_id("hk-org-b")
 
     def test_unaddressable_named_env_raises(self):
-        resolved = {("agent", "v1.2"): {"name": "v1.2", "environments": [{"kind": "web", "host": "user_device"}]}}
+        resolved = {("agent", "v1.2"): {"name": "v1.2", "environments": [{"kind": "desktop"}]}}
         with pytest.raises(ValueError, match="cannot be addressed"):
             localize_agent({"name": "x", "subagents": ["v1.2"]}, api_key=API_KEY, resolved=resolved)
 
@@ -221,15 +212,6 @@ class TestLocalizeAgent:
                 {"name": "x", "environments": [{"id": "phone", "kind": "mobile", "host": "user_device"}]},
                 api_key=API_KEY,
             )
-
-    def test_pydantic_env_model_is_stamped(self):
-        from hai_agents.types.browser import Browser
-
-        agent = {"name": "x", "environments": [Browser(id="laptop", host="user_device")]}
-        localized, [bridge], _ = localize_agent(agent, api_key=API_KEY)
-        env = localized["environments"][0]
-        assert env.session_id == bridge.session_id
-        assert env.model_dump()["kind"] == "web"
 
     @pytest.mark.parametrize(
         ("model", "bridge_type"), [(Desktop, PyautoguiDesktopBridge), (Workstation, WorkstationBridge)]
@@ -316,15 +298,79 @@ class TestAutoStart:
                 "name": "x",
                 "environments": [{"id": "box", "kind": "desktop", "host": "user_device"}],
                 "subagents": [
-                    {"name": "child", "environments": [{"id": "laptop", "kind": "web", "host": "user_device"}]}
+                    {"name": "child", "environments": [{"id": "vm", "kind": "workstation", "host": "user_device"}]}
                 ],
             },
             messages="hi",
         )
-        desktop, web = started
-        assert isinstance(desktop, PyautoguiDesktopBridge) and isinstance(web, SeleniumBrowserBridge)
+        desktop, shell = started
+        assert isinstance(desktop, PyautoguiDesktopBridge) and isinstance(shell, WorkstationBridge)
         assert captured["agent"]["environments"][0]["session_id"] == desktop.session_id
-        assert captured["agent"]["subagents"][0]["environments"][0]["session_id"] == web.session_id
+        assert captured["agent"]["subagents"][0]["environments"][0]["session_id"] == shell.session_id
+
+    def test_an_inline_user_device_browser_runs_as_a_shell_desktop_that_runs_only_web(self, monkeypatch):
+        monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
+        started: list = []
+        sent: list = []
+        monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: started.extend(bridges) or [])
+
+        def platform(request: httpx.Request) -> httpx.Response:
+            sent.append(json.loads(request.content)["agent"]["environments"][0])
+            return httpx.Response(418, text="stop")
+
+        sessions = Client(api_key=API_KEY, httpx_client=httpx.Client(transport=httpx.MockTransport(platform))).sessions
+        fields = {"id": "laptop", "host": "user_device", "start_url": "https://example.com"}
+        for env in ({**fields, "kind": "web"}, Browser(**fields), Environment_Web(**fields)):
+            with pytest.raises(ApiError):
+                sessions.create_session(agent={"name": "x", "environments": [env]}, messages="hi")
+        assert sent == [
+            {
+                "id": "laptop",
+                "kind": "desktop",
+                "mode": {"type": "shell", "allowed_commands": ["web"]},
+                "session_id": bridge.session_id,
+            }
+            for bridge in started
+        ]
+        assert all(isinstance(bridge, WorkstationBridge) and bridge.only == ("web",) for bridge in started)
+        assert all(bridge.workspace == Path.home() / "hai" / bridge.session_id for bridge in started)
+
+    def test_a_named_served_or_overridden_user_device_browser_fails_the_session_before_any_bridge_or_request(
+        self, monkeypatch
+    ):
+        monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
+        calls: list = []
+        monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: calls.append(bridges) or [])
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: calls.append(kw))
+        served = {"kind": "web", "host": "user_device", "session_id": "mine"}
+        _registry(monkeypatch, agents={"named": {"name": "named", "environments": [served]}})
+        sessions = Client(api_key=API_KEY).sessions
+        with pytest.raises(ValueError, match="pass it inline"):
+            sessions.create_session(agent="named", messages="hi")
+        with pytest.raises(ValueError, match="drop its session_id"):
+            sessions.create_session(agent={"name": "x", "environments": [served]}, messages="hi")
+        browser = {"kind": "web", "host": "user_device"}
+        inline = {"name": "x", "environments": [browser]}
+        for key in (
+            "[kind=web].session_id",
+            "[kind=desktop].session_id",
+            "[kind=web].start_url",
+            "[kind=desktop].mode",
+        ):
+            with pytest.raises(ValueError, match="drop its session_id, and any override"):
+                sessions.create_session(agent=inline, messages="hi", overrides={f"agent.environments{key}": "mine"})
+        shell = {"kind": "desktop", "host": "user_device", "mode": {"type": "shell"}}
+        for environments in ([browser, browser], [shell, browser], [browser, shell]):
+            with pytest.raises(ValueError, match="serves one shell|already has a desktop"):
+                sessions.create_session(agent={"name": "x", "environments": environments}, messages="hi")
+        visual = {"kind": "desktop", "host": "user_device"}
+        for environments in ([visual, browser], [browser, visual]):
+            with pytest.raises(ValueError, match="already has a desktop"):
+                sessions.create_session(agent={"name": "x", "environments": environments}, messages="hi")
+        child = {"name": "child", "environments": [browser]}
+        with pytest.raises(ValueError, match="serves one shell"):
+            sessions.create_session(agent={"name": "x", "environments": [shell], "subagents": [child]}, messages="hi")
+        assert calls == []
 
     def test_what_the_caller_sets_for_a_shell_desktop_reaches_it_and_stays_on_this_machine(self, monkeypatch, tmp_path):
         monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
@@ -455,7 +501,7 @@ class TestAutoStart:
         "name": "x",
         "environments": [
             {"id": "box", "kind": "desktop", "host": "user_device"},
-            {"id": "laptop", "kind": "web", "host": "user_device"},
+            {"id": "vm", "kind": "workstation", "host": "user_device"},
         ],
     }
 
@@ -495,6 +541,7 @@ class TestAutoStart:
         stopped: list = []
         bridges: list = []
         self._crash_wiring(monkeypatch, cancelled, stopped, bridges)
+        monkeypatch.setattr(WorkstationBridge, "preflight", lambda self: None)
 
         async def create_and_crash(self, **kw):
             bridges[0].on_crash()
@@ -1062,12 +1109,6 @@ class TestBridgeProtocol:
 
 
 class TestDriverInterfaces:
-    def test_browser_commands_match_hai_drivers_interface(self):
-        pytest.importorskip("hai_drivers.web.interface")
-        commands = SeleniumBrowserBridge(api_key="k").commands
-        assert {"goto", "click_at", "press_key", "screenshot_b64", "get_tabs"} <= commands
-        assert not any(name.startswith("_") for name in commands)
-
     def test_desktop_commands_match_hai_drivers_interface(self):
         pytest.importorskip("hai_drivers.desktop.interface")
         commands = PyautoguiDesktopBridge(api_key="k").commands
@@ -1076,11 +1117,7 @@ class TestDriverInterfaces:
 
     def test_args_decode_by_the_interface_types(self):
         pytest.importorskip("hai_drivers.code_sandbox.local.driver")
-        for bridge in (
-            SeleniumBrowserBridge(api_key="k"),
-            PyautoguiDesktopBridge(api_key="k"),
-            WorkstationBridge(api_key="k"),
-        ):
+        for bridge in (PyautoguiDesktopBridge(api_key="k"), WorkstationBridge(api_key="k")):
             interface = bridge.driver_interface()
             for name in bridge.commands:
                 if callable(getattr(interface, name)):
@@ -1138,6 +1175,40 @@ class TestDriverInterfaces:
             assert bridge._dispatch("approve_command", {"command": "touch made"}) == (None, None)
             result, error = bridge._dispatch("execute", {"command": "touch made"})
             assert error is None and (tmp_path / "workspace" / "made").exists()
+        finally:
+            bridge._driver.close()
+
+    def test_workstation_that_runs_only_web_refuses_any_other_command_even_approved(
+        self, tmp_path, caplog, monkeypatch
+    ):
+        pytest.importorskip("hai_drivers.code_sandbox.local.allowlist")
+        from hai_agents_local import workstation
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setattr(workstation, "ensure_macos_input_permissions", lambda prompt: pytest.fail("screen"))
+        monkeypatch.setattr(workstation, "_host_cua", lambda environment: pytest.fail("cua daemon"))
+        bridge = WorkstationBridge(
+            api_key="k",
+            workspace=str(tmp_path / "project"),
+            sandbox=str(tmp_path / "sandbox.json"),
+            require_sandbox=True,
+            only=("web",),
+        )
+        assert bridge.workspace == tmp_path / "hai" / bridge.session_id and not bridge.drives_desktop
+        bridge.preflight()
+        bridge._driver = bridge.create_driver()
+        try:
+            assert bridge._dispatch("execute", {"command": "web --help >/dev/null; web daemon stop"})[1] is None
+            with caplog.at_level(logging.WARNING):
+                for command in ("touch made", "web --help && touch made", "/usr/bin/web"):
+                    assert "approves no command" in bridge._dispatch("approve_command", {"command": command})[1]
+                    result, error = bridge._dispatch("execute", {"command": command})
+                    assert error is None and result["exit_code"] == 126 and "runs only `web`" in result["stderr"]
+                    submitted = {"request_id": "r", "command": command}
+                    result, error = bridge._dispatch("submit_command", submitted)
+                    assert result is None and "runs only `web`" in error
+            assert not (bridge.workspace / "made").exists()
+            assert "raised" not in caplog.text
         finally:
             bridge._driver.close()
 
@@ -1452,8 +1523,8 @@ class ServingBridge(FakeBridge):
             self._serving.set()
 
 
-class BrowserServingBridge(ServingBridge):
-    environment_kind = "web"
+class WorkstationServingBridge(ServingBridge):
+    environment_kind = "workstation"
 
 
 class DesktopDrivingBridge(FakeBridge):
@@ -1544,11 +1615,11 @@ class TestManager:
     def test_newer_session_takes_over_the_kind_and_notifies_the_displaced(self, manager, monkeypatch, stop_times_out):
         first = ServingBridge(api_key="k")
         second = ServingBridge(api_key="k")
-        browser = BrowserServingBridge(api_key="k")
+        other_kind = WorkstationServingBridge(api_key="k")
         first_lost, second_lost = threading.Event(), threading.Event()
         first.on_crash = first_lost.set
         second.on_crash = second_lost.set
-        manager.ensure([first, browser])
+        manager.ensure([first, other_kind])
         first_runner = manager._runners[first.session_id]
         if stop_times_out:
             original_stop = first_runner.stop
@@ -1564,7 +1635,7 @@ class TestManager:
         assert first_lost.is_set()
         assert not second_lost.is_set()
         assert manager._runners[second.session_id].thread.is_alive()
-        assert manager._runners[browser.session_id].thread.is_alive()
+        assert manager._runners[other_kind.session_id].thread.is_alive()
 
     def test_ensure_reports_new_bridges_and_stop_is_targeted(self, manager):
         bridge = ServingBridge(api_key="k")
@@ -1578,7 +1649,7 @@ class TestManager:
         with pytest.raises(RuntimeError, match="two local desktop"):
             manager.ensure(
                 [
-                    BrowserServingBridge(api_key="k"),
+                    WorkstationServingBridge(api_key="k"),
                     ServingBridge(api_key="k"),
                     ServingBridge(api_key="k"),
                 ]
@@ -1739,7 +1810,7 @@ class TestDoctor:
         by_name = {result.name: result for result in results}
         assert not by_name["login"].ok and by_name["login"].fix is not None
         assert "platform" not in by_name
-        assert {"browser", "desktop"} <= set(by_name)
+        assert "desktop" in by_name
 
 
 async def test_stopping_workstation_interrupts_running_command_answers_it_with_an_error_and_skips_queue(tmp_path):

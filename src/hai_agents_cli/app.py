@@ -73,7 +73,7 @@ skills_app = typer.Typer(no_args_is_help=True, help="Browse available skills.")
 mcp_app = typer.Typer()
 local_app = typer.Typer(
     no_args_is_help=True,
-    help="Manually run the local browser or desktop bridge. Only needed when the session is started "
+    help="Manually run the local desktop bridge. Only needed when the session is started "
     "elsewhere (the web app, another machine, or an agent referenced by name); sessions created "
     "from the Python SDK with an inline agent start it automatically.",
 )
@@ -201,7 +201,7 @@ def logout() -> None:
 
 @app.command()
 def doctor(ctx: typer.Context) -> None:
-    """Diagnose this machine's holo setup: login, platform access, local browser/desktop. Read-only."""
+    """Diagnose this machine's holo setup: login, platform access, local desktop. Read-only."""
     from .doctor import run_checks
 
     state = _state(ctx)
@@ -465,16 +465,8 @@ class _Conversation:
         return bool(self.kinds)
 
     @property
-    def drives_desktop(self) -> bool:
-        from hai_agents_local.routing import BRIDGE_TYPES
-
-        return any(BRIDGE_TYPES[kind].drives_desktop for kind in self.kinds)
-
-    @property
     def does(self) -> str:
-        if self.drives_desktop:
-            return "drives this desktop"
-        return "drives this machine's browser" if self.controls_machine else "runs in the cloud"
+        return "drives this desktop" if self.controls_machine else "runs in the cloud"
 
     def open(self) -> None:
         """`client` runs sessions; `cloud` looks up agents and quota, which a local runtime does not serve."""
@@ -518,7 +510,7 @@ class _Conversation:
         if welcome.is_newer(facts.latest, current):
             upgrade = f"holo {facts.latest} is available {ui.SEP} pip install -U 'hai-agents[cli]'"
             tips.append(Text(upgrade, style="warn"))
-        if self.drives_desktop and (missing := welcome.missing_grants()):
+        if self.controls_machine and (missing := welcome.missing_grants()):
             tips.append(Text(f"missing macOS grants: {', '.join(missing)} {ui.SEP} run holo doctor", style="warn"))
         about = [Text.assemble(self.label, (f" {ui.SEP} {self.does}", "meta"))]
         about += [
@@ -578,7 +570,7 @@ class _Conversation:
         return f"  {self.label} {ui.SEP} {state} {ui.SEP} ? for shortcuts"
 
     def example(self) -> str | None:
-        return None if self.session is not None else EXAMPLE_TASKS[self.drives_desktop]
+        return None if self.session is not None else EXAMPLE_TASKS[self.controls_machine]
 
     def placeholder(self) -> str:
         example = self.example()
@@ -1571,18 +1563,6 @@ def _print_mcp_results(results: list[dict], server: str, json_output: bool) -> N
     console.print(f"\n  [meta]server[/meta] {escape(server)}")
 
 
-@local_app.command("browser")
-def local_browser(
-    ctx: typer.Context,
-    session_id: str | None = typer.Option(None, "--session-id", help="Session id to serve. Generated when omitted."),
-    debug_port: int = typer.Option(9222, "--debug-port", help="Chrome remote-debugging port to attach to."),
-) -> None:
-    """Serve browser commands on this machine through Chrome on --debug-port."""
-    from hai_agents_local import SeleniumBrowserBridge
-
-    _run_bridge(_state(ctx), SeleniumBrowserBridge, session_id, debugging_port=debug_port)
-
-
 @local_app.command("desktop")
 def local_desktop(
     ctx: typer.Context,
@@ -1641,7 +1621,7 @@ def local_desktop(
 
 @local_app.command("stop")
 def local_stop() -> None:
-    """Stop any in-flight local browser/desktop turn on this machine (same effect as double-Esc)."""
+    """Stop any in-flight local desktop turn on this machine (same effect as double-Esc)."""
     from hai_agents_local.killswitch import request_stop
 
     request_stop()
