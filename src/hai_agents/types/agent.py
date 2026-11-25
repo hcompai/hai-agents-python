@@ -9,6 +9,7 @@ from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel, update
 from .agent_environments_item import AgentEnvironmentsItem
 from .agent_reasoning_effort import AgentReasoningEffort
 from .agent_skills_item import AgentSkillsItem
+from .memory_config import MemoryConfig
 from .tool_definition import ToolDefinition
 
 
@@ -65,6 +66,11 @@ class Agent(UniversalBaseModel):
     tools: typing.Optional[typing.List[ToolDefinition]] = pydantic.Field(default=None)
     """
     Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
+    """
+
+    memory: typing.Optional[MemoryConfig] = pydantic.Field(default=None)
+    """
+    Persistent memory the agent can save to and recall from across sessions. Off when null.
     """
 
     if IS_PYDANTIC_V2:
