@@ -38,6 +38,7 @@ if typing.TYPE_CHECKING:
     from hai_agents_local.runtime.acquire import RuntimeHold
 
 API_KEY_VAR = "HAI_API_KEY"
+BASE_URL_VAR = "HAI_API_BASE_URL"
 
 _P = typing_extensions.ParamSpec("_P")
 
