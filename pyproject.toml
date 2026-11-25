@@ -51,9 +51,6 @@ shell = [
 workstation = [
   "hai-agents[shell]",
 ]
-browser = [
-  "hai-agents[shell]",
-]
 all = [
   "hai-agents[cli,desktop,shell]",
 ]
