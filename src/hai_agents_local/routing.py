@@ -130,20 +130,15 @@ class _Walk:
                 self.environment(spec, path, [self.lookup(sibling) for sibling in siblings], by_name=True)
             return env
         kind = _local_kind(env)
-        if kind is None or _read(env, "session_id"):
+        if kind is None:
             return env
         key = f"{path}.environments[kind={kind}].session_id"
-        if any(key == claim or key.startswith(f"{claim}.") for claim in self.claimed):
+        claimed = any(key == claim or key.startswith(f"{claim}.") for claim in self.claimed)
+        if kind == "web":
+            return self.web(env, path, by_name=by_name, claimed=claimed)
+        if claimed or _read(env, "session_id"):
             return env
         serve = SERVE_COMMANDS[_bridge_type(env, kind).environment_kind]
-        if kind == "web":
-            if by_name:
-                raise ValueError(
-                    f"the browser on this machine at {path} is served as a desktop in shell mode that runs only "
-                    "`web`, which only an inline environment can become: pass it inline, or store it as "
-                    "{'kind': 'desktop', 'mode': {'type': 'shell'}}"
-                )
-            return _web_desktop(env, self.bridge(env, kind).session_id)
         if not by_name:
             return _replace(env, kind=kind, session_id=self.bridge(env, kind).session_id)
         if sum(_kind(sibling) == kind for sibling in siblings) > 1:
@@ -159,6 +154,21 @@ class _Walk:
             )
         self.overrides[key] = self.bridge(env, kind).session_id
         return env
+
+    def web(self, env: EnvironmentLike, path: str, *, by_name: bool, claimed: bool) -> EnvironmentLike:
+        """A browser on this machine, as the shell desktop that runs only `web`, on its own session id if it has one."""
+        becomes = f"the browser on this machine at {path} runs as a desktop in shell mode that runs only `web`"
+        if by_name:
+            raise ValueError(
+                f"{becomes}, which only an inline environment can become: pass it inline, or store it as "
+                "{'kind': 'desktop', 'mode': {'type': 'shell'}}"
+            )
+        if claimed:
+            raise ValueError(f"{becomes}, which no override to kind=web reaches: set session_id on the environment")
+        session_id = _read(env, "session_id")
+        if session_id:
+            logger.warning("serve %r with `holo local desktop --shell --session-id %s`", _read(env, "id"), session_id)
+        return _web_desktop(env, session_id or self.bridge(env, "web").session_id)
 
     def lookup(self, env: EnvironmentLike) -> Any:
         return self.resolved.get(("environment", env), env) if isinstance(env, str) else env

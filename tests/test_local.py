@@ -329,16 +329,25 @@ class TestAutoStart:
         assert model_env.mode.type == "shell" and model_env.mode.allowed_commands == ["web"]
         assert all(isinstance(bridge, WorkstationBridge) and bridge.only == ("web",) for bridge in started)
 
-    def test_a_named_user_device_browser_fails_the_session_before_any_bridge_or_request(self, monkeypatch):
+        served = {"id": "laptop", "kind": "web", "host": "user_device", "session_id": "mine"}
+        sessions.create_session(agent={"name": "x", "environments": [served]}, messages="hi")
+        assert captured[-1]["agent"]["environments"][0]["session_id"] == "mine" and len(started) == 2
+
+    def test_a_named_or_overridden_user_device_browser_fails_the_session_before_any_bridge_or_request(self, monkeypatch):
         monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
         calls: list = []
         monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: calls.append(bridges) or [])
         monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: calls.append(kw))
-        _registry(
-            monkeypatch, agents={"named": {"name": "named", "environments": [{"kind": "web", "host": "user_device"}]}}
-        )
+        served = {"kind": "web", "host": "user_device", "session_id": "mine"}
+        _registry(monkeypatch, agents={"named": {"name": "named", "environments": [served]}})
+        sessions = Client(api_key=API_KEY).sessions
         with pytest.raises(ValueError, match="pass it inline"):
-            Client(api_key=API_KEY).sessions.create_session(agent="named", messages="hi")
+            sessions.create_session(agent="named", messages="hi")
+        inline = {"name": "x", "environments": [{"kind": "web", "host": "user_device"}]}
+        with pytest.raises(ValueError, match="set session_id on the environment"):
+            sessions.create_session(
+                agent=inline, messages="hi", overrides={"agent.environments[kind=web].session_id": "mine"}
+            )
         assert calls == []
 
     def test_what_the_caller_sets_for_a_shell_desktop_reaches_it_and_stays_on_this_machine(self, monkeypatch, tmp_path):
