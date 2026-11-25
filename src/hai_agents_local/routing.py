@@ -134,7 +134,7 @@ class _Walk:
             return env
         key = f"{path}.environments[kind={kind}].session_id"
         if kind == "web":
-            claimed = self.claims(path, "web") or self.claims(path, "desktop")
+            claimed = self.overridden(path, "web") or self.overridden(path, "desktop")
             return self.web(env, path, siblings, by_name=by_name, claimed=claimed)
         if self.claims(path, kind) or _read(env, "session_id"):
             return env
@@ -162,21 +162,27 @@ class _Walk:
         becomes = f"the browser on this machine at {path} runs as a desktop in shell mode that runs only `web`"
         if by_name:
             raise ValueError(
-                f"{becomes}, which only an inline environment can become: pass it inline, or store it as "
-                "{'kind': 'desktop', 'mode': {'type': 'shell'}}"
+                f"{becomes}, which only an inline environment can become: pass it inline, or store a desktop "
+                "in shell mode, whose shell runs any command"
             )
         if claimed or _read(env, "session_id"):
             raise ValueError(
                 f"{becomes}, which only this client serves: drop its session_id, and any override of "
-                f"{path}.environments[kind=web] or [kind=desktop].session_id"
+                f"{path}.environments[kind=web] or [kind=desktop]"
             )
         if any(_kind(self.lookup(sibling)) == "desktop" for sibling in siblings):
-            raise ValueError(f"{becomes}, but {path} already has a desktop and an agent holds one: drop the browser")
+            raise ValueError(
+                f"{becomes}, but {path} already has a desktop, and an agent holds only one: drop the browser"
+            )
         return _web_desktop(env, self.bridge(env, "web").session_id)
 
     def claims(self, path: str, kind: str) -> bool:
         key = f"{path}.environments[kind={kind}].session_id"
         return any(key == claim or key.startswith(f"{claim}.") for claim in self.claimed)
+
+    def overridden(self, path: str, kind: str) -> bool:
+        key = f"{path}.environments[kind={kind}]"
+        return self.claims(path, kind) or any(claim.startswith(f"{key}.") for claim in self.claimed)
 
     def lookup(self, env: EnvironmentLike) -> Any:
         return self.resolved.get(("environment", env), env) if isinstance(env, str) else env

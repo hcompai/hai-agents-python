@@ -70,7 +70,7 @@ class LocalBridge(ABC, Generic[DriverT]):
     """Appended to the manager's not-ready timeout error; names the common cause of a hung startup."""
     verify_runtime: bool = False
     """Reject responses not HMAC-proven with api_key; requires api_key to be the local runtime's token string."""
-    drives_desktop: ClassVar[bool] = False
+    drives_desktop: bool = False
     """Holds the machine-wide desktop claim while serving, so two agents never share one mouse."""
 
     def __init__(

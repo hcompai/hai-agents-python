@@ -141,12 +141,16 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             allowed_domains: Hosts the built-in rules let commands reach besides the registries.
             writable_folders: Folders the built-in rules let commands write besides the workspace.
             only: Programs the shell runs, refusing every other command with no approval to wait for; the
-                allowlists then do not apply.
+                allowlists and the sandbox then do not apply, and the bridge leaves the screen to other agents.
 
         Under either, the agent's file tools stay inside the workspace.
         """
         super().__init__(environment_id, api_key=api_key, base_url=base_url, session_id=session_id)
         self.only = tuple(only)
+        self.drives_desktop = not self.only
+        if self.only:
+            # `web` reaches Chrome over its debugging socket, outside any sandbox and without the screen.
+            sandbox, require_sandbox = False, False
         if self.only:
             self.workspace = Path.home() / "hai" / self.session_id
         elif workspace:
@@ -168,7 +172,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
     def preflight(self) -> None:
         _keep_off_path(self.workspace, ["srt"] if self.sandbox else [])
         self._sandbox_runtime()
-        if sys.platform == "darwin":
+        if sys.platform == "darwin" and not self.only:
             ensure_macos_input_permissions(prompt=True)
 
     def create_driver(self) -> ManagedCodeSandboxInterface:
@@ -254,7 +258,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             logger.warning("shell commands are confined to %s by %s", self.workspace, rules)
         elif self.sandbox:
             logger.warning("shell commands run unconfined, as you. %s", SANDBOX_HINT)
-        else:
+        elif not self.only:
             logger.warning("commands run unconfined, as you: no sandbox is on")
         return LocalCodeSandbox(
             str(self.workspace),

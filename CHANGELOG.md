@@ -13,15 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- An inline `web` environment with `host="user_device"` runs as a `desktop` in `shell` mode on the same id, whose agent drives this machine's Chrome with the `web` CLI. That shell runs `web` commands only, refuses any other, and works in `~/hai/<session_id>`. Its fields other than `id` and `lazy` are ignored, with a warning. Install it with `pip install "hai-agents[shell]"`.
+- An inline `web` environment with `host="user_device"` runs as a `desktop` in `shell` mode on the same id, whose agent drives this machine's Chrome with the `web` CLI. That shell runs `web` commands only, refuses any other, and works in `~/hai/<session_id>`. It leaves the screen to other agents and asks for no screen permission. Its fields other than `id` and `lazy` are ignored, with a warning. Install it with `pip install "hai-agents[shell]"`.
 
 ### Removed
 
-- The `browser` extra, `hai_agents_local.SeleniumBrowserBridge`, `holo local browser`, and the browser check of `holo doctor`. A named agent or environment holding a browser on this machine fails at session start: pass it inline, or store it as a `desktop` in `shell` mode. So does one with its own `session_id`, since the client serves it, and one beside another shell on this machine, whose desktop drives Chrome with `web` itself.
-
-### Fixed
-
-- A local bridge that stops while a command runs now answers that command with an error. The platform applies a session's cancel only once its in-flight command has an answer, so an unanswered one held the cancel, and dropped every message sent to the session, until the command's own timeout.
+- The `browser` extra, `hai_agents_local.SeleniumBrowserBridge`, `holo local browser`, and the browser check of `holo doctor`. A named agent or environment holding a browser on this machine fails at session start: pass it inline, or store a `desktop` in `shell` mode, whose shell runs any command. So does one with its own `session_id` or under an override of `environments[kind=web]` or `[kind=desktop]`, since the client serves it, and one beside another shell on this machine, whose desktop drives Chrome with `web` itself.
 
 ## [0.1.12]
 

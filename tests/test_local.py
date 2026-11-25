@@ -351,11 +351,14 @@ class TestAutoStart:
             sessions.create_session(agent={"name": "x", "environments": [served]}, messages="hi")
         browser = {"kind": "web", "host": "user_device"}
         inline = {"name": "x", "environments": [browser]}
-        for kind in ("web", "desktop"):
+        for key in (
+            "[kind=web].session_id",
+            "[kind=desktop].session_id",
+            "[kind=web].start_url",
+            "[kind=desktop].mode",
+        ):
             with pytest.raises(ValueError, match="drop its session_id, and any override"):
-                sessions.create_session(
-                    agent=inline, messages="hi", overrides={f"agent.environments[kind={kind}].session_id": "mine"}
-                )
+                sessions.create_session(agent=inline, messages="hi", overrides={f"agent.environments{key}": "mine"})
         shell = {"kind": "desktop", "host": "user_device", "mode": {"type": "shell"}}
         for environments in ([browser, browser], [shell, browser], [browser, shell]):
             with pytest.raises(ValueError, match="serves one shell|already has a desktop"):
@@ -1179,9 +1182,20 @@ class TestDriverInterfaces:
         self, tmp_path, caplog, monkeypatch
     ):
         pytest.importorskip("hai_drivers.code_sandbox.local.allowlist")
+        from hai_agents_local import workstation
+
         monkeypatch.setenv("HOME", str(tmp_path))
-        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "project"), sandbox=False, only=("web",))
-        assert bridge.workspace == tmp_path / "hai" / bridge.session_id
+        monkeypatch.setattr(workstation, "ensure_macos_input_permissions", lambda prompt: pytest.fail("screen"))
+        monkeypatch.setattr(workstation, "_host_cua", lambda environment: pytest.fail("cua daemon"))
+        bridge = WorkstationBridge(
+            api_key="k",
+            workspace=str(tmp_path / "project"),
+            sandbox=str(tmp_path / "sandbox.json"),
+            require_sandbox=True,
+            only=("web",),
+        )
+        assert bridge.workspace == tmp_path / "hai" / bridge.session_id and not bridge.drives_desktop
+        bridge.preflight()
         bridge._driver = bridge.create_driver()
         try:
             assert bridge._dispatch("execute", {"command": "web --help >/dev/null; web daemon stop"})[1] is None
