@@ -24,7 +24,7 @@ from .desktop import ensure_macos_input_permissions
 from .runtime.errors import LocalRuntimeError
 from .runtime.install import install_artifact
 from .runtime.manifest import RuntimeArtifact, platform_key
-from .transport import Json
+from .transport import Json, serialize_result
 
 if TYPE_CHECKING:
     from cua_cli.config import Config
@@ -290,6 +290,11 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
     def _dispatch(self, name: str, args: dict[str, Any]) -> tuple[Json, str | None]:
         if self.only and name == "approve_command":
             return None, f"this machine approves no command: it runs only {_named(self.only)}"
+        if self.only and name == "execute" and (refused := _Only(self.only).refusal(args.get("command", ""))):
+            from hai_drivers.code_sandbox.interface import ShellResult
+
+            # Exit 126 as a shell answers a program it cannot run: an error would end the session's startup probe.
+            return serialize_result(ShellResult(stderr=refused, exit_code=126, execution_time=0.0)), None
         return super()._dispatch(name, args)
 
     def _is_expected(self, exc: Exception) -> bool:
@@ -306,14 +311,19 @@ class _Only:
     def __init__(self, programs: Sequence[str]) -> None:
         self.programs = frozenset(programs)
 
-    def hold(self, command: str) -> str | None:
-        from hai_drivers.code_sandbox.interface import CodeSandboxRequestError
+    def refusal(self, command: str) -> str | None:
         from hai_drivers.code_sandbox.local.allowlist import only_runs
 
         if only_runs(command, self.programs):
             return None
-        message = f"this machine runs only {_named(self.programs)} for this agent, each called by its bare name"
-        raise CodeSandboxRequestError(COMMAND_REFUSED, {"message": message})
+        return f"this machine runs only {_named(self.programs)} for this agent, each called by its bare name"
+
+    def hold(self, command: str) -> str | None:
+        from hai_drivers.code_sandbox.interface import CodeSandboxRequestError
+
+        if refused := self.refusal(command):
+            raise CodeSandboxRequestError(COMMAND_REFUSED, {"message": refused})
+        return None
 
 
 def _named(programs: Iterable[str]) -> str:

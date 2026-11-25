@@ -1189,6 +1189,9 @@ class TestDriverInterfaces:
                 for command in ("touch made", "web --help && touch made", "/usr/bin/web"):
                     assert "approves no command" in bridge._dispatch("approve_command", {"command": command})[1]
                     result, error = bridge._dispatch("execute", {"command": command})
+                    assert error is None and result["exit_code"] == 126 and "runs only `web`" in result["stderr"]
+                    submitted = {"request_id": "r", "command": command}
+                    result, error = bridge._dispatch("submit_command", submitted)
                     assert result is None and "runs only `web`" in error
             assert not (bridge.workspace / "made").exists()
             assert "raised" not in caplog.text
