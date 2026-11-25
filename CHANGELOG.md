@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `memory` on agents: `{"namespace": "..."}` gives the agent notes that its later sessions read back. Agents in an organization that share a namespace share their notes.
+
 ### Fixed
 
 - A local bridge that stops while a command runs now answers that command with an error. The platform applies a session's cancel only once its in-flight command has an answer, so an unanswered one held the cancel, and dropped every message sent to the session, until the command's own timeout.
