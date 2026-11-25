@@ -1,7 +1,6 @@
-"""Local control: serve agent commands on this machine's browser, desktop or workstation via hai-drivers."""
+"""Local control: serve agent commands on this machine's desktop or workstation via hai-drivers."""
 
 from .bridge import LocalBridge
-from .browser import SeleniumBrowserBridge
 from .desktop import PyautoguiDesktopBridge
 from .manager import BridgeManager, ensure_bridges, stop_bridges
 from .workstation import WorkstationBridge
@@ -10,7 +9,6 @@ __all__ = [
     "BridgeManager",
     "LocalBridge",
     "PyautoguiDesktopBridge",
-    "SeleniumBrowserBridge",
     "WorkstationBridge",
     "ensure_bridges",
     "stop_bridges",

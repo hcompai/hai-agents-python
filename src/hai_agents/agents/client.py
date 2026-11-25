@@ -9,6 +9,7 @@ from ..types.agent_environments_item import AgentEnvironmentsItem
 from ..types.agent_reasoning_effort import AgentReasoningEffort
 from ..types.agent_skills_item import AgentSkillsItem
 from ..types.agent_subagents_item import AgentSubagentsItem
+from ..types.memory_config import MemoryConfig
 from ..types.page_agent import PageAgent
 from ..types.page_agent_revision_record import PageAgentRevisionRecord
 from ..types.tool_definition import ToolDefinition
@@ -116,6 +117,7 @@ class AgentsClient:
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
         message: typing.Optional[str] = None,
+        idempotency_key: typing.Optional[str] = None,
         model: typing.Optional[str] = OMIT,
         reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
@@ -123,6 +125,7 @@ class AgentsClient:
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
+        memory: typing.Optional[MemoryConfig] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -141,6 +144,9 @@ class AgentsClient:
 
         message : typing.Optional[str]
             Optional note stored on the revision this write creates, such as why the change was made.
+
+        idempotency_key : typing.Optional[str]
+            Repeating the create with the same key, spec and message within 24h returns the agent the first one made, at revision 1, instead of a 409. The same key with a different request is a 422. A replay while the first create is still running is a 409 with Retry-After. A replay after that agent was deleted is a 404.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
@@ -162,6 +168,9 @@ class AgentsClient:
 
         tools : typing.Optional[typing.Sequence[ToolDefinition]]
             Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
+
+        memory : typing.Optional[MemoryConfig]
+            Persistent memory the agent can save to and recall from across sessions. Off when null.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -189,6 +198,7 @@ class AgentsClient:
             description=description,
             environments=environments,
             message=message,
+            idempotency_key=idempotency_key,
             model=model,
             reasoning_effort=reasoning_effort,
             instructions=instructions,
@@ -196,6 +206,7 @@ class AgentsClient:
             skills=skills,
             answer_format=answer_format,
             tools=tools,
+            memory=memory,
             request_options=request_options,
         )
         return _response.data
@@ -370,6 +381,7 @@ class AgentsClient:
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
+        memory: typing.Optional[MemoryConfig] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -418,6 +430,9 @@ class AgentsClient:
         tools : typing.Optional[typing.Sequence[ToolDefinition]]
             Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
 
+        memory : typing.Optional[MemoryConfig]
+            Persistent memory the agent can save to and recall from across sessions. Off when null.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -454,6 +469,7 @@ class AgentsClient:
             skills=skills,
             answer_format=answer_format,
             tools=tools,
+            memory=memory,
             request_options=request_options,
         )
         return _response.data
@@ -512,6 +528,7 @@ class AgentsClient:
         skills: typing.Optional[typing.Sequence[PatchAgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
+        memory: typing.Optional[MemoryConfig] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -555,6 +572,9 @@ class AgentsClient:
         tools : typing.Optional[typing.Sequence[ToolDefinition]]
             Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
 
+        memory : typing.Optional[MemoryConfig]
+            Persistent memory the agent can save to and recall from across sessions. Off when null.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -587,6 +607,7 @@ class AgentsClient:
             skills=skills,
             answer_format=answer_format,
             tools=tools,
+            memory=memory,
             request_options=request_options,
         )
         return _response.data
@@ -691,6 +712,7 @@ class AsyncAgentsClient:
         description: str,
         environments: typing.Sequence[AgentEnvironmentsItem],
         message: typing.Optional[str] = None,
+        idempotency_key: typing.Optional[str] = None,
         model: typing.Optional[str] = OMIT,
         reasoning_effort: typing.Optional[AgentReasoningEffort] = OMIT,
         instructions: typing.Optional[str] = OMIT,
@@ -698,6 +720,7 @@ class AsyncAgentsClient:
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
+        memory: typing.Optional[MemoryConfig] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -716,6 +739,9 @@ class AsyncAgentsClient:
 
         message : typing.Optional[str]
             Optional note stored on the revision this write creates, such as why the change was made.
+
+        idempotency_key : typing.Optional[str]
+            Repeating the create with the same key, spec and message within 24h returns the agent the first one made, at revision 1, instead of a 409. The same key with a different request is a 422. A replay while the first create is still running is a 409 with Retry-After. A replay after that agent was deleted is a 404.
 
         model : typing.Optional[str]
             Model that serves the agent. Defaults to the platform model if omitted.
@@ -737,6 +763,9 @@ class AsyncAgentsClient:
 
         tools : typing.Optional[typing.Sequence[ToolDefinition]]
             Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
+
+        memory : typing.Optional[MemoryConfig]
+            Persistent memory the agent can save to and recall from across sessions. Off when null.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -772,6 +801,7 @@ class AsyncAgentsClient:
             description=description,
             environments=environments,
             message=message,
+            idempotency_key=idempotency_key,
             model=model,
             reasoning_effort=reasoning_effort,
             instructions=instructions,
@@ -779,6 +809,7 @@ class AsyncAgentsClient:
             skills=skills,
             answer_format=answer_format,
             tools=tools,
+            memory=memory,
             request_options=request_options,
         )
         return _response.data
@@ -977,6 +1008,7 @@ class AsyncAgentsClient:
         skills: typing.Optional[typing.Sequence[AgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
+        memory: typing.Optional[MemoryConfig] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -1025,6 +1057,9 @@ class AsyncAgentsClient:
         tools : typing.Optional[typing.Sequence[ToolDefinition]]
             Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
 
+        memory : typing.Optional[MemoryConfig]
+            Persistent memory the agent can save to and recall from across sessions. Off when null.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -1069,6 +1104,7 @@ class AsyncAgentsClient:
             skills=skills,
             answer_format=answer_format,
             tools=tools,
+            memory=memory,
             request_options=request_options,
         )
         return _response.data
@@ -1135,6 +1171,7 @@ class AsyncAgentsClient:
         skills: typing.Optional[typing.Sequence[PatchAgentSkillsItem]] = OMIT,
         answer_format: typing.Optional[typing.Dict[str, typing.Any]] = OMIT,
         tools: typing.Optional[typing.Sequence[ToolDefinition]] = OMIT,
+        memory: typing.Optional[MemoryConfig] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Agent:
         """
@@ -1178,6 +1215,9 @@ class AsyncAgentsClient:
         tools : typing.Optional[typing.Sequence[ToolDefinition]]
             Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result.
 
+        memory : typing.Optional[MemoryConfig]
+            Persistent memory the agent can save to and recall from across sessions. Off when null.
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -1218,6 +1258,7 @@ class AsyncAgentsClient:
             skills=skills,
             answer_format=answer_format,
             tools=tools,
+            memory=memory,
             request_options=request_options,
         )
         return _response.data

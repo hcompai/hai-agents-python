@@ -3261,6 +3261,26 @@
               "title": "Message"
             },
             "description": "Optional note stored on the revision this write creates, such as why the change was made."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Repeating the create with the same key, spec and message within 24h returns the agent the first one made, at revision 1, instead of a 409. The same key with a different request is a 422. A replay while the first create is still running is a 409 with Retry-After. A replay after that agent was deleted is a 404.",
+              "title": "Idempotency-Key"
+            },
+            "description": "Repeating the create with the same key, spec and message within 24h returns the agent the first one made, at revision 1, instead of a 409. The same key with a different request is a 422. A replay while the first create is still running is a 409 with Retry-After. A replay after that agent was deleted is a 404."
           }
         ],
         "requestBody": {
@@ -6949,6 +6969,17 @@
             ],
             "title": "Tools",
             "description": "Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result."
+          },
+          "memory": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemoryConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Persistent memory the agent can save to and recall from across sessions. Off when null."
           }
         },
         "type": "object",
@@ -8854,6 +8885,23 @@
         "title": "ManagedProxySelection",
         "description": "Request for an H-managed proxy, provisioned per session.\n\nDescribes intent only \u2014 pool, country, stickiness \u2014 never credentials; H resolves\nand injects those when provisioning the session, including which provider backs\nthe requested pool."
       },
+      "MemoryConfig": {
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "maxLength": 127,
+            "minLength": 1,
+            "title": "Namespace",
+            "description": "Memory namespace the agent reads and writes."
+          }
+        },
+        "type": "object",
+        "required": [
+          "namespace"
+        ],
+        "title": "MemoryConfig",
+        "description": "Persistent memory for an agent: agents that share a namespace share their memories."
+      },
       "MessageEvent": {
         "properties": {
           "kind": {
@@ -9592,6 +9640,17 @@
             ],
             "title": "Tools",
             "description": "Custom tools executed by the API client. The agent emits a tool call, pauses, and resumes once the client sends back the matching tool result."
+          },
+          "memory": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemoryConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Persistent memory the agent can save to and recall from across sessions. Off when null."
           }
         },
         "type": "object",
@@ -11608,7 +11667,7 @@
           "decided_by": {
             "type": "string",
             "title": "Decided By",
-            "description": "Who decided: 'client' for a response posted through the API, 'unattended' for an agent set to settle held calls on its own, 'run_end' when the run ended with the call still waiting."
+            "description": "Who decided: 'client' for a response posted through the API, 'unattended' for an agent set to settle held calls on its own, 'run_end' when the run ended with the call still waiting, 'superseded' when the user sent a new message instead of deciding."
           },
           "message": {
             "anyOf": [

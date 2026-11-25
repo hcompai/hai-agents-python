@@ -94,6 +94,7 @@ if typing.TYPE_CHECKING:
     from .live_view_url_data import LiveViewUrlData
     from .live_view_url_event import LiveViewUrlEvent
     from .managed_proxy_selection import ManagedProxySelection
+    from .memory_config import MemoryConfig
     from .message_event import MessageEvent
     from .message_event_content_item import MessageEventContentItem
     from .metrics import Metrics
@@ -307,6 +308,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "LiveViewUrlData": ".live_view_url_data",
     "LiveViewUrlEvent": ".live_view_url_event",
     "ManagedProxySelection": ".managed_proxy_selection",
+    "MemoryConfig": ".memory_config",
     "MessageEvent": ".message_event",
     "MessageEventContentItem": ".message_event_content_item",
     "Metrics": ".metrics",
@@ -538,6 +540,7 @@ __all__ = [
     "LiveViewUrlData",
     "LiveViewUrlEvent",
     "ManagedProxySelection",
+    "MemoryConfig",
     "MessageEvent",
     "MessageEventContentItem",
     "Metrics",

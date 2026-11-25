@@ -17,7 +17,7 @@ class ToolApprovalDecision(UniversalBaseModel):
     decision: ToolApprovalDecisionDecision
     decided_by: str = pydantic.Field()
     """
-    Who decided: 'client' for a response posted through the API, 'unattended' for an agent set to settle held calls on its own, 'run_end' when the run ended with the call still waiting.
+    Who decided: 'client' for a response posted through the API, 'unattended' for an agent set to settle held calls on its own, 'run_end' when the run ended with the call still waiting, 'superseded' when the user sent a new message instead of deciding.
     """
 
     message: typing.Optional[str] = pydantic.Field(default=None)

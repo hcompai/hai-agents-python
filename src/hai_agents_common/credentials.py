@@ -11,12 +11,11 @@ from urllib.parse import urljoin
 from dotenv import dotenv_values, set_key, unset_key
 
 from hai_agents import AsyncClient, Client
-from hai_agents.client import API_KEY_VAR, credentials_path
+from hai_agents.client import API_KEY_VAR, BASE_URL_VAR, credentials_path
 from hai_agents.environment import HaiAgentsEnvironment
 
 ApiKey = str | Callable[[], str]
 
-BASE_URL_VAR = "HAI_API_BASE_URL"
 AGENT_VAR = "HAI_AGENT"
 DEFAULT_AGENT = "h/web-surfer-flash"
 

@@ -12,13 +12,15 @@ import hmac
 import inspect
 import json
 import logging
+import os
 import threading
 import types
 import typing
 
 import httpx
 
-from hai_agents.base_client import BaseClient
+from hai_agents.base_client import AsyncBaseClient, BaseClient
+from hai_agents.client import API_KEY_VAR, BASE_URL_VAR, default_api_key
 from hai_agents.core.api_error import ApiError
 from hai_agents.core.parse_error import ParsingError
 from hai_agents.core.request_options import RequestOptions
@@ -31,7 +33,15 @@ from .bridge import LocalBridge, TokenSource
 from .config import refuse_unread_settings
 from .killswitch import StopWatcher
 from .manager import ensure_bridges, serving_bridges, stop_bridges
-from .routing import Reference, local_bridge_types, localize_agent, references, split_revision
+from .routing import (
+    Reference,
+    catalog_names,
+    inline_catalog,
+    local_bridge_types,
+    localize_agent,
+    references,
+    split_revision,
+)
 
 if typing.TYPE_CHECKING:
     from .runtime import LocalRuntime
@@ -45,6 +55,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_LOCAL_MAX_STEPS = 150
 DEFAULT_LOCAL_MAX_TIME_S = 1800.0
 REMOTE_CANCEL_TIMEOUT_S = 60.0
+PLATFORM_TIMEOUT_S = 60.0
 
 
 def _apply_runaway_budgets(kwargs: typing.Dict[str, typing.Any]) -> None:
@@ -92,7 +103,8 @@ def _warn_if_overrides_target_user_device(kwargs: typing.Dict[str, typing.Any]) 
     if overrides and "user_device" in json.dumps(overrides, default=str):
         logger.warning(
             "session overrides mention user_device, but auto-started bridges are derived from the agent "
-            "spec only; serve override-injected environments manually with `holo local browser|desktop`"
+            "spec only; serve an override-injected desktop with `holo local desktop`, and put a browser on this "
+            "machine in the agent itself"
         )
 
 
@@ -160,6 +172,45 @@ async def _resolve_references_async(
     found = references(agent)
     specs = await asyncio.gather(*(fetch(reference) for reference in found))
     return {reference: spec for reference, spec in zip(found, specs) if spec is not None}
+
+
+def _platform_options() -> typing.Dict[str, typing.Any]:
+    """Where the catalog behind a local runtime lives: the platform the default key belongs to."""
+    api_key = default_api_key()
+    if api_key is None:
+        raise ApiError(
+            body=f"A local runtime has no catalog, so names in the agent are fetched from the platform: "
+            f"set {API_KEY_VAR} or run `holo login`, or pass the agent and its environments and skills inline."
+        )
+    return {"api_key": api_key, "base_url": os.environ.get(BASE_URL_VAR) or None}
+
+
+def _fetch_spec(platform: typing.Any, kind: str, reference: str) -> typing.Any:
+    name, revision = split_revision(reference)
+    if kind == "agent":
+        return platform.agents.get_agent(name, revision=revision, resolve=True)
+    if kind == "environment":
+        return platform.environments.get_environment(name, revision=revision)
+    return platform.skills.get_skill(name, revision=revision)
+
+
+def _inline_for_runtime(kwargs: typing.Dict[str, typing.Any]) -> None:
+    names = catalog_names(kwargs["agent"])
+    if names:
+        options = _platform_options()
+        with httpx.Client(timeout=PLATFORM_TIMEOUT_S, follow_redirects=True) as http:
+            platform = BaseClient(**options, httpx_client=http)
+            kwargs["agent"] = inline_catalog(kwargs["agent"], {name: _fetch_spec(platform, *name) for name in names})
+
+
+async def _inline_for_runtime_async(kwargs: typing.Dict[str, typing.Any]) -> None:
+    names = catalog_names(kwargs["agent"])
+    if names:
+        options = _platform_options()
+        async with httpx.AsyncClient(timeout=PLATFORM_TIMEOUT_S, follow_redirects=True) as http:
+            platform = AsyncBaseClient(**options, httpx_client=http)
+            specs = await asyncio.gather(*(_fetch_spec(platform, *name) for name in names))
+        kwargs["agent"] = inline_catalog(kwargs["agent"], dict(zip(names, specs)))
 
 
 def local_environment_kinds(client: typing.Any, agent: typing.Any) -> typing.List[str]:
@@ -492,6 +543,8 @@ class LocalSessionsClient(_LocalSessionsState, SessionsClient):
     def create_session(self, **kwargs: typing.Any) -> typing.Any:
         if self._hold is not None:
             self._hold.reacquire()
+            if kwargs.get("agent") is not None:
+                _inline_for_runtime(kwargs)
         bridges: typing.List[LocalBridge] = []
         shell = _pop_shell_options(kwargs)
         if _wants_bridges(self._auto_bridges(), kwargs):
@@ -568,6 +621,8 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
     async def create_session(self, **kwargs: typing.Any) -> typing.Any:
         if self._hold is not None:
             await self._hold.reacquire_async()
+            if kwargs.get("agent") is not None:
+                await _inline_for_runtime_async(kwargs)
         bridges: typing.List[LocalBridge] = []
         shell = _pop_shell_options(kwargs)
         if _wants_bridges(self._auto_bridges(), kwargs):
