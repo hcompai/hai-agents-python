@@ -273,9 +273,11 @@ def _web_desktop(env: EnvironmentLike, session_id: str) -> EnvironmentLike:
         )
     kept = {field: value for field in _WEB_DESKTOP_KEEPS if (value := _read(env, field)) is not None}
     if isinstance(env, BaseModel):
-        from hai_agents.types import Desktop, DesktopMode_Shell
+        from hai_agents.types import DesktopMode_Shell, Environment_Desktop
 
-        return Desktop(**kept, mode=DesktopMode_Shell(allowed_commands=list(WEB_ONLY)), session_id=session_id)
+        return Environment_Desktop(
+            **kept, mode=DesktopMode_Shell(allowed_commands=list(WEB_ONLY)), session_id=session_id
+        )
     return {
         **kept,
         "kind": "desktop",

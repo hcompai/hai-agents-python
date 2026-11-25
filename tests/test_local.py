@@ -24,7 +24,7 @@ import pytest
 from hai_agents import Client
 from hai_agents.core.api_error import ApiError
 from hai_agents.sessions.client import SessionsClient
-from hai_agents.types import Agent, Desktop, Workstation
+from hai_agents.types import Agent, Desktop, Environment_Web, Workstation
 from hai_agents.types.browser import Browser
 from hai_agents_local import BridgeManager, LocalBridge, PyautoguiDesktopBridge, WorkstationBridge
 from hai_agents_local.config import shell_sandbox
@@ -311,22 +311,27 @@ class TestAutoStart:
     def test_an_inline_user_device_browser_runs_as_a_shell_desktop_that_runs_only_web(self, monkeypatch):
         monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
         started: list = []
-        captured: list = []
+        sent: list = []
         monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: started.extend(bridges) or [])
-        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: captured.append(kw))
-        sessions = Client(api_key=API_KEY).sessions
-        as_dict = {"id": "laptop", "kind": "web", "host": "user_device", "start_url": "https://example.com"}
-        for env in (as_dict, Browser(id="laptop", host="user_device", start_url="https://example.com")):
-            sessions.create_session(agent={"name": "x", "environments": [env]}, messages="hi")
-        dict_env, model_env = (kw["agent"]["environments"][0] for kw in captured)
-        assert dict_env == {
-            "id": "laptop",
-            "kind": "desktop",
-            "mode": {"type": "shell", "allowed_commands": ["web"]},
-            "session_id": started[0].session_id,
-        }
-        assert isinstance(model_env, Desktop) and model_env.session_id == started[1].session_id
-        assert model_env.mode.type == "shell" and model_env.mode.allowed_commands == ["web"]
+
+        def platform(request: httpx.Request) -> httpx.Response:
+            sent.append(json.loads(request.content)["agent"]["environments"][0])
+            return httpx.Response(418, text="stop")
+
+        sessions = Client(api_key=API_KEY, httpx_client=httpx.Client(transport=httpx.MockTransport(platform))).sessions
+        fields = {"id": "laptop", "host": "user_device", "start_url": "https://example.com"}
+        for env in ({**fields, "kind": "web"}, Browser(**fields), Environment_Web(**fields)):
+            with pytest.raises(ApiError):
+                sessions.create_session(agent={"name": "x", "environments": [env]}, messages="hi")
+        assert sent == [
+            {
+                "id": "laptop",
+                "kind": "desktop",
+                "mode": {"type": "shell", "allowed_commands": ["web"]},
+                "session_id": bridge.session_id,
+            }
+            for bridge in started
+        ]
         assert all(isinstance(bridge, WorkstationBridge) and bridge.only == ("web",) for bridge in started)
         assert all(bridge.workspace == Path.home() / "hai" / bridge.session_id for bridge in started)
 
