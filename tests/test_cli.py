@@ -380,12 +380,9 @@ def test_a_follow_up_after_a_failed_turn_starts_a_new_session(monkeypatch) -> No
     assert client.sessions.sent == []
 
 
-def test_local_runs_any_agent_inline_on_the_local_runtime(monkeypatch) -> None:
+def test_local_runs_any_agent_on_the_local_runtime(monkeypatch) -> None:
     captured: dict = {}
     cloud, runtime = _RunClient(), _RunClient(captured)
-    fetched: list = []
-    spec = types.SimpleNamespace(model_dump=lambda **_: {"name": "h/web-surfer-pro", "instructions": "Browse."})
-    cloud.agents = types.SimpleNamespace(get_agent=lambda *a, **kw: fetched.append((a, kw)) or spec)
     monkeypatch.setattr(app_module, "_client", lambda state: cloud)
     monkeypatch.setattr(app_module, "_local_client", lambda state, inference: captured.update(on=inference) or runtime)
     monkeypatch.setattr(app_module, "_follow", _no_events)
@@ -394,8 +391,7 @@ def test_local_runs_any_agent_inline_on_the_local_runtime(monkeypatch) -> None:
     result = runner.invoke(app, ["run", "x", "--local", "-a", "h/web-surfer-pro"], env={"HAI_API_KEY": "hk-t"})
 
     assert result.exit_code == 0, result.output
-    assert fetched == [(("h/web-surfer-pro",), {"revision": None, "resolve": True})]
-    assert captured["agent"] == {"name": "h/web-surfer-pro", "instructions": "Browse."} and captured["on"] is None
+    assert captured["agent"] == "h/web-surfer-pro" and captured["on"] is None
     assert cloud.sessions.created == 0 and "sandbox" not in captured
 
     result = runner.invoke(app, ["run", "x", "--local", "--no-sandbox", *server], env={"HAI_API_KEY": "hk-t"})
