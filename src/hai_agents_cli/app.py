@@ -707,16 +707,13 @@ class _Conversation:
     def _create_session(self, message: str) -> Any:
         """On ctrl+c, the session is cancelled once the create call returns, even if ctrl+c is pressed again."""
         params = self.params(message)
-        if self.local or holo_dir.customized():
+        if holo_dir.customized():
             from hai_agents_local.routing import split_revision
 
             name, revision = split_revision(self.agent)
             agent = self.cloud.agents.get_agent(name, revision=revision, resolve=self.local)
             spec = agent.model_dump(mode="json", exclude_none=True)
-            if self.local:
-                params["agent"] = spec
-            if holo_dir.customized():
-                params["overrides"] = {**holo_dir.overrides(spec), **self.overrides}
+            params["overrides"] = {**holo_dir.overrides(spec), **self.overrides}
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             created = pool.submit(self.client.sessions.create_session, **params)
             try:
