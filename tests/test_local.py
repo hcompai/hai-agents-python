@@ -308,7 +308,28 @@ class TestAutoStart:
         assert captured["agent"]["environments"][0]["session_id"] == desktop.session_id
         assert captured["agent"]["subagents"][0]["environments"][0]["session_id"] == shell.session_id
 
-    def test_a_user_device_browser_fails_the_session_before_any_bridge_or_request(self, monkeypatch):
+    def test_an_inline_user_device_browser_runs_as_a_shell_desktop_that_runs_only_web(self, monkeypatch):
+        monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
+        started: list = []
+        captured: list = []
+        monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: started.extend(bridges) or [])
+        monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: captured.append(kw))
+        sessions = Client(api_key=API_KEY).sessions
+        as_dict = {"id": "laptop", "kind": "web", "host": "user_device", "start_url": "https://example.com"}
+        for env in (as_dict, Browser(id="laptop", host="user_device", start_url="https://example.com")):
+            sessions.create_session(agent={"name": "x", "environments": [env]}, messages="hi")
+        dict_env, model_env = (kw["agent"]["environments"][0] for kw in captured)
+        assert dict_env == {
+            "id": "laptop",
+            "kind": "desktop",
+            "mode": {"type": "shell", "allowed_commands": ["web"]},
+            "session_id": started[0].session_id,
+        }
+        assert isinstance(model_env, Desktop) and model_env.session_id == started[1].session_id
+        assert model_env.mode.type == "shell" and model_env.mode.allowed_commands == ["web"]
+        assert all(isinstance(bridge, WorkstationBridge) and bridge.only == ("web",) for bridge in started)
+
+    def test_a_named_user_device_browser_fails_the_session_before_any_bridge_or_request(self, monkeypatch):
         monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
         calls: list = []
         monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: calls.append(bridges) or [])
@@ -316,10 +337,8 @@ class TestAutoStart:
         _registry(
             monkeypatch, agents={"named": {"name": "named", "environments": [{"kind": "web", "host": "user_device"}]}}
         )
-        sessions = Client(api_key=API_KEY).sessions
-        for agent in ({"name": "x", "environments": [Browser(id="laptop", host="user_device")]}, "named"):
-            with pytest.raises(ValueError, match="shell mode"):
-                sessions.create_session(agent=agent, messages="hi")
+        with pytest.raises(ValueError, match="pass it inline"):
+            Client(api_key=API_KEY).sessions.create_session(agent="named", messages="hi")
         assert calls == []
 
     def test_what_the_caller_sets_for_a_shell_desktop_reaches_it_and_stays_on_this_machine(self, monkeypatch, tmp_path):
@@ -1125,6 +1144,22 @@ class TestDriverInterfaces:
             assert bridge._dispatch("approve_command", {"command": "touch made"}) == (None, None)
             result, error = bridge._dispatch("execute", {"command": "touch made"})
             assert error is None and (tmp_path / "workspace" / "made").exists()
+        finally:
+            bridge._driver.close()
+
+    def test_workstation_that_runs_only_web_refuses_any_other_command_even_approved(self, tmp_path, caplog):
+        pytest.importorskip("hai_drivers.code_sandbox.local.allowlist")
+        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), sandbox=False, only=("web",))
+        bridge._driver = bridge.create_driver()
+        try:
+            assert bridge._dispatch("execute", {"command": "web --help >/dev/null; web daemon stop"})[1] is None
+            with caplog.at_level(logging.WARNING):
+                for command in ("touch made", "web --help && touch made", "/usr/bin/web"):
+                    assert "approves no command" in bridge._dispatch("approve_command", {"command": command})[1]
+                    result, error = bridge._dispatch("execute", {"command": command})
+                    assert result is None and "runs only `web`" in error
+            assert not (tmp_path / "workspace" / "made").exists()
+            assert "raised" not in caplog.text
         finally:
             bridge._driver.close()
 

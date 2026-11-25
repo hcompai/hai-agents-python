@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- An inline `web` environment with `host="user_device"` runs as a `desktop` in `shell` mode on the same id, whose agent drives this machine's Chrome with the `web` CLI. That shell runs `web` commands only and refuses any other. `start_url`, `mode`, `headless`, `network` and the profile fields of such a browser are ignored, with a warning. The `browser` extra installs the `shell` one.
+
 ### Removed
 
-- The local browser bridge: the `browser` extra, `holo local browser`, `hai_agents_local.SeleniumBrowserBridge`, and the browser check of `holo doctor`. A `web` environment with `host="user_device"` now fails at session start; to drive this machine's Chrome, give the agent a `desktop` environment in `shell` mode (`pip install "hai-agents[shell]"`).
+- `hai_agents_local.SeleniumBrowserBridge`, `holo local browser`, and the browser check of `holo doctor`. A named agent or environment holding a browser on this machine fails at session start: pass it inline, or store it as a `desktop` in `shell` mode.
 
 ### Fixed
 

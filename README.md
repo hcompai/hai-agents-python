@@ -327,7 +327,8 @@ asyncio.run(main())
 
 `Client.local()` and `await AsyncClient.local()` run the agent on this machine through a local agent runtime,
 started on demand or passed in with `runtime=...`. A desktop is this machine; a browser runs in the cloud. To drive
-this machine's Chrome, give the agent a desktop in `shell` mode (see [Code on this machine](#code-on-this-machine)).
+this machine's Chrome, give the agent a desktop in `shell` mode (see [Code on this machine](#code-on-this-machine)):
+an inline browser with `host="user_device"` becomes one that runs only the `web` CLI.
 `Client()` keeps using the hosted Agents API. Closing the client stops a runtime it started, unless other clients still
 have active sessions there.
 

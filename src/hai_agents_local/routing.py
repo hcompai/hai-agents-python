@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from typing import TYPE_CHECKING, Any, Collection, Literal, Mapping, NamedTuple, Sequence, Union
@@ -14,6 +15,8 @@ from .workstation import WorkstationBridge
 
 if TYPE_CHECKING:
     from hai_agents.types.agent import Agent
+
+logger = logging.getLogger(__name__)
 
 AgentLike = Union[str, "Agent", Mapping[str, Any]]
 EnvironmentLike = Union[str, BaseModel, Mapping[str, Any]]
@@ -133,6 +136,14 @@ class _Walk:
         if any(key == claim or key.startswith(f"{claim}.") for claim in self.claimed):
             return env
         serve = SERVE_COMMANDS[_bridge_type(env, kind).environment_kind]
+        if kind == "web":
+            if by_name:
+                raise ValueError(
+                    f"the browser on this machine at {path} is served as a desktop in shell mode that runs only "
+                    "`web`, which only an inline environment can become: pass it inline, or store it as "
+                    "{'kind': 'desktop', 'mode': {'type': 'shell'}}"
+                )
+            return _web_desktop(env, self.bridge(env, kind).session_id)
         if not by_name:
             return _replace(env, kind=kind, session_id=self.bridge(env, kind).session_id)
         if sum(_kind(sibling) == kind for sibling in siblings) > 1:
@@ -166,7 +177,9 @@ class _Walk:
         width = _read(env, "screenshot_max_width")
         if bridge_type is WorkstationBridge and width:
             options["environment_variables"] = {"WEB_MAX_IMAGE_WIDTH": str(width), "DESK_MAX_IMAGE_WIDTH": str(width)}
-        if bridge_type is WorkstationBridge:
+        if kind == "web":
+            options.update(self.shell, only=WEB_ONLY)
+        elif bridge_type is WorkstationBridge:
             options.update(self.shell)
             mode = _read(env, "mode")
             options["require_approval"] = _read(mode, "command_approval") == "required"
@@ -186,6 +199,18 @@ SERVE_COMMANDS = {
     PyautoguiDesktopBridge.environment_kind: "holo local desktop",
     WorkstationBridge.environment_kind: "holo local desktop --shell",
 }
+WEB_ONLY = ("web",)
+_BROWSER_ONLY_FIELDS = (
+    "start_url",
+    "headless",
+    "mode",
+    "settle_s",
+    "vault_id",
+    "browser_profile_id",
+    "use_default_browser_profile",
+    "persist_browser_profile",
+    "network",
+)
 _SEGMENT = re.compile(r"^[A-Za-z_]\w*(?:\[[^\[\]]+\])?$")
 
 
@@ -201,17 +226,14 @@ def _kind(env: Any) -> str | None:
 
 
 def _local_kind(env: EnvironmentLike) -> str | None:
-    """The kind of ``env`` when this machine serves it: a desktop always, a workstation on user_device."""
+    """The kind of ``env`` when this machine serves it: a desktop always, a browser or workstation on user_device."""
     kind = _kind(env)
     if kind == "desktop":
         return kind
     if _read(env, "host") != "user_device":
         return None
     if kind == "web":
-        raise ValueError(
-            f"user_device browser {_read(env, 'id')!r} cannot be served from this machine; to drive this machine's "
-            "Chrome, use a desktop environment in shell mode: {'kind': 'desktop', 'mode': {'type': 'shell'}}"
-        )
+        return kind
     if kind not in BRIDGE_TYPES:
         raise ValueError(
             f"user_device environment {_read(env, 'id')!r} has kind {kind!r}, which cannot be served by a "
@@ -221,9 +243,30 @@ def _local_kind(env: EnvironmentLike) -> str | None:
 
 
 def _bridge_type(env: EnvironmentLike, kind: str) -> type[LocalBridge]:
-    if kind == "desktop" and _read(_read(env, "mode"), "type") == "shell":
+    if kind == "web" or (kind == "desktop" and _read(_read(env, "mode"), "type") == "shell"):
         return WorkstationBridge
     return BRIDGE_TYPES[kind]
+
+
+def _web_desktop(env: EnvironmentLike, session_id: str) -> EnvironmentLike:
+    """``env``, a browser on this machine, as the shell desktop whose agent drives this machine's Chrome with `web`."""
+    if dropped := [field for field in _BROWSER_ONLY_FIELDS if _read(env, field) is not None]:
+        logger.warning(
+            "browser %r on this machine runs as a desktop in shell mode driving Chrome with `web`, which ignores %s",
+            _read(env, "id"),
+            ", ".join(dropped),
+        )
+    kept = {field: value for field in ("id", "lazy") if (value := _read(env, field)) is not None}
+    if isinstance(env, BaseModel):
+        from hai_agents.types import Desktop, DesktopMode_Shell
+
+        return Desktop(**kept, mode=DesktopMode_Shell(allowed_commands=list(WEB_ONLY)), session_id=session_id)
+    return {
+        **kept,
+        "kind": "desktop",
+        "mode": {"type": "shell", "allowed_commands": list(WEB_ONLY)},
+        "session_id": session_id,
+    }
 
 
 def _model_kind(env: EnvironmentLike) -> str | None:

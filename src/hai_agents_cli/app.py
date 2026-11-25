@@ -1563,6 +1563,17 @@ def _print_mcp_results(results: list[dict], server: str, json_output: bool) -> N
     console.print(f"\n  [meta]server[/meta] {escape(server)}")
 
 
+@local_app.command("browser", hidden=True)
+def local_browser() -> None:
+    """Point at the shell desktop that serves this machine's Chrome."""
+    _raise_cli_error(
+        ValueError(
+            "this machine's Chrome is served by a desktop in shell mode, whose agent drives it with `web`: give the "
+            "agent {'kind': 'desktop', 'mode': {'type': 'shell'}} and serve it with `holo local desktop --shell`"
+        )
+    )
+
+
 @local_app.command("desktop")
 def local_desktop(
     ctx: typer.Context,
