@@ -16,6 +16,8 @@ from hai_agents_local.runtime.inference import served_inference
 from hai_agents_local.runtime.runtime import default_port
 from hai_agents_local.runtime.state import DEFAULT_PORT, inference_file_path, token_file_path, write_owner_only
 
+INLINE_AGENT = {"name": "qa", "description": "d", "environments": [{"id": "box", "kind": "web"}]}
+
 
 class RuntimeServer(ThreadingHTTPServer):
     """A loopback stand-in for the runtime: answers every response with an HMAC proof keyed by `proof_token`."""
@@ -156,6 +158,60 @@ async def test_local_client_without_auto_bridges_leaves_execution_to_the_product
     assert requested[0]["agent"] == agent
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asynchronous", [False, True])
+async def test_a_local_runtime_is_sent_catalog_names_as_specs_from_the_platform(monkeypatch, asynchronous):
+    from hai_agents.sessions.client import AsyncSessionsClient, SessionsClient
+
+    monkeypatch.setenv("HAI_API_KEY", "hk-platform")
+    monkeypatch.setenv("HAI_API_BASE_URL", "https://platform.test")
+    browser = {"id": "h/browser", "kind": "web"}
+    catalog = {
+        "agents/h/web-surfer": {"name": "h/web-surfer", "description": "d", "environments": [browser]},
+        "environments/h/browser": browser,
+        "skills/h/search": {"name": "h/search", "description": "d", "body": "b"},
+    }
+    fetched = []
+
+    def platform(request):
+        fetched.append((request.url.host, request.headers["authorization"], request.url.params.get("revision")))
+        return httpx.Response(200, json=catalog[request.url.path.removeprefix("/api/v2/")])
+
+    for name in ("Client", "AsyncClient"):
+        real = getattr(httpx, name)
+        monkeypatch.setattr(httpx, name, lambda real=real, **kw: real(transport=httpx.MockTransport(platform), **kw))
+    requested = []
+
+    def create(self, **kwargs):
+        requested.append(kwargs["agent"])
+        return type("Session", (), {"id": "run"})()
+
+    async def async_create(self, **kwargs):
+        return create(self, **kwargs)
+
+    monkeypatch.setattr(SessionsClient, "create_session", create)
+    monkeypatch.setattr(AsyncSessionsClient, "create_session", async_create)
+    inline = {"id": "mine", "kind": "web"}
+    agents = (
+        "h/web-surfer:2",
+        {"name": "qa", "description": "d", "environments": ["h/browser", inline], "skills": ["h/search"]},
+    )
+    for agent in agents:
+        if asynchronous:
+            async with await AsyncClient.local(runtime=FakeRuntime(), auto_bridges=False) as client:
+                await client.sessions.create_session(agent=agent, messages="test")
+        else:
+            with Client.local(runtime=FakeRuntime(), auto_bridges=False) as client:
+                client.sessions.create_session(agent=agent, messages="test")
+
+    named, partly_named = requested
+    assert (named.name, named.environments[0].id) == ("h/web-surfer", "h/browser")
+    assert [env if env is inline else env.id for env in partly_named["environments"]] == ["h/browser", inline]
+    assert [skill.name for skill in partly_named["skills"]] == ["h/search"]
+    assert {(host, auth) for host, auth, _ in fetched} == {("platform.test", "Bearer hk-platform")}
+    assert fetched[0][2] == "2"
+
+
 def test_self_hosted_inference_does_not_receive_hosted_key(monkeypatch):
     monkeypatch.setenv("HAI_API_KEY", "hosted-secret")
     env = Inference.self_hosted("http://127.0.0.1:8000/v1", model="my-model").runtime_env()
@@ -230,9 +286,9 @@ async def test_attached_client_reacquires_a_runtime_its_spawner_took_along(
         # The replacement answers 401 to any other bearer, so a 404 proves the client switched tokens.
         with pytest.raises(ApiError) as failed:
             if asynchronous:
-                await client.sessions.create_session(agent="h/agent", messages="hi")
+                await client.sessions.create_session(agent=INLINE_AGENT, messages="hi")
             else:
-                client.sessions.create_session(agent="h/agent", messages="hi")
+                client.sessions.create_session(agent=INLINE_AGENT, messages="hi")
         assert failed.value.status_code == 404
         assert client.local_runtime.api_key == "fresh-token"
     finally:
@@ -300,11 +356,11 @@ async def test_close_stops_only_an_owned_runtime_no_other_client_uses(
     options = {"runtime": runtime} if runtime_use == "borrowed" else {}
     if asynchronous:
         client = await AsyncClient.local(auto_bridges=False, **options)
-        await client.sessions.create_session(agent="h/agent", messages="hi")
+        await client.sessions.create_session(agent=INLINE_AGENT, messages="hi")
         await client.aclose()
     else:
         client = Client.local(auto_bridges=False, **options)
-        client.sessions.create_session(agent="h/agent", messages="hi")
+        client.sessions.create_session(agent=INLINE_AGENT, messages="hi")
         client.close()
     assert stopped == ([True] if runtime_use == "idle" else [])
     assert client._client_wrapper.httpx_client.httpx_client.is_closed
@@ -327,7 +383,7 @@ def test_last_client_of_the_spawning_process_stops_the_runtime(tmp_path, monkeyp
 
     spawner = Client.local(auto_bridges=False)
     later = Client.local(auto_bridges=False)
-    later.sessions.create_session(agent="h/agent", messages="hi")
+    later.sessions.create_session(agent=INLINE_AGENT, messages="hi")
     runtime_server.active = ["theirs"]
     spawner.close()
     assert stopped == [], "the spawner must not kill a runtime another client of its process still uses"

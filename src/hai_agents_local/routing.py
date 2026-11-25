@@ -46,6 +46,34 @@ def references(agent: AgentLike) -> list[Reference]:
     return found
 
 
+CatalogName = tuple[Literal["agent", "environment", "skill"], str]
+
+
+def catalog_names(agent: AgentLike) -> list[CatalogName]:
+    """Names a local runtime cannot resolve: it has no catalog, so each one is sent as its spec."""
+    if isinstance(agent, str):
+        return [("agent", agent)]
+    return [("environment", env) for env in _read(agent, "environments") or [] if isinstance(env, str)] + [
+        ("skill", skill) for skill in _read(agent, "skills") or [] if isinstance(skill, str)
+    ]
+
+
+def inline_catalog(agent: AgentLike, specs: Mapping[CatalogName, Any]) -> AgentLike:
+    """``agent`` with each name from ``catalog_names`` replaced by its spec."""
+    if isinstance(agent, str):
+        return specs[("agent", agent)]
+    changes = {}
+    fields: tuple[tuple[str, Literal["environment", "skill"]], ...] = (
+        ("environments", "environment"),
+        ("skills", "skill"),
+    )
+    for field, kind in fields:
+        items = _read(agent, field) or []
+        if any(isinstance(item, str) for item in items):
+            changes[field] = [specs[(kind, item)] if isinstance(item, str) else item for item in items]
+    return _replace(agent, **changes) if changes else agent
+
+
 def split_revision(reference: str) -> tuple[str, int | None]:
     """``name:N`` pins a revision; any other colon is part of the name."""
     name, sep, revision = reference.rpartition(":")
