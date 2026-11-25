@@ -333,7 +333,9 @@ class TestAutoStart:
         sessions.create_session(agent={"name": "x", "environments": [served]}, messages="hi")
         assert captured[-1]["agent"]["environments"][0]["session_id"] == "mine" and len(started) == 2
 
-    def test_a_named_or_overridden_user_device_browser_fails_the_session_before_any_bridge_or_request(self, monkeypatch):
+    def test_a_named_or_overridden_user_device_browser_fails_the_session_before_any_bridge_or_request(
+        self, monkeypatch
+    ):
         monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
         calls: list = []
         monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: calls.append(bridges) or [])

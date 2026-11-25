@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- An inline `web` environment with `host="user_device"` runs as a `desktop` in `shell` mode on the same id, whose agent drives this machine's Chrome with the `web` CLI. That shell runs `web` commands only and refuses any other. `start_url`, `mode`, `headless`, `network` and the profile fields of such a browser are ignored, with a warning. The `browser` extra installs the `shell` one.
+- An inline `web` environment with `host="user_device"` runs as a `desktop` in `shell` mode on the same id, whose agent drives this machine's Chrome with the `web` CLI. That shell runs `web` commands only and refuses any other. A browser with its own `session_id` keeps it, served with `holo local desktop --shell --session-id <id>`. Its fields other than `id` and `lazy` are ignored, with a warning. The `browser` extra installs the `shell` one.
 
 ### Removed
 

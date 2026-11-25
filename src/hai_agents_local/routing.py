@@ -210,17 +210,7 @@ SERVE_COMMANDS = {
     WorkstationBridge.environment_kind: "holo local desktop --shell",
 }
 WEB_ONLY = ("web",)
-_BROWSER_ONLY_FIELDS = (
-    "start_url",
-    "headless",
-    "mode",
-    "settle_s",
-    "vault_id",
-    "browser_profile_id",
-    "use_default_browser_profile",
-    "persist_browser_profile",
-    "network",
-)
+_WEB_DESKTOP_KEEPS = ("id", "lazy")
 _SEGMENT = re.compile(r"^[A-Za-z_]\w*(?:\[[^\[\]]+\])?$")
 
 
@@ -260,13 +250,14 @@ def _bridge_type(env: EnvironmentLike, kind: str) -> type[LocalBridge]:
 
 def _web_desktop(env: EnvironmentLike, session_id: str) -> EnvironmentLike:
     """``env``, a browser on this machine, as the shell desktop whose agent drives this machine's Chrome with `web`."""
-    if dropped := [field for field in _BROWSER_ONLY_FIELDS if _read(env, field) is not None]:
+    given = env.model_fields_set if isinstance(env, BaseModel) else set(env)
+    if dropped := sorted(given - {*_WEB_DESKTOP_KEEPS, "kind", "host", "session_id"}):
         logger.warning(
             "browser %r on this machine runs as a desktop in shell mode driving Chrome with `web`, which ignores %s",
             _read(env, "id"),
             ", ".join(dropped),
         )
-    kept = {field: value for field in ("id", "lazy") if (value := _read(env, field)) is not None}
+    kept = {field: value for field in _WEB_DESKTOP_KEEPS if (value := _read(env, field)) is not None}
     if isinstance(env, BaseModel):
         from hai_agents.types import Desktop, DesktopMode_Shell
 
