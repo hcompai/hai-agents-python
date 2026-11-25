@@ -84,7 +84,9 @@ def test_operations_prod_does_not_serve_block_the_release():
 
 
 def test_session_fields_the_runtime_does_not_accept_block_the_release():
-    environment = {"properties": {"kind": {"type": "string"}, "settle_s": {"type": "number"}}}
+    environment = {
+        "properties": {"kind": {"type": "string"}, "settle_s": {"type": "number"}, "host": {"type": "string"}}
+    }
     agent = {
         "properties": {
             "environments": {

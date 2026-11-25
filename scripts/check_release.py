@@ -15,6 +15,8 @@ PROD_SPECS = ("https://agp.hcompany.ai/share/openapi.json", "https://agp.eu.hcom
 RUNTIME_SPEC = "https://assets.hcompanyprod.fr/hai-agent-runtime/{}/openapi.json"
 # The local runtime answers every other resource with 501, so only sessions carry fields it must accept.
 RUNTIME_RESOURCE = "/api/v2/sessions"
+# Fields the runtime parses but leaves out of its schema on purpose: `Browser.host` is only for HoloTab.
+RUNTIME_UNPUBLISHED = frozenset({"agent.environments[].host"})
 METHODS = ("get", "post", "put", "patch", "delete")
 
 Spec = dict[str, Any]
@@ -68,7 +70,7 @@ def unaccepted_session_fields(sdk: Spec, runtime: Spec) -> list[str]:
         f"{name}: {field}"
         for name, op in operations(sdk).items()
         if name.split(" ", 1)[1].startswith(RUNTIME_RESOURCE) and name in served
-        for field in _body_fields(sdk, op) - _body_fields(runtime, served[name])
+        for field in _body_fields(sdk, op) - _body_fields(runtime, served[name]) - RUNTIME_UNPUBLISHED
     )
 
 
