@@ -121,7 +121,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
 
         Args:
             workspace: The folder the shell starts in and the file tools act in; defaults to the current one,
-                and with ``only``, or from the home folder or above it, to ``~/hai/<session_id>``.
+                and from the home folder or above it to ``~/hai/<session_id>``. With ``only``, always the latter.
             policy: This machine's allowlist file, one command prefix a line. With one, the shell runs the
                 commands it covers and holds any other until the session's client approves it, whatever the agent
                 asks. Without one, commands wait only for an agent that requires approval. A file that does not
@@ -147,10 +147,12 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         """
         super().__init__(environment_id, api_key=api_key, base_url=base_url, session_id=session_id)
         self.only = tuple(only)
-        if workspace:
+        if self.only:
+            self.workspace = Path.home() / "hai" / self.session_id
+        elif workspace:
             self.workspace = Path(workspace).expanduser().absolute()
         else:
-            self.workspace = Path.home() / "hai" / self.session_id if self.only else _workspace(self.session_id)
+            self.workspace = _workspace(self.session_id)
         self.environment_variables = dict(environment_variables or {})
         refuse_unread_settings()
         self.policy = policy

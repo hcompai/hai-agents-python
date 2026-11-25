@@ -353,8 +353,15 @@ class TestAutoStart:
                 )
         shell = {"kind": "desktop", "host": "user_device", "mode": {"type": "shell"}}
         for environments in ([browser, browser], [shell, browser], [browser, shell]):
-            with pytest.raises(ValueError, match="serves one shell"):
+            with pytest.raises(ValueError, match="serves one shell|already has a desktop"):
                 sessions.create_session(agent={"name": "x", "environments": environments}, messages="hi")
+        visual = {"kind": "desktop", "host": "user_device"}
+        for environments in ([visual, browser], [browser, visual]):
+            with pytest.raises(ValueError, match="already has a desktop"):
+                sessions.create_session(agent={"name": "x", "environments": environments}, messages="hi")
+        child = {"name": "child", "environments": [browser]}
+        with pytest.raises(ValueError, match="serves one shell"):
+            sessions.create_session(agent={"name": "x", "environments": [shell], "subagents": [child]}, messages="hi")
         assert calls == []
 
     def test_what_the_caller_sets_for_a_shell_desktop_reaches_it_and_stays_on_this_machine(self, monkeypatch, tmp_path):
@@ -1163,9 +1170,13 @@ class TestDriverInterfaces:
         finally:
             bridge._driver.close()
 
-    def test_workstation_that_runs_only_web_refuses_any_other_command_even_approved(self, tmp_path, caplog):
+    def test_workstation_that_runs_only_web_refuses_any_other_command_even_approved(
+        self, tmp_path, caplog, monkeypatch
+    ):
         pytest.importorskip("hai_drivers.code_sandbox.local.allowlist")
-        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"), sandbox=False, only=("web",))
+        monkeypatch.setenv("HOME", str(tmp_path))
+        bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "project"), sandbox=False, only=("web",))
+        assert bridge.workspace == tmp_path / "hai" / bridge.session_id
         bridge._driver = bridge.create_driver()
         try:
             assert bridge._dispatch("execute", {"command": "web --help >/dev/null; web daemon stop"})[1] is None
@@ -1174,7 +1185,7 @@ class TestDriverInterfaces:
                     assert "approves no command" in bridge._dispatch("approve_command", {"command": command})[1]
                     result, error = bridge._dispatch("execute", {"command": command})
                     assert result is None and "runs only `web`" in error
-            assert not (tmp_path / "workspace" / "made").exists()
+            assert not (bridge.workspace / "made").exists()
             assert "raised" not in caplog.text
         finally:
             bridge._driver.close()

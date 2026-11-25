@@ -135,7 +135,7 @@ class _Walk:
         key = f"{path}.environments[kind={kind}].session_id"
         if kind == "web":
             claimed = self.claims(path, "web") or self.claims(path, "desktop")
-            return self.web(env, path, by_name=by_name, claimed=claimed)
+            return self.web(env, path, siblings, by_name=by_name, claimed=claimed)
         if self.claims(path, kind) or _read(env, "session_id"):
             return env
         serve = SERVE_COMMANDS[_bridge_type(env, kind).environment_kind]
@@ -155,7 +155,9 @@ class _Walk:
         self.overrides[key] = self.bridge(env, kind).session_id
         return env
 
-    def web(self, env: EnvironmentLike, path: str, *, by_name: bool, claimed: bool) -> EnvironmentLike:
+    def web(
+        self, env: EnvironmentLike, path: str, siblings: Sequence[Any], *, by_name: bool, claimed: bool
+    ) -> EnvironmentLike:
         """A browser on this machine, as the shell desktop that runs only `web`, served by this client."""
         becomes = f"the browser on this machine at {path} runs as a desktop in shell mode that runs only `web`"
         if by_name:
@@ -168,6 +170,8 @@ class _Walk:
                 f"{becomes}, which only this client serves: drop its session_id, and any override of "
                 f"{path}.environments[kind=web] or [kind=desktop].session_id"
             )
+        if any(_kind(self.lookup(sibling)) == "desktop" for sibling in siblings):
+            raise ValueError(f"{becomes}, but {path} already has a desktop and an agent holds one: drop the browser")
         return _web_desktop(env, self.bridge(env, "web").session_id)
 
     def claims(self, path: str, kind: str) -> bool:
