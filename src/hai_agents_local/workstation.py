@@ -121,7 +121,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
 
         Args:
             workspace: The folder the shell starts in and the file tools act in; defaults to the current one,
-                and from the home folder or above it to ``~/hai/<session_id>``.
+                and with ``only``, or from the home folder or above it, to ``~/hai/<session_id>``.
             policy: This machine's allowlist file, one command prefix a line. With one, the shell runs the
                 commands it covers and holds any other until the session's client approves it, whatever the agent
                 asks. Without one, commands wait only for an agent that requires approval. A file that does not
@@ -146,7 +146,11 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         Under either, the agent's file tools stay inside the workspace.
         """
         super().__init__(environment_id, api_key=api_key, base_url=base_url, session_id=session_id)
-        self.workspace = Path(workspace).expanduser().absolute() if workspace else _workspace(self.session_id)
+        self.only = tuple(only)
+        if workspace:
+            self.workspace = Path(workspace).expanduser().absolute()
+        else:
+            self.workspace = Path.home() / "hai" / self.session_id if self.only else _workspace(self.session_id)
         self.environment_variables = dict(environment_variables or {})
         refuse_unread_settings()
         self.policy = policy
@@ -157,7 +161,6 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         self.require_sandbox = require_sandbox
         self._sandbox_asked = bool(sandbox or require_sandbox)
         self.allowed_domains, self.writable_folders = list(allowed_domains), list(writable_folders)
-        self.only = tuple(only)
         self._starter: tempfile.TemporaryDirectory[str] | None = None
 
     def preflight(self) -> None:

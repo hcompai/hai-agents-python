@@ -133,10 +133,10 @@ class _Walk:
         if kind is None:
             return env
         key = f"{path}.environments[kind={kind}].session_id"
-        claimed = any(key == claim or key.startswith(f"{claim}.") for claim in self.claimed)
         if kind == "web":
+            claimed = self.claims(path, "web") or self.claims(path, "desktop")
             return self.web(env, path, by_name=by_name, claimed=claimed)
-        if claimed or _read(env, "session_id"):
+        if self.claims(path, kind) or _read(env, "session_id"):
             return env
         serve = SERVE_COMMANDS[_bridge_type(env, kind).environment_kind]
         if not by_name:
@@ -164,14 +164,27 @@ class _Walk:
                 "{'kind': 'desktop', 'mode': {'type': 'shell'}}"
             )
         if claimed or _read(env, "session_id"):
-            raise ValueError(f"{becomes}, which only this client serves: drop its session_id and any override of it")
+            raise ValueError(
+                f"{becomes}, which only this client serves: drop its session_id, and any override of "
+                f"{path}.environments[kind=web] or [kind=desktop].session_id"
+            )
         return _web_desktop(env, self.bridge(env, "web").session_id)
+
+    def claims(self, path: str, kind: str) -> bool:
+        key = f"{path}.environments[kind={kind}].session_id"
+        return any(key == claim or key.startswith(f"{claim}.") for claim in self.claimed)
 
     def lookup(self, env: EnvironmentLike) -> Any:
         return self.resolved.get(("environment", env), env) if isinstance(env, str) else env
 
     def bridge(self, env: EnvironmentLike, kind: str) -> LocalBridge:
         bridge_type = _bridge_type(env, kind)
+        shells = [bridge for bridge in self.bridges if isinstance(bridge, WorkstationBridge)]
+        if bridge_type is WorkstationBridge and shells and (kind == "web" or shells[0].only):
+            raise ValueError(
+                "the agent tree has a browser on this machine beside another one or a shell desktop, but this "
+                "machine serves one shell: keep a single desktop in shell mode, whose agent drives Chrome with `web`"
+            )
         if any(type(bridge) is bridge_type for bridge in self.bridges):
             raise ValueError(
                 f"the agent tree has multiple local {kind} environments that this machine would serve the same "

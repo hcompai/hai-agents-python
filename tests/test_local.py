@@ -328,6 +328,7 @@ class TestAutoStart:
         assert isinstance(model_env, Desktop) and model_env.session_id == started[1].session_id
         assert model_env.mode.type == "shell" and model_env.mode.allowed_commands == ["web"]
         assert all(isinstance(bridge, WorkstationBridge) and bridge.only == ("web",) for bridge in started)
+        assert all(bridge.workspace == Path.home() / "hai" / bridge.session_id for bridge in started)
 
     def test_a_named_served_or_overridden_user_device_browser_fails_the_session_before_any_bridge_or_request(
         self, monkeypatch
@@ -343,11 +344,17 @@ class TestAutoStart:
             sessions.create_session(agent="named", messages="hi")
         with pytest.raises(ValueError, match="drop its session_id"):
             sessions.create_session(agent={"name": "x", "environments": [served]}, messages="hi")
-        inline = {"name": "x", "environments": [{"kind": "web", "host": "user_device"}]}
-        with pytest.raises(ValueError, match="drop its session_id and any override"):
-            sessions.create_session(
-                agent=inline, messages="hi", overrides={"agent.environments[kind=web].session_id": "mine"}
-            )
+        browser = {"kind": "web", "host": "user_device"}
+        inline = {"name": "x", "environments": [browser]}
+        for kind in ("web", "desktop"):
+            with pytest.raises(ValueError, match="drop its session_id, and any override"):
+                sessions.create_session(
+                    agent=inline, messages="hi", overrides={f"agent.environments[kind={kind}].session_id": "mine"}
+                )
+        shell = {"kind": "desktop", "host": "user_device", "mode": {"type": "shell"}}
+        for environments in ([browser, browser], [shell, browser], [browser, shell]):
+            with pytest.raises(ValueError, match="serves one shell"):
+                sessions.create_session(agent={"name": "x", "environments": environments}, messages="hi")
         assert calls == []
 
     def test_what_the_caller_sets_for_a_shell_desktop_reaches_it_and_stays_on_this_machine(self, monkeypatch, tmp_path):
