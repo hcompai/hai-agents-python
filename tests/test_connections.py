@@ -5,6 +5,8 @@ import json
 import logging
 import os
 import sys
+import threading
+import time
 from pathlib import Path
 
 import httpx
@@ -13,6 +15,7 @@ import pytest
 from hai_agents_local import WorkstationBridge
 from hai_agents_local.config import shell_sandbox
 from hai_agents_local.connections import load_connections
+from hai_agents_local.manager import STOP_JOIN_TIMEOUT_S
 
 SERVER = """\
 from mcp.server.fastmcp import FastMCP
@@ -116,7 +119,7 @@ def test_a_shell_desktop_reaches_its_mcp_servers_through_the_resolver_alone(tmp_
     assert resolver.host in rules["network"]["allowedDomains"]
     denied = set(rules["filesystem"]["denyRead"])
     assert {str(config / "mcp.json"), str(config / ".env")} <= denied
-    assert any(path.endswith("mcporter.json") for path in denied)
+    assert not any(path.endswith("mcporter.json") for path in denied)
     assert {"name": "NOTES_KEY", "mode": "deny"} in rules["credentials"]["envVars"]
     assert Path(shim).parent != srt.parent and "secret-key" not in shown
     served = json.loads(shown)["mcpServers"]["notes"]
@@ -126,7 +129,13 @@ def test_a_shell_desktop_reaches_its_mcp_servers_through_the_resolver_alone(tmp_
     assert asyncio.run(_call(url, headers, "add", {"a": 2, "b": 3})) == "5 secret-key"
     assert httpx.post(url, json={}).status_code == 401
 
+    monkeypatch.setattr("hai_agents_local.resolver.CALL_S", 60)
+    calling = threading.Thread(target=lambda: asyncio.run(_call(url, headers, "hang", {})), daemon=True)
+    calling.start()
+    time.sleep(1)
+    began = time.monotonic()
     bridge._stop_connections()
+    assert time.monotonic() - began < STOP_JOIN_TIMEOUT_S
     assert bridge._resolver is None
     with pytest.raises(httpx.ConnectError):
         httpx.post(url, json={}, headers=headers)

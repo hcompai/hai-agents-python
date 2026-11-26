@@ -266,7 +266,6 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
                             owned,
                             resolver,
                             passed=self.environment_variables,
-                            mcporter=Path(self._mcporter.name) if self._mcporter else None,
                         ),
                     )
             else:
@@ -280,7 +279,6 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
                             built_in,
                             resolver,
                             passed=self.environment_variables,
-                            mcporter=Path(self._mcporter.name) if self._mcporter else None,
                         )
                         if resolver
                         else built_in
@@ -497,7 +495,6 @@ def _with_resolver(
     resolver: Resolver,
     *,
     passed: Mapping[str, str] | None = None,
-    mcporter: Path | None = None,
 ) -> dict[str, Any]:
     """`rules` that also let commands reach `resolver`, and never read the keys of the servers it serves.
 
@@ -507,11 +504,7 @@ def _with_resolver(
     network, filesystem = dict(rules.get("network") or {}), dict(rules.get("filesystem") or {})
     credentials = dict(rules.get("credentials") or {})
     network["allowedDomains"] = [*network.get("allowedDomains", []), resolver.host]
-    denied = [
-        str(connections_path()),
-        str(credentials_path()),
-        *([str(mcporter / "mcporter.json")] if mcporter else []),
-    ]
+    denied = [str(connections_path()), str(credentials_path())]
     filesystem["denyRead"] = [*filesystem.get("denyRead", []), *denied]
     keys = sorted({name for connection in resolver.connections.values() for name in connection.variables})
     tokens = sorted(

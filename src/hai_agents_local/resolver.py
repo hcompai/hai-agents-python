@@ -27,7 +27,8 @@ from .connections import Connection, connections_path
 logger = logging.getLogger(__name__)
 
 START_S = 10.0
-STOP_S = 10.0
+# A whole stop, inside the bridge manager's join of the bridge that runs this resolver.
+STOP_S = 2.0
 CONNECT_S = 30.0
 # Above mcporter's own timeout, which the bridge sets to `MCPORTER_CALL_TIMEOUT_MS`: mcporter gives up first.
 CALL_S = 210.0
@@ -77,7 +78,7 @@ class Resolver:
             with contextlib.suppress(RuntimeError):
                 self._loop.call_soon_threadsafe(self._stopping.set)
         if self._thread is not None:
-            self._thread.join(STOP_S + CONNECT_S)
+            self._thread.join(STOP_S + 1)
         self._thread, self.port = None, None
 
     def _run(self) -> None:
@@ -105,13 +106,13 @@ class Resolver:
             self._started.set()
             await self._stopping.wait()
         finally:
+            # Forced: a connected `mcporter` holds its stream open, which a graceful stop waits out.
+            server.should_exit = server.force_exit = True
+            closing = asyncio.gather(
+                serving, *(upstream.close() for upstream in self._upstreams.values()), return_exceptions=True
+            )
             with contextlib.suppress(TimeoutError, asyncio.TimeoutError):
-                await asyncio.wait_for(
-                    asyncio.gather(*(upstream.close() for upstream in self._upstreams.values())), STOP_S
-                )
-            server.should_exit = True
-            with contextlib.suppress(TimeoutError, asyncio.TimeoutError):
-                await asyncio.wait_for(serving, STOP_S)
+                await asyncio.wait_for(closing, STOP_S)
 
     def _app(self) -> Any:
         from mcp import types
