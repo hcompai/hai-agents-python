@@ -7,6 +7,7 @@ import logging
 import os
 import pathlib
 import shutil
+import tarfile
 import tempfile
 import typing
 import zipfile
@@ -127,6 +128,9 @@ def install_artifact(
             # Contents are sha256-verified above, so extraction is trusted.
             with zipfile.ZipFile(download_path) as archive:
                 archive.extractall(staged_version)
+        elif artifact.url.endswith(".tar.gz"):
+            with tarfile.open(download_path) as archive:
+                archive.extractall(staged_version, **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
         else:
             shutil.move(str(download_path), str(staged_version / BINARY_NAME))
 
