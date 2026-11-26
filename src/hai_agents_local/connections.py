@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 Transport = Literal["stdio", "http", "sse"]
 
 # `mcporter call <name>.<tool>` splits on the first dot.
-_NAME = re.compile(r"^[A-Za-z0-9_-]+$")
+_NAME = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _REFERENCE = re.compile(r"\$\{(?:env:)?([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
@@ -78,7 +78,7 @@ def save_servers(servers: Mapping[str, Any], path: Path | None = None) -> Path:
 def check_name(name: str) -> None:
     if not _NAME.match(name):
         raise ValueError(
-            f"{name!r}: a name holds only letters, digits, `-` and `_`, as `mcporter call <name>.<tool>` reads it"
+            f"{name!r}: a name holds 1 to 64 letters, digits, `-` and `_`, as `mcporter call <name>.<tool>` reads it"
         )
 
 
