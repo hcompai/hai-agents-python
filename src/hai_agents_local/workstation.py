@@ -20,7 +20,7 @@ from hai_agents.client import credentials_path
 
 from .bridge import LocalBridge, TokenSource
 from .config import machine_allowlist, refuse_unread_settings, shell_sandbox
-from .connections import connections_path, load_connections
+from .connections import Connection, connections_path, load_connections
 from .desktop import ensure_macos_input_permissions
 from .mcporter import shell_tools
 from .resolver import Resolver
@@ -119,6 +119,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         allowed_domains: Sequence[str] = (),
         writable_folders: Sequence[str] = (),
         only: Sequence[str] = (),
+        connections: Sequence[Connection] | None = None,
     ) -> None:
         """Build the bridge.
 
@@ -149,6 +150,8 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             writable_folders: Folders the built-in rules let commands write besides the workspace.
             only: Programs the shell runs, refusing every other command with no approval to wait for; the
                 allowlists and the sandbox then do not apply, and the bridge leaves the screen to other agents.
+            connections: The MCP servers the shell reaches with ``mcporter``; defaults to ``mcp.json`` beside the
+                stored credentials, and to none with ``only``. An app with its own servers passes ``[]``.
 
         Under either, the agent's file tools stay inside the workspace.
         """
@@ -177,7 +180,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         self._starter: tempfile.TemporaryDirectory[str] | None = None
         self._mcporter: tempfile.TemporaryDirectory[str] | None = None
         self._resolver: Resolver | None = None
-        self.connections = [] if self.only else load_connections()
+        self.connections = list(connections) if connections is not None else [] if self.only else load_connections()
         """This machine's MCP servers, served to the shell and named in the session request."""
 
     def preflight(self) -> None:

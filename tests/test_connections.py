@@ -54,6 +54,8 @@ def test_connections_fill_their_keys_and_leave_out_what_they_cannot(tmp_path, mo
     assert found["notion"].headers == {"Authorization": "Bearer stored"} and found["notion"].transport == "sse"
     assert found["files"].env == {"TOKEN": "from-env"} and found["files"].variables == {"LINEAR_KEY"}
     assert "NOWHERE" in caplog.text and "dotted.name" in caplog.text
+    (config / "mcp.json").write_text("{")
+    assert WorkstationBridge(api_key="k", connections=[]).connections == []
 
 
 @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
