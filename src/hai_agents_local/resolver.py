@@ -15,6 +15,7 @@ import re
 import secrets
 import shutil
 import socket
+import tempfile
 import threading
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
@@ -30,6 +31,7 @@ CONNECT_S = 30.0
 # Above mcporter's own timeout, which the bridge sets to `MCPORTER_CALL_TIMEOUT_MS`: mcporter gives up first.
 CALL_S = 210.0
 MCPORTER_CALL_TIMEOUT_MS = 200_000
+STDERR_CHARACTERS = 600
 REFUSED = -32000
 CLOSED = "the connection to the server closed"
 _SIGN_IN = re.compile(
@@ -357,9 +359,15 @@ def _stdio(connection: Connection) -> _Transport:
 
     @asynccontextmanager
     async def open_transport() -> AsyncIterator[Any]:
-        with open(os.devnull, "w") as quiet:
-            async with stdio_client(parameters, errlog=quiet) as streams:
-                yield streams
+        with tempfile.TemporaryFile("w+", encoding="utf-8", errors="replace") as printed:
+            try:
+                async with stdio_client(parameters, errlog=printed) as streams:
+                    yield streams
+            except Exception as error:
+                printed.seek(0)
+                if said := printed.read()[-STDERR_CHARACTERS:].strip():
+                    raise ConnectionError(f"{_cause(error)}; `{connection.command}` printed: {said}") from error
+                raise
 
     return open_transport
 
