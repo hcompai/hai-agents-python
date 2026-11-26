@@ -127,7 +127,8 @@ def test_a_session_served_here_names_this_machines_mcp_servers_and_never_their_k
     captured: dict = {}
     monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: captured.update(kw))
 
-    agent = {"name": "x", "environments": [{"kind": "desktop", "mode": {"type": "shell"}}]}
+    shell = {"name": "y", "environments": [{"kind": "desktop", "mode": {"type": "shell"}}]}
+    agent = {"name": "x", "subagents": [shell]}
     Client(api_key="k").sessions.create_session(agent=agent, messages="hi", workspace=str(tmp_path / "w"))
 
     assert captured["request_options"]["additional_body_parameters"]["connections"] == ["linear", "files"]
