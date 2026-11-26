@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - The `browser` extra, `hai_agents_local.SeleniumBrowserBridge`, `holo local browser`, and the browser check of `holo doctor`. A named agent or environment holding a browser on this machine fails at session start: pass it inline, or store a `desktop` in `shell` mode, whose shell runs any command. So does one with its own `session_id` or under an override of `environments[kind=web]` or `[kind=desktop]`, since the client serves it, and one beside another shell on this machine, whose desktop drives Chrome with `web` itself.
+- The typed `Browser.host` field and the `BrowserHost` and `PatchEnvironmentHost` types. `host` still parses as an untyped field, so `Browser(id="web", host="user_device")` keeps working; code that imports either type does not.
 
 ## [0.1.12]
 
