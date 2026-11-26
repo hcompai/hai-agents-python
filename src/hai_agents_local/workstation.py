@@ -71,6 +71,8 @@ STARTER_SECRETS = [
     "~/.codex",
     "~/.claude.json",
     "~/.cursor/mcp.json",
+    "~/.mcporter",
+    "~/Library/Application Support/Claude",
     "~/.bash_history",
     "~/.zsh_history",
     "~/Library/Keychains",
