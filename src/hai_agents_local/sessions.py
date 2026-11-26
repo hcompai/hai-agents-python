@@ -63,6 +63,15 @@ def _apply_runaway_budgets(kwargs: typing.Dict[str, typing.Any]) -> None:
     kwargs.setdefault("max_time_s", DEFAULT_LOCAL_MAX_TIME_S)
 
 
+def _name_connections(kwargs: typing.Dict[str, typing.Any], bridges: typing.Sequence[LocalBridge]) -> None:
+    """Name in the request the MCP servers the bridges here serve, for the agent's system prompt; never their keys."""
+    names = [connection.name for bridge in bridges for connection in bridge.connections]
+    if names:
+        options = dict(kwargs.get("request_options") or {})
+        body = {**options.get("additional_body_parameters", {}), "connections": names}
+        kwargs["request_options"] = {**options, "additional_body_parameters": body}
+
+
 def _stop_bridges_keeping_error(session_ids: typing.Sequence[str]) -> None:
     """Stop bridges inside an except block; a stop failure is logged so the handled error still propagates."""
     try:
@@ -553,6 +562,7 @@ class LocalSessionsClient(_LocalSessionsState, SessionsClient):
             bridges = _localize(wrapper, self._runtime, kwargs, resolved, shell)
         if bridges:
             _apply_runaway_budgets(kwargs)
+            _name_connections(kwargs, bridges)
         stop_watcher = _ensure_stop_watcher() if bridges else None
         watcher = _LossWatcher(bridges)
         started = ensure_bridges(bridges)
@@ -631,6 +641,7 @@ class LocalAsyncSessionsClient(_LocalSessionsState, AsyncSessionsClient):
             bridges = _localize(wrapper, self._runtime, kwargs, resolved, shell)
         if bridges:
             _apply_runaway_budgets(kwargs)
+            _name_connections(kwargs, bridges)
         # Native permission prompts must run before bridge startup moves to a worker.
         for bridge in bridges:
             bridge.preflight()

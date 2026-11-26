@@ -109,3 +109,26 @@ async def _call(url: str, headers: dict[str, str], tool: str, arguments: dict[st
         await session.initialize()
         result = await session.call_tool(tool, arguments)
     return result.content[0].text
+
+
+def test_a_session_served_here_names_this_machines_mcp_servers_and_never_their_keys(tmp_path, monkeypatch):
+    from hai_agents import Client
+    from hai_agents.sessions.client import SessionsClient
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("LINEAR_KEY", "secret-key")
+    config = tmp_path / ".config" / "hai"
+    config.mkdir(parents=True)
+    linear = {"url": "https://mcp.linear.app/mcp", "headers": {"Authorization": "Bearer ${LINEAR_KEY}"}}
+    (config / "mcp.json").write_text(json.dumps({"mcpServers": {"linear": linear, "files": {"command": "npx"}}}))
+    monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
+    monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: [])
+    captured: dict = {}
+    monkeypatch.setattr(SessionsClient, "create_session", lambda self, **kw: captured.update(kw))
+
+    agent = {"name": "x", "environments": [{"kind": "desktop", "mode": {"type": "shell"}}]}
+    Client(api_key="k").sessions.create_session(agent=agent, messages="hi", workspace=str(tmp_path / "w"))
+
+    assert captured["request_options"]["additional_body_parameters"]["connections"] == ["linear", "files"]
+    assert "secret-key" not in json.dumps(captured, default=str)

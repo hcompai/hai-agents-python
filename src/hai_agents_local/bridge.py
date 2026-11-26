@@ -11,8 +11,8 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Awaitable, Callable
-from typing import Any, AsyncIterator, ClassVar, Generic, TypeVar, Union
+from collections.abc import Awaitable, Callable, Sequence
+from typing import TYPE_CHECKING, Any, AsyncIterator, ClassVar, Generic, TypeVar, Union
 
 import httpx
 
@@ -21,6 +21,9 @@ from .desktop_lock import DesktopClaim
 from .errors import ChannelClosedError, RateLimitedError, SessionNotFoundError
 from .runtime import identity
 from .transport import Command, CommandExchange, Json, deserialize_args, serialize_result
+
+if TYPE_CHECKING:
+    from .connections import Connection
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +75,8 @@ class LocalBridge(ABC, Generic[DriverT]):
     """Reject responses not HMAC-proven with api_key; requires api_key to be the local runtime's token string."""
     drives_desktop: bool = False
     """Holds the machine-wide desktop claim while serving, so two agents never share one mouse."""
+    connections: Sequence[Connection] = ()
+    """The MCP servers this bridge serves to the agent's shell, named in the session request."""
 
     def __init__(
         self,
