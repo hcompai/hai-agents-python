@@ -24,9 +24,7 @@ from .connections import Connection, connections_path, load_connections
 from .desktop import ensure_macos_input_permissions
 from .mcporter import shell_tools
 from .resolver import Resolver
-from .runtime.errors import LocalRuntimeError
-from .runtime.install import install_artifact
-from .runtime.manifest import RuntimeArtifact, platform_key
+from .runtime.install import install_pinned
 from .transport import Json, serialize_result
 
 if TYPE_CHECKING:
@@ -453,21 +451,9 @@ def _sandbox_runtime(workspace: Path) -> str:
 
 
 def _pinned_sandbox_runtime() -> Path | None:
-    """The pinned `srt` under `SRT_HOME`, downloaded where a build of it is published; None where there is none."""
-    home, platform = SRT_HOME / SRT_VERSION, platform_key()
-    if _srt_in(home) or platform not in SRT_SHA256:
-        return _srt_in(home)
-    logger.warning("downloading the sandbox for shell commands into %s, once", home)
-    artifact = RuntimeArtifact(url=f"{SRT_CDN}/{SRT_VERSION}/srt-{platform}.zip", sha256=SRT_SHA256[platform])
-    try:
-        return install_artifact(artifact, home, _srt_in, "sandbox-runtime")
-    except (LocalRuntimeError, OSError) as error:
-        logger.warning("%s", error)
-        return None
-
-
-def _srt_in(home: Path) -> Path | None:
-    return home / "srt" if (home / "srt").is_file() else None
+    return install_pinned(
+        "srt", SRT_HOME / SRT_VERSION, SRT_SHA256, lambda platform: f"{SRT_CDN}/{SRT_VERSION}/srt-{platform}.zip"
+    )
 
 
 def _private_temp(workspace: Path, config: Path) -> Path | None:

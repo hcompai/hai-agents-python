@@ -41,10 +41,6 @@ class Connection:
     variables: frozenset[str] = frozenset()
     """The environment variables its `${VAR}` references read: keys, to keep from the agent's shell."""
 
-    @property
-    def target(self) -> str:
-        return self.url or " ".join([self.command, *self.args])
-
 
 def read_servers(path: Path) -> dict[str, Any]:
     """The `mcpServers` object of an MCP config file; empty where the file does not exist."""

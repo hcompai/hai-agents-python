@@ -184,3 +184,22 @@ def _download_to(url: str, dest: pathlib.Path, name: str) -> str:
         raise LocalRuntimeError(f"{name} download failed: {exc} (url: {url})") from exc
     logger.info("download complete (%d bytes)", written)
     return digest.hexdigest()
+
+
+def install_pinned(
+    name: str, home: pathlib.Path, sha256: typing.Mapping[str, str], url: typing.Callable[[str], str]
+) -> typing.Optional[pathlib.Path]:
+    """The pinned `name` in `home`, downloaded once where a build is published for this platform; else None."""
+
+    def found(folder: pathlib.Path) -> typing.Optional[pathlib.Path]:
+        return folder / name if (folder / name).is_file() else None
+
+    platform = platform_key()
+    if found(home) or platform not in sha256:
+        return found(home)
+    logger.warning("downloading %s into %s, once", name, home)
+    try:
+        return install_artifact(RuntimeArtifact(url=url(platform), sha256=sha256[platform]), home, found, name)
+    except (LocalRuntimeError, OSError) as error:
+        logger.warning("%s", error)
+        return None
