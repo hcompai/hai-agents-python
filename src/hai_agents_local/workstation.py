@@ -177,6 +177,8 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         self._starter: tempfile.TemporaryDirectory[str] | None = None
         self._mcporter: tempfile.TemporaryDirectory[str] | None = None
         self._resolver: Resolver | None = None
+        self.connections = [] if self.only else load_connections()
+        """This machine's MCP servers, served to the shell and named in the session request."""
 
     def preflight(self) -> None:
         _keep_off_path(self.workspace, ["srt"] if self.sandbox else [])
@@ -283,10 +285,9 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
 
     def _serve_connections(self, environment: dict[str, str]) -> Resolver | None:
         """Serve this machine's MCP servers to the shell's `mcporter`; None where it has none."""
-        connections = [] if self.only else load_connections()
-        if not connections:
+        if not self.connections:
             return None
-        self._resolver = Resolver(connections)
+        self._resolver = Resolver(self.connections)
         self._resolver.start()
         folder = _private_temp(self.workspace, credentials_path().parent)
         self._mcporter = tempfile.TemporaryDirectory(prefix="hai-mcp-", dir=folder)
