@@ -15,7 +15,6 @@ if typing.TYPE_CHECKING:
     )
     from .list_environment_revisions_request_sort_item import ListEnvironmentRevisionsRequestSortItem
     from .list_environments_request_sort_item import ListEnvironmentsRequestSortItem
-    from .patch_environment_host import PatchEnvironmentHost
     from .patch_environment_mode import (
         PatchEnvironmentMode,
         PatchEnvironmentMode_Shell,
@@ -37,7 +36,6 @@ _dynamic_imports: typing.Dict[str, str] = {
     "CreateEnvironmentRequestBody_Workstation": ".create_environment_request_body",
     "ListEnvironmentRevisionsRequestSortItem": ".list_environment_revisions_request_sort_item",
     "ListEnvironmentsRequestSortItem": ".list_environments_request_sort_item",
-    "PatchEnvironmentHost": ".patch_environment_host",
     "PatchEnvironmentMode": ".patch_environment_mode",
     "PatchEnvironmentMode_Shell": ".patch_environment_mode",
     "PatchEnvironmentMode_Text": ".patch_environment_mode",
@@ -79,7 +77,6 @@ __all__ = [
     "CreateEnvironmentRequestBody_Workstation",
     "ListEnvironmentRevisionsRequestSortItem",
     "ListEnvironmentsRequestSortItem",
-    "PatchEnvironmentHost",
     "PatchEnvironmentMode",
     "PatchEnvironmentMode_Shell",
     "PatchEnvironmentMode_Text",

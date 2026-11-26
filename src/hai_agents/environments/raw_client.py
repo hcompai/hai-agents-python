@@ -23,7 +23,6 @@ from ..types.workstation_storage import WorkstationStorage
 from .types.create_environment_request_body import CreateEnvironmentRequestBody
 from .types.list_environment_revisions_request_sort_item import ListEnvironmentRevisionsRequestSortItem
 from .types.list_environments_request_sort_item import ListEnvironmentsRequestSortItem
-from .types.patch_environment_host import PatchEnvironmentHost
 from .types.patch_environment_mode import PatchEnvironmentMode
 from .types.update_environment_request_body import UpdateEnvironmentRequestBody
 from pydantic import ValidationError
@@ -578,7 +577,6 @@ class RawEnvironmentsClient:
         *,
         message: typing.Optional[str] = None,
         if_match: typing.Optional[str] = None,
-        host: typing.Optional[PatchEnvironmentHost] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         headless: typing.Optional[bool] = OMIT,
         session_id: typing.Optional[str] = OMIT,
@@ -609,9 +607,6 @@ class RawEnvironmentsClient:
         if_match : typing.Optional[str]
             The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
-        host : typing.Optional[PatchEnvironmentHost]
-            Where the browser runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.
-
         start_url : typing.Optional[str]
             Initial URL to open. An absolute http or https URL.
 
@@ -628,13 +623,13 @@ class RawEnvironmentsClient:
             Seconds to wait after each page action.
 
         vault_id : typing.Optional[str]
-            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run without secret access.
+            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
 
         browser_profile_id : typing.Optional[str]
-            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run with a fresh profile.
+            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
 
         use_default_browser_profile : typing.Optional[bool]
-            When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile. Only supported on cloud-hosted browsers.
+            When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile.
 
         persist_browser_profile : typing.Optional[bool]
             When true, the browser profile is updated with this session's final browser state (cookies, storage) when the session ends. Requires browser_profile_id or use_default_browser_profile. Only one active session at a time may persist a given profile; concurrent read-only use is always allowed.
@@ -666,7 +661,6 @@ class RawEnvironmentsClient:
                 "message": message,
             },
             json={
-                "host": host,
                 "start_url": start_url,
                 "headless": headless,
                 "session_id": session_id,
@@ -1283,7 +1277,6 @@ class AsyncRawEnvironmentsClient:
         *,
         message: typing.Optional[str] = None,
         if_match: typing.Optional[str] = None,
-        host: typing.Optional[PatchEnvironmentHost] = OMIT,
         start_url: typing.Optional[str] = OMIT,
         headless: typing.Optional[bool] = OMIT,
         session_id: typing.Optional[str] = OMIT,
@@ -1314,9 +1307,6 @@ class AsyncRawEnvironmentsClient:
         if_match : typing.Optional[str]
             The ``ETag`` of the revision this write is based on, e.g. ``"3"``. If the resource has moved past it the write is refused with 412. Omit it, or send ``*``, to write unconditionally.
 
-        host : typing.Optional[PatchEnvironmentHost]
-            Where the browser runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.
-
         start_url : typing.Optional[str]
             Initial URL to open. An absolute http or https URL.
 
@@ -1333,13 +1323,13 @@ class AsyncRawEnvironmentsClient:
             Seconds to wait after each page action.
 
         vault_id : typing.Optional[str]
-            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run without secret access.
+            Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
 
         browser_profile_id : typing.Optional[str]
-            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run with a fresh profile.
+            Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
 
         use_default_browser_profile : typing.Optional[bool]
-            When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile. Only supported on cloud-hosted browsers.
+            When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile.
 
         persist_browser_profile : typing.Optional[bool]
             When true, the browser profile is updated with this session's final browser state (cookies, storage) when the session ends. Requires browser_profile_id or use_default_browser_profile. Only one active session at a time may persist a given profile; concurrent read-only use is always allowed.
@@ -1371,7 +1361,6 @@ class AsyncRawEnvironmentsClient:
                 "message": message,
             },
             json={
-                "host": host,
                 "start_url": start_url,
                 "headless": headless,
                 "session_id": session_id,

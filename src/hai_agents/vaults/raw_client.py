@@ -169,9 +169,9 @@ class RawVaultsClient:
                 raise ConflictError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        DetailErrorResponse,
+                        typing.Any,
                         parse_obj_as(
-                            type_=DetailErrorResponse,  # type: ignore
+                            type_=typing.Any,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -300,9 +300,9 @@ class RawVaultsClient:
                 raise ConflictError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        DetailErrorResponse,
+                        typing.Any,
                         parse_obj_as(
-                            type_=DetailErrorResponse,  # type: ignore
+                            type_=typing.Any,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -407,9 +407,9 @@ class RawVaultsClient:
                 raise ConflictError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        DetailErrorResponse,
+                        typing.Any,
                         parse_obj_as(
-                            type_=DetailErrorResponse,  # type: ignore
+                            type_=typing.Any,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1254,9 +1254,9 @@ class AsyncRawVaultsClient:
                 raise ConflictError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        DetailErrorResponse,
+                        typing.Any,
                         parse_obj_as(
-                            type_=DetailErrorResponse,  # type: ignore
+                            type_=typing.Any,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1385,9 +1385,9 @@ class AsyncRawVaultsClient:
                 raise ConflictError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        DetailErrorResponse,
+                        typing.Any,
                         parse_obj_as(
-                            type_=DetailErrorResponse,  # type: ignore
+                            type_=typing.Any,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1492,9 +1492,9 @@ class AsyncRawVaultsClient:
                 raise ConflictError(
                     headers=dict(_response.headers),
                     body=typing.cast(
-                        DetailErrorResponse,
+                        typing.Any,
                         parse_obj_as(
-                            type_=DetailErrorResponse,  # type: ignore
+                            type_=typing.Any,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),

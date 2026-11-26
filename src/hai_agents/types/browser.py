@@ -4,7 +4,6 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .browser_host import BrowserHost
 from .browser_mode import BrowserMode
 from .browser_network import BrowserNetwork
 
@@ -17,11 +16,6 @@ class Browser(UniversalBaseModel):
     id: str = pydantic.Field()
     """
     Catalog identifier for this environment.
-    """
-
-    host: typing.Optional[BrowserHost] = pydantic.Field(default=None)
-    """
-    Where the browser runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.
     """
 
     start_url: typing.Optional[str] = pydantic.Field(default=None)
@@ -56,17 +50,17 @@ class Browser(UniversalBaseModel):
 
     vault_id: typing.Optional[str] = pydantic.Field(default=None)
     """
-    Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run without secret access.
+    Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access.
     """
 
     browser_profile_id: typing.Optional[str] = pydantic.Field(default=None)
     """
-    Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run with a fresh profile.
+    Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile.
     """
 
     use_default_browser_profile: typing.Optional[bool] = pydantic.Field(default=None)
     """
-    When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile. Only supported on cloud-hosted browsers.
+    When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile.
     """
 
     persist_browser_profile: typing.Optional[bool] = pydantic.Field(default=None)

@@ -5,12 +5,16 @@ import typing
 
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
+from ..types.connected_server import ConnectedServer
+from ..types.json_value import JsonValue
 from ..types.page_session_event import PageSessionEvent
 from ..types.page_session_summary import PageSessionSummary
 from ..types.quota_status import QuotaStatus
 from ..types.session import Session
 from ..types.session_changes import SessionChanges
 from ..types.session_flag import SessionFlag
+from ..types.session_probe_verdict import SessionProbeVerdict
+from ..types.session_project import SessionProject
 from ..types.session_request_agent import SessionRequestAgent
 from ..types.session_request_messages import SessionRequestMessages
 from ..types.session_status import SessionStatus
@@ -153,12 +157,15 @@ class SessionsClient:
         self,
         *,
         agent: SessionRequestAgent,
+        capture_end_state: typing.Optional[bool] = None,
+        workflow_type: typing.Optional[str] = None,
         idempotency_key: typing.Optional[str] = None,
         messages: typing.Optional[SessionRequestMessages] = OMIT,
         max_steps: typing.Optional[int] = OMIT,
         max_time_s: typing.Optional[float] = OMIT,
         idle_timeout_s: typing.Optional[int] = OMIT,
         timezone: typing.Optional[str] = OMIT,
+        connections: typing.Optional[typing.Sequence[ConnectedServer]] = OMIT,
         delete_after_min: typing.Optional[int] = OMIT,
         delete_screenshot_after_min: typing.Optional[int] = OMIT,
         queue: typing.Optional[bool] = OMIT,
@@ -174,6 +181,12 @@ class SessionsClient:
         ----------
         agent : SessionRequestAgent
             Agent to run: a registered agent's name, or an inline Agent definition.
+
+        capture_end_state : typing.Optional[bool]
+            Have the session's browser record its end state (its calls and localStorage, kept 30 days) when it closes, so `POST /sessions/{id}/probe` can judge it. Refused for an organization whose runs record no browser end state.
+
+        workflow_type : typing.Optional[str]
+            Stamped as the session's `workflow_type` metadata, which groups the sessions `POST /workflows/{workflow_type}/probe/draft` drafts a probe from.
 
         idempotency_key : typing.Optional[str]
 
@@ -191,6 +204,9 @@ class SessionsClient:
 
         timezone : typing.Optional[str]
             IANA timezone the agent uses for dates and times, e.g. 'Europe/Paris'. UTC if null.
+
+        connections : typing.Optional[typing.Sequence[ConnectedServer]]
+            MCP servers the user connected, which the agent's shell reaches with `mcporter`; their keys stay where they are served. Each entry is a name plus an optional description (a bare name string is accepted). Listed in the system prompt of the agent, and of each subagent, with a desktop in shell mode; ignored by the others.
 
         delete_after_min : typing.Optional[int]
             Minutes after the session finishes before it is automatically deleted. When omitted, Portal's retention preference applies. An explicit value adds an earlier expiry; null adds no expiry beyond Portal's policy.
@@ -231,12 +247,15 @@ class SessionsClient:
         """
         _response = self._raw_client.create_session(
             agent=agent,
+            capture_end_state=capture_end_state,
+            workflow_type=workflow_type,
             idempotency_key=idempotency_key,
             messages=messages,
             max_steps=max_steps,
             max_time_s=max_time_s,
             idle_timeout_s=idle_timeout_s,
             timezone=timezone,
+            connections=connections,
             delete_after_min=delete_after_min,
             delete_screenshot_after_min=delete_screenshot_after_min,
             queue=queue,
@@ -297,6 +316,38 @@ class SessionsClient:
         client.sessions.get_session_visibility()
         """
         _response = self._raw_client.get_session_visibility(request_options=request_options)
+        return _response.data
+
+    def get_session_project(
+        self, id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> SessionProject:
+        """
+        The project a session ran in, for a caller who would see it there but is working in another project.
+
+        Parameters
+        ----------
+        id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        SessionProject
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.sessions.get_session_project(
+            id="id",
+        )
+        """
+        _response = self._raw_client.get_session_project(id, request_options=request_options)
         return _response.data
 
     def flag_session(
@@ -773,6 +824,45 @@ class SessionsClient:
         )
         return _response.data
 
+    def judge_session_probe(
+        self, id: str, *, probe: typing.Dict[str, JsonValue], request_options: typing.Optional[RequestOptions] = None
+    ) -> SessionProbeVerdict:
+        """
+        Judge a finished session's browser end state with a completion probe.
+
+        The session must have been created with `capture_end_state`. Answers 409 with `Retry-After` while the session
+        runs or its browser is still closing, which takes up to two minutes after the session ends.
+
+        Parameters
+        ----------
+        id : str
+
+        probe : typing.Dict[str, JsonValue]
+            A hai-probes CompletionProbe: a call the page must make and what its localStorage must hold. The session must have been created with `capture_end_state`.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        SessionProbeVerdict
+            Successful Response
+
+        Examples
+        --------
+        from hai_agents import Client
+
+        client = Client(
+            api_key="YOUR_API_KEY",
+        )
+        client.sessions.judge_session_probe(
+            id="id",
+            probe={},
+        )
+        """
+        _response = self._raw_client.judge_session_probe(id, probe=probe, request_options=request_options)
+        return _response.data
+
     def submit_session_feedback(
         self,
         id: str,
@@ -1096,12 +1186,15 @@ class AsyncSessionsClient:
         self,
         *,
         agent: SessionRequestAgent,
+        capture_end_state: typing.Optional[bool] = None,
+        workflow_type: typing.Optional[str] = None,
         idempotency_key: typing.Optional[str] = None,
         messages: typing.Optional[SessionRequestMessages] = OMIT,
         max_steps: typing.Optional[int] = OMIT,
         max_time_s: typing.Optional[float] = OMIT,
         idle_timeout_s: typing.Optional[int] = OMIT,
         timezone: typing.Optional[str] = OMIT,
+        connections: typing.Optional[typing.Sequence[ConnectedServer]] = OMIT,
         delete_after_min: typing.Optional[int] = OMIT,
         delete_screenshot_after_min: typing.Optional[int] = OMIT,
         queue: typing.Optional[bool] = OMIT,
@@ -1117,6 +1210,12 @@ class AsyncSessionsClient:
         ----------
         agent : SessionRequestAgent
             Agent to run: a registered agent's name, or an inline Agent definition.
+
+        capture_end_state : typing.Optional[bool]
+            Have the session's browser record its end state (its calls and localStorage, kept 30 days) when it closes, so `POST /sessions/{id}/probe` can judge it. Refused for an organization whose runs record no browser end state.
+
+        workflow_type : typing.Optional[str]
+            Stamped as the session's `workflow_type` metadata, which groups the sessions `POST /workflows/{workflow_type}/probe/draft` drafts a probe from.
 
         idempotency_key : typing.Optional[str]
 
@@ -1134,6 +1233,9 @@ class AsyncSessionsClient:
 
         timezone : typing.Optional[str]
             IANA timezone the agent uses for dates and times, e.g. 'Europe/Paris'. UTC if null.
+
+        connections : typing.Optional[typing.Sequence[ConnectedServer]]
+            MCP servers the user connected, which the agent's shell reaches with `mcporter`; their keys stay where they are served. Each entry is a name plus an optional description (a bare name string is accepted). Listed in the system prompt of the agent, and of each subagent, with a desktop in shell mode; ignored by the others.
 
         delete_after_min : typing.Optional[int]
             Minutes after the session finishes before it is automatically deleted. When omitted, Portal's retention preference applies. An explicit value adds an earlier expiry; null adds no expiry beyond Portal's policy.
@@ -1182,12 +1284,15 @@ class AsyncSessionsClient:
         """
         _response = await self._raw_client.create_session(
             agent=agent,
+            capture_end_state=capture_end_state,
+            workflow_type=workflow_type,
             idempotency_key=idempotency_key,
             messages=messages,
             max_steps=max_steps,
             max_time_s=max_time_s,
             idle_timeout_s=idle_timeout_s,
             timezone=timezone,
+            connections=connections,
             delete_after_min=delete_after_min,
             delete_screenshot_after_min=delete_screenshot_after_min,
             queue=queue,
@@ -1266,6 +1371,46 @@ class AsyncSessionsClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.get_session_visibility(request_options=request_options)
+        return _response.data
+
+    async def get_session_project(
+        self, id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> SessionProject:
+        """
+        The project a session ran in, for a caller who would see it there but is working in another project.
+
+        Parameters
+        ----------
+        id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        SessionProject
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.sessions.get_session_project(
+                id="id",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.get_session_project(id, request_options=request_options)
         return _response.data
 
     async def flag_session(
@@ -1850,6 +1995,53 @@ class AsyncSessionsClient:
         _response = await self._raw_client.list_session_events(
             id, page=page, size=size, sort=sort, type=type, request_options=request_options
         )
+        return _response.data
+
+    async def judge_session_probe(
+        self, id: str, *, probe: typing.Dict[str, JsonValue], request_options: typing.Optional[RequestOptions] = None
+    ) -> SessionProbeVerdict:
+        """
+        Judge a finished session's browser end state with a completion probe.
+
+        The session must have been created with `capture_end_state`. Answers 409 with `Retry-After` while the session
+        runs or its browser is still closing, which takes up to two minutes after the session ends.
+
+        Parameters
+        ----------
+        id : str
+
+        probe : typing.Dict[str, JsonValue]
+            A hai-probes CompletionProbe: a call the page must make and what its localStorage must hold. The session must have been created with `capture_end_state`.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        SessionProbeVerdict
+            Successful Response
+
+        Examples
+        --------
+        import asyncio
+
+        from hai_agents import AsyncClient
+
+        client = AsyncClient(
+            api_key="YOUR_API_KEY",
+        )
+
+
+        async def main() -> None:
+            await client.sessions.judge_session_probe(
+                id="id",
+                probe={},
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.judge_session_probe(id, probe=probe, request_options=request_options)
         return _response.data
 
     async def submit_session_feedback(

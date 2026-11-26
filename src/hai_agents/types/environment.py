@@ -7,7 +7,6 @@ import typing
 import pydantic
 import typing_extensions
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
-from .browser_host import BrowserHost
 from .browser_mode import BrowserMode
 from .browser_network import BrowserNetwork
 from .desktop_mode import DesktopMode
@@ -52,7 +51,6 @@ class Environment_Desktop(UniversalBaseModel):
 class Environment_Web(UniversalBaseModel):
     kind: typing.Literal["web"] = "web"
     id: str
-    host: typing.Optional[BrowserHost] = None
     start_url: typing.Optional[str] = None
     headless: typing.Optional[bool] = None
     session_id: typing.Optional[str] = None

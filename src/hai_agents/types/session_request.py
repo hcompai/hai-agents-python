@@ -6,6 +6,7 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel, update_forward_refs
+from .connected_server import ConnectedServer
 from .session_request_agent import SessionRequestAgent
 from .session_request_messages import SessionRequestMessages
 
@@ -43,6 +44,11 @@ class SessionRequest(UniversalBaseModel):
     timezone: typing.Optional[str] = pydantic.Field(default=None)
     """
     IANA timezone the agent uses for dates and times, e.g. 'Europe/Paris'. UTC if null.
+    """
+
+    connections: typing.Optional[typing.List[ConnectedServer]] = pydantic.Field(default=None)
+    """
+    MCP servers the user connected, which the agent's shell reaches with `mcporter`; their keys stay where they are served. Each entry is a name plus an optional description (a bare name string is accepted). Listed in the system prompt of the agent, and of each subagent, with a desktop in shell mode; ignored by the others.
     """
 
     delete_after_min: typing.Optional[int] = pydantic.Field(default=None)
