@@ -230,6 +230,10 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             policy = Allowlist(allowed, also=self.allowed_commands)
             logger.info("commands outside %s wait for approval", allowed)
         srt = self._sandbox_runtime()
+        if resolver and not srt:
+            raise RuntimeError(
+                f"MCP servers need the sandbox, so their keys stay out of the agent's shell. {SANDBOX_HINT}"
+            )
         if srt:
             from hai_drivers.code_sandbox.local.sandbox_runtime import SandboxRuntime
 
@@ -256,12 +260,32 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
                     rules += f", and reach this machine's MCP servers at {resolver.host}"
                     _refuse_a_guard_in(self.workspace, settings)
                     owned = json.loads(settings.read_text(encoding="utf-8"))
-                    settings = self._starter_settings(config, _with_resolver(owned, resolver))
+                    settings = self._starter_settings(
+                        config,
+                        _with_resolver(
+                            owned,
+                            resolver,
+                            passed=self.environment_variables,
+                            mcporter=Path(self._mcporter.name) if self._mcporter else None,
+                        ),
+                    )
             else:
                 rules = "the built-in rules" + f", and may {' and '.join(asked)} as the agent asks" * bool(asked)
                 rules += f"; a {settings} replaces them"
                 built_in = _starter_sandbox(self.environment_variables, self.allowed_domains)
-                settings = self._starter_settings(config, _with_resolver(built_in, resolver) if resolver else built_in)
+                settings = self._starter_settings(
+                    config,
+                    (
+                        _with_resolver(
+                            built_in,
+                            resolver,
+                            passed=self.environment_variables,
+                            mcporter=Path(self._mcporter.name) if self._mcporter else None,
+                        )
+                        if resolver
+                        else built_in
+                    ),
+                )
                 host["writable"] = [*host.get("writable", []), *map(Path, self.writable_folders)]
             _refuse_a_guard_in(self.workspace, settings)
             sandbox = SandboxRuntime(settings, protected=protected, program=srt, **host)
@@ -467,14 +491,35 @@ def _private_temp(workspace: Path, config: Path) -> Path | None:
     return config
 
 
-def _with_resolver(rules: Mapping[str, Any], resolver: Resolver) -> dict[str, Any]:
-    """`rules` that also let commands reach `resolver`, and never read the keys of the servers it serves."""
+def _with_resolver(
+    rules: Mapping[str, Any],
+    resolver: Resolver,
+    *,
+    passed: Mapping[str, str] | None = None,
+    mcporter: Path | None = None,
+) -> dict[str, Any]:
+    """`rules` that also let commands reach `resolver`, and never read the keys of the servers it serves.
+
+    Always applies the built-in secret-env scrub, even when the user owns ``sandbox.json``.
+    """
+    passed = dict(passed or ())
     network, filesystem = dict(rules.get("network") or {}), dict(rules.get("filesystem") or {})
     credentials = dict(rules.get("credentials") or {})
     network["allowedDomains"] = [*network.get("allowedDomains", []), resolver.host]
-    filesystem["denyRead"] = [*filesystem.get("denyRead", []), str(connections_path()), str(credentials_path())]
+    denied = [
+        str(connections_path()),
+        str(credentials_path()),
+        *([str(mcporter / "mcporter.json")] if mcporter else []),
+    ]
+    filesystem["denyRead"] = [*filesystem.get("denyRead", []), *denied]
     keys = sorted({name for connection in resolver.connections.values() for name in connection.variables})
-    credentials["envVars"] = [*credentials.get("envVars", []), *({"name": name, "mode": "deny"} for name in keys)]
+    tokens = sorted(
+        name
+        for name, value in os.environ.items()
+        if name not in passed and (_SECRET_NAME.search(name) or _SECRET_URL.search(value))
+    )
+    scrub = [*({"name": name, "mode": "deny"} for name in dict.fromkeys([*keys, *tokens]))]
+    credentials["envVars"] = [*credentials.get("envVars", []), *scrub]
     return {**rules, "network": network, "filesystem": filesystem, "credentials": credentials}
 
 
