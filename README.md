@@ -406,8 +406,8 @@ holo connections --check                # each server and its tools
 
 ```bash
 # what the agent runs in its shell
-mcporter list linear
-mcporter call linear.list_issues assignee=me --output json | jq '.[].title'
+mcporter list files
+mcporter call files.list_directory path=~/Documents > listing.txt
 ```
 
 `${VAR}` reads a variable from the environment, else from `~/.config/hai/.env`. The keys stay on this machine,
