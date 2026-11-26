@@ -1633,18 +1633,18 @@ def connections_list(
     """List the MCP servers in mcp.json, which agents with a shell on this machine reach with `mcporter`."""
     if ctx.invoked_subcommand is not None:
         return
-    from hai_agents_local.connections import connections_path, load_connections, read_servers
+    from hai_agents_local.connections import connections_path, load_connections_report, read_servers
 
     path = connections_path()
     try:
-        servers, found = read_servers(path), load_connections(path)
+        servers, (found, skipped) = read_servers(path), load_connections_report(path)
     except ValueError as exc:
         _raise_cli_error(exc)
-    reached: dict[str, Any] = {}
+    reached: dict[str, Any] = {name: ValueError(why) for name, why in skipped.items()}
     if check and found:
         from hai_agents_local.resolver import check as check_servers
 
-        reached = check_servers(found)
+        reached.update(check_servers(found))
     rows = [
         {
             "name": name,
@@ -1723,7 +1723,7 @@ def connections_import(
     force: bool = typer.Option(False, "--force", help="Replace servers of the same names."),
 ) -> None:
     """Copy the MCP servers another app is set up with into mcp.json; sign-ins stay with that app."""
-    from hai_agents_local.connections import connections_path, read_servers
+    from hai_agents_local.connections import check_name, connections_path, read_servers
 
     if source not in IMPORT_SOURCES:
         _raise_cli_error(ValueError(f"unknown source {source!r}: one of {', '.join(IMPORT_SOURCES)}"))
@@ -1731,17 +1731,28 @@ def connections_import(
     own = {mcp_hosts.SERVER_NAME, mcp_hosts.STDIO_SERVER_NAME}
     try:
         servers, theirs = read_servers(path), read_servers(origin)
-        taken = {name: spec for name, spec in theirs.items() if name not in own and (force or name not in servers)}
+        taken, bad = {}, []
+        for name, spec in theirs.items():
+            if name in own or (name in servers and not force):
+                continue
+            try:
+                check_name(name)
+            except ValueError:
+                bad.append(name)
+                continue
+            taken[name] = spec
         if taken:
             _save_servers({**servers, **taken}, path)
     except ValueError as exc:
         _raise_cli_error(exc)
-    left = sorted(set(theirs) - set(taken) - own)
+    left = sorted(set(theirs) - set(taken) - own - set(bad))
     console.print(
         f"[ok]{ui.DONE}[/ok] imported {', '.join(map(escape, taken)) or 'nothing'} from {escape(str(origin))}"
     )
     if left:
         console.print(f"  [meta]already in mcp.json, kept: {escape(', '.join(left))}; --force replaces them[/meta]")
+    if bad:
+        console.print(f"  [meta]skipped (invalid name for mcporter): {escape(', '.join(bad))}[/meta]")
 
 
 def _save_servers(servers: dict[str, Any], path: Path) -> None:
