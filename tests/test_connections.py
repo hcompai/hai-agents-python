@@ -83,6 +83,7 @@ def test_a_shell_desktop_reaches_its_mcp_servers_through_the_resolver_alone(tmp_
     notes = {"command": sys.executable, "args": [str(script)], "env": {"NOTES_KEY": "${NOTES_KEY}"}}
     (config / "mcp.json").write_text(json.dumps({"mcpServers": {"notes": notes}}))
     workspace = tmp_path / "workspace"
+    sandbox = None
     if owned:
         rules = json.dumps(
             {
@@ -90,7 +91,8 @@ def test_a_shell_desktop_reaches_its_mcp_servers_through_the_resolver_alone(tmp_
                 "filesystem": {"denyRead": [], "allowWrite": [], "denyWrite": []},
             }
         )
-        (config / "sandbox.json").write_text(rules)
+        sandbox = config / "sandbox.json"
+        sandbox.write_text(rules)
         workspace.mkdir()
         (workspace / "sandbox.json").write_text(rules)
         inside = WorkstationBridge(api_key="k", workspace=str(workspace), sandbox=str(workspace / "sandbox.json"))
@@ -98,7 +100,7 @@ def test_a_shell_desktop_reaches_its_mcp_servers_through_the_resolver_alone(tmp_
             pass
         inside._stop_connections()
 
-    bridge = WorkstationBridge(api_key="k", workspace=str(workspace))
+    bridge = WorkstationBridge(api_key="k", workspace=str(workspace), sandbox=str(sandbox) if sandbox else None)
     with bridge.create_driver() as driver:
         rules = json.loads(Path(driver.execute('echo "$SRT_SETTINGS"').stdout.strip()).read_text())
         shim = driver.execute("command -v mcporter").stdout.strip()
