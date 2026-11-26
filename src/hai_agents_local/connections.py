@@ -53,8 +53,10 @@ def read_servers(path: Path) -> dict[str, Any]:
     except (OSError, ValueError) as error:
         raise ValueError(f"{path} is not valid JSON: {error}") from error
     servers = data.get("mcpServers") if isinstance(data, dict) else None
+    if servers is None:
+        return {}
     if not isinstance(servers, dict):
-        raise ValueError(f"{path} holds no `mcpServers` object")
+        raise ValueError(f"{path} holds a `mcpServers` that is not an object")
     return servers
 
 
@@ -69,18 +71,26 @@ def load_connections(path: Path | None = None) -> list[Connection]:
     """Each server in the file, its `${VAR}` filled from the environment, else the stored credentials.
 
     A server that names no `url` or `command`, or a variable set nowhere, is left out with a warning."""
+    connections, errors = load_connections_report(path)
+    for name, error in errors.items():
+        logger.warning("MCP server %r in %s is left out: %s", name, path or connections_path(), error)
+    return connections
+
+
+def load_connections_report(path: Path | None = None) -> tuple[list[Connection], dict[str, str]]:
+    """Like ``load_connections``, but returns skipped servers and why instead of only logging."""
     path = path or connections_path()
     servers = read_servers(path)
     if not servers:
-        return []
+        return [], {}
     values = {**_stored_values(), **os.environ}
-    connections = []
+    connections, errors = [], {}
     for name, spec in servers.items():
         try:
             connections.append(_connection(name, spec, values))
         except ValueError as error:
-            logger.warning("MCP server %r in %s is left out: %s", name, path, error)
-    return connections
+            errors[name] = str(error)
+    return connections, errors
 
 
 def _connection(name: str, spec: object, values: Mapping[str, str]) -> Connection:
@@ -117,7 +127,7 @@ def _connection(name: str, spec: object, values: Mapping[str, str]) -> Connectio
             name,
             "stdio",
             command=os.path.expanduser(filled(command)),
-            args=tuple(filled(arg) for arg in args),
+            args=tuple(os.path.expanduser(filled(arg)) for arg in args),
             env=table("env"),
             cwd=os.path.expanduser(filled(cwd)) if cwd else None,
         )

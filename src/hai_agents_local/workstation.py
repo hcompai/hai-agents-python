@@ -315,7 +315,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             return None
         self._resolver = Resolver(self.connections)
         self._resolver.start()
-        folder = _private_temp(self.workspace, credentials_path().parent)
+        folder = _private_temp(self.workspace)
         self._mcporter = tempfile.TemporaryDirectory(prefix="hai-mcp-", dir=folder)
         variables, tools = shell_tools(Path(self._mcporter.name), self._resolver)
         environment.update(variables)
@@ -331,7 +331,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             folder.cleanup()
 
     def _starter_settings(self, config: Path, rules: Mapping[str, Any]) -> Path:
-        self._starter = tempfile.TemporaryDirectory(prefix="hai-sandbox-", dir=_private_temp(self.workspace, config))
+        self._starter = tempfile.TemporaryDirectory(prefix="hai-sandbox-", dir=_private_temp(self.workspace))
         settings = Path(self._starter.name) / "sandbox.json"
         settings.write_text(json.dumps(rules), encoding="utf-8")
         return settings
@@ -480,15 +480,16 @@ def _pinned_sandbox_runtime() -> Path | None:
     )
 
 
-def _private_temp(workspace: Path, config: Path) -> Path | None:
-    """Where a session's own temporary files go: the system's folder, else beside the stored credentials.
+def _private_temp(workspace: Path) -> Path | None:
+    """Where a session's own temporary files go: the system's folder, else under ``~/.hai/tmp``.
 
-    A folder, as Windows opens a temporary file a second time for nobody while it is open; beside the credentials
-    where the system's temporary folder is in the workspace, and a command could write it."""
+    A folder, as Windows opens a temporary file a second time for nobody while it is open. Not beside the stored
+    credentials: that tree is deny-read, and ``mcporter`` must read its own config from here."""
     if not _holds(workspace, Path(tempfile.gettempdir())):
         return None
-    config.mkdir(parents=True, exist_ok=True, mode=0o700)
-    return config
+    folder = Path.home() / ".hai" / "tmp"
+    folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return folder
 
 
 def _with_resolver(

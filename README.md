@@ -128,7 +128,7 @@ An agent that drives this desktop, like `h/holo-desktop`, uses your mouse and ke
 | `holo agents` | `list` agents, `get` one, `use` one as the default |
 | `holo skills` | browse available skills |
 | `holo mcp install` | let Cursor, Claude Code, Codex, and other MCP clients run agents through `holo mcp`; `--remote` adds the hosted server instead |
-| `holo connections` | `add`, `remove`, `import` the MCP servers a shell on this machine reaches; `--check` them |
+| `holo connections` | `add`, `import` the MCP servers a shell on this machine reaches; `--check` them |
 | `holo local` | serve a desktop on this machine for a session started elsewhere |
 | `holo login`, `logout`, `whoami`, `doctor` | manage and check your credentials and setup |
 
