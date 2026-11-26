@@ -1688,7 +1688,7 @@ def connections_add(
     holo connections add linear https://mcp.linear.app/mcp -H 'Authorization: Bearer ${LINEAR_KEY}'
     holo connections add files -- npx -y @modelcontextprotocol/server-filesystem ~/Documents
     """
-    from hai_agents_local.connections import check_name, connections_path, read_servers, save_servers
+    from hai_agents_local.connections import check_name, connections_path, read_servers
 
     path = connections_path()
     try:
@@ -1704,26 +1704,10 @@ def connections_add(
             spec = {"command": target[0], "args": target[1:]}
             if env:
                 spec["env"] = dict(_pair(item, "=") for item in env)
-        save_servers({**servers, name: spec}, path)
+        _save_servers({**servers, name: spec}, path)
     except ValueError as exc:
         _raise_cli_error(exc)
     console.print(f"[ok]{ui.DONE}[/ok] {escape(name)} added to {escape(str(path))}")
-
-
-@connections_app.command("remove")
-def connections_remove(name: str = typer.Argument(..., help="The server's name in mcp.json.")) -> None:
-    """Remove an MCP server from mcp.json."""
-    from hai_agents_local.connections import connections_path, read_servers, save_servers
-
-    path = connections_path()
-    try:
-        servers = read_servers(path)
-        if name not in servers:
-            raise ValueError(f"no MCP server named {name!r} in {path}")
-        save_servers({key: spec for key, spec in servers.items() if key != name}, path)
-    except ValueError as exc:
-        _raise_cli_error(exc)
-    console.print(f"[ok]{ui.DONE}[/ok] {escape(name)} removed")
 
 
 @connections_app.command("import")
@@ -1732,7 +1716,7 @@ def connections_import(
     force: bool = typer.Option(False, "--force", help="Replace servers of the same names."),
 ) -> None:
     """Copy the MCP servers another app is set up with into mcp.json; sign-ins stay with that app."""
-    from hai_agents_local.connections import connections_path, read_servers, save_servers
+    from hai_agents_local.connections import connections_path, read_servers
 
     if source not in IMPORT_SOURCES:
         _raise_cli_error(ValueError(f"unknown source {source!r}: one of {', '.join(IMPORT_SOURCES)}"))
@@ -1742,7 +1726,7 @@ def connections_import(
         servers, theirs = read_servers(path), read_servers(origin)
         taken = {name: spec for name, spec in theirs.items() if name not in own and (force or name not in servers)}
         if taken:
-            save_servers({**servers, **taken}, path)
+            _save_servers({**servers, **taken}, path)
     except ValueError as exc:
         _raise_cli_error(exc)
     left = sorted(set(theirs) - set(taken) - own)
@@ -1751,6 +1735,12 @@ def connections_import(
     )
     if left:
         console.print(f"  [meta]already in mcp.json, kept: {escape(', '.join(left))}; --force replaces them[/meta]")
+
+
+def _save_servers(servers: dict[str, Any], path: Path) -> None:
+    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    mcp_hosts._atomic_write_secret(path, json.dumps({**data, "mcpServers": servers}, indent=2) + "\n")
 
 
 def _pair(item: str, separator: str) -> tuple[str, str]:
