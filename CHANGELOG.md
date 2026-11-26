@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A desktop in `shell` mode reaches the MCP servers in `~/.config/hai/mcp.json` (Cursor's `mcpServers` format) with `mcporter` in its shell. Their keys, `${VAR}` filled from the environment or `~/.config/hai/.env`, stay in this process: it serves each server on a loopback port the sandbox opens for it alone, and the sandbox reads neither the file nor the variables it names. `holo connections` lists, checks, adds, removes and imports them from Cursor or Claude. The `shell` extra now brings `mcp`.
+
 ### Changed
 
 - An inline `web` environment with `host="user_device"` runs as a `desktop` in `shell` mode on the same id, whose agent drives this machine's Chrome with the `web` CLI. That shell runs `web` commands only, refuses any other, and works in `~/hai/<session_id>`. It leaves the screen to other agents and asks for no screen permission. Its fields other than `id` and `lazy` are ignored, with a warning. Install it with `pip install "hai-agents[shell]"`.
