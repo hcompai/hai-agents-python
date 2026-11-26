@@ -38,6 +38,8 @@ class Connection:
     args: tuple[str, ...] = ()
     env: Mapping[str, str] = field(default_factory=dict)
     cwd: str | None = None
+    description: str | None = None
+    """Optional short hint for the agent when the name alone is opaque."""
     variables: frozenset[str] = frozenset()
     """The environment variables its `${VAR}` references read: keys, to keep from the agent's shell."""
 
@@ -121,7 +123,10 @@ def _connection(name: str, spec: object, values: Mapping[str, str]) -> Connectio
         )
     else:
         raise ValueError("it names neither a `url` nor a `command`")
-    return replace(connection, variables=frozenset(read))
+    description = spec.get("description")
+    if description is not None:
+        description = " ".join(str(description).split()) or None
+    return replace(connection, variables=frozenset(read), description=description)
 
 
 def _stored_values() -> dict[str, str]:

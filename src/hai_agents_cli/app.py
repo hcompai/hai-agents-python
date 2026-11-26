@@ -1649,6 +1649,7 @@ def connections_list(
         {
             "name": name,
             "target": spec.get("url") or " ".join([spec.get("command", ""), *spec.get("args", [])]),
+            **({"description": text} if (text := " ".join(str(spec["description"]).split()) if spec.get("description") else "") else {}),
             **({"tools": reached[name]} if isinstance(reached.get(name), list) else {}),
             **({"error": str(reached[name])} if isinstance(reached.get(name), BaseException) else {}),
         }
@@ -1668,7 +1669,8 @@ def connections_list(
             status = f"  [ok]{ui.DONE}[/ok] {count} tool{'s' * (count != 1)}"
         elif "error" in row:
             status = f"  [fail]{ui.FAILED}[/fail] {escape(row['error'])}"
-        console.print(f"  [key]{escape(row['name'])}[/key]  [meta]{escape(row['target'])}[/meta]{status}")
+        hint = f"  [meta]{escape(row['description'])}[/meta]" if row.get("description") else ""
+        console.print(f"  [key]{escape(row['name'])}[/key]{hint}  [meta]{escape(row['target'])}[/meta]{status}")
     console.print(f"\n  [meta]{escape(str(path))}[/meta]")
 
 
@@ -1680,6 +1682,9 @@ def connections_add(
         [], "--header", "-H", help="'Name: value' sent to a URL. ${VAR} reads a variable."
     ),
     env: list[str] = typer.Option([], "--env", "-e", help="NAME=value set for a command. ${VAR} reads a variable."),
+    description: str | None = typer.Option(
+        None, "--description", "-d", help="Short hint for the agent when the name alone is opaque."
+    ),
     force: bool = typer.Option(False, "--force", help="Replace a server of that name."),
 ) -> None:
     """Add an MCP server to mcp.json. Its keys stay on this machine, out of the agent's shell.
@@ -1704,6 +1709,8 @@ def connections_add(
             spec = {"command": target[0], "args": target[1:]}
             if env:
                 spec["env"] = dict(_pair(item, "=") for item in env)
+        if description and (text := " ".join(description.split())):
+            spec["description"] = text
         _save_servers({**servers, name: spec}, path)
     except ValueError as exc:
         _raise_cli_error(exc)

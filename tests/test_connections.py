@@ -38,7 +38,11 @@ def test_connections_fill_their_keys_and_leave_out_what_they_cannot(tmp_path, mo
     config.mkdir(parents=True)
     (config / ".env").write_text("NOTION_KEY=stored\n")
     servers = {
-        "linear": {"url": "https://mcp.linear.app/mcp", "headers": {"Authorization": "Bearer ${env:LINEAR_KEY}"}},
+        "linear": {
+            "url": "https://mcp.linear.app/mcp",
+            "headers": {"Authorization": "Bearer ${env:LINEAR_KEY}"},
+            "description": "  issues tracker  ",
+        },
         "notion": {"type": "sse", "url": "https://n/sse", "headers": {"Authorization": "Bearer ${NOTION_KEY}"}},
         "files": {"command": "npx", "args": ["-y", "server", "~/docs"], "env": {"TOKEN": "${LINEAR_KEY}"}},
         "unset": {"url": "https://u/mcp", "headers": {"Authorization": "${NOWHERE}"}},
@@ -51,7 +55,9 @@ def test_connections_fill_their_keys_and_leave_out_what_they_cannot(tmp_path, mo
 
     assert list(found) == ["linear", "notion", "files"]
     assert found["linear"].headers == {"Authorization": "Bearer from-env"} and found["linear"].transport == "http"
+    assert found["linear"].description == "issues tracker"
     assert found["notion"].headers == {"Authorization": "Bearer stored"} and found["notion"].transport == "sse"
+    assert found["notion"].description is None
     assert found["files"].env == {"TOKEN": "from-env"} and found["files"].variables == {"LINEAR_KEY"}
     assert "NOWHERE" in caplog.text and "dotted.name" in caplog.text
     (config / "mcp.json").write_text("{")
@@ -149,7 +155,11 @@ def test_a_session_served_here_names_this_machines_mcp_servers_and_never_their_k
     monkeypatch.setenv("LINEAR_KEY", "secret-key")
     config = tmp_path / ".config" / "hai"
     config.mkdir(parents=True)
-    linear = {"url": "https://mcp.linear.app/mcp", "headers": {"Authorization": "Bearer ${LINEAR_KEY}"}}
+    linear = {
+        "url": "https://mcp.linear.app/mcp",
+        "headers": {"Authorization": "Bearer ${LINEAR_KEY}"},
+        "description": "issues",
+    }
     (config / "mcp.json").write_text(json.dumps({"mcpServers": {"linear": linear, "files": {"command": "npx"}}}))
     monkeypatch.setattr("hai_agents.client._LocalRuntimeAccess.auto_bridges", True)
     monkeypatch.setattr("hai_agents_local.sessions.ensure_bridges", lambda bridges: [])
@@ -160,7 +170,10 @@ def test_a_session_served_here_names_this_machines_mcp_servers_and_never_their_k
     agent = {"name": "x", "subagents": [shell]}
     Client(api_key="k").sessions.create_session(agent=agent, messages="hi", workspace=str(tmp_path / "w"))
 
-    assert captured["request_options"]["additional_body_parameters"]["connections"] == ["linear", "files"]
+    assert captured["request_options"]["additional_body_parameters"]["connections"] == [
+        {"name": "linear", "description": "issues"},
+        {"name": "files"},
+    ]
     assert "secret-key" not in json.dumps(captured, default=str)
 
 

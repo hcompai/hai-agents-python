@@ -69,17 +69,21 @@ MAX_NAMED_CONNECTIONS = 100
 
 def _name_connections(kwargs: typing.Dict[str, typing.Any], bridges: typing.Sequence[LocalBridge]) -> None:
     """Name in the request the MCP servers the bridges here serve, for the agent's system prompt; never their keys."""
-    names = [connection.name for bridge in bridges for connection in bridge.connections]
-    if len(names) > MAX_NAMED_CONNECTIONS:
+    named = [
+        {"name": connection.name, **({"description": connection.description} if connection.description else {})}
+        for bridge in bridges
+        for connection in bridge.connections
+    ]
+    if len(named) > MAX_NAMED_CONNECTIONS:
         logger.warning(
             "the agent is told the first %d of %d MCP servers; `mcporter list` shows them all",
             MAX_NAMED_CONNECTIONS,
-            len(names),
+            len(named),
         )
-        names = names[:MAX_NAMED_CONNECTIONS]
-    if names:
+        named = named[:MAX_NAMED_CONNECTIONS]
+    if named:
         options = dict(kwargs.get("request_options") or {})
-        body = {**options.get("additional_body_parameters", {}), "connections": names}
+        body = {**options.get("additional_body_parameters", {}), "connections": named}
         kwargs["request_options"] = {**options, "additional_body_parameters": body}
 
 
