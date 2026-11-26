@@ -204,6 +204,28 @@ class Resolver:
             return types.CallToolResult(content=[types.TextContent(type="text", text=note)], isError=True)
 
 
+def check(connections: Sequence[Connection]) -> dict[str, list[str] | BaseException]:
+    """Each server's tool names, or why it did not connect."""
+
+    async def tools(connection: Connection) -> list[str]:
+        upstream: _Upstream | None = None
+        try:
+            upstream = _Upstream(_transport(connection))
+            return [tool.name for tool in await upstream.open()]
+        finally:
+            if upstream is not None:
+                await upstream.close()
+
+    async def every() -> list[list[str] | BaseException]:
+        return await asyncio.gather(*map(tools, connections), return_exceptions=True)
+
+    found = asyncio.run(every())
+    return {
+        connection.name: _cause(result) if isinstance(result, BaseException) else result
+        for connection, result in zip(connections, found)
+    }
+
+
 class _Upstream:
     """One server, owned by one task: anyio refuses to unwind a transport in a task other than the one that entered it."""
 

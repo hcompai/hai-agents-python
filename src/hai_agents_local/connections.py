@@ -60,6 +60,28 @@ def read_servers(path: Path) -> dict[str, Any]:
     return servers
 
 
+def save_servers(servers: Mapping[str, Any], path: Path | None = None) -> Path:
+    """Write `servers` as the file's `mcpServers`, keeping its other keys; owner-only, as it holds keys."""
+    path = path or connections_path()
+    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    staged = path.with_name(f".{path.name}.tmp")
+    staged.unlink(missing_ok=True)
+    descriptor = os.open(staged, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+        json.dump({**data, "mcpServers": dict(servers)}, file, indent=2)
+        file.write("\n")
+    os.replace(staged, path)
+    return path
+
+
+def check_name(name: str) -> None:
+    if not _NAME.match(name):
+        raise ValueError(
+            f"{name!r}: a name holds only letters, digits, `-` and `_`, as `mcporter call <name>.<tool>` reads it"
+        )
+
+
 def load_connections(path: Path | None = None) -> list[Connection]:
     """Each server in the file, its `${VAR}` filled from the environment, else the stored credentials.
 
@@ -79,8 +101,7 @@ def load_connections(path: Path | None = None) -> list[Connection]:
 
 
 def _connection(name: str, spec: object, values: Mapping[str, str]) -> Connection:
-    if not _NAME.match(name):
-        raise ValueError("a name holds only letters, digits, `-` and `_`, as `mcporter call <name>.<tool>` reads it")
+    check_name(name)
     if not isinstance(spec, dict):
         raise ValueError("it is not an object")
     read: set[str] = set()
