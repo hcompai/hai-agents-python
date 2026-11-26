@@ -106,7 +106,9 @@ def test_a_shell_desktop_reaches_its_mcp_servers_through_the_resolver_alone(tmp_
     resolver = bridge._resolver
     assert resolver is not None
     assert resolver.host in rules["network"]["allowedDomains"]
-    assert {str(config / "mcp.json"), str(config / ".env")} <= set(rules["filesystem"]["denyRead"])
+    denied = set(rules["filesystem"]["denyRead"])
+    assert {str(config / "mcp.json"), str(config / ".env")} <= denied
+    assert any(path.endswith("mcporter.json") for path in denied)
     assert {"name": "NOTES_KEY", "mode": "deny"} in rules["credentials"]["envVars"]
     assert Path(shim).parent != srt.parent and "secret-key" not in shown
     served = json.loads(shown)["mcpServers"]["notes"]
@@ -158,3 +160,18 @@ def test_a_session_served_here_names_this_machines_mcp_servers_and_never_their_k
 
     assert captured["request_options"]["additional_body_parameters"]["connections"] == ["linear", "files"]
     assert "secret-key" not in json.dumps(captured, default=str)
+
+
+def test_mcp_servers_need_the_sandbox(tmp_path, monkeypatch):
+    from hai_agents_local import WorkstationBridge
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    config = tmp_path / ".config" / "hai"
+    config.mkdir(parents=True)
+    (config / "mcp.json").write_text(json.dumps({"mcpServers": {"notes": {"command": "true"}}}))
+    bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "w"), sandbox=False)
+    with pytest.raises(RuntimeError, match="MCP servers need the sandbox"):
+        with bridge.create_driver():
+            pass
+    bridge._stop_connections()

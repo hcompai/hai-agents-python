@@ -304,7 +304,7 @@ def _transport(connection: Connection) -> _Transport:
 
         timeout = httpx.Timeout(CALL_S, connect=CONNECT_S)
         async with (
-            httpx.AsyncClient(headers=headers, timeout=timeout, follow_redirects=True) as client,
+            httpx.AsyncClient(headers=headers, timeout=timeout, follow_redirects=False) as client,
             streamable_http_client(url, http_client=client) as streams,
         ):
             yield streams
@@ -320,8 +320,10 @@ def _stdio(connection: Connection) -> _Transport:
     executable = shutil.which(connection.command)
     if executable is None:
         raise ValueError(f"{connection.name} runs `{connection.command}`, which is not installed on this machine")
+    keep = ("PATH", "HOME", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL", "USER", "LOGNAME", "SystemRoot", "USERPROFILE")
+    host = {name: os.environ[name] for name in keep if name in os.environ}
     parameters = StdioServerParameters(
-        command=executable, args=list(connection.args), env={**os.environ, **connection.env}, cwd=connection.cwd
+        command=executable, args=list(connection.args), env={**host, **connection.env}, cwd=connection.cwd
     )
 
     @asynccontextmanager
@@ -333,8 +335,8 @@ def _stdio(connection: Connection) -> _Transport:
             except Exception as error:
                 printed.seek(0)
                 if said := printed.read()[-STDERR_CHARACTERS:].strip():
-                    raise ConnectionError(f"{_cause(error)}; `{connection.command}` printed: {said}") from error
-                raise
+                    logger.warning("%s stderr: %s", connection.name, said)
+                raise ConnectionError(str(_cause(error))) from error
 
     return open_transport
 
