@@ -20,7 +20,10 @@ from hai_agents.client import credentials_path
 
 from .bridge import LocalBridge, TokenSource
 from .config import machine_allowlist, refuse_unread_settings, shell_sandbox
+from .connections import connections_path, load_connections
 from .desktop import ensure_macos_input_permissions
+from .mcporter import shell_tools
+from .resolver import Resolver
 from .runtime.errors import LocalRuntimeError
 from .runtime.install import install_artifact
 from .runtime.manifest import RuntimeArtifact, platform_key
@@ -51,6 +54,8 @@ STARTER_ALLOWLIST = """\
 # Commands the agent runs on this machine without asking, one prefix a line. Any other waits for your approval.
 # `cua` sees and drives this screen: its clicks and keys do whatever you can do here, outside any sandbox.
 cua
+# `mcporter list` names the MCP servers in mcp.json, beside this file, and their tools: it reads, and changes nothing.
+mcporter list
 """
 STARTER_REGISTRIES = ["pypi.org", "files.pythonhosted.org", "registry.npmjs.org"]
 STARTER_SECRETS = [
@@ -170,6 +175,8 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         self._sandbox_asked = bool(sandbox or require_sandbox)
         self.allowed_domains, self.writable_folders = list(allowed_domains), list(writable_folders)
         self._starter: tempfile.TemporaryDirectory[str] | None = None
+        self._mcporter: tempfile.TemporaryDirectory[str] | None = None
+        self._resolver: Resolver | None = None
 
     def preflight(self) -> None:
         _keep_off_path(self.workspace, ["srt"] if self.sandbox else [])
@@ -204,6 +211,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             "WEB_SESSION": self.session_id,
             "PATH": tools,
         }
+        resolver = self._serve_connections(environment)
         policy: CommandPolicy | None = None
         allowed: Path | None = None
         sandbox = None
@@ -241,18 +249,15 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             if settings.exists():
                 rules = f"the rules in {settings}"
                 rules += f", which decide alone: the agent's asks to {' and '.join(asked)} are not added" * bool(asked)
+                if resolver:
+                    rules += f", and reach this machine's MCP servers at {resolver.host}"
+                    owned = json.loads(settings.read_text(encoding="utf-8"))
+                    settings = self._starter_settings(config, _with_resolver(owned, resolver))
             else:
                 rules = "the built-in rules" + f", and may {' and '.join(asked)} as the agent asks" * bool(asked)
                 rules += f"; a {settings} replaces them"
-                # A folder: Windows opens a temporary file a second time for nobody while it is open. Beside the stored
-                # credentials where the system's temporary folder is in the workspace, and a command could write it.
-                elsewhere = config if _holds(self.workspace, Path(tempfile.gettempdir())) else None
-                if elsewhere:
-                    elsewhere.mkdir(parents=True, exist_ok=True, mode=0o700)
-                self._starter = tempfile.TemporaryDirectory(prefix="hai-sandbox-", dir=elsewhere)
-                settings = Path(self._starter.name) / "sandbox.json"
                 built_in = _starter_sandbox(self.environment_variables, self.allowed_domains)
-                settings.write_text(json.dumps(built_in), encoding="utf-8")
+                settings = self._starter_settings(config, _with_resolver(built_in, resolver) if resolver else built_in)
                 host["writable"] = [*host.get("writable", []), *map(Path, self.writable_folders)]
             _refuse_a_guard_in(self.workspace, settings)
             sandbox = SandboxRuntime(settings, protected=protected, program=srt, **host)
@@ -269,6 +274,40 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             sandbox=sandbox,
             folders=[_cua({**os.environ, **environment}).state()],
         )
+
+    async def run(self) -> None:
+        try:
+            await super().run()
+        finally:
+            await asyncio.to_thread(self._stop_connections)
+
+    def _serve_connections(self, environment: dict[str, str]) -> Resolver | None:
+        """Serve this machine's MCP servers to the shell's `mcporter`; None where it has none."""
+        connections = [] if self.only else load_connections()
+        if not connections:
+            return None
+        self._resolver = Resolver(connections)
+        self._resolver.start()
+        folder = _private_temp(self.workspace, credentials_path().parent)
+        self._mcporter = tempfile.TemporaryDirectory(prefix="hai-mcp-", dir=folder)
+        variables, tools = shell_tools(Path(self._mcporter.name), self._resolver)
+        environment.update(variables)
+        environment["PATH"] = os.pathsep.join([str(tools), environment["PATH"]])
+        return self._resolver
+
+    def _stop_connections(self) -> None:
+        resolver, self._resolver = self._resolver, None
+        if resolver is not None:
+            resolver.stop()
+        folder, self._mcporter = self._mcporter, None
+        if folder is not None:
+            folder.cleanup()
+
+    def _starter_settings(self, config: Path, rules: Mapping[str, Any]) -> Path:
+        self._starter = tempfile.TemporaryDirectory(prefix="hai-sandbox-", dir=_private_temp(self.workspace, config))
+        settings = Path(self._starter.name) / "sandbox.json"
+        settings.write_text(json.dumps(rules), encoding="utf-8")
+        return settings
 
     def _sandbox_runtime(self) -> str | None:
         """This machine's `srt`; None where commands run unconfined."""
@@ -424,6 +463,28 @@ def _pinned_sandbox_runtime() -> Path | None:
 
 def _srt_in(home: Path) -> Path | None:
     return home / "srt" if (home / "srt").is_file() else None
+
+
+def _private_temp(workspace: Path, config: Path) -> Path | None:
+    """Where a session's own temporary files go: the system's folder, else beside the stored credentials.
+
+    A folder, as Windows opens a temporary file a second time for nobody while it is open; beside the credentials
+    where the system's temporary folder is in the workspace, and a command could write it."""
+    if not _holds(workspace, Path(tempfile.gettempdir())):
+        return None
+    config.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return config
+
+
+def _with_resolver(rules: Mapping[str, Any], resolver: Resolver) -> dict[str, Any]:
+    """`rules` that also let commands reach `resolver`, and never read the keys of the servers it serves."""
+    network, filesystem = dict(rules.get("network") or {}), dict(rules.get("filesystem") or {})
+    credentials = dict(rules.get("credentials") or {})
+    network["allowedDomains"] = [*network.get("allowedDomains", []), resolver.host]
+    filesystem["denyRead"] = [*filesystem.get("denyRead", []), str(connections_path())]
+    keys = sorted({name for connection in resolver.connections.values() for name in connection.variables})
+    credentials["envVars"] = [*credentials.get("envVars", []), *({"name": name, "mode": "deny"} for name in keys)]
+    return {**rules, "network": network, "filesystem": filesystem, "credentials": credentials}
 
 
 def _starter_sandbox(passed: Mapping[str, str], domains: Sequence[str] = ()) -> dict[str, object]:

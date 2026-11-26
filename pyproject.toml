@@ -45,6 +45,8 @@ desktop = [
 ]
 shell = [
   "hai-drivers[cua-cli,desktop-cli,web-cli]>=0.2.1",
+  "mcp>=1.24,<2",
+  "python-dotenv>=1.2.3,<2",
   "pynput>=1.7.6; sys_platform == 'win32'",
   "ripgrep-bin==15.2.0; platform_machine in 'x86_64 AMD64 arm64 aarch64 ARM64'",
 ]
