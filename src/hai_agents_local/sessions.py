@@ -63,7 +63,7 @@ def _apply_runaway_budgets(kwargs: typing.Dict[str, typing.Any]) -> None:
     kwargs.setdefault("max_time_s", DEFAULT_LOCAL_MAX_TIME_S)
 
 
-MAX_NAMED_CONNECTIONS = 50
+MAX_NAMED_CONNECTIONS = 100
 """The most a session request names, as the platform accepts."""
 
 
