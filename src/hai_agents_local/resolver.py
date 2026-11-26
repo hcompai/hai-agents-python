@@ -35,12 +35,6 @@ MCPORTER_CALL_TIMEOUT_MS = 200_000
 STDERR_CHARACTERS = 600
 REFUSED = -32000
 CLOSED = "the connection to the server closed"
-_SIGN_IN = re.compile(
-    r"\b(?:HTTP|status|code)\W{0,3}40[13]\b|\b401\s+unauthori[sz]ed\b|\b403\s+forbidden\b|\binvalid_token\b"
-    r"|\bunauthori[sz]ed\b",
-    re.IGNORECASE,
-)
-
 _Transport = Callable[[], AbstractAsyncContextManager[Any]]
 
 
@@ -97,7 +91,9 @@ class Resolver:
         self._loop, self._stopping = asyncio.get_running_loop(), asyncio.Event()
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listener.bind(("127.0.0.1", 0))
-        server = _uvicorn(self._app())
+        import uvicorn
+
+        server = uvicorn.Server(uvicorn.Config(self._app(), log_level="warning", lifespan="on", access_log=False))
         serving = asyncio.create_task(server.serve(sockets=[listener]))
         try:
             while not server.started:
@@ -184,7 +180,9 @@ class Resolver:
                 self._tools[name] = await upstream.open()
             except Exception as error:  # noqa: BLE001 - an unreachable server is told to the agent
                 logger.warning("MCP server %s did not connect: %s", name, _cause(error))
-                raise McpError(ErrorData(code=REFUSED, message=_unreachable(name, error))) from error
+                raise McpError(
+                    ErrorData(code=REFUSED, message=f"{name} could not be reached: {_cause(error)}")
+                ) from error
             self._upstreams[name] = upstream
             return upstream
 
@@ -192,17 +190,11 @@ class Resolver:
         from mcp import types
 
         upstream = await self._reach(name)
-        listed = [listed.name for listed in self._tools[name]]
-        if tool not in listed:
-            close = difflib.get_close_matches(tool, listed, n=3, cutoff=0.5)
-            nearest = f"; the closest are {', '.join(close)}" if close else ""
-            note = f"{name} has no tool {tool!r}{nearest}. `mcporter list {name}` shows them all."
-            return types.CallToolResult(content=[types.TextContent(type="text", text=note)], isError=True)
         try:
             return await upstream.call(tool, arguments)
         except Exception as error:  # noqa: BLE001 - the server's failure is the call's answer
             logger.warning("MCP call %s.%s failed: %s", name, tool, type(error).__name__)
-            note = _refused(name, error) if _needs_sign_in(error) else f"{name} could not run {tool}: {_cause(error)}"
+            note = f"{name} could not run {tool}: {_cause(error)}"
             return types.CallToolResult(content=[types.TextContent(type="text", text=note)], isError=True)
 
 
@@ -294,18 +286,6 @@ class _Upstream:
                 self._ready.set_exception(ConnectionError(CLOSED))
 
 
-def _uvicorn(app: Any) -> Any:
-    """uvicorn without its signal handlers: the bridge's process owns those."""
-    import uvicorn
-
-    class Server(uvicorn.Server):
-        @contextlib.contextmanager
-        def capture_signals(self) -> Any:
-            yield
-
-    return Server(uvicorn.Config(app, log_level="warning", lifespan="on", access_log=False))
-
-
 def _transport(connection: Connection) -> _Transport:
     if connection.transport == "stdio":
         return _stdio(connection)
@@ -359,36 +339,8 @@ def _stdio(connection: Connection) -> _Transport:
     return open_transport
 
 
-def _needs_sign_in(error: BaseException) -> bool:
-    """A refused key anywhere in `error`'s chain: a 401 or 403, or the words a server uses for one."""
-    seen: set[int] = set()
-    waiting: list[BaseException] = [error]
-    while waiting:
-        current = waiting.pop()
-        if id(current) in seen:
-            continue
-        seen.add(id(current))
-        status = getattr(getattr(current, "response", None), "status_code", None)
-        if status in (401, 403) or _SIGN_IN.search(str(current)):
-            return True
-        waiting.extend(found for found in (current.__cause__, current.__context__) if found is not None)
-        waiting.extend(getattr(current, "exceptions", ()))
-    return False
-
-
 def _cause(error: BaseException) -> BaseException:
     """The first leaf of an exception group: anyio wraps a transport's failure in one."""
     while getattr(error, "exceptions", None):
         error = error.exceptions[0]  # type: ignore[attr-defined]
     return error
-
-
-def _refused(name: str, error: BaseException) -> str:
-    return (
-        f"{name} refused this machine's key for it: do what you can without it, and tell the user to update "
-        f"{name} in {connections_path()}. ({_cause(error)})"
-    )
-
-
-def _unreachable(name: str, error: BaseException) -> str:
-    return _refused(name, error) if _needs_sign_in(error) else f"{name} could not be reached: {_cause(error)}"

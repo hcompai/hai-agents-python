@@ -9,9 +9,7 @@ import shutil
 from pathlib import Path
 
 from .resolver import MCPORTER_CALL_TIMEOUT_MS, Resolver
-from .runtime.errors import LocalRuntimeError
-from .runtime.install import install_artifact
-from .runtime.manifest import RuntimeArtifact, platform_key
+from .runtime.install import install_pinned
 
 logger = logging.getLogger(__name__)
 
@@ -29,18 +27,13 @@ def mcporter() -> str | None:
     """This machine's `mcporter`: its own on PATH, else the pinned build, downloaded on its first use."""
     if found := shutil.which("mcporter"):
         return found
-    home, platform = MCPORTER_HOME / MCPORTER_VERSION, platform_key()
-    pinned = _mcporter_in(home)
-    if pinned or platform not in MCPORTER_SHA256:
-        return str(pinned) if pinned else None
-    logger.warning("downloading mcporter, which the agent reaches MCP servers with, into %s, once", home)
+    pinned = install_pinned("mcporter", MCPORTER_HOME / MCPORTER_VERSION, MCPORTER_SHA256, _release)
+    return str(pinned) if pinned else None
+
+
+def _release(platform: str) -> str:
     name = f"mcporter_{MCPORTER_VERSION}_{platform.replace('-', '_')}.tar.gz"
-    artifact = RuntimeArtifact(url=f"{MCPORTER_RELEASES}/v{MCPORTER_VERSION}/{name}", sha256=MCPORTER_SHA256[platform])
-    try:
-        return str(install_artifact(artifact, home, _mcporter_in, "mcporter"))
-    except (LocalRuntimeError, OSError) as error:
-        logger.warning("%s", error)
-        return None
+    return f"{MCPORTER_RELEASES}/v{MCPORTER_VERSION}/{name}"
 
 
 def shell_tools(folder: Path, resolver: Resolver) -> tuple[dict[str, str], Path]:
@@ -70,7 +63,3 @@ def shell_tools(folder: Path, resolver: Resolver) -> tuple[dict[str, str], Path]
         "MCPORTER_NO_SPINNER": "1",
     }
     return variables, tools
-
-
-def _mcporter_in(home: Path) -> Path | None:
-    return home / "mcporter" if (home / "mcporter").is_file() else None
