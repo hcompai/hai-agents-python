@@ -63,9 +63,20 @@ def _apply_runaway_budgets(kwargs: typing.Dict[str, typing.Any]) -> None:
     kwargs.setdefault("max_time_s", DEFAULT_LOCAL_MAX_TIME_S)
 
 
+MAX_NAMED_CONNECTIONS = 50
+"""The most a session request names, as the platform accepts."""
+
+
 def _name_connections(kwargs: typing.Dict[str, typing.Any], bridges: typing.Sequence[LocalBridge]) -> None:
     """Name in the request the MCP servers the bridges here serve, for the agent's system prompt; never their keys."""
     names = [connection.name for bridge in bridges for connection in bridge.connections]
+    if len(names) > MAX_NAMED_CONNECTIONS:
+        logger.warning(
+            "the agent is told the first %d of %d MCP servers; `mcporter list` shows them all",
+            MAX_NAMED_CONNECTIONS,
+            len(names),
+        )
+        names = names[:MAX_NAMED_CONNECTIONS]
     if names:
         options = dict(kwargs.get("request_options") or {})
         body = {**options.get("additional_body_parameters", {}), "connections": names}
