@@ -32,6 +32,37 @@
         ],
         "parameters": [
           {
+            "name": "capture_end_state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Have the session's browser record its end state (its calls and localStorage, kept 30 days) when it closes, so `POST /sessions/{id}/probe` can judge it. Refused for an organization whose runs record no browser end state.",
+              "default": false,
+              "title": "Capture End State"
+            },
+            "description": "Have the session's browser record its end state (its calls and localStorage, kept 30 days) when it closes, so `POST /sessions/{id}/probe` can judge it. Refused for an organization whose runs record no browser end state."
+          },
+          {
+            "name": "workflow_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_.-]{1,200}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Stamped as the session's `workflow_type` metadata, which groups the sessions `POST /workflows/{workflow_type}/probe/draft` drafts a probe from.",
+              "title": "Workflow Type"
+            },
+            "description": "Stamped as the session's `workflow_type` metadata, which groups the sessions `POST /workflows/{workflow_type}/probe/draft` drafts a probe from."
+          },
+          {
             "name": "Idempotency-Key",
             "in": "header",
             "required": false,
@@ -489,6 +520,58 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v2/sessions/{id}/project": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Get Session Project",
+        "description": "The project a session ran in, for a caller who would see it there but is working in another project.",
+        "operationId": "get_session_project_api_v2_sessions__id__project_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionProject"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v2/sessions/{id}/flag": {
@@ -1265,6 +1348,68 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{id}/probe": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Judge Session Probe",
+        "description": "Judge a finished session's browser end state with a completion probe.\n\nThe session must have been created with `capture_end_state`. Answers 409 with `Retry-After` while the session\nruns or its browser is still closing, which takes up to two minutes after the session ends.",
+        "operationId": "judge_session_probe_api_v2_sessions__id__probe_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionProbeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionProbeVerdict"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session or its browser is still running"
           },
           "422": {
             "description": "Validation Error",
@@ -7518,16 +7663,6 @@
             "title": "Kind",
             "default": "web"
           },
-          "host": {
-            "type": "string",
-            "enum": [
-              "user_device",
-              "cloud"
-            ],
-            "title": "Host",
-            "description": "Where the browser runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine.",
-            "default": "cloud"
-          },
           "start_url": {
             "anyOf": [
               {
@@ -7603,7 +7738,7 @@
               }
             ],
             "title": "Vault Id",
-            "description": "Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run without secret access."
+            "description": "Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access."
           },
           "browser_profile_id": {
             "anyOf": [
@@ -7616,12 +7751,12 @@
               }
             ],
             "title": "Browser Profile Id",
-            "description": "Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run with a fresh profile."
+            "description": "Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile."
           },
           "use_default_browser_profile": {
             "type": "boolean",
             "title": "Use Default Browser Profile",
-            "description": "When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile. Only supported on cloud-hosted browsers.",
+            "description": "When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile.",
             "default": false
           },
           "persist_browser_profile": {
@@ -7967,6 +8102,35 @@
         ],
         "title": "CatalogRevisionRef",
         "description": "A catalog skill or environment at the revision a session ran."
+      },
+      "ConnectedServer": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Name",
+            "description": "Server name as `mcporter call <name>.<tool>` reads it."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Optional short hint for custom or opaque names; omitted when unused."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ConnectedServer",
+        "description": "One MCP server the user's shell reaches with ``mcporter``; keys stay where it is served."
       },
       "CreateSchedule": {
         "properties": {
@@ -9659,15 +9823,6 @@
       },
       "PatchEnvironment": {
         "properties": {
-          "host": {
-            "type": "string",
-            "enum": [
-              "user_device",
-              "cloud"
-            ],
-            "title": "Host",
-            "description": "Where the browser runs: 'cloud' on H Company infrastructure, or 'user_device' on your own machine."
-          },
           "start_url": {
             "anyOf": [
               {
@@ -9740,7 +9895,7 @@
               }
             ],
             "title": "Vault Id",
-            "description": "Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run without secret access."
+            "description": "Id of a vault config to bind to this browser, letting the agent sign in to sites with secrets resolved from the vault. The vault must belong to the caller's organization. Omit to run without secret access."
           },
           "browser_profile_id": {
             "anyOf": [
@@ -9753,12 +9908,12 @@
               }
             ],
             "title": "Browser Profile Id",
-            "description": "Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Only supported on cloud-hosted browsers. Omit to run with a fresh profile."
+            "description": "Id of a browser profile to load into this browser, restoring saved cookies and storage state from a prior session. The profile must belong to the caller's organization. Omit to run with a fresh profile."
           },
           "use_default_browser_profile": {
             "type": "boolean",
             "title": "Use Default Browser Profile",
-            "description": "When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile. Only supported on cloud-hosted browsers."
+            "description": "When true, load the caller's default browser profile for this browser flavor (marked via the browser-profiles API) instead of naming one explicitly. Mutually exclusive with browser_profile_id. When no default exists, an empty profile is auto-created and marked default; default-profile sessions save their final state back on stop when no other session is already persisting the profile."
           },
           "persist_browser_profile": {
             "type": "boolean",
@@ -10929,6 +11084,70 @@
         "title": "SessionFlag",
         "description": "A shared \"needs attention\" marker on a session; anyone who can see the session can raise or clear it."
       },
+      "SessionProbeRequest": {
+        "properties": {
+          "probe": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Probe",
+            "description": "A hai-probes CompletionProbe: a call the page must make and what its localStorage must hold. The session must have been created with `capture_end_state`."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "probe"
+        ],
+        "title": "SessionProbeRequest",
+        "description": "A completion probe to judge a finished session's browser end state with."
+      },
+      "SessionProbeVerdict": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "unjudged"
+            ],
+            "title": "Outcome",
+            "description": "`unjudged` when the probe cannot tell: no browser, no recorded end state, an end state it cannot read, or a session the agent did not end itself (cancelled, out of credit, or failed by our infrastructure)."
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed",
+            "description": "The probe's conditions the end state did not meet."
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "title": "SessionProbeVerdict",
+        "description": "What a completion probe says of a finished session's browser end state."
+      },
+      "SessionProject": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id",
+            "description": "The session's project; the organization's default project for older sessions."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "project_id"
+        ],
+        "title": "SessionProject",
+        "description": "The project a session ran in, so a caller in another of the org's projects can switch to it."
+      },
       "SessionRequest": {
         "properties": {
           "agent": {
@@ -11014,6 +11233,22 @@
             ],
             "title": "Timezone",
             "description": "IANA timezone the agent uses for dates and times, e.g. 'Europe/Paris'. UTC if null."
+          },
+          "connections": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ConnectedServer"
+                },
+                "type": "array",
+                "maxItems": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connections",
+            "description": "MCP servers the user connected, which the agent's shell reaches with `mcporter`; their keys stay where they are served. Each entry is a name plus an optional description (a bare name string is accepted). Listed in the system prompt of the agent, and of each subagent, with a desktop in shell mode; ignored by the others."
           },
           "delete_after_min": {
             "anyOf": [

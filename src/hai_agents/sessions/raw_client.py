@@ -14,11 +14,14 @@ from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
 from ..core.serialization import convert_and_respect_annotation_metadata
+from ..errors.conflict_error import ConflictError
 from ..errors.forbidden_error import ForbiddenError
 from ..errors.not_found_error import NotFoundError
 from ..errors.too_many_requests_error import TooManyRequestsError
 from ..errors.unprocessable_entity_error import UnprocessableEntityError
+from ..types.connected_server import ConnectedServer
 from ..types.error_response import ErrorResponse
+from ..types.json_value import JsonValue
 from ..types.page_session_event import PageSessionEvent
 from ..types.page_session_summary import PageSessionSummary
 from ..types.quota_error_response import QuotaErrorResponse
@@ -26,6 +29,8 @@ from ..types.quota_status import QuotaStatus
 from ..types.session import Session
 from ..types.session_changes import SessionChanges
 from ..types.session_flag import SessionFlag
+from ..types.session_probe_verdict import SessionProbeVerdict
+from ..types.session_project import SessionProject
 from ..types.session_request_agent import SessionRequestAgent
 from ..types.session_request_messages import SessionRequestMessages
 from ..types.session_status import SessionStatus
@@ -180,12 +185,15 @@ class RawSessionsClient:
         self,
         *,
         agent: SessionRequestAgent,
+        capture_end_state: typing.Optional[bool] = None,
+        workflow_type: typing.Optional[str] = None,
         idempotency_key: typing.Optional[str] = None,
         messages: typing.Optional[SessionRequestMessages] = OMIT,
         max_steps: typing.Optional[int] = OMIT,
         max_time_s: typing.Optional[float] = OMIT,
         idle_timeout_s: typing.Optional[int] = OMIT,
         timezone: typing.Optional[str] = OMIT,
+        connections: typing.Optional[typing.Sequence[ConnectedServer]] = OMIT,
         delete_after_min: typing.Optional[int] = OMIT,
         delete_screenshot_after_min: typing.Optional[int] = OMIT,
         queue: typing.Optional[bool] = OMIT,
@@ -201,6 +209,12 @@ class RawSessionsClient:
         ----------
         agent : SessionRequestAgent
             Agent to run: a registered agent's name, or an inline Agent definition.
+
+        capture_end_state : typing.Optional[bool]
+            Have the session's browser record its end state (its calls and localStorage, kept 30 days) when it closes, so `POST /sessions/{id}/probe` can judge it. Refused for an organization whose runs record no browser end state.
+
+        workflow_type : typing.Optional[str]
+            Stamped as the session's `workflow_type` metadata, which groups the sessions `POST /workflows/{workflow_type}/probe/draft` drafts a probe from.
 
         idempotency_key : typing.Optional[str]
 
@@ -218,6 +232,9 @@ class RawSessionsClient:
 
         timezone : typing.Optional[str]
             IANA timezone the agent uses for dates and times, e.g. 'Europe/Paris'. UTC if null.
+
+        connections : typing.Optional[typing.Sequence[ConnectedServer]]
+            MCP servers the user connected, which the agent's shell reaches with `mcporter`; their keys stay where they are served. Each entry is a name plus an optional description (a bare name string is accepted). Listed in the system prompt of the agent, and of each subagent, with a desktop in shell mode; ignored by the others.
 
         delete_after_min : typing.Optional[int]
             Minutes after the session finishes before it is automatically deleted. When omitted, Portal's retention preference applies. An explicit value adds an earlier expiry; null adds no expiry beyond Portal's policy.
@@ -248,6 +265,10 @@ class RawSessionsClient:
         _response = self._client_wrapper.httpx_client.request(
             "api/v2/sessions",
             method="POST",
+            params={
+                "capture_end_state": capture_end_state,
+                "workflow_type": workflow_type,
+            },
             json={
                 "agent": convert_and_respect_annotation_metadata(
                     object_=agent, annotation=SessionRequestAgent, direction="write"
@@ -259,6 +280,9 @@ class RawSessionsClient:
                 "max_time_s": max_time_s,
                 "idle_timeout_s": idle_timeout_s,
                 "timezone": timezone,
+                "connections": convert_and_respect_annotation_metadata(
+                    object_=connections, annotation=typing.Optional[typing.Sequence[ConnectedServer]], direction="write"
+                ),
                 "delete_after_min": delete_after_min,
                 "delete_screenshot_after_min": delete_screenshot_after_min,
                 "queue": queue,
@@ -407,6 +431,70 @@ class RawSessionsClient:
                     ),
                 )
                 return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def get_session_project(
+        self, id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[SessionProject]:
+        """
+        The project a session ran in, for a caller who would see it there but is working in another project.
+
+        Parameters
+        ----------
+        id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[SessionProject]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{encode_path_param(id)}/project",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    SessionProject,
+                    parse_obj_as(
+                        type_=SessionProject,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -1170,6 +1258,83 @@ class RawSessionsClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
+    def judge_session_probe(
+        self, id: str, *, probe: typing.Dict[str, JsonValue], request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[SessionProbeVerdict]:
+        """
+        Judge a finished session's browser end state with a completion probe.
+
+        The session must have been created with `capture_end_state`. Answers 409 with `Retry-After` while the session
+        runs or its browser is still closing, which takes up to two minutes after the session ends.
+
+        Parameters
+        ----------
+        id : str
+
+        probe : typing.Dict[str, JsonValue]
+            A hai-probes CompletionProbe: a call the page must make and what its localStorage must hold. The session must have been created with `capture_end_state`.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[SessionProbeVerdict]
+            Successful Response
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{encode_path_param(id)}/probe",
+            method="POST",
+            json={
+                "probe": probe,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    SessionProbeVerdict,
+                    parse_obj_as(
+                        type_=SessionProbeVerdict,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 409:
+                raise ConflictError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
     def submit_session_feedback(
         self,
         id: str,
@@ -1598,12 +1763,15 @@ class AsyncRawSessionsClient:
         self,
         *,
         agent: SessionRequestAgent,
+        capture_end_state: typing.Optional[bool] = None,
+        workflow_type: typing.Optional[str] = None,
         idempotency_key: typing.Optional[str] = None,
         messages: typing.Optional[SessionRequestMessages] = OMIT,
         max_steps: typing.Optional[int] = OMIT,
         max_time_s: typing.Optional[float] = OMIT,
         idle_timeout_s: typing.Optional[int] = OMIT,
         timezone: typing.Optional[str] = OMIT,
+        connections: typing.Optional[typing.Sequence[ConnectedServer]] = OMIT,
         delete_after_min: typing.Optional[int] = OMIT,
         delete_screenshot_after_min: typing.Optional[int] = OMIT,
         queue: typing.Optional[bool] = OMIT,
@@ -1619,6 +1787,12 @@ class AsyncRawSessionsClient:
         ----------
         agent : SessionRequestAgent
             Agent to run: a registered agent's name, or an inline Agent definition.
+
+        capture_end_state : typing.Optional[bool]
+            Have the session's browser record its end state (its calls and localStorage, kept 30 days) when it closes, so `POST /sessions/{id}/probe` can judge it. Refused for an organization whose runs record no browser end state.
+
+        workflow_type : typing.Optional[str]
+            Stamped as the session's `workflow_type` metadata, which groups the sessions `POST /workflows/{workflow_type}/probe/draft` drafts a probe from.
 
         idempotency_key : typing.Optional[str]
 
@@ -1636,6 +1810,9 @@ class AsyncRawSessionsClient:
 
         timezone : typing.Optional[str]
             IANA timezone the agent uses for dates and times, e.g. 'Europe/Paris'. UTC if null.
+
+        connections : typing.Optional[typing.Sequence[ConnectedServer]]
+            MCP servers the user connected, which the agent's shell reaches with `mcporter`; their keys stay where they are served. Each entry is a name plus an optional description (a bare name string is accepted). Listed in the system prompt of the agent, and of each subagent, with a desktop in shell mode; ignored by the others.
 
         delete_after_min : typing.Optional[int]
             Minutes after the session finishes before it is automatically deleted. When omitted, Portal's retention preference applies. An explicit value adds an earlier expiry; null adds no expiry beyond Portal's policy.
@@ -1666,6 +1843,10 @@ class AsyncRawSessionsClient:
         _response = await self._client_wrapper.httpx_client.request(
             "api/v2/sessions",
             method="POST",
+            params={
+                "capture_end_state": capture_end_state,
+                "workflow_type": workflow_type,
+            },
             json={
                 "agent": convert_and_respect_annotation_metadata(
                     object_=agent, annotation=SessionRequestAgent, direction="write"
@@ -1677,6 +1858,9 @@ class AsyncRawSessionsClient:
                 "max_time_s": max_time_s,
                 "idle_timeout_s": idle_timeout_s,
                 "timezone": timezone,
+                "connections": convert_and_respect_annotation_metadata(
+                    object_=connections, annotation=typing.Optional[typing.Sequence[ConnectedServer]], direction="write"
+                ),
                 "delete_after_min": delete_after_min,
                 "delete_screenshot_after_min": delete_screenshot_after_min,
                 "queue": queue,
@@ -1825,6 +2009,70 @@ class AsyncRawSessionsClient:
                     ),
                 )
                 return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def get_session_project(
+        self, id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[SessionProject]:
+        """
+        The project a session ran in, for a caller who would see it there but is working in another project.
+
+        Parameters
+        ----------
+        id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[SessionProject]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{encode_path_param(id)}/project",
+            method="GET",
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    SessionProject,
+                    parse_obj_as(
+                        type_=SessionProject,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),
@@ -2578,6 +2826,83 @@ class AsyncRawSessionsClient:
                     ),
                 )
                 return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 422:
+                raise UnprocessableEntityError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        ErrorResponse,
+                        parse_obj_as(
+                            type_=ErrorResponse,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def judge_session_probe(
+        self, id: str, *, probe: typing.Dict[str, JsonValue], request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[SessionProbeVerdict]:
+        """
+        Judge a finished session's browser end state with a completion probe.
+
+        The session must have been created with `capture_end_state`. Answers 409 with `Retry-After` while the session
+        runs or its browser is still closing, which takes up to two minutes after the session ends.
+
+        Parameters
+        ----------
+        id : str
+
+        probe : typing.Dict[str, JsonValue]
+            A hai-probes CompletionProbe: a call the page must make and what its localStorage must hold. The session must have been created with `capture_end_state`.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[SessionProbeVerdict]
+            Successful Response
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            f"api/v2/sessions/{encode_path_param(id)}/probe",
+            method="POST",
+            json={
+                "probe": probe,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    SessionProbeVerdict,
+                    parse_obj_as(
+                        type_=SessionProbeVerdict,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 409:
+                raise ConflictError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
             if _response.status_code == 422:
                 raise UnprocessableEntityError(
                     headers=dict(_response.headers),

@@ -23,6 +23,7 @@ from .core.api_error import ApiError
 from .core.request_options import RequestOptions
 from .sessions import SendSessionMessagesRequestBody_UserMessage
 from .tools import Tool, ToolInput, as_tools
+from .types.connected_server import ConnectedServer
 from .types.session_request_agent import SessionRequestAgent
 from .types.session_request_messages import SessionRequestMessages
 from .types.session_changes import SessionChanges
@@ -83,6 +84,8 @@ class CreateSessionParams(typing_extensions.TypedDict, total=False):
     """
 
     agent: typing_extensions.Required[SessionRequestAgent]
+    capture_end_state: typing.Optional[bool]
+    workflow_type: typing.Optional[str]
     idempotency_key: typing.Optional[str]
     messages: typing.Optional[SessionRequestMessages]
     overrides: typing.Optional[typing.Dict[str, typing.Any]]
@@ -92,6 +95,7 @@ class CreateSessionParams(typing_extensions.TypedDict, total=False):
     group_id: typing.Optional[str]
     parent_session_id: typing.Optional[str]
     timezone: typing.Optional[str]
+    connections: typing.Optional[typing.Sequence[ConnectedServer]]
     delete_after_min: typing.Optional[int]
     delete_screenshot_after_min: typing.Optional[int]
     queue: typing.Optional[bool]

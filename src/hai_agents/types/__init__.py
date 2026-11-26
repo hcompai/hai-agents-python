@@ -46,7 +46,6 @@ if typing.TYPE_CHECKING:
     from .attachment_data_origin import AttachmentDataOrigin
     from .attachment_event import AttachmentEvent
     from .browser import Browser
-    from .browser_host import BrowserHost
     from .browser_mode import BrowserMode, BrowserMode_Text, BrowserMode_Visual
     from .browser_network import BrowserNetwork
     from .browser_profile_list import BrowserProfileList
@@ -54,6 +53,7 @@ if typing.TYPE_CHECKING:
     from .browser_text_mode import BrowserTextMode
     from .browser_visual_mode import BrowserVisualMode
     from .catalog_revision_ref import CatalogRevisionRef
+    from .connected_server import ConnectedServer
     from .cron_timing import CronTiming
     from .cron_timing_type import CronTimingType
     from .dependency_revisions import DependencyRevisions
@@ -161,6 +161,9 @@ if typing.TYPE_CHECKING:
         SessionEventZero_ToolApprovalRequestedEvent,
     )
     from .session_flag import SessionFlag
+    from .session_probe_verdict import SessionProbeVerdict
+    from .session_probe_verdict_outcome import SessionProbeVerdictOutcome
+    from .session_project import SessionProject
     from .session_request import SessionRequest
     from .session_request_agent import SessionRequestAgent
     from .session_request_messages import SessionRequestMessages
@@ -258,7 +261,6 @@ _dynamic_imports: typing.Dict[str, str] = {
     "AttachmentDataOrigin": ".attachment_data_origin",
     "AttachmentEvent": ".attachment_event",
     "Browser": ".browser",
-    "BrowserHost": ".browser_host",
     "BrowserMode": ".browser_mode",
     "BrowserMode_Text": ".browser_mode",
     "BrowserMode_Visual": ".browser_mode",
@@ -268,6 +270,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "BrowserTextMode": ".browser_text_mode",
     "BrowserVisualMode": ".browser_visual_mode",
     "CatalogRevisionRef": ".catalog_revision_ref",
+    "ConnectedServer": ".connected_server",
     "CronTiming": ".cron_timing",
     "CronTimingType": ".cron_timing_type",
     "DependencyRevisions": ".dependency_revisions",
@@ -373,6 +376,9 @@ _dynamic_imports: typing.Dict[str, str] = {
     "SessionEventZero_ToolApprovalDecidedEvent": ".session_event_zero",
     "SessionEventZero_ToolApprovalRequestedEvent": ".session_event_zero",
     "SessionFlag": ".session_flag",
+    "SessionProbeVerdict": ".session_probe_verdict",
+    "SessionProbeVerdictOutcome": ".session_probe_verdict_outcome",
+    "SessionProject": ".session_project",
     "SessionRequest": ".session_request",
     "SessionRequestAgent": ".session_request_agent",
     "SessionRequestMessages": ".session_request_messages",
@@ -490,7 +496,6 @@ __all__ = [
     "AttachmentDataOrigin",
     "AttachmentEvent",
     "Browser",
-    "BrowserHost",
     "BrowserMode",
     "BrowserMode_Text",
     "BrowserMode_Visual",
@@ -500,6 +505,7 @@ __all__ = [
     "BrowserTextMode",
     "BrowserVisualMode",
     "CatalogRevisionRef",
+    "ConnectedServer",
     "CronTiming",
     "CronTimingType",
     "DependencyRevisions",
@@ -605,6 +611,9 @@ __all__ = [
     "SessionEventZero_ToolApprovalDecidedEvent",
     "SessionEventZero_ToolApprovalRequestedEvent",
     "SessionFlag",
+    "SessionProbeVerdict",
+    "SessionProbeVerdictOutcome",
+    "SessionProject",
     "SessionRequest",
     "SessionRequestAgent",
     "SessionRequestMessages",
