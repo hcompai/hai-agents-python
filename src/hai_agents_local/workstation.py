@@ -20,10 +20,11 @@ from hai_agents.client import credentials_path
 
 from .bridge import LocalBridge, TokenSource
 from .config import machine_allowlist, refuse_unread_settings, shell_sandbox
+from .connections import Connection, connections_path, load_connections
 from .desktop import ensure_macos_input_permissions
-from .runtime.errors import LocalRuntimeError
-from .runtime.install import install_artifact
-from .runtime.manifest import RuntimeArtifact, platform_key
+from .mcporter import shell_tools
+from .resolver import Resolver
+from .runtime.install import install_pinned
 from .transport import Json, serialize_result
 
 if TYPE_CHECKING:
@@ -51,6 +52,8 @@ STARTER_ALLOWLIST = """\
 # Commands the agent runs on this machine without asking, one prefix a line. Any other waits for your approval.
 # `cua` sees and drives this screen: its clicks and keys do whatever you can do here, outside any sandbox.
 cua
+# `mcporter list` names the MCP servers in mcp.json, beside this file, and their tools: it reads, and changes nothing.
+mcporter list
 """
 STARTER_REGISTRIES = ["pypi.org", "files.pythonhosted.org", "registry.npmjs.org"]
 STARTER_SECRETS = [
@@ -114,6 +117,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         allowed_domains: Sequence[str] = (),
         writable_folders: Sequence[str] = (),
         only: Sequence[str] = (),
+        connections: Sequence[Connection] | None = None,
     ) -> None:
         """Build the bridge.
 
@@ -144,6 +148,8 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             writable_folders: Folders the built-in rules let commands write besides the workspace.
             only: Programs the shell runs, refusing every other command with no approval to wait for; the
                 allowlists and the sandbox then do not apply, and the bridge leaves the screen to other agents.
+            connections: The MCP servers the shell reaches with ``mcporter``; defaults to ``mcp.json`` beside the
+                stored credentials, and to none with ``only``. An app with its own servers passes ``[]``.
 
         Under either, the agent's file tools stay inside the workspace.
         """
@@ -170,6 +176,10 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
         self._sandbox_asked = bool(sandbox or require_sandbox)
         self.allowed_domains, self.writable_folders = list(allowed_domains), list(writable_folders)
         self._starter: tempfile.TemporaryDirectory[str] | None = None
+        self._mcporter: tempfile.TemporaryDirectory[str] | None = None
+        self._resolver: Resolver | None = None
+        self.connections = list(connections) if connections is not None else [] if self.only else load_connections()
+        """This machine's MCP servers, served to the shell and named in the session request."""
 
     def preflight(self) -> None:
         _keep_off_path(self.workspace, ["srt"] if self.sandbox else [])
@@ -204,6 +214,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             "WEB_SESSION": self.session_id,
             "PATH": tools,
         }
+        resolver = self._serve_connections(environment)
         policy: CommandPolicy | None = None
         allowed: Path | None = None
         sandbox = None
@@ -219,6 +230,10 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             policy = Allowlist(allowed, also=self.allowed_commands)
             logger.info("commands outside %s wait for approval", allowed)
         srt = self._sandbox_runtime()
+        if resolver and not srt:
+            raise RuntimeError(
+                f"MCP servers need the sandbox, so their keys stay out of the agent's shell. {SANDBOX_HINT}"
+            )
         if srt:
             from hai_drivers.code_sandbox.local.sandbox_runtime import SandboxRuntime
 
@@ -241,18 +256,34 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             if settings.exists():
                 rules = f"the rules in {settings}"
                 rules += f", which decide alone: the agent's asks to {' and '.join(asked)} are not added" * bool(asked)
+                if resolver:
+                    rules += f", and reach this machine's MCP servers at {resolver.host}"
+                    _refuse_a_guard_in(self.workspace, settings)
+                    owned = json.loads(settings.read_text(encoding="utf-8"))
+                    settings = self._starter_settings(
+                        config,
+                        _with_resolver(
+                            owned,
+                            resolver,
+                            passed=self.environment_variables,
+                        ),
+                    )
             else:
                 rules = "the built-in rules" + f", and may {' and '.join(asked)} as the agent asks" * bool(asked)
                 rules += f"; a {settings} replaces them"
-                # A folder: Windows opens a temporary file a second time for nobody while it is open. Beside the stored
-                # credentials where the system's temporary folder is in the workspace, and a command could write it.
-                elsewhere = config if _holds(self.workspace, Path(tempfile.gettempdir())) else None
-                if elsewhere:
-                    elsewhere.mkdir(parents=True, exist_ok=True, mode=0o700)
-                self._starter = tempfile.TemporaryDirectory(prefix="hai-sandbox-", dir=elsewhere)
-                settings = Path(self._starter.name) / "sandbox.json"
                 built_in = _starter_sandbox(self.environment_variables, self.allowed_domains)
-                settings.write_text(json.dumps(built_in), encoding="utf-8")
+                settings = self._starter_settings(
+                    config,
+                    (
+                        _with_resolver(
+                            built_in,
+                            resolver,
+                            passed=self.environment_variables,
+                        )
+                        if resolver
+                        else built_in
+                    ),
+                )
                 host["writable"] = [*host.get("writable", []), *map(Path, self.writable_folders)]
             _refuse_a_guard_in(self.workspace, settings)
             sandbox = SandboxRuntime(settings, protected=protected, program=srt, **host)
@@ -269,6 +300,39 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
             sandbox=sandbox,
             folders=[_cua({**os.environ, **environment}).state()],
         )
+
+    async def run(self) -> None:
+        try:
+            await super().run()
+        finally:
+            await asyncio.to_thread(self._stop_connections)
+
+    def _serve_connections(self, environment: dict[str, str]) -> Resolver | None:
+        """Serve this machine's MCP servers to the shell's `mcporter`; None where it has none."""
+        if not self.connections:
+            return None
+        self._resolver = Resolver(self.connections)
+        self._resolver.start()
+        folder = _private_temp(self.workspace)
+        self._mcporter = tempfile.TemporaryDirectory(prefix="hai-mcp-", dir=folder)
+        variables, tools = shell_tools(Path(self._mcporter.name), self._resolver)
+        environment.update(variables)
+        environment["PATH"] = os.pathsep.join([str(tools), environment["PATH"]])
+        return self._resolver
+
+    def _stop_connections(self) -> None:
+        resolver, self._resolver = self._resolver, None
+        if resolver is not None:
+            resolver.stop()
+        folder, self._mcporter = self._mcporter, None
+        if folder is not None:
+            folder.cleanup()
+
+    def _starter_settings(self, config: Path, rules: Mapping[str, Any]) -> Path:
+        self._starter = tempfile.TemporaryDirectory(prefix="hai-sandbox-", dir=_private_temp(self.workspace))
+        settings = Path(self._starter.name) / "sandbox.json"
+        settings.write_text(json.dumps(rules), encoding="utf-8")
+        return settings
 
     def _sandbox_runtime(self) -> str | None:
         """This machine's `srt`; None where commands run unconfined."""
@@ -409,21 +473,48 @@ def _sandbox_runtime(workspace: Path) -> str:
 
 
 def _pinned_sandbox_runtime() -> Path | None:
-    """The pinned `srt` under `SRT_HOME`, downloaded where a build of it is published; None where there is none."""
-    home, platform = SRT_HOME / SRT_VERSION, platform_key()
-    if _srt_in(home) or platform not in SRT_SHA256:
-        return _srt_in(home)
-    logger.warning("downloading the sandbox for shell commands into %s, once", home)
-    artifact = RuntimeArtifact(url=f"{SRT_CDN}/{SRT_VERSION}/srt-{platform}.zip", sha256=SRT_SHA256[platform])
-    try:
-        return install_artifact(artifact, home, _srt_in, "sandbox-runtime")
-    except (LocalRuntimeError, OSError) as error:
-        logger.warning("%s", error)
+    return install_pinned(
+        "srt", SRT_HOME / SRT_VERSION, SRT_SHA256, lambda platform: f"{SRT_CDN}/{SRT_VERSION}/srt-{platform}.zip"
+    )
+
+
+def _private_temp(workspace: Path) -> Path | None:
+    """Where a session's own temporary files go: the system's folder, else under ``~/.hai/tmp``.
+
+    A folder, as Windows opens a temporary file a second time for nobody while it is open. Not beside the stored
+    credentials: that tree is deny-read, and ``mcporter`` must read its own config from here."""
+    if not _holds(workspace, Path(tempfile.gettempdir())):
         return None
+    folder = Path.home() / ".hai" / "tmp"
+    folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return folder
 
 
-def _srt_in(home: Path) -> Path | None:
-    return home / "srt" if (home / "srt").is_file() else None
+def _with_resolver(
+    rules: Mapping[str, Any],
+    resolver: Resolver,
+    *,
+    passed: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """`rules` that also let commands reach `resolver`, and never read the keys of the servers it serves.
+
+    Always applies the built-in secret-env scrub, even when the user owns ``sandbox.json``.
+    """
+    passed = dict(passed or ())
+    network, filesystem = dict(rules.get("network") or {}), dict(rules.get("filesystem") or {})
+    credentials = dict(rules.get("credentials") or {})
+    network["allowedDomains"] = [*network.get("allowedDomains", []), resolver.host]
+    denied = [str(connections_path()), str(credentials_path())]
+    filesystem["denyRead"] = [*filesystem.get("denyRead", []), *denied]
+    keys = sorted({name for connection in resolver.connections.values() for name in connection.variables})
+    tokens = sorted(
+        name
+        for name, value in os.environ.items()
+        if name not in passed and (_SECRET_NAME.search(name) or _SECRET_URL.search(value))
+    )
+    scrub = [*({"name": name, "mode": "deny"} for name in dict.fromkeys([*keys, *tokens]))]
+    credentials["envVars"] = [*credentials.get("envVars", []), *scrub]
+    return {**rules, "network": network, "filesystem": filesystem, "credentials": credentials}
 
 
 def _starter_sandbox(passed: Mapping[str, str], domains: Sequence[str] = ()) -> dict[str, object]:

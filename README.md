@@ -128,6 +128,7 @@ An agent that drives this desktop, like `h/holo-desktop`, uses your mouse and ke
 | `holo agents` | `list` agents, `get` one, `use` one as the default |
 | `holo skills` | browse available skills |
 | `holo mcp install` | let Cursor, Claude Code, Codex, and other MCP clients run agents through `holo mcp`; `--remote` adds the hosted server instead |
+| `holo connections` | `add`, `import` the MCP servers a shell on this machine reaches; `--check` them |
 | `holo local` | serve a desktop on this machine for a session started elsewhere |
 | `holo login`, `logout`, `whoami`, `doctor` | manage and check your credentials and setup |
 
@@ -390,6 +391,30 @@ machine has it: it writes in the workspace only, reaches the Python and npm regi
 credentials. macOS downloads it on the first session; Linux and Windows run commands as you until you install it.
 `--no-sandbox`, or `sandbox=False` in `run_session` and `start_session`, turns it off. The
 [guide](https://hub.hcompany.ai/agents-api/your-desktop/shell-mode) covers both.
+
+#### MCP servers
+
+The agent's shell reaches the MCP servers in `~/.config/hai/mcp.json`, Cursor's `mcpServers` format, with
+`mcporter`:
+
+```bash
+holo connections add linear https://mcp.linear.app/mcp -H 'Authorization: Bearer ${LINEAR_KEY}'
+holo connections add files -- npx -y @modelcontextprotocol/server-filesystem ~/Documents
+holo connections import cursor          # or claude, claude-desktop
+holo connections --check                # each server and its tools
+```
+
+```bash
+# what the agent runs in its shell
+mcporter list files
+mcporter call files.list_directory path=~/Documents > listing.txt
+```
+
+`${VAR}` reads a variable from the environment, else from `~/.config/hai/.env`. The keys stay on this machine,
+out of the agent's shell: this process serves each server on a loopback port the sandbox opens for it alone, starts
+the stdio ones itself, and the shell's `mcporter` config names only that port and the session's token. The sandbox
+cannot read `mcp.json`, the `.env`, or the variables they name. `mcporter` is the one on `PATH`, else macOS
+downloads it on the first session; elsewhere, `npm install -g mcporter`.
 
 ### Inspect and share sessions
 

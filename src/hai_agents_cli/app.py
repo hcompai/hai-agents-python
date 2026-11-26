@@ -16,6 +16,7 @@ import threading
 import time
 import webbrowser
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
@@ -71,6 +72,7 @@ sessions_app = typer.Typer(no_args_is_help=True, help="Inspect and steer session
 agents_app = typer.Typer(no_args_is_help=True, help="Browse available agents.")
 skills_app = typer.Typer(no_args_is_help=True, help="Browse available skills.")
 mcp_app = typer.Typer()
+connections_app = typer.Typer(help="Manage the MCP servers agents reach from a shell on this machine.")
 local_app = typer.Typer(
     no_args_is_help=True,
     help="Manually run the local desktop bridge. Only needed when the session is started "
@@ -1616,6 +1618,156 @@ def local_desktop(
     )
 
 
+IMPORT_SOURCES = {
+    "cursor": "~/.cursor/mcp.json",
+    "claude": "~/.claude.json",
+    "claude-desktop": mcp_hosts.user_config_path("Claude", "claude_desktop_config.json"),
+}
+
+
+@connections_app.callback(invoke_without_command=True)
+def connections_list(
+    ctx: typer.Context,
+    check: bool = typer.Option(False, "--check", help="Connect to each server and count its tools."),
+) -> None:
+    """List the MCP servers in mcp.json, which agents with a shell on this machine reach with `mcporter`."""
+    if ctx.invoked_subcommand is not None:
+        return
+    from hai_agents_local.connections import connections_path, load_connections_report, read_servers
+
+    path = connections_path()
+    try:
+        servers, (found, skipped) = read_servers(path), load_connections_report(path)
+    except ValueError as exc:
+        _raise_cli_error(exc)
+    reached: dict[str, Any] = {name: ValueError(why) for name, why in skipped.items()}
+    if check and found:
+        from hai_agents_local.resolver import check as check_servers
+
+        reached.update(check_servers(found))
+    rows = [
+        {
+            "name": name,
+            "target": spec.get("url") or " ".join([spec.get("command", ""), *spec.get("args", [])]),
+            **({"description": text} if (text := " ".join(str(spec["description"]).split()) if spec.get("description") else "") else {}),
+            **({"tools": reached[name]} if isinstance(reached.get(name), list) else {}),
+            **({"error": str(reached[name])} if isinstance(reached.get(name), BaseException) else {}),
+        }
+        for name, spec in servers.items()
+        if isinstance(spec, dict)
+    ]
+    if _state(ctx).json_output:
+        _print_json(rows)
+        return
+    if not rows:
+        console.print(f"No MCP servers in {escape(str(path))}. Add one: holo connections add <name> <url>")
+        return
+    for row in rows:
+        status = ""
+        if "tools" in row:
+            count = len(row["tools"])
+            status = f"  [ok]{ui.DONE}[/ok] {count} tool{'s' * (count != 1)}"
+        elif "error" in row:
+            status = f"  [fail]{ui.FAILED}[/fail] {escape(row['error'])}"
+        hint = f"  [meta]{escape(row['description'])}[/meta]" if row.get("description") else ""
+        console.print(f"  [key]{escape(row['name'])}[/key]{hint}  [meta]{escape(row['target'])}[/meta]{status}")
+    console.print(f"\n  [meta]{escape(str(path))}[/meta]")
+
+
+@connections_app.command("add")
+def connections_add(
+    name: str = typer.Argument(..., help="The name the agent calls it by: `mcporter call <name>.<tool>`."),
+    target: list[str] = typer.Argument(..., help="A URL, or after `--` a command and its arguments."),
+    header: list[str] = typer.Option(
+        [], "--header", "-H", help="'Name: value' sent to a URL. ${VAR} reads a variable."
+    ),
+    env: list[str] = typer.Option([], "--env", "-e", help="NAME=value set for a command. ${VAR} reads a variable."),
+    description: str | None = typer.Option(
+        None, "--description", "-d", help="Short hint for the agent when the name alone is opaque."
+    ),
+    force: bool = typer.Option(False, "--force", help="Replace a server of that name."),
+) -> None:
+    """Add an MCP server to mcp.json. Its keys stay on this machine, out of the agent's shell.
+
+    \b
+    holo connections add linear https://mcp.linear.app/mcp -H 'Authorization: Bearer ${LINEAR_KEY}'
+    holo connections add files -- npx -y @modelcontextprotocol/server-filesystem ~/Documents
+    """
+    from hai_agents_local.connections import check_name, connections_path, read_servers
+
+    path = connections_path()
+    try:
+        check_name(name)
+        servers = read_servers(path)
+        if name in servers and not force:
+            raise ValueError(f"{name} is already in {path}; --force replaces it")
+        if target[0].startswith(("http://", "https://")) and len(target) == 1:
+            spec: dict[str, Any] = {"url": target[0]}
+            if header:
+                spec["headers"] = dict(_pair(item, ":") for item in header)
+        else:
+            spec = {"command": target[0], "args": target[1:]}
+            if env:
+                spec["env"] = dict(_pair(item, "=") for item in env)
+        if description and (text := " ".join(description.split())):
+            spec["description"] = text
+        _save_servers({**servers, name: spec}, path)
+    except ValueError as exc:
+        _raise_cli_error(exc)
+    console.print(f"[ok]{ui.DONE}[/ok] {escape(name)} added to {escape(str(path))}")
+
+
+@connections_app.command("import")
+def connections_import(
+    source: str = typer.Argument(..., help=f"Where from: {', '.join(IMPORT_SOURCES)}."),
+    force: bool = typer.Option(False, "--force", help="Replace servers of the same names."),
+) -> None:
+    """Copy the MCP servers another app is set up with into mcp.json; sign-ins stay with that app."""
+    from hai_agents_local.connections import check_name, connections_path, read_servers
+
+    if source not in IMPORT_SOURCES:
+        _raise_cli_error(ValueError(f"unknown source {source!r}: one of {', '.join(IMPORT_SOURCES)}"))
+    origin, path = Path(IMPORT_SOURCES[source]).expanduser(), connections_path()
+    own = {mcp_hosts.SERVER_NAME, mcp_hosts.STDIO_SERVER_NAME}
+    try:
+        servers, theirs = read_servers(path), read_servers(origin)
+        taken, bad = {}, []
+        for name, spec in theirs.items():
+            if name in own or (name in servers and not force):
+                continue
+            try:
+                check_name(name)
+            except ValueError:
+                bad.append(name)
+                continue
+            taken[name] = spec
+        if taken:
+            _save_servers({**servers, **taken}, path)
+    except ValueError as exc:
+        _raise_cli_error(exc)
+    left = sorted(set(theirs) - set(taken) - own - set(bad))
+    console.print(
+        f"[ok]{ui.DONE}[/ok] imported {', '.join(map(escape, taken)) or 'nothing'} from {escape(str(origin))}"
+    )
+    if left:
+        console.print(f"  [meta]already in mcp.json, kept: {escape(', '.join(left))}; --force replaces them[/meta]")
+    if bad:
+        console.print(f"  [meta]skipped (invalid name for mcporter): {escape(', '.join(bad))}[/meta]")
+
+
+def _save_servers(servers: dict[str, Any], path: Path) -> None:
+    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    mcp_hosts._atomic_write_secret(path, json.dumps({**data, "mcpServers": servers}, indent=2) + "\n")
+
+
+def _pair(item: str, separator: str) -> tuple[str, str]:
+    key, found, value = item.partition(separator)
+    if not found or not key.strip():
+        raise ValueError(f"{item!r} is not 'name{separator} value'")
+    return key.strip(), value.strip()
+
+
 @local_app.command("stop")
 def local_stop() -> None:
     """Stop any in-flight local desktop turn on this machine (same effect as double-Esc)."""
@@ -1701,6 +1853,7 @@ app.add_typer(agents_app, name="agents")
 app.add_typer(skills_app, name="skills")
 app.add_typer(mcp_app, name="mcp")
 app.add_typer(local_app, name="local")
+app.add_typer(connections_app, name="connections")
 
 
 _GLOBAL_FLAGS = ("--json",)
