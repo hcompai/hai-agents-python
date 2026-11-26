@@ -19,6 +19,7 @@ import tempfile
 import threading
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from datetime import timedelta
 from typing import Any
 
 from .connections import Connection, connections_path
@@ -41,7 +42,6 @@ _SIGN_IN = re.compile(
 )
 
 _Transport = Callable[[], AbstractAsyncContextManager[Any]]
-_Request = tuple[str, dict[str, Any], "asyncio.Future[Any]"]
 
 
 class Resolver:
@@ -229,44 +229,45 @@ def check(connections: Sequence[Connection]) -> dict[str, list[str] | BaseExcept
 
 
 class _Upstream:
-    """One server, owned by one task: anyio refuses to unwind a transport in a task other than the one that entered it."""
+    """One server's session, entered and left by one task: anyio refuses to unwind a transport in another task."""
 
     def __init__(self, transport: _Transport) -> None:
         self._transport = transport
-        self._requests: asyncio.Queue[_Request | None] = asyncio.Queue()
-        self._ready: asyncio.Future[list[Any]] = asyncio.get_running_loop().create_future()
+        self._ready: asyncio.Future[tuple[Any, list[Any]]] = asyncio.get_running_loop().create_future()
+        self._stop = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
 
     @property
     def alive(self) -> bool:
-        return self._task is not None and not self._task.done()
+        return self._task is not None and not self._task.done() and not self._stop.is_set()
 
     async def open(self) -> list[Any]:
         self._task = asyncio.create_task(self._serve())
         try:
-            return await asyncio.wait_for(asyncio.shield(self._ready), CONNECT_S)
+            _, tools = await asyncio.wait_for(asyncio.shield(self._ready), CONNECT_S)
         except BaseException:
             await self.close()
             raise
+        return tools
 
     async def call(self, tool: str, arguments: dict[str, Any]) -> Any:
-        serving = self._task
-        if serving is None or serving.done():
+        from mcp.shared.exceptions import McpError
+        from mcp.types import CONNECTION_CLOSED
+
+        if not self.alive:
             raise ConnectionError(CLOSED)
-        answer: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
+        session, _ = self._ready.result()
         try:
-            await self._requests.put((tool, arguments, answer))
-            done, _ = await asyncio.wait({answer, serving}, timeout=CALL_S, return_when=asyncio.FIRST_COMPLETED)
-            if answer in done:
-                return answer.result()
-            raise ConnectionError(CLOSED) if done else TimeoutError(f"no answer in {CALL_S:.0f} s")
-        finally:
-            answer.cancel()
+            return await session.call_tool(tool, arguments, read_timeout_seconds=timedelta(seconds=CALL_S))
+        except McpError as error:
+            if error.error.code == CONNECTION_CLOSED:
+                self._stop.set()
+            raise
 
     async def close(self) -> None:
         if self._task is None:
             return
-        await self._requests.put(None)
+        self._stop.set()
         try:
             await asyncio.wait_for(self._task, CONNECT_S)
         except (TimeoutError, asyncio.TimeoutError, asyncio.CancelledError):
@@ -278,27 +279,13 @@ class _Upstream:
 
     async def _serve(self) -> None:
         from mcp import ClientSession
-        from mcp.shared.exceptions import McpError
-        from mcp.types import CONNECTION_CLOSED
 
         try:
             async with self._transport() as streams, ClientSession(streams[0], streams[1]) as session:
                 await session.initialize()
                 listed = await session.list_tools()
-                if not self._ready.done():
-                    self._ready.set_result(listed.tools)
-                while (request := await self._requests.get()) is not None:
-                    tool, arguments, answer = request
-                    try:
-                        result = await session.call_tool(tool, arguments)
-                    except Exception as error:  # noqa: BLE001 - one failed call is a result, not a dead connection
-                        if not answer.done():
-                            answer.set_exception(error)
-                        if isinstance(error, McpError) and error.error.code == CONNECTION_CLOSED:
-                            return
-                        continue
-                    if not answer.done():
-                        answer.set_result(result)
+                self._ready.set_result((session, listed.tools))
+                await self._stop.wait()
         except Exception as error:  # noqa: BLE001 - the failure belongs to whoever opened the connection
             if not self._ready.done():
                 self._ready.set_exception(error)

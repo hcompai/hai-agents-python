@@ -21,6 +21,11 @@ server = FastMCP("notes")
 @server.tool()
 def add(a: int, b: int) -> str:
     return f"{a + b} {os.environ['NOTES_KEY']}"
+@server.tool()
+async def hang() -> str:
+    import asyncio
+    await asyncio.sleep(60)
+    return "late"
 server.run()
 """
 
@@ -52,9 +57,10 @@ def test_connections_fill_their_keys_and_leave_out_what_they_cannot(tmp_path, mo
 
 
 @pytest.mark.skipif(os.name == "nt", reason="the stand-in srt is a shell script")
-def test_a_shell_desktop_reaches_its_mcp_servers_through_the_resolver_alone(tmp_path, monkeypatch):
+@pytest.mark.parametrize("owned", [False, True], ids=["built-in rules", "the user's sandbox.json"])
+def test_a_shell_desktop_reaches_its_mcp_servers_through_the_resolver_alone(tmp_path, monkeypatch, owned):
     pytest.importorskip("hai_drivers.code_sandbox.local.sandbox_runtime")
-    from hai_agents_local import mcporter, workstation
+    from hai_agents_local import mcporter, resolver, workstation
 
     srt = tmp_path / "bin" / "srt"
     srt.parent.mkdir()
@@ -67,14 +73,30 @@ def test_a_shell_desktop_reaches_its_mcp_servers_through_the_resolver_alone(tmp_
     monkeypatch.setattr(workstation, "shell_sandbox", shell_sandbox)
     monkeypatch.setattr(workstation, "_host_cua", lambda environment: {})
     monkeypatch.setattr(mcporter, "mcporter", lambda: None)
+    monkeypatch.setattr(resolver, "CALL_S", 1)
     script = tmp_path / "notes.py"
     script.write_text(SERVER)
     config = tmp_path / ".config" / "hai"
     config.mkdir(parents=True)
     notes = {"command": sys.executable, "args": [str(script)], "env": {"NOTES_KEY": "${NOTES_KEY}"}}
     (config / "mcp.json").write_text(json.dumps({"mcpServers": {"notes": notes}}))
+    workspace = tmp_path / "workspace"
+    if owned:
+        rules = json.dumps(
+            {
+                "network": {"allowedDomains": [], "deniedDomains": []},
+                "filesystem": {"denyRead": [], "allowWrite": [], "denyWrite": []},
+            }
+        )
+        (config / "sandbox.json").write_text(rules)
+        workspace.mkdir()
+        (workspace / "sandbox.json").write_text(rules)
+        inside = WorkstationBridge(api_key="k", workspace=str(workspace), sandbox=str(workspace / "sandbox.json"))
+        with pytest.raises(ValueError, match="inside the workspace"), inside.create_driver():
+            pass
+        inside._stop_connections()
 
-    bridge = WorkstationBridge(api_key="k", workspace=str(tmp_path / "workspace"))
+    bridge = WorkstationBridge(api_key="k", workspace=str(workspace))
     with bridge.create_driver() as driver:
         rules = json.loads(Path(driver.execute('echo "$SRT_SETTINGS"').stdout.strip()).read_text())
         shim = driver.execute("command -v mcporter").stdout.strip()
@@ -82,12 +104,13 @@ def test_a_shell_desktop_reaches_its_mcp_servers_through_the_resolver_alone(tmp_
     resolver = bridge._resolver
     assert resolver is not None
     assert resolver.host in rules["network"]["allowedDomains"]
-    assert str(config / "mcp.json") in rules["filesystem"]["denyRead"]
+    assert {str(config / "mcp.json"), str(config / ".env")} <= set(rules["filesystem"]["denyRead"])
     assert {"name": "NOTES_KEY", "mode": "deny"} in rules["credentials"]["envVars"]
     assert Path(shim).parent != srt.parent and "secret-key" not in shown
     served = json.loads(shown)["mcpServers"]["notes"]
     url, headers = served["baseUrl"], served["headers"]
 
+    assert "could not run hang" in asyncio.run(_call(url, headers, "hang", {}))
     assert asyncio.run(_call(url, headers, "add", {"a": 2, "b": 3})) == "5 secret-key"
     assert httpx.post(url, json={}).status_code == 401
 

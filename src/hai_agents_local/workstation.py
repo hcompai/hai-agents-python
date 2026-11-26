@@ -253,6 +253,7 @@ class WorkstationBridge(LocalBridge["ManagedCodeSandboxInterface"]):
                 rules += f", which decide alone: the agent's asks to {' and '.join(asked)} are not added" * bool(asked)
                 if resolver:
                     rules += f", and reach this machine's MCP servers at {resolver.host}"
+                    _refuse_a_guard_in(self.workspace, settings)
                     owned = json.loads(settings.read_text(encoding="utf-8"))
                     settings = self._starter_settings(config, _with_resolver(owned, resolver))
             else:
@@ -482,7 +483,7 @@ def _with_resolver(rules: Mapping[str, Any], resolver: Resolver) -> dict[str, An
     network, filesystem = dict(rules.get("network") or {}), dict(rules.get("filesystem") or {})
     credentials = dict(rules.get("credentials") or {})
     network["allowedDomains"] = [*network.get("allowedDomains", []), resolver.host]
-    filesystem["denyRead"] = [*filesystem.get("denyRead", []), str(connections_path())]
+    filesystem["denyRead"] = [*filesystem.get("denyRead", []), str(connections_path()), str(credentials_path())]
     keys = sorted({name for connection in resolver.connections.values() for name in connection.variables})
     credentials["envVars"] = [*credentials.get("envVars", []), *({"name": name, "mode": "deny"} for name in keys)]
     return {**rules, "network": network, "filesystem": filesystem, "credentials": credentials}
