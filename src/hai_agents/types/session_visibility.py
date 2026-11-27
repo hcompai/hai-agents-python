@@ -21,6 +21,16 @@ class SessionVisibility(UniversalBaseModel):
     Whether the caller administers the organization: an owner, or a platform administrator.
     """
 
+    is_org_owner: bool = pydantic.Field()
+    """
+    Whether the caller owns the organization. Only a vault's creator or an organization owner can reveal its items; platform administrators who are not owners cannot.
+    """
+
+    permissions: typing.List[str] = pydantic.Field()
+    """
+    The caller's effective AgP permissions, sorted. ``agp:records:see_all``: sees and changes every member's records, as an owner does, or any member once the organization lets members see each other's sessions. ``agp:vaults:reveal_any``: reveals any vault's items, never granted by that setting.
+    """
+
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2
     else:

@@ -33,7 +33,7 @@ class RawBrowserProfilesClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[BrowserProfileList]:
         """
-        List the caller's browser profiles.
+        List the caller's browser profiles, or the whole org's for an org-wide caller.
 
         Parameters
         ----------
@@ -397,7 +397,7 @@ class RawBrowserProfilesClient:
         self, profile_id: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> HttpResponse[BrowserProfileRead]:
         """
-        Fetch a browser profile by id.
+        Fetch a browser profile by id: the caller's own, or any of the org's for an org-wide caller.
 
         Parameters
         ----------
@@ -504,7 +504,7 @@ class AsyncRawBrowserProfilesClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[BrowserProfileList]:
         """
-        List the caller's browser profiles.
+        List the caller's browser profiles, or the whole org's for an org-wide caller.
 
         Parameters
         ----------
@@ -868,7 +868,7 @@ class AsyncRawBrowserProfilesClient:
         self, profile_id: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> AsyncHttpResponse[BrowserProfileRead]:
         """
-        Fetch a browser profile by id.
+        Fetch a browser profile by id: the caller's own, or any of the org's for an org-wide caller.
 
         Parameters
         ----------
