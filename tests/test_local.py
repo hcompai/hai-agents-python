@@ -1095,7 +1095,10 @@ class TestBridgeProtocol:
         assert polls[0].extensions["timeout"]["read"] == bridge_module.LONG_POLL_READ_TIMEOUT_S
         records = [r for r in caplog.records if r.name == bridge_module.__name__]
         assert [(r.levelno, r.getMessage()) for r in records if "poll" in r.getMessage()] == [
-            (logging.INFO, "command poll got no answer within 35s; retrying in 1s")
+            (
+                logging.INFO,
+                f"command poll got no answer within {bridge_module.LONG_POLL_READ_TIMEOUT_S:.0f}s; retrying in 1s",
+            )
         ]
         assert not [r for r in records if r.levelno >= logging.WARNING]
 

@@ -223,12 +223,15 @@ class LocalBridge(ABC, Generic[DriverT]):
         retry_delay = 1.0
         recreate_channel = False
         while not self._stop_event.is_set():
+            polling = False
             try:
                 if recreate_channel:
                     await exchange.ensure_channel(self.session_id)
                     recreate_channel = False
+                polling = True
                 started = time.monotonic()
                 commands = await self._fetch_until_stop(exchange)
+                polling = False
                 retry_delay = 1.0
                 if commands:
                     await self._process_commands(exchange, commands)
@@ -258,7 +261,7 @@ class LocalBridge(ABC, Generic[DriverT]):
                     # A 4xx will not heal by waiting; surface it instead of retrying forever.
                     raise
                 # Network blips and 5xx: exponential backoff, keep serving when the platform returns.
-                if isinstance(exc, httpx.ReadTimeout):
+                if polling and isinstance(exc, httpx.ReadTimeout):
                     logger.info(
                         "command poll got no answer within %.0fs; retrying in %.0fs",
                         LONG_POLL_READ_TIMEOUT_S,
