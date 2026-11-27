@@ -18,9 +18,9 @@ from hai_agents_local.connections import load_connections
 from hai_agents_local.manager import STOP_JOIN_TIMEOUT_S
 
 SERVER = """\
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 import os
-server = FastMCP("notes")
+server = MCPServer("notes")
 @server.tool()
 def add(a: int, b: int) -> str:
     return f"{a + b} {os.environ['NOTES_KEY']}"
@@ -142,12 +142,13 @@ def test_a_shell_desktop_reaches_its_mcp_servers_through_the_resolver_alone(tmp_
 
 
 async def _call(url: str, headers: dict[str, str], tool: str, arguments: dict[str, object]) -> str:
+    import httpx2
     from mcp import ClientSession
     from mcp.client.streamable_http import streamable_http_client
 
     async with (
-        httpx.AsyncClient(headers=headers) as client,
-        streamable_http_client(url, http_client=client) as (read, write, _),
+        httpx2.AsyncClient(headers=headers) as client,
+        streamable_http_client(url, http_client=client) as (read, write),
         ClientSession(read, write) as session,
     ):
         await session.initialize()

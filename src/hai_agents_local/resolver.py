@@ -19,7 +19,6 @@ import tempfile
 import threading
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from datetime import timedelta
 from typing import Any
 
 from .connections import Connection, connections_path
@@ -122,21 +121,17 @@ class Resolver:
         from starlette.responses import JSONResponse
         from starlette.routing import Mount
 
-        server: Server[Any, Any] = Server("hai-connections")
-
-        async def list_tools(_: types.ListToolsRequest) -> types.ServerResult:
-            name = self._addressed(server)
+        async def list_tools(ctx: Any, _: types.PaginatedRequestParams | None) -> types.ListToolsResult:
+            name = self._addressed(ctx)
             await self._reach(name)
-            tools = [tool.model_copy(update={"outputSchema": None}) for tool in self._tools[name]]
-            return types.ServerResult(types.ListToolsResult(tools=tools))
+            return types.ListToolsResult(
+                tools=[tool.model_copy(update={"output_schema": None}) for tool in self._tools[name]]
+            )
 
-        async def call_tool(request: types.CallToolRequest) -> types.ServerResult:
-            name = self._addressed(server)
-            return types.ServerResult(await self._call(name, request.params.name, request.params.arguments or {}))
+        async def call_tool(ctx: Any, params: types.CallToolRequestParams) -> types.CallToolResult:
+            return await self._call(self._addressed(ctx), params.name, params.arguments or {})
 
-        # Registered by hand: the decorators cache tool definitions by name alone, across every server here.
-        server.request_handlers[types.ListToolsRequest] = list_tools
-        server.request_handlers[types.CallToolRequest] = call_tool
+        server: Server[Any] = Server("hai-connections", on_list_tools=list_tools, on_call_tool=call_tool)
         manager = StreamableHTTPSessionManager(server, json_response=True, stateless=True)
 
         async def endpoint(scope: Any, receive: Any, send: Any) -> None:
@@ -155,20 +150,18 @@ class Resolver:
 
         return Starlette(routes=[Mount("/mcp", app=endpoint)], lifespan=lifespan)
 
-    def _addressed(self, server: Any) -> str:
-        from mcp.shared.exceptions import McpError
-        from mcp.types import ErrorData
+    def _addressed(self, ctx: Any) -> str:
+        from mcp.shared.exceptions import MCPError
 
-        request = server.request_context.request
+        request = ctx.request
         name = request.url.path.rstrip("/").rsplit("/", 1)[-1] if request is not None else ""
         if name not in self.connections:
             served = ", ".join(self.connections) or "none"
-            raise McpError(ErrorData(code=REFUSED, message=f"no MCP server named {name!r} here; served: {served}"))
+            raise MCPError(REFUSED, f"no MCP server named {name!r} here; served: {served}")
         return name
 
     async def _reach(self, name: str) -> _Upstream:
-        from mcp.shared.exceptions import McpError
-        from mcp.types import ErrorData
+        from mcp.shared.exceptions import MCPError
 
         async with self._opening.setdefault(name, asyncio.Lock()):
             upstream = self._upstreams.get(name)
@@ -181,9 +174,7 @@ class Resolver:
                 self._tools[name] = await upstream.open()
             except Exception as error:  # noqa: BLE001 - an unreachable server is told to the agent
                 logger.warning("MCP server %s did not connect: %s", name, _cause(error))
-                raise McpError(
-                    ErrorData(code=REFUSED, message=f"{name} could not be reached: {_cause(error)}")
-                ) from error
+                raise MCPError(REFUSED, f"{name} could not be reached: {_cause(error)}") from error
             self._upstreams[name] = upstream
             return upstream
 
@@ -196,7 +187,7 @@ class Resolver:
         except Exception as error:  # noqa: BLE001 - the server's failure is the call's answer
             logger.warning("MCP call %s.%s failed: %s", name, tool, type(error).__name__)
             note = f"{name} could not run {tool}: {_cause(error)}"
-            return types.CallToolResult(content=[types.TextContent(type="text", text=note)], isError=True)
+            return types.CallToolResult(content=[types.TextContent(type="text", text=note)], is_error=True)
 
 
 def check(connections: Sequence[Connection]) -> dict[str, list[str] | BaseException]:
@@ -244,16 +235,16 @@ class _Upstream:
         return tools
 
     async def call(self, tool: str, arguments: dict[str, Any]) -> Any:
-        from mcp.shared.exceptions import McpError
+        from mcp.shared.exceptions import MCPError
         from mcp.types import CONNECTION_CLOSED
 
         if not self.alive:
             raise ConnectionError(CLOSED)
         session, _ = self._ready.result()
         try:
-            return await session.call_tool(tool, arguments, read_timeout_seconds=timedelta(seconds=CALL_S))
-        except McpError as error:
-            if error.error.code == CONNECTION_CLOSED:
+            return await session.call_tool(tool, arguments, read_timeout_seconds=CALL_S)
+        except MCPError as error:
+            if error.code == CONNECTION_CLOSED:
                 self._stop.set()
             raise
 
@@ -300,12 +291,12 @@ def _transport(connection: Connection) -> _Transport:
             async with sse_client(url, headers=headers, timeout=CONNECT_S, sse_read_timeout=CALL_S) as streams:
                 yield streams
             return
-        import httpx
+        import httpx2
         from mcp.client.streamable_http import streamable_http_client
 
-        timeout = httpx.Timeout(CALL_S, connect=CONNECT_S)
+        timeout = httpx2.Timeout(CALL_S, connect=CONNECT_S)
         async with (
-            httpx.AsyncClient(headers=headers, timeout=timeout, follow_redirects=False) as client,
+            httpx2.AsyncClient(headers=headers, timeout=timeout, follow_redirects=False) as client,
             streamable_http_client(url, http_client=client) as streams,
         ):
             yield streams
