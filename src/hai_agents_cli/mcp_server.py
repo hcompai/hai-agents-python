@@ -4,15 +4,19 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import json
 import os
 import signal
 import time
-from collections.abc import AsyncIterator
-from typing import Any
+import warnings
+from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Any, TypeVar
 
 import anyio
-from mcp.server.fastmcp import Context, FastMCP
+from mcp import MCPDeprecationWarning
+from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 from hai_agents import AsyncClient
 from hai_agents_common import credentials
@@ -40,7 +44,8 @@ async def _kill_switch(ctx: Context, kinds: list[str]) -> AsyncIterator[None]:
         yield
         return
     if (listener := arm_esc_listener()) is None:
-        await ctx.info(KILL_SWITCH_UNAVAILABLE_HINT)
+        await _tell(ctx, KILL_SWITCH_UNAVAILABLE_HINT)
+        await ctx.report_progress(0.0, message=KILL_SWITCH_UNAVAILABLE_HINT)
     try:
         yield
     finally:
@@ -49,7 +54,7 @@ async def _kill_switch(ctx: Context, kinds: list[str]) -> AsyncIterator[None]:
 
 
 @contextlib.asynccontextmanager
-async def _lifespan(_: FastMCP) -> AsyncIterator[dict[bool, AsyncClient]]:
+async def _lifespan(_: MCPServer) -> AsyncIterator[dict[bool, AsyncClient]]:
     clients: dict[bool, AsyncClient] = {}
     try:
         yield clients
@@ -58,7 +63,23 @@ async def _lifespan(_: FastMCP) -> AsyncIterator[dict[bool, AsyncClient]]:
             await client.aclose()
 
 
-server = FastMCP("holo", instructions=INSTRUCTIONS, lifespan=_lifespan, log_level="WARNING")
+server = MCPServer("holo", instructions=INSTRUCTIONS, lifespan=_lifespan, log_level="WARNING")
+_Tool = TypeVar("_Tool", bound=Callable[..., Awaitable[str]])
+
+
+def _told(tool: _Tool) -> _Tool:
+    """A failure reaches the host in its own words: MCPServer hides any that is not a `ToolError`."""
+
+    @functools.wraps(tool)
+    async def told(*args: Any, **kwargs: Any) -> str:
+        try:
+            return await tool(*args, **kwargs)
+        except ToolError:
+            raise
+        except Exception as error:
+            raise ToolError(str(error)) from error
+
+    return told  # type: ignore[return-value]
 
 
 async def _client(ctx: Context, local: bool = False) -> AsyncClient:
@@ -84,6 +105,7 @@ async def _start(client: AsyncClient, params: dict[str, Any]) -> Any:
 
 
 @server.tool()
+@_told
 async def run_agent(
     task: str,
     ctx: Context,
@@ -155,20 +177,34 @@ def _held(event: Any) -> bool:
 
 
 async def _report(ctx: Context, event: Any, steps: int) -> int:
-    """Log each tool call; progress notifications keep hosts from timing out a long run."""
+    """Each step's tool calls as progress, which also keeps hosts from timing out a long run."""
     kind, data, _ = ui.unwrap(event)
     if kind != "policy_event":
         return steps
+    labels = [
+        f"{verb.capitalize()} {target}".strip()
+        for verb, target in (
+            tools.label(req)
+            for req in data.get("tool_reqs") or []
+            if isinstance(req, dict) and req.get("tool_name") != "answer"
+        )
+    ]
     steps += 1
-    await ctx.report_progress(float(steps))
-    for req in data.get("tool_reqs") or []:
-        if isinstance(req, dict) and req.get("tool_name") != "answer":
-            verb, target = tools.label(req)
-            await ctx.info(f"{verb.capitalize()} {target}".strip())
+    await ctx.report_progress(float(steps), message="; ".join(labels) or None)
+    for label in labels:
+        await _tell(ctx, label)
     return steps
 
 
+async def _tell(ctx: Context, text: str) -> None:
+    """A log line, which hosts keep in view; MCP's 2026-07-28 protocol drops logging, so progress carries it too."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", MCPDeprecationWarning)
+        await ctx.info(text)
+
+
 @server.tool()
+@_told
 async def list_agents(ctx: Context, search: str | None = None) -> str:
     """Agents `run_agent` can use, one `name: description` per line."""
     page = await (await _client(ctx)).agents.list_agents(search=search, size=100)

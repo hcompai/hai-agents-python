@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `cli` and `shell` extras run on `mcp` 2 (`mcp>=2.2,<3`), so they install beside projects on `mcp` 2. `holo mcp` also reports each step's tool calls and the kill-switch hint as progress messages, for hosts on MCP's 2026-07-28 protocol, which drops logging.
 - An inline `web` environment with `host="user_device"` runs as a `desktop` in `shell` mode on the same id, whose agent drives this machine's Chrome with the `web` CLI. That shell runs `web` commands only, refuses any other, and works in `~/hai/<session_id>`. It leaves the screen to other agents and asks for no screen permission. Its fields other than `id` and `lazy` are ignored, with a warning. Install it with `pip install "hai-agents[shell]"`.
 
 ### Fixed

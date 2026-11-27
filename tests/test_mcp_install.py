@@ -165,7 +165,7 @@ def test_install_wires_this_holo_and_keeps_only_the_endpoint(monkeypatch, tmp_pa
 async def test_a_desktop_run_streams_progress_under_the_kill_switch_and_always_ends(
     monkeypatch, status, stopped, answer
 ) -> None:
-    from mcp.shared.memory import create_connected_server_and_client_session
+    from mcp import Client as McpClient
 
     from hai_agents_cli import mcp_server
 
@@ -204,19 +204,26 @@ async def test_a_desktop_run_streams_progress_under_the_kill_switch_and_always_e
 
     monkeypatch.setattr(mcp_server.credentials, "make_async_client", Client)
     progress: list[str] = []
+    logged: list[str] = []
+
+    async def on_progress(_progress, _total, message):
+        progress.append(message)
 
     async def on_log(params):
-        progress.append(params.data)
+        logged.append(params.data)
 
-    async with create_connected_server_and_client_session(mcp_server.server, logging_callback=on_log) as session:
-        result = await session.call_tool("run_agent", {"task": "open Calculator", "agent": "h/holo-desktop"})
+    async with McpClient(mcp_server.server, mode="legacy", logging_callback=on_log) as session:
+        result = await session.call_tool(
+            "run_agent", {"task": "open Calculator", "agent": "h/holo-desktop"}, progress_callback=on_progress
+        )
 
-    assert result.content[0].text.startswith(answer) and not result.isError
-    assert progress == ["Wait"] and Handle.cancelled and switch == ["armed", "disarmed"]
+    assert result.content[0].text.startswith(answer) and not result.is_error
+    assert progress == logged == ["Wait"], "hosts on logging and on the 2026-07-28 protocol both see each step"
+    assert Handle.cancelled and switch == ["armed", "disarmed"]
 
 
 async def test_a_held_call_ends_the_run_and_tells_the_host_what_waits(monkeypatch) -> None:
-    from mcp.shared.memory import create_connected_server_and_client_session
+    from mcp import Client as McpClient
 
     from hai_agents_cli import mcp_server
 
@@ -250,10 +257,10 @@ async def test_a_held_call_ends_the_run_and_tells_the_host_what_waits(monkeypatc
 
     monkeypatch.setattr(mcp_server.credentials, "make_async_client", Client)
 
-    async with create_connected_server_and_client_session(mcp_server.server) as session:
+    async with McpClient(mcp_server.server) as session:
         result = await session.call_tool("run_agent", {"task": "clean up"})
 
-    assert result.isError and "run rm -rf build" in result.content[0].text and Handle.cancelled
+    assert result.is_error and "run rm -rf build" in result.content[0].text and Handle.cancelled
 
 
 async def test_a_run_cancelled_while_its_session_is_created_cancels_that_session() -> None:
