@@ -5316,7 +5316,7 @@
           "Browser Profiles"
         ],
         "summary": "List Browser Profiles",
-        "description": "List the caller's browser profiles.",
+        "description": "List the caller's browser profiles, or the whole org's for an org-wide caller.",
         "operationId": "list_browser_profiles_api_v2_browser_profiles_get",
         "security": [
           {
@@ -5620,7 +5620,7 @@
           "Browser Profiles"
         ],
         "summary": "Get Browser Profile",
-        "description": "Fetch a browser profile by id.",
+        "description": "Fetch a browser profile by id: the caller's own, or any of the org's for an org-wide caller.",
         "operationId": "get_browser_profile_api_v2_browser_profiles__profile_id__get",
         "security": [
           {
@@ -5774,7 +5774,7 @@
           "Vaults"
         ],
         "summary": "List Vaults",
-        "description": "List the caller's org vault configs.",
+        "description": "List the org's vault configs the caller sees: every one for an org-wide caller, else those they created.",
         "operationId": "list_vaults_api_v2_vaults_get",
         "security": [
           {
@@ -6598,7 +6598,7 @@
           "Vaults"
         ],
         "summary": "Reveal Vault Item",
-        "description": "Return an internal vault item's values, with the current TOTP code in place of its seed. Audit-logged.",
+        "description": "Return an internal vault item's values, with the current TOTP code in place of its seed. Audit-logged.\n\nOnly the vault's creator or an org owner, whatever the org's run-visibility setting; never an agent.",
         "operationId": "reveal_vault_item_api_v2_vaults__vault_id__items__item_id__reveal_post",
         "security": [
           {
@@ -6640,6 +6640,16 @@
           },
           "400": {
             "description": "The vault is not an internal vault.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the vault's creator or an organization owner can reveal its items.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11565,13 +11575,28 @@
             "type": "boolean",
             "title": "Is Org Admin",
             "description": "Whether the caller administers the organization: an owner, or a platform administrator."
+          },
+          "is_org_owner": {
+            "type": "boolean",
+            "title": "Is Org Owner",
+            "description": "Whether the caller owns the organization. Only a vault's creator or an organization owner can reveal its items; platform administrators who are not owners cannot."
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Permissions",
+            "description": "The caller's effective AgP permissions, sorted. ``agp:records:see_all``: sees and changes every member's records, as an owner does, or any member once the organization lets members see each other's sessions. ``agp:vaults:reveal_any``: reveals any vault's items, never granted by that setting."
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "organization_runs",
-          "is_org_admin"
+          "is_org_admin",
+          "is_org_owner",
+          "permissions"
         ],
         "title": "SessionVisibility",
         "description": "How much of the organization's sessions the caller sees."
@@ -13301,7 +13326,7 @@
       },
       "AgentWithRevision": {
         "title": "AgentWithRevision",
-        "description": "An agent spec with its current revision number, as listed by ``GET /v2/agents?include=revision``.\n\nOnly listed, never accepted as a body: ``revision`` is not part of the spec.",
+        "description": "An agent spec with its current revision number and creator, as listed by ``GET /v2/agents?include=revision``.\n\nOnly listed, never accepted as a body: ``revision`` and ``created_by`` are not part of the spec.",
         "allOf": [
           {
             "$ref": "#/components/schemas/Agent"
@@ -13314,6 +13339,20 @@
             "minimum": 1,
             "title": "Revision",
             "type": "integer"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User who created the agent. Only they, or an organization owner (any member once the organization lets members see each other's sessions), can change it. Null on reserved ``h/`` agents.",
+            "title": "Created By"
           }
         },
         "required": [

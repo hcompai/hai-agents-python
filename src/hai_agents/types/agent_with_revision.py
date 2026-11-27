@@ -11,14 +11,19 @@ from .agent import Agent
 
 class AgentWithRevision(Agent):
     """
-    An agent spec with its current revision number, as listed by ``GET /v2/agents?include=revision``.
+    An agent spec with its current revision number and creator, as listed by ``GET /v2/agents?include=revision``.
 
-    Only listed, never accepted as a body: ``revision`` is not part of the spec.
+    Only listed, never accepted as a body: ``revision`` and ``created_by`` are not part of the spec.
     """
 
     revision: int = pydantic.Field()
     """
     Current revision number of the agent, as its ``ETag`` carries it.
+    """
+
+    created_by: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    User who created the agent. Only they, or an organization owner (any member once the organization lets members see each other's sessions), can change it. Null on reserved ``h/`` agents.
     """
 
     if IS_PYDANTIC_V2:

@@ -41,7 +41,7 @@ class VaultsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> VaultConfigList:
         """
-        List the caller's org vault configs.
+        List the org's vault configs the caller sees: every one for an org-wide caller, else those they created.
 
         Parameters
         ----------
@@ -502,6 +502,8 @@ class VaultsClient:
         """
         Return an internal vault item's values, with the current TOTP code in place of its seed. Audit-logged.
 
+        Only the vault's creator or an org owner, whatever the org's run-visibility setting; never an agent.
+
         Parameters
         ----------
         vault_id : str
@@ -555,7 +557,7 @@ class AsyncVaultsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> VaultConfigList:
         """
-        List the caller's org vault configs.
+        List the org's vault configs the caller sees: every one for an org-wide caller, else those they created.
 
         Parameters
         ----------
@@ -1115,6 +1117,8 @@ class AsyncVaultsClient:
     ) -> VaultItemValues:
         """
         Return an internal vault item's values, with the current TOTP code in place of its seed. Audit-logged.
+
+        Only the vault's creator or an org owner, whatever the org's run-visibility setting; never an agent.
 
         Parameters
         ----------
