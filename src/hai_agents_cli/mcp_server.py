@@ -9,10 +9,12 @@ import json
 import os
 import signal
 import time
+import warnings
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, TypeVar
 
 import anyio
+from mcp import MCPDeprecationWarning
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
@@ -42,6 +44,7 @@ async def _kill_switch(ctx: Context, kinds: list[str]) -> AsyncIterator[None]:
         yield
         return
     if (listener := arm_esc_listener()) is None:
+        await _tell(ctx, KILL_SWITCH_UNAVAILABLE_HINT)
         await ctx.report_progress(0.0, message=KILL_SWITCH_UNAVAILABLE_HINT)
     try:
         yield
@@ -188,7 +191,16 @@ async def _report(ctx: Context, event: Any, steps: int) -> int:
     ]
     steps += 1
     await ctx.report_progress(float(steps), message="; ".join(labels) or None)
+    for label in labels:
+        await _tell(ctx, label)
     return steps
+
+
+async def _tell(ctx: Context, text: str) -> None:
+    """A log line, which hosts keep in view; MCP's 2026-07-28 protocol drops logging, so progress carries it too."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", MCPDeprecationWarning)
+        await ctx.info(text)
 
 
 @server.tool()

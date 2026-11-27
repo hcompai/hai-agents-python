@@ -204,17 +204,22 @@ async def test_a_desktop_run_streams_progress_under_the_kill_switch_and_always_e
 
     monkeypatch.setattr(mcp_server.credentials, "make_async_client", Client)
     progress: list[str] = []
+    logged: list[str] = []
 
     async def on_progress(_progress, _total, message):
         progress.append(message)
 
-    async with McpClient(mcp_server.server) as session:
+    async def on_log(params):
+        logged.append(params.data)
+
+    async with McpClient(mcp_server.server, mode="legacy", logging_callback=on_log) as session:
         result = await session.call_tool(
             "run_agent", {"task": "open Calculator", "agent": "h/holo-desktop"}, progress_callback=on_progress
         )
 
     assert result.content[0].text.startswith(answer) and not result.is_error
-    assert progress == ["Wait"] and Handle.cancelled and switch == ["armed", "disarmed"]
+    assert progress == logged == ["Wait"], "hosts on logging and on the 2026-07-28 protocol both see each step"
+    assert Handle.cancelled and switch == ["armed", "disarmed"]
 
 
 async def test_a_held_call_ends_the_run_and_tells_the_host_what_waits(monkeypatch) -> None:
