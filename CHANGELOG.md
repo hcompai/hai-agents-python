@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A local bridge waits 35 s for a command poll the platform holds for 20 s, instead of 21 s. With 1 s of margin, about a third of polls timed out on this side, and a command the platform handed to such a poll was lost: its caller waited out the 360 s command timeout. A poll that still times out is logged at info as a timeout, not as a warning with an empty message.
 - `Client.local()` runs agents, environments and skills given by name, like `agent="h/web-surfer"` or `"environments": ["h/browser"]`. A local runtime has no catalog, so the client fetches each named spec from the platform of `HAI_API_KEY` (and `HAI_API_BASE_URL`) and sends it inline.
 
 ### Removed
