@@ -1055,6 +1055,53 @@ class TestBridgeProtocol:
         with pytest.raises(httpx.HTTPStatusError):
             await bridge._poll_loop(BadRequestExchange())
 
+    async def test_command_poll_waits_well_past_the_server_hold(self):
+        """A poll that times out here while the platform hands it a command loses that command."""
+        import hai_agents_local.bridge as bridge_module
+
+        assert bridge_module.LONG_POLL_READ_TIMEOUT_S >= bridge_module.LONG_POLL_SECONDS + 10
+
+    async def test_command_poll_read_timeout_is_logged_and_serving_goes_on(self, monkeypatch, caplog):
+        import hai_agents_local.bridge as bridge_module
+
+        bridge = _bridge(FakeDriver())
+        sleeps: list[float] = []
+
+        async def record_sleep(seconds: float) -> bool:
+            sleeps.append(seconds)
+            return False
+
+        monkeypatch.setattr(bridge, "_interruptible_sleep", record_sleep)
+        polls: list[httpx.Request] = []
+        posts: list[str] = []
+
+        def respond(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/commands"):
+                polls.append(request)
+                if len(polls) == 1:
+                    raise httpx.ReadTimeout("", request=request)
+                return httpx.Response(200, json=[_click("c1")])
+            posts.append(request.url.path.split("/")[-2])
+            bridge.request_stop()
+            return httpx.Response(200)
+
+        with caplog.at_level(logging.DEBUG, logger=bridge_module.__name__):
+            async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+                await bridge._poll_loop(CommandExchange(client, "http://test"))
+
+        assert posts == ["c1"]
+        assert sleeps == [1.0]
+        assert [poll.url.params["wait_for_seconds"] for poll in polls] == ["20", "20"]
+        assert polls[0].extensions["timeout"]["read"] == bridge_module.LONG_POLL_READ_TIMEOUT_S
+        records = [r for r in caplog.records if r.name == bridge_module.__name__]
+        assert [(r.levelno, r.getMessage()) for r in records if "poll" in r.getMessage()] == [
+            (
+                logging.INFO,
+                f"command poll got no answer within {bridge_module.LONG_POLL_READ_TIMEOUT_S:.0f}s; retrying in 1s",
+            )
+        ]
+        assert not [r for r in records if r.levelno >= logging.WARNING]
+
     async def test_post_result_auth_failure_propagates(self):
         bridge = _bridge(FakeDriver())
 

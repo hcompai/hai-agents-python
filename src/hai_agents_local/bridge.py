@@ -30,7 +30,10 @@ logger = logging.getLogger(__name__)
 TokenSource = Union[str, Callable[[], str], Callable[[], Awaitable[str]]]
 
 LONG_POLL_SECONDS = 20
-LONG_POLL_READ_TIMEOUT_S = 21.0
+# The platform holds a command poll for up to LONG_POLL_SECONDS. The client waits well past that: a command
+# handed to a poll that already timed out on this side is lost, and its caller waits out the command timeout.
+LONG_POLL_READ_TIMEOUT_MARGIN_S = 15.0
+LONG_POLL_READ_TIMEOUT_S = LONG_POLL_SECONDS + LONG_POLL_READ_TIMEOUT_MARGIN_S
 MIN_POLL_INTERVAL_S = 1.0
 POST_RESULT_TIMEOUT_S = 10.0
 POST_RESULT_RETRIES = 2
@@ -220,12 +223,15 @@ class LocalBridge(ABC, Generic[DriverT]):
         retry_delay = 1.0
         recreate_channel = False
         while not self._stop_event.is_set():
+            polling = False
             try:
                 if recreate_channel:
                     await exchange.ensure_channel(self.session_id)
                     recreate_channel = False
+                polling = True
                 started = time.monotonic()
                 commands = await self._fetch_until_stop(exchange)
+                polling = False
                 retry_delay = 1.0
                 if commands:
                     await self._process_commands(exchange, commands)
@@ -255,7 +261,16 @@ class LocalBridge(ABC, Generic[DriverT]):
                     # A 4xx will not heal by waiting; surface it instead of retrying forever.
                     raise
                 # Network blips and 5xx: exponential backoff, keep serving when the platform returns.
-                logger.warning("connection error: %s; retrying in %.0fs", exc, retry_delay)
+                if polling and isinstance(exc, httpx.ReadTimeout):
+                    logger.info(
+                        "command poll got no answer within %.0fs; retrying in %.0fs",
+                        LONG_POLL_READ_TIMEOUT_S,
+                        retry_delay,
+                    )
+                else:
+                    logger.warning(
+                        "connection error: %s; retrying in %.0fs", str(exc) or type(exc).__name__, retry_delay
+                    )
                 if await self._interruptible_sleep(retry_delay):
                     break
                 retry_delay = min(retry_delay * 2, MAX_RECONNECT_DELAY_S)
